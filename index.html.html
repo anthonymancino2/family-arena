@@ -1,0 +1,2025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Family Arena</title>
+<style>
+  :root{
+    --ink:#0e1b2a; --snow:#eef6fb; --ice:#7fd8f0; --gold:#ffcf4d;
+    --silver:#c9d6e0; --bronze:#d98a4a; --plat:#b7f0e0;
+    --danger:#ff5b5b; --panel:rgba(14,27,42,0.86);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  html,body{margin:0;height:100%;background:#050b12;color:var(--snow);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; overflow:hidden;}
+  #app{position:fixed;inset:0;background:#050b12;}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
+    justify-content:center;padding:24px;padding-top:calc(24px + env(safe-area-inset-top));
+    padding-bottom:calc(24px + env(safe-area-inset-bottom));}
+  .screen.active{display:flex;}
+  .screen.bg-arena{background:radial-gradient(ellipse at 50% 0%, #163049, #050b12 70%);}
+
+  h1.title{font-size:34px;letter-spacing:1px;margin:0 0 4px;font-weight:800;}
+  .subtitle{opacity:0.65;font-size:14px;margin-bottom:28px;}
+
+  .tokenPill{position:absolute;top:calc(14px + env(safe-area-inset-top));right:14px;
+    background:var(--panel);border:1px solid rgba(255,207,77,0.4);border-radius:999px;
+    padding:8px 14px;font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;}
+  .tokenPill .coin{width:16px;height:16px;border-radius:50%;background:var(--gold);
+    box-shadow:inset 0 0 0 2px #b8892a;}
+
+  .bigBtn{background:var(--ice);color:#052233;border:none;border-radius:16px;
+    padding:16px 36px;font-size:18px;font-weight:800;margin:8px 0;min-width:220px;}
+  .bigBtn:active{transform:scale(0.97);}
+  .ghostBtn{background:transparent;color:var(--snow);border:1px solid rgba(255,255,255,0.3);
+    border-radius:14px;padding:12px 28px;font-size:15px;font-weight:600;margin:6px 0;}
+
+  .nameRow{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;justify-content:center;}
+  .nameChip{background:var(--panel);border:1px solid rgba(255,255,255,0.15);border-radius:12px;
+    padding:10px 16px;font-weight:700;font-size:14px;}
+  .nameChip.sel{border-color:var(--ice);color:var(--ice);}
+  input#newName{background:var(--panel);border:1px solid rgba(255,255,255,0.2);color:var(--snow);
+    border-radius:12px;padding:10px 14px;font-size:14px;width:160px;text-align:center;}
+
+  .modeGrid{display:flex;flex-direction:column;gap:14px;width:100%;max-width:380px;}
+  .modeCard{background:var(--panel);border:1px solid rgba(255,255,255,0.12);border-radius:18px;
+    padding:18px;text-align:left;position:relative;}
+  .modeCard h3{margin:0 0 4px;font-size:18px;}
+  .modeCard p{margin:0;font-size:13px;opacity:0.65;}
+  .modeCard.locked{opacity:0.5;}
+  .modeCard .soon{position:absolute;top:14px;right:14px;font-size:11px;font-weight:800;
+    background:rgba(255,255,255,0.12);padding:4px 8px;border-radius:8px;}
+  .modeCard button{margin-top:12px;width:100%;}
+
+  .swatchRow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:18px;}
+  .swatch{width:40px;height:40px;border-radius:50%;border:3px solid transparent;}
+  .swatch.sel{border-color:var(--ice);}
+
+  #avatarPreview{width:120px;height:170px;position:relative;margin-bottom:8px;}
+  #avatarPreview .head{position:absolute;top:0;left:35px;width:50px;height:44px;border-radius:12px;}
+  #avatarPreview .torso{position:absolute;top:46px;left:26px;width:68px;height:66px;border-radius:14px;}
+  #avatarPreview .armL,#avatarPreview .armR{position:absolute;top:50px;width:16px;height:56px;border-radius:8px;}
+  #avatarPreview .armL{left:8px;} #avatarPreview .armR{left:96px;}
+  #avatarPreview .legL,#avatarPreview .legR{position:absolute;top:112px;width:20px;height:52px;border-radius:8px;}
+  #avatarPreview .legL{left:33px;} #avatarPreview .legR{left:67px;}
+
+  #gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
+  #hud{position:absolute;inset:0;pointer-events:none;}
+  .hitFlash{position:absolute;inset:0;background:radial-gradient(ellipse at center, rgba(255,30,30,0) 40%, rgba(255,20,20,0.55) 100%);
+    opacity:0;transition:opacity 0.12s;pointer-events:none;}
+  .hitFlash.show{opacity:1;transition:opacity 0.02s;}
+  .heartsWrap{position:absolute;top:calc(14px + env(safe-area-inset-top));left:14px;
+    background:var(--panel);border-radius:14px;padding:8px 10px;}
+  .heartsRow{display:flex;gap:5px;}
+  .heart{width:26px;height:26px;background:var(--danger);clip-path:polygon(50% 15%,61% 0,78% 0,100% 22%,100% 45%,50% 100%,0 45%,0 22%,22% 0,39% 0);
+    filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5));}
+  .heart.dead{background:rgba(255,255,255,0.15);}
+  .roundPill{position:absolute;top:calc(14px + env(safe-area-inset-top));left:50%;
+    transform:translateX(-50%);background:var(--panel);padding:8px 18px;border-radius:999px;
+    font-weight:800;font-size:14px;}
+  .toast{position:absolute;top:80px;left:50%;transform:translateX(-50%);
+    background:var(--panel);padding:10px 20px;border-radius:12px;font-weight:700;
+    opacity:0;transition:opacity 0.25s;}
+  .toast.show{opacity:1;}
+
+  .moveZone{position:absolute;left:0;top:0;bottom:0;width:45%;pointer-events:auto;}
+  .moveKnob{position:absolute;width:88px;height:88px;border-radius:50%;
+    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.22);
+    display:none;pointer-events:none;}
+  .moveKnob.active{display:block;}
+  .moveKnobDot{position:absolute;width:32px;height:32px;border-radius:50%;
+    background:rgba(255,255,255,0.4);left:28px;top:28px;pointer-events:none;}
+  .lookZone{position:absolute;right:0;top:0;bottom:0;width:55%;pointer-events:auto;}
+  .actBtn{position:absolute;bottom:calc(34px + env(safe-area-inset-bottom));right:22px;
+    width:98px;height:98px;border-radius:50%;background:rgba(255,91,91,0.85);
+    border:2px solid rgba(255,255,255,0.4);font-weight:800;font-size:15px;color:#fff;
+    pointer-events:auto;display:flex;align-items:center;justify-content:center;}
+  .jumpBtn{position:absolute;bottom:calc(150px + env(safe-area-inset-bottom));right:40px;
+    width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.15);
+    border:2px solid rgba(255,255,255,0.3);font-weight:800;font-size:11px;color:#fff;
+    pointer-events:auto;display:flex;align-items:center;justify-content:center;}
+  .camBtn{position:absolute;top:calc(56px + env(safe-area-inset-top));right:14px;
+    width:52px;height:52px;border-radius:14px;background:rgba(255,255,255,0.12);
+    border:1px solid rgba(255,255,255,0.25);font-weight:800;font-size:9px;color:#fff;
+    line-height:1.2;pointer-events:auto;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;}
+  .camBtn span{font-size:16px;}
+  .dashBtn{position:absolute;bottom:calc(48px + env(safe-area-inset-bottom));right:132px;
+    width:62px;height:62px;border-radius:50%;background:rgba(255,207,77,0.9);
+    border:2px solid rgba(255,255,255,0.4);font-weight:800;font-size:11px;color:#052233;
+    pointer-events:auto;display:flex;align-items:center;justify-content:center;
+    transition:opacity 0.15s;}
+  .dashBtn.cooling{opacity:0.3;}
+  .lookFwdBtn{position:absolute;bottom:calc(220px + env(safe-area-inset-bottom));right:40px;
+    width:56px;height:56px;border-radius:14px;background:rgba(255,255,255,0.12);
+    border:1px solid rgba(255,255,255,0.25);font-weight:800;font-size:9px;color:#fff;
+    line-height:1.2;pointer-events:auto;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;}
+  .pauseBtn{position:absolute;top:50%;left:14px;transform:translateY(-50%);
+    width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,0.14);
+    border:1px solid rgba(255,255,255,0.28);pointer-events:auto;display:flex;
+    align-items:center;justify-content:center;font-size:16px;color:#fff;letter-spacing:2px;}
+  .pauseOverlay{position:absolute;inset:0;background:rgba(5,10,18,0.85);
+    display:none;align-items:center;justify-content:center;pointer-events:auto;}
+  .pauseOverlay.show{display:flex;}
+  .pausePanel{background:var(--panel);border-radius:20px;padding:28px;
+    text-align:center;width:82%;max-width:320px;}
+  .pausePanel .bigBtn, .pausePanel .ghostBtn{width:100%;}
+
+  .resultCard{background:var(--panel);border-radius:22px;padding:28px;text-align:center;
+    width:100%;max-width:340px;}
+  .rankBadge{width:96px;height:96px;border-radius:50%;margin:0 auto 14px;display:flex;
+    align-items:center;justify-content:center;font-size:32px;font-weight:900;color:#052233;}
+  .rankBadge.bronze{background:var(--bronze);}
+  .rankBadge.silver{background:var(--silver);}
+  .rankBadge.gold{background:var(--gold);}
+  .rankBadge.platinum{background:var(--plat);}
+  .statLine{display:flex;justify-content:space-between;font-size:14px;margin:6px 0;
+    padding:0 6px;opacity:0.85;}
+  .lbRow{display:flex;justify-content:space-between;font-size:13px;padding:6px 8px;
+    border-bottom:1px solid rgba(255,255,255,0.08);}
+  .lbRow.me{color:var(--ice);font-weight:800;}
+
+  .shopGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:380px;
+    overflow-y:auto;max-height:60vh;}
+  .shopCard{background:var(--panel);border-radius:16px;padding:14px;text-align:center;}
+  .shopCard .icon{width:56px;height:56px;border-radius:14px;margin:0 auto 8px;
+    background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;
+    font-size:24px;}
+  .shopCard h4{margin:0 0 4px;font-size:13px;}
+  .shopCard .price{font-size:12px;opacity:0.7;margin-bottom:8px;}
+  .shopCard button{width:100%;padding:8px;border-radius:10px;border:none;font-weight:700;
+    font-size:12px;background:var(--ice);color:#052233;}
+  .shopCard button.owned{background:rgba(255,255,255,0.12);color:var(--snow);}
+  .shopCard button.cant{background:rgba(255,91,91,0.35);color:var(--snow);}
+
+  .themeGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:380px;
+    overflow-y:auto;max-height:56vh;margin-bottom:14px;}
+  .themeCard{background:var(--panel);border-radius:14px;padding:10px;text-align:center;
+    border:2px solid transparent;}
+  .themeCard.sel{border-color:var(--ice);}
+  .themeCard .swatch3{height:36px;border-radius:8px;margin-bottom:6px;}
+  .themeCard h4{margin:0;font-size:12px;font-weight:700;}
+
+  .backRow{position:absolute;top:calc(14px + env(safe-area-inset-top));left:14px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HOME -->
+  <div class="screen active" id="screenHome">
+    <div class="tokenPill" id="tokenPillHome"><span class="coin"></span><span id="tokenCountHome">0</span></div>
+    <h1 class="title">🏔️ Family Arena</h1>
+    <div class="subtitle">Highest rank wins the biggest reward. Nobody loses.</div>
+    <div class="nameRow" id="nameRow"></div>
+    <input id="newName" placeholder="Add player name" maxlength="14">
+    <div style="height:14px"></div>
+    <button class="bigBtn" id="btnGoModes">Play</button>
+    <button class="ghostBtn" id="btnGoShop">Token Shop</button>
+  </div>
+
+  <!-- MODE SELECT -->
+  <div class="screen" id="screenModes">
+    <div class="tokenPill"><span class="coin"></span><span id="tokenCountModes">0</span></div>
+    <div class="backRow"><button class="ghostBtn" id="backHome1">← Back</button></div>
+    <h1 class="title" style="font-size:24px;margin-bottom:18px;">Choose a mode</h1>
+    <div class="modeGrid">
+      <div class="modeCard" id="cardSurvival">
+        <h3>❄️ Zombie Survival</h3>
+        <p>Waves get bigger every round. Survive as long as you can.</p>
+        <button class="bigBtn" id="btnPlaySurvival">Play</button>
+      </div>
+      <div class="modeCard locked">
+        <div class="soon">SOON</div>
+        <h3>⚔️ Battle Royale</h3>
+        <p>Last one standing on a shrinking arena.</p>
+      </div>
+      <div class="modeCard locked">
+        <div class="soon">SOON</div>
+        <h3>🧱 Build Match</h3>
+        <p>Copy the target structure — fast and accurate.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUSTOMIZE -->
+  <div class="screen" id="screenCustomize">
+    <div class="backRow"><button class="ghostBtn" id="backHome2">← Back</button></div>
+    <h1 class="title" style="font-size:22px;">Build your avatar</h1>
+    <div id="avatarPreview">
+      <div class="head"></div><div class="torso"></div>
+      <div class="armL"></div><div class="armR"></div>
+      <div class="legL"></div><div class="legR"></div>
+    </div>
+    <div class="subtitle" style="margin-bottom:6px;">Skin tone</div>
+    <div class="swatchRow" id="skinRow"></div>
+    <div class="subtitle" style="margin-bottom:6px;">Outfit color</div>
+    <div class="swatchRow" id="outfitRow"></div>
+    <button class="bigBtn" id="btnStartGame">Choose Theme →</button>
+  </div>
+
+  <!-- THEME SELECT -->
+  <div class="screen" id="screenTheme">
+    <div class="backRow"><button class="ghostBtn" id="backCustomize">← Back</button></div>
+    <h1 class="title" style="font-size:22px;">Pick a starting theme</h1>
+    <div class="subtitle">The world changes theme every round, cycling forward from here.</div>
+    <div class="themeGrid" id="themeGrid"></div>
+    <button class="bigBtn" id="btnBeginSurvival">Begin</button>
+  </div>
+
+  <!-- GAME -->
+  <div class="screen bg-arena" id="screenGame" style="padding:0;">
+    <canvas id="gl"></canvas>
+    <div id="hud">
+      <div class="hitFlash" id="hitFlash"></div>
+      <div class="heartsWrap"><div class="heartsRow" id="heartsRow"></div></div>
+      <div class="roundPill" id="roundPill">Round 1</div>
+      <div class="toast" id="toast"></div>
+      <div class="moveZone" id="moveZone"></div>
+      <div class="moveKnob" id="moveKnob"><div class="moveKnobDot" id="moveKnobDot"></div></div>
+      <div class="lookZone" id="lookZone"></div>
+      <div class="jumpBtn" id="jumpBtn">JUMP</div>
+      <div class="actBtn" id="actBtn">FIRE</div>
+      <div class="camBtn" id="camBtn">VIEW<br><span id="camLabel">3</span></div>
+      <div class="dashBtn" id="dashBtn">DASH</div>
+      <div class="lookFwdBtn" id="lookFwdBtn">LOOK<br>FWD</div>
+      <div class="pauseBtn" id="pauseBtn">❚❚</div>
+      <div class="pauseOverlay" id="pauseOverlay">
+        <div class="pausePanel">
+          <h2 style="margin:0 0 18px;">Paused</h2>
+          <button class="bigBtn" id="btnResume">Resume</button>
+          <button class="bigBtn" id="btnRestart">Restart</button>
+          <button class="bigBtn" id="btnChangeThemeMid">Change Theme</button>
+          <button class="ghostBtn" id="btnQuitMid">Quit to Home</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="screen" id="screenResults">
+    <div class="resultCard">
+      <div class="rankBadge" id="rankBadge">?</div>
+      <h2 id="rankName" style="margin:0 0 14px;">Rank</h2>
+      <div class="statLine"><span>Rounds survived</span><span id="statRounds">0</span></div>
+      <div class="statLine"><span>Zombies defeated</span><span id="statKills">0</span></div>
+      <div class="statLine"><span>Score</span><span id="statScore">0</span></div>
+      <div class="statLine" style="color:var(--gold);font-weight:800;">
+        <span>Tokens earned</span><span id="statTokens">+0</span></div>
+      <div style="height:14px"></div>
+      <div id="lbList"></div>
+      <div style="height:10px"></div>
+      <button class="bigBtn" id="btnPlayAgain">Play Again</button>
+      <button class="ghostBtn" id="btnResultsHome">Home</button>
+    </div>
+  </div>
+
+  <!-- SHOP -->
+  <div class="screen" id="screenShop">
+    <div class="tokenPill"><span class="coin"></span><span id="tokenCountShop">0</span></div>
+    <div class="backRow"><button class="ghostBtn" id="backHome3">← Back</button></div>
+    <h1 class="title" style="font-size:22px;">Token Shop</h1>
+    <div class="subtitle">Spend tokens on new characters.</div>
+    <div class="shopGrid" id="shopGrid"></div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(function(){
+
+// ---------------------------------------------------------------------
+// STORE — all persistence goes through here. Right now it's backed by
+// localStorage. SYNC POINT for next chunk: swap the bodies of these
+// functions for Firestore reads/writes; every caller below only ever
+// calls Store.*, so no other code needs to change when that happens.
+// ---------------------------------------------------------------------
+const Store = {
+  _key(k){ return 'famarena:'+k; },
+  listProfiles(){
+    try{ return JSON.parse(localStorage.getItem(this._key('profiles'))||'[]'); }
+    catch(e){ return []; }
+  },
+  saveProfileList(list){
+    localStorage.setItem(this._key('profiles'), JSON.stringify(list));
+  },
+  getProfile(name){
+    try{
+      const raw = localStorage.getItem(this._key('profile:'+name));
+      if(!raw) return { name, tokens:0, unlocked:['human'], skin:0, outfit:0 };
+      return JSON.parse(raw);
+    }catch(e){ return { name, tokens:0, unlocked:['human'], skin:0, outfit:0 }; }
+  },
+  saveProfile(p){
+    localStorage.setItem(this._key('profile:'+p.name), JSON.stringify(p));
+  },
+  getLeaderboard(mode){
+    try{ return JSON.parse(localStorage.getItem(this._key('lb:'+mode))||'[]'); }
+    catch(e){ return []; }
+  },
+  submitScore(mode, name, score){
+    const lb = this.getLeaderboard(mode);
+    lb.push({ name, score, at: Date.now() });
+    lb.sort((a,b)=>b.score-a.score);
+    localStorage.setItem(this._key('lb:'+mode), JSON.stringify(lb.slice(0,25)));
+    return lb;
+  }
+};
+
+// ---------------------------------------------------------------------
+// APP STATE
+// ---------------------------------------------------------------------
+const SKINS = ['#f2c9a0','#c68a5a','#8d5a3c','#5a3826'];
+const OUTFITS = ['#3fa9d6','#e0533d','#4caf50','#9b59b6','#f1c40f','#ecf0f1'];
+
+let state = {
+  currentName: null,
+  skin: 0,
+  outfit: 0,
+  mode: null,
+  themeIndex: 0
+};
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function refreshTokenPills(){
+  const p = state.currentName ? Store.getProfile(state.currentName) : {tokens:0};
+  ['tokenCountHome','tokenCountModes','tokenCountShop'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.textContent = p.tokens;
+  });
+}
+
+// ---- HOME: name chips ----
+function renderNameRow(){
+  const row = document.getElementById('nameRow');
+  row.innerHTML = '';
+  const names = Store.listProfiles();
+  names.forEach(n=>{
+    const chip = document.createElement('div');
+    chip.className = 'nameChip' + (state.currentName===n ? ' sel':'');
+    chip.textContent = n;
+    chip.onclick = ()=>{ state.currentName = n; renderNameRow(); refreshTokenPills(); };
+    row.appendChild(chip);
+  });
+}
+renderNameRow();
+refreshTokenPills();
+
+document.getElementById('newName').addEventListener('keydown', e=>{
+  if(e.key === 'Enter') addName();
+});
+function addName(){
+  const input = document.getElementById('newName');
+  const name = input.value.trim();
+  if(!name) return;
+  const names = Store.listProfiles();
+  if(!names.includes(name)){
+    names.push(name);
+    Store.saveProfileList(names);
+    Store.saveProfile(Store.getProfile(name));
+  }
+  state.currentName = name;
+  input.value = '';
+  renderNameRow();
+  refreshTokenPills();
+}
+document.getElementById('newName').addEventListener('blur', addName);
+
+document.getElementById('btnGoModes').onclick = ()=>{
+  if(!state.currentName){
+    const names = Store.listProfiles();
+    if(names.length){ state.currentName = names[0]; }
+    else { alert('Add a player name first.'); return; }
+  }
+  refreshTokenPills();
+  show('screenModes');
+};
+document.getElementById('btnGoShop').onclick = ()=>{
+  if(!state.currentName){ alert('Pick a player first.'); return; }
+  renderShop();
+  show('screenShop');
+};
+document.getElementById('backHome1').onclick = ()=>show('screenHome');
+document.getElementById('backHome2').onclick = ()=>show('screenModes');
+document.getElementById('backHome3').onclick = ()=>show('screenHome');
+
+document.getElementById('btnPlaySurvival').onclick = ()=>{
+  state.mode = 'survival';
+  buildCustomizeUI();
+  show('screenCustomize');
+};
+
+// ---- CUSTOMIZE ----
+function buildCustomizeUI(){
+  const skinRow = document.getElementById('skinRow');
+  const outfitRow = document.getElementById('outfitRow');
+  skinRow.innerHTML = ''; outfitRow.innerHTML = '';
+  SKINS.forEach((c,i)=>{
+    const sw = document.createElement('div');
+    sw.className = 'swatch' + (state.skin===i?' sel':'');
+    sw.style.background = c;
+    sw.onclick = ()=>{ state.skin=i; buildCustomizeUI(); };
+    skinRow.appendChild(sw);
+  });
+  OUTFITS.forEach((c,i)=>{
+    const sw = document.createElement('div');
+    sw.className = 'swatch' + (state.outfit===i?' sel':'');
+    sw.style.background = c;
+    sw.onclick = ()=>{ state.outfit=i; buildCustomizeUI(); };
+    outfitRow.appendChild(sw);
+  });
+  const pv = document.getElementById('avatarPreview');
+  pv.querySelector('.head').style.background = SKINS[state.skin];
+  pv.querySelector('.torso').style.background = OUTFITS[state.outfit];
+  pv.querySelector('.armL').style.background = SKINS[state.skin];
+  pv.querySelector('.armR').style.background = SKINS[state.skin];
+  pv.querySelector('.legL').style.background = '#2b3a4a';
+  pv.querySelector('.legR').style.background = '#2b3a4a';
+}
+
+document.getElementById('btnStartGame').onclick = ()=>{
+  renderThemeGrid();
+  show('screenTheme');
+};
+document.getElementById('backCustomize').onclick = ()=>show('screenCustomize');
+
+function renderThemeGrid(){
+  const grid = document.getElementById('themeGrid');
+  grid.innerHTML = '';
+  THEMES.forEach((t,i)=>{
+    const card = document.createElement('div');
+    card.className = 'themeCard' + (state.themeIndex===i ? ' sel':'');
+    const swatch = `linear-gradient(90deg, #${t.sky.toString(16).padStart(6,'0')} 0 34%, #${t.ground.toString(16).padStart(6,'0')} 34% 67%, #${t.obstacle.toString(16).padStart(6,'0')} 67% 100%)`;
+    card.innerHTML = `<div class="swatch3" style="background:${swatch}"></div><h4>${t.name}</h4>`;
+    card.onclick = ()=>{ state.themeIndex = i; renderThemeGrid(); };
+    grid.appendChild(card);
+  });
+}
+
+document.getElementById('btnBeginSurvival').onclick = ()=>{
+  show('screenGame');
+  startSurvival();
+};
+
+// ---- SHOP (stub catalogue — purchase logic works now, character
+// swap into gameplay is the fresh-avatar-set hook for a later chunk) ----
+const CATALOG = [
+  { id:'knight', name:'Knight', icon:'⚔️', price:500 },
+  { id:'wizard', name:'Wizard', icon:'🧙', price:750 },
+  { id:'ranger', name:'Ranger', icon:'🏹', price:600 },
+  { id:'robot', name:'Robot', icon:'🤖', price:900 },
+];
+function renderShop(){
+  const grid = document.getElementById('shopGrid');
+  grid.innerHTML = '';
+  const p = Store.getProfile(state.currentName);
+  CATALOG.forEach(item=>{
+    const owned = p.unlocked.includes(item.id);
+    const card = document.createElement('div');
+    card.className = 'shopCard';
+    card.innerHTML = `<div class="icon">${item.icon}</div><h4>${item.name}</h4>
+      <div class="price">${item.price} tokens</div>
+      <button class="${owned?'owned':(p.tokens<item.price?'cant':'')}">
+        ${owned?'Owned':'Buy'}</button>`;
+    card.querySelector('button').onclick = ()=>{
+      if(owned) return;
+      if(p.tokens < item.price){ toast('Not enough tokens'); return; }
+      p.tokens -= item.price;
+      p.unlocked.push(item.id);
+      Store.saveProfile(p);
+      refreshTokenPills();
+      renderShop();
+    };
+    grid.appendChild(card);
+  });
+}
+
+// ---------------------------------------------------------------------
+// THREE.JS ENGINE
+// ---------------------------------------------------------------------
+let renderer, scene, camera, clock;
+let player, playerMixer = null;
+let arenaSize = 30;
+let zombies = [];
+let hearts = 3, round = 1, kills = 0, roundKillTarget = 0, roundKillsDone = 0;
+let gameRunning = false;
+let camYaw = 0, camPitch = 0.35, camDist = 7;
+let camMode = 3; // 1=POV, 2=close 3rd, 3=far 3rd, 4=wide 3rd
+const CAM_DISTS = {2:2.6, 3:5.5, 4:9.5};
+const PLAYER_SPEED = 6.5;
+const CAM_LABELS = {1:'POV', 2:'Close', 3:'Far', 4:'Wide'};
+let BULLET_GEO, BULLET_MAT, MUZZLE_GEO, MUZZLE_MAT, FX_GEO, FX_MAT_ZOMBIE, FX_MAT_DUST, FX_MAT_SPARK;
+let fx = [];
+let groundMat = null;
+let hemiLight = null, sunLight = null;
+let GROUND_TEX, OBSTACLE_TEX, TRUNK_TEX, ROCK_TEX;
+
+// Procedural canvas textures (speckle/grain patterns) rather than flat
+// colors — same technique as the original Penguin Paradise build.
+// Generated once in near-white/grey so material.color (set per theme,
+// per round) tints them; no per-round texture regeneration needed.
+function makeSpeckleTexture(base, speck, size, dots){
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = base; ctx.fillRect(0,0,size,size);
+  ctx.fillStyle = speck;
+  for(let i=0;i<dots;i++){
+    const x=Math.random()*size, y=Math.random()*size, r=0.5+Math.random()*1.3;
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = tex.minFilter = THREE.NearestFilter;
+  return tex;
+}
+function makeGrainTexture(base, line, size){
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = base; ctx.fillRect(0,0,size,size);
+  ctx.strokeStyle = line; ctx.lineWidth = 1;
+  for(let x=0;x<size;x+=3){
+    ctx.beginPath();
+    ctx.moveTo(x+Math.random()*1.5, 0);
+    ctx.lineTo(x+Math.random()*1.5, size);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = tex.minFilter = THREE.NearestFilter;
+  return tex;
+}
+function buildProceduralTextures(){
+  GROUND_TEX = makeSpeckleTexture('#d6d6ce', '#a8a698', 32, 150);
+  GROUND_TEX.repeat.set(30,30);
+  OBSTACLE_TEX = makeSpeckleTexture('#dcdcdc', '#9c9c9c', 24, 90);
+  OBSTACLE_TEX.repeat.set(3,3);
+  ROCK_TEX = makeSpeckleTexture('#cfcfcf', '#8a8a8a', 24, 110);
+  ROCK_TEX.repeat.set(2,2);
+  TRUNK_TEX = makeGrainTexture('#d8d0c4', '#a08a70', 16);
+  TRUNK_TEX.repeat.set(1,3);
+}
+let obstacleMeshes = [], obstacleBoxes = [];
+
+// ---- Theme system ----
+// Chunks 1-2 of the full theme list (20 of 100 — completes "Natural")
+// — more will be added in later chunks. Beyond colors, each theme also describes scenery
+// (trees and a water/lava/ice patch) so a theme swap actually changes
+// what the world looks like, not just its color grade.
+const THEMES = [
+  {name:'Spring', sky:0xbff0d0, ground:0xa8e8b0, obstacle:0x7ed99a,
+    trees:{count:10, trunk:0x6b4a2a, foliage:0x4caf50, style:'round'},
+    water:{color:0x4aa3d8, style:'water'},
+    grassTufts:{count:22, color:0x8fd98a},
+    rocks:{count:5, color:0xb0c9a8, style:'round'}},
+  {name:'Summer', sky:0x7ec8f0, ground:0xf5e6a8, obstacle:0xe8c468,
+    trees:{count:8, trunk:0x6b4a2a, foliage:0x3d8b3d, style:'round'},
+    water:{color:0x2e93c9, style:'water'},
+    grassTufts:{count:18, color:0xd9c468},
+    rocks:{count:6, color:0xc9a45c, style:'round'}},
+  {name:'Autumn', sky:0xf0c080, ground:0xd98a4a, obstacle:0xb5652f,
+    trees:{count:9, trunk:0x5a3a1e, foliage:0xd2691e, style:'round'},
+    water:{color:0x4a7a9c, style:'water'},
+    grassTufts:{count:16, color:0xb5652f},
+    rocks:{count:6, color:0x8a7a6a, style:'round'}},
+  {name:'Winter', sky:0xcfe8f5, ground:0xffffff, obstacle:0xb7d9e8,
+    trees:{count:8, trunk:0x5a4a3a, foliage:0xf0f8ff, style:'round'},
+    water:{color:0xd8f0fa, style:'ice'},
+    rocks:{count:8, color:0xd8e8ee, style:'round'},
+    crystals:{count:6, colors:[0xcfeffb,0xa8d8ea]},
+    weather:{count:70, color:0xffffff, size:0.09, speed:1.0, sway:0.3, opacity:0.95}},
+  {name:'Desert', sky:0xf5deb3, ground:0xedc98a, obstacle:0xc9a45c,
+    trees:{count:4, trunk:0x3a6a2a, foliage:0x4a7a3a, style:'cactus'},
+    water:{color:0x4ab5c9, style:'water'}, // small oasis
+    rocks:{count:10, color:0xc9925c, style:'spire'},
+    grassTufts:{count:6, color:0xb59a5c}},
+  {name:'Arctic', sky:0xd8f0fa, ground:0xffffff, obstacle:0xa8d8ea,
+    water:{color:0xcfeffb, style:'ice'},
+    rocks:{count:9, color:0xc9e4ee, style:'round'},
+    crystals:{count:8, colors:[0xbfe8fa,0xe8f8ff]},
+    weather:{count:55, color:0xf4fbff, size:0.08, speed:0.9, sway:0.25, opacity:0.9}},
+  {name:'Volcano', sky:0x3a1a15, ground:0x4a2018, obstacle:0xff5722,
+    water:{color:0xff4500, style:'lava'},
+    rocks:{count:12, color:0x2a1712, style:'spire'},
+    crystals:{count:7, colors:[0xff5722,0xff8a3c]},
+    glowDots:{count:14, colors:[0xff6a3c,0xffab4a]},
+    fog:{near:14, far:38}, lightDim:true},
+  {name:'Tropical Jungle', sky:0xa8e0c0, ground:0x3f7d4a, obstacle:0x2e5c38,
+    trees:{count:14, trunk:0x5a3a1e, foliage:0x1f6b2f, style:'round'},
+    water:{color:0x2e8b8b, style:'water'},
+    grassTufts:{count:20, color:0x2e6b3a},
+    rocks:{count:5, color:0x5a6b4a, style:'round'}},
+  {name:'Bamboo Forest', sky:0xcdeccb, ground:0x7fae6b, obstacle:0x4f7a3d,
+    trees:{count:16, trunk:0x8fbf5a, foliage:0x4f7a3d, style:'bamboo'},
+    water:{color:0x6fae9c, style:'water'},
+    grassTufts:{count:16, color:0x6f9a4a},
+    rocks:{count:4, color:0x7a8a6a, style:'round'}},
+  {name:'Swamp', sky:0x6b7a5e, ground:0x4a5a3a, obstacle:0x3a4a2c,
+    trees:{count:9, trunk:0x3a2e22, foliage:0x2e3a22, style:'dead'},
+    water:{color:0x33422a, style:'water', big:true},
+    rocks:{count:6, color:0x3a4232, style:'round'},
+    glowDots:{count:10, colors:[0x8fff8a,0x6fdc9a]},
+    fog:{near:14, far:40}, lightDim:true},
+
+  // Chunk 2 (11-20) — completes the "Natural" set.
+  {name:'Mountain Peaks', sky:0xb8cbe0, ground:0x8a94a0, obstacle:0x5c6670,
+    trees:{count:5, trunk:0x4a3a2a, foliage:0x2e5c3a, style:'round'},
+    water:{color:0x6fa8c9, style:'water'},
+    rocks:{count:14, color:0x7c8794, style:'spire'},
+    fog:{near:25, far:70}},
+  {name:'Canyon', sky:0xe8b48a, ground:0xc1703f, obstacle:0x96502c,
+    rocks:{count:13, color:0xb5652f, style:'spire'},
+    grassTufts:{count:5, color:0xa3814a}},
+  {name:'Ocean', sky:0x4aa3d8, ground:0xe8d9a0, obstacle:0x6a7a8a,
+    water:{color:0x1e6f9c, style:'water', big:true},
+    rocks:{count:4, color:0x7a8a8a, style:'round'}},
+  {name:'Coral Reef', sky:0x6fd0d8, ground:0xe8d9b0, obstacle:0xff9e8a,
+    coral:{count:15, colors:[0xff6f6f,0xff9e2c,0xff2e9e,0x4aeaff,0xffab6b]},
+    water:{color:0x2ea8c9, style:'water', big:true},
+    fog:{near:10, far:34}},
+  {name:'Deep Sea', sky:0x061b33, ground:0x0c2b4d, obstacle:0x123a5e,
+    rocks:{count:8, color:0x0a1f33, style:'round'},
+    glowDots:{count:22, colors:[0x4aeaff,0x7aff9e,0xff4aea,0x3ad4ff]},
+    fog:{near:6, far:20}, lightDim:true},
+  {name:'Cave', sky:0x1a1a1e, ground:0x33333a, obstacle:0x45454e,
+    rocks:{count:14, color:0x3a3a42, style:'stalagmite'},
+    fog:{near:8, far:26}, lightDim:true},
+  {name:'Crystal Cavern', sky:0x2a1f3d, ground:0x3a2a52, obstacle:0xa685e0,
+    crystals:{count:18, colors:[0xa685e0,0x6bd4ff,0xff6bd4,0xc9a0ff]},
+    rocks:{count:6, color:0x2a1f33, style:'round'},
+    fog:{near:8, far:28}, lightDim:true},
+  {name:'Floating Islands', sky:0xbfe0ff, ground:0x7ec87a, obstacle:0x5aa85a,
+    trees:{count:5, trunk:0x6b4a2a, foliage:0x5aa85a, style:'round'},
+    water:{color:0x4aa3d8, style:'water'},
+    floaters:{count:7, color:0x8fd98a}},
+  {name:'Savannah', sky:0xe8d99a, ground:0xc9a75c, obstacle:0xa3814a,
+    trees:{count:6, trunk:0x5a4a2a, foliage:0x8a9a3a, style:'round'},
+    grassTufts:{count:26, color:0xc9b45a},
+    rocks:{count:4, color:0x8a7a5a, style:'round'}},
+  {name:'Cherry Blossom Grove', sky:0xffd6e8, ground:0xffc0d8, obstacle:0xff8fb3,
+    trees:{count:14, trunk:0x5a3a2a, foliage:0xffb3d1, style:'round'},
+    water:{color:0x6fa8c9, style:'water'},
+    grassTufts:{count:10, color:0x9fd9a0},
+    weather:{count:40, color:0xffc0dd, size:0.14, speed:0.45, sway:0.12}},
+
+  // Chunk 3 (21-30) — Holiday & Events.
+  {name:'Halloween', sky:0x1a0f24, ground:0x2e1a3d, obstacle:0xff7518,
+    trees:{count:8, trunk:0x2a1a12, foliage:0x1a0f0a, style:'dead'},
+    rocks:{count:8, color:0x3a2a44, style:'round'},
+    pumpkins:{count:9},
+    glowDots:{count:14, colors:[0xff9518,0xffb347]},
+    weather:{count:30, color:0x5a3a1a, size:0.12, speed:0.5, sway:0.2, opacity:0.85},
+    fog:{near:12, far:36}, lightDim:true},
+  {name:'Christmas', sky:0x0f2e22, ground:0xffffff, obstacle:0xc0392b,
+    trees:{count:9, trunk:0x5a3a1e, foliage:0x1f6b2f, style:'christmas'},
+    rocks:{count:5, color:0xe8f4f8, style:'round'},
+    glowDots:{count:16, colors:[0xff4444,0x44ff44,0xffd700,0x4488ff]},
+    weather:{count:60, color:0xffffff, size:0.09, speed:0.9, sway:0.28, opacity:0.95}},
+  {name:'Easter', sky:0xd8f0ff, ground:0xeaffea, obstacle:0xffd6e8,
+    trees:{count:8, trunk:0x8a7a6a, foliage:0xffe0f0, style:'round'},
+    grassTufts:{count:20, color:0xb8f0c0},
+    water:{color:0xbfe8ff, style:'water'},
+    rocks:{count:5, color:0xffe0a0, style:'round'}},
+  {name:'Lunar New Year', sky:0x3a0f0f, ground:0x5c1414, obstacle:0xe0b23c,
+    rocks:{count:6, color:0x7a1a1a, style:'round'},
+    glowDots:{count:18, colors:[0xffd700,0xff4444,0xffab4a]},
+    fog:{near:16, far:44}},
+  {name:"Valentine's Day", sky:0x3d0f1e, ground:0x5c1a33, obstacle:0xff4d6d,
+    trees:{count:6, trunk:0x4a2a3a, foliage:0xff8fae, style:'round'},
+    weather:{count:35, color:0xff9ebd, size:0.13, speed:0.5, sway:0.18, opacity:0.9},
+    glowDots:{count:10, colors:[0xff6b9e,0xffb3d1]}},
+  {name:'Thanksgiving', sky:0x4a2a12, ground:0x8a5a2a, obstacle:0xc17a2e,
+    trees:{count:9, trunk:0x5a3a1e, foliage:0xd2691e, style:'round'},
+    grassTufts:{count:18, color:0xc9a45c},
+    rocks:{count:5, color:0x7a5a3a, style:'round'}},
+  {name:'Oktoberfest', sky:0x5c3a1a, ground:0x7a5a2a, obstacle:0x1e6b3a,
+    trees:{count:8, trunk:0x5a3a1e, foliage:0x2e7d3a, style:'round'},
+    grassTufts:{count:14, color:0x4a8a3a},
+    rocks:{count:5, color:0x8a6a3a, style:'round'}},
+  {name:'Day of the Dead', sky:0x1e0f2e, ground:0x3a1e4a, obstacle:0xff9e2c,
+    trees:{count:7, trunk:0x3a2a3a, foliage:0xff9e2c, style:'dead'},
+    glowDots:{count:16, colors:[0xffab4a,0xffd700,0xff6b3c]},
+    weather:{count:28, color:0xff9e2c, size:0.13, speed:0.5, sway:0.22, opacity:0.9},
+    fog:{near:14, far:38}, lightDim:true},
+  {name:'Carnival', sky:0x2e1a4a, ground:0x4a2a6b, obstacle:0xff2e9e,
+    crystals:{count:14, colors:[0xff2e9e,0xffd700,0x4aeaff,0x7aff4a,0xff6b3c]},
+    glowDots:{count:14, colors:[0xffd700,0xff2e9e,0x4aeaff]},
+    fog:{near:18, far:48}},
+  {name:"New Year's Celebration", sky:0x0a0a2e, ground:0x1a1a4a, obstacle:0xffd700,
+    glowDots:{count:20, colors:[0xffd700,0xffffff,0xffab4a]},
+    crystals:{count:10, colors:[0xffd700,0xffffff]},
+    weather:{count:35, color:0xffd700, size:0.1, speed:0.6, sway:0.3, opacity:0.9},
+    fog:{near:20, far:55}},
+
+  // Chunk 4 (31-40) — Historical.
+  {name:'Stone Age', sky:0x8a8270, ground:0x6b6350, obstacle:0x55503f,
+    trees:{count:5, trunk:0x4a3a2a, foliage:0x5a6b3a, style:'round'},
+    rocks:{count:10, color:0x8a8270, style:'spire'},
+    grassTufts:{count:10, color:0x7a8a5a}},
+  {name:'Ancient Egypt', sky:0xf0d9a0, ground:0xd9b56a, obstacle:0xb8863f,
+    pyramids:{count:3},
+    rocks:{count:6, color:0xc9a45c, style:'round'}},
+  {name:'Ancient Greece', sky:0xcfe8f0, ground:0xe0ddd0, obstacle:0xb0a99a,
+    rocks:{count:10, color:0xe8e4d8, style:'spire'},
+    water:{color:0x2e93c9, style:'water', big:true},
+    grassTufts:{count:8, color:0x8a9a5a}},
+  {name:'Roman Empire', sky:0xe8d9c0, ground:0xc9a875, obstacle:0x8a2a2a,
+    rocks:{count:9, color:0xd9c9a0, style:'spire'},
+    grassTufts:{count:10, color:0x8a9a5a}},
+  {name:'Viking Age', sky:0x6b8a9a, ground:0x4a5a5e, obstacle:0x2e3a3d,
+    trees:{count:6, trunk:0x3a2a1e, foliage:0x2e4a3a, style:'round'},
+    water:{color:0x2e5a7a, style:'water', big:true},
+    rocks:{count:9, color:0x5a6a70, style:'round'},
+    fog:{near:22, far:60}},
+  {name:'Medieval Kingdom', sky:0x8aa0b0, ground:0x6b7a5a, obstacle:0x5a4a3a,
+    trees:{count:7, trunk:0x5a3a1e, foliage:0x3a6b3a, style:'round'},
+    rocks:{count:8, color:0x7a7a72, style:'spire'},
+    water:{color:0x4a7a9c, style:'water'},
+    grassTufts:{count:12, color:0x5a8a4a}},
+  {name:'Renaissance', sky:0xd9c9a0, ground:0xb09a6b, obstacle:0x7a5a3a,
+    trees:{count:8, trunk:0x5a3a1e, foliage:0x4a7a3a, style:'round'},
+    water:{color:0x5a9ac9, style:'water'},
+    grassTufts:{count:14, color:0x6a9a4a},
+    rocks:{count:5, color:0xe0d0a0, style:'round'}},
+  {name:'Wild West', sky:0xe0b978, ground:0xc18a4a, obstacle:0x8a5a2e,
+    trees:{count:5, trunk:0x3a6a2a, foliage:0x4a7a3a, style:'cactus'},
+    rocks:{count:9, color:0xa5652f, style:'spire'},
+    grassTufts:{count:6, color:0xa38a5a}},
+  {name:'Victorian Era', sky:0x5a5a6b, ground:0x3a3a4a, obstacle:0x2a2a35,
+    trees:{count:6, trunk:0x3a2a2a, foliage:0x2e4a3a, style:'round'},
+    rocks:{count:7, color:0x4a4a55, style:'spire'},
+    glowDots:{count:10, colors:[0xffab4a,0xffd27a]},
+    fog:{near:10, far:32}, lightDim:true},
+  {name:'Industrial Revolution', sky:0x4a4a4a, ground:0x333333, obstacle:0x5c3a1a,
+    rocks:{count:8, color:0x3a3a3a, style:'spire'},
+    glowDots:{count:12, colors:[0xff6a3c,0xffab4a]},
+    fog:{near:9, far:28}, lightDim:true}
+];
+
+// Which theme applies to a given round, given the player's chosen
+// starting theme. Every round is a different theme — starts at the
+// player's pick and advances one theme per round, wrapping around
+// through however many themes are implemented so far.
+function themeForRound(round, startIndex){
+  return THEMES[(startIndex + (round-1)) % THEMES.length];
+}
+
+function applyTheme(round){
+  const theme = themeForRound(round, state.themeIndex||0);
+  // Small deterministic per-round jitter so consecutive rounds inside
+  // the same 5-round theme block still look a little different from
+  // each other, not just identical repeats.
+  const hueJitter = ((round*53) % 40 - 20) / 1000; // small hue nudge
+  const lightJitter = ((round*29) % 30 - 15) / 200; // small light nudge
+
+  const sky = new THREE.Color(theme.sky).offsetHSL(hueJitter, 0, lightJitter);
+  const ground = new THREE.Color(theme.ground).offsetHSL(hueJitter, 0, lightJitter);
+  const obstacle = new THREE.Color(theme.obstacle).offsetHSL(hueJitter, 0, lightJitter);
+
+  scene.background = sky;
+  scene.fog.color = sky;
+  const fogRange = theme.fog || {near:20, far:55};
+  scene.fog.near = fogRange.near;
+  scene.fog.far = fogRange.far;
+  groundMat.color = ground;
+
+  // Dim, moody lighting for enclosed/underwater/underground themes.
+  const dim = !!theme.lightDim;
+  hemiLight.intensity = dim ? 0.4 : 0.9;
+  sunLight.intensity = dim ? 0.25 : 0.8;
+
+  buildObstacles(obstacle);
+  buildFloaters(theme);
+  buildDecorations(theme);
+
+  document.getElementById('roundPill').textContent = 'Round '+round+' · '+theme.name;
+}
+
+// A single flexible tree builder covering every look the current
+// themes need: broadleaf ('round'), bamboo stalks, desert cactus, and
+// bare dead trees for swamp/wasteland-style themes.
+function buildTree(trunkHex, foliageHex, style){
+  const g = new THREE.Group();
+  const trunkMat = new THREE.MeshLambertMaterial({color:trunkHex, map:TRUNK_TEX});
+  if(style === 'bamboo'){
+    const h = 2.2 + Math.random()*1.3;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.1,h,6), trunkMat);
+    trunk.position.y = h/2;
+    g.add(trunk);
+    const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.3,0.5,5), new THREE.MeshLambertMaterial({color:foliageHex}));
+    tuft.position.y = h*0.88;
+    g.add(tuft);
+  } else if(style === 'cactus'){
+    const h = 1.1 + Math.random()*0.8;
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.22,h,7), trunkMat);
+    body.position.y = h/2;
+    g.add(body);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.12,0.5,6), trunkMat);
+    arm.position.set(0.22, h*0.6, 0);
+    arm.rotation.z = Math.PI/2.4;
+    g.add(arm);
+  } else if(style === 'dead'){
+    const h = 1.5 + Math.random()*0.9;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.15,h,6), trunkMat);
+    trunk.position.y = h/2;
+    g.add(trunk);
+    const twigMat = new THREE.MeshLambertMaterial({color:foliageHex});
+    for(let i=0;i<3;i++){
+      const twig = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.4,0.06), twigMat);
+      twig.position.set((Math.random()-0.5)*0.3, h*0.82, (Math.random()-0.5)*0.3);
+      twig.rotation.z = (Math.random()-0.5)*1.3;
+      g.add(twig);
+    }
+  } else if(style === 'christmas'){
+    const trunkH = 0.28;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.13,trunkH,6), trunkMat);
+    trunk.position.y = trunkH/2;
+    g.add(trunk);
+    const foliageMat = new THREE.MeshLambertMaterial({color:foliageHex});
+    let y = trunkH, topY = y;
+    const tierCount = 3;
+    for(let i=0;i<tierCount;i++){
+      const tierH = 0.7 - i*0.12;
+      const tierR = 0.55 - i*0.13;
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(tierR, tierH, 8), foliageMat);
+      cone.position.y = y + tierH/2;
+      g.add(cone);
+      topY = cone.position.y + tierH/2;
+      y += tierH*0.55; // next tier overlaps partway up, like a real layered pine
+    }
+    const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.09,0), new THREE.MeshBasicMaterial({color:0xffd700}));
+    star.position.y = topY + 0.1;
+    g.add(star);
+    const ornamentColors = [0xff4444,0xffd700,0x4488ff,0xffffff];
+    for(let i=0;i<7;i++){
+      const orn = new THREE.Mesh(new THREE.SphereGeometry(0.045,6,6), new THREE.MeshBasicMaterial({color:ornamentColors[i%ornamentColors.length]}));
+      const ang = Math.random()*Math.PI*2, r = 0.3+Math.random()*0.2, oy = trunkH+0.2+Math.random()*0.6;
+      orn.position.set(Math.cos(ang)*r, oy, Math.sin(ang)*r);
+      g.add(orn);
+    }
+  } else { // 'round' broadleaf — default
+    const h = 1.5 + Math.random()*0.9;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.16,h,6), trunkMat);
+    trunk.position.y = h/2;
+    g.add(trunk);
+    const foliageMat = new THREE.MeshLambertMaterial({color:foliageHex});
+    for(let i=0;i<3;i++){
+      const s = 0.55 + Math.random()*0.25;
+      const blob = new THREE.Mesh(new THREE.SphereGeometry(s,7,6), foliageMat);
+      blob.position.set((Math.random()-0.5)*0.4, h + s*0.6 + i*0.15, (Math.random()-0.5)*0.4);
+      g.add(blob);
+    }
+  }
+  return g;
+}
+
+let decorMeshes = [];
+let ROCK_GEO, CRYSTAL_GEO, GRASS_GEO, GLOWDOT_GEO, HILL_GEO;
+
+// Rocks/crystals/grass/glow-dots reuse one persistent shared geometry
+// across every round (see ROCK_GEO etc. below) for performance, since
+// scenery now regenerates every single round. Materials are still
+// fresh per round and always safe to dispose, but the geometry must
+// NOT be freed each round, or it breaks for every future round too.
+function disposeDecorMesh(obj){
+  obj.traverse(o=>{
+    if(o.geometry && o.geometry!==ROCK_GEO && o.geometry!==CRYSTAL_GEO &&
+       o.geometry!==GRASS_GEO && o.geometry!==GLOWDOT_GEO && o.geometry!==HILL_GEO){
+      o.geometry.dispose();
+    }
+    if(o.material){
+      if(Array.isArray(o.material)) o.material.forEach(m=>m.dispose());
+      else o.material.dispose();
+    }
+  });
+}
+
+function buildDecorations(theme){
+  decorMeshes.forEach(m=>{ scene.remove(m); disposeDecorMesh(m); });
+  decorMeshes = [];
+
+  if(theme.trees && theme.trees.count > 0){
+    for(let i=0;i<theme.trees.count;i++){
+      const tree = buildTree(theme.trees.trunk, theme.trees.foliage, theme.trees.style);
+      const ang = Math.random()*Math.PI*2;
+      const rad = 4 + Math.random()*(arenaSize-6);
+      tree.position.set(Math.cos(ang)*rad, 0, Math.sin(ang)*rad);
+      tree.userData.sway = Math.random()*Math.PI*2; // phase offset so trees don't sway in lockstep
+      scene.add(tree);
+      decorMeshes.push(tree);
+    }
+  }
+
+  if(theme.water){
+    const isWater = theme.water.style === 'water';
+    const mat = new THREE.MeshLambertMaterial({
+      color: theme.water.color, transparent: isWater, opacity: isWater ? 0.78 : 1
+    });
+    const baseR = theme.water.big ? 8 : 4;
+    const patch = new THREE.Mesh(new THREE.CircleGeometry(baseR+Math.random()*3, 22), mat);
+    patch.rotation.x = -Math.PI/2;
+    const ang = Math.random()*Math.PI*2;
+    const rad = 5 + Math.random()*10;
+    patch.position.set(Math.cos(ang)*rad, 0.02, Math.sin(ang)*rad);
+    patch.userData.bob = Math.random()*Math.PI*2;
+    patch.userData.baseY = 0.02;
+    scene.add(patch);
+    decorMeshes.push(patch);
+  }
+
+  // Low-poly boulders / spires / stalagmites — one shared geometry,
+  // scaled and stretched per-instance so each round rebuild is cheap.
+  if(theme.rocks && theme.rocks.count > 0){
+    const mat = new THREE.MeshLambertMaterial({color:theme.rocks.color, map:ROCK_TEX});
+    const tall = theme.rocks.style === 'spire' || theme.rocks.style === 'stalagmite';
+    for(let i=0;i<theme.rocks.count;i++){
+      const rock = new THREE.Mesh(ROCK_GEO, mat);
+      const s = 0.5 + Math.random()*0.7;
+      rock.scale.set(s, tall ? s*(2+Math.random()*2) : s*(0.7+Math.random()*0.6), s);
+      rock.rotation.y = Math.random()*Math.PI*2;
+      rock.rotation.x = (Math.random()-0.5)*0.3;
+      rock.rotation.z = (Math.random()-0.5)*0.3;
+      const ang = Math.random()*Math.PI*2;
+      const rad = 4 + Math.random()*(arenaSize-6);
+      rock.position.set(Math.cos(ang)*rad, rock.scale.y*0.5, Math.sin(ang)*rad);
+      scene.add(rock);
+      decorMeshes.push(rock);
+    }
+  }
+
+  // Bright, unlit crystal spikes — MeshBasicMaterial so they read as
+  // "glowing" even with the scene's ambient light dimmed down.
+  if(theme.crystals && theme.crystals.count > 0){
+    const mats = theme.crystals.colors.map(c=>new THREE.MeshBasicMaterial({color:c}));
+    for(let i=0;i<theme.crystals.count;i++){
+      const mat = mats[i % mats.length];
+      const c = new THREE.Mesh(CRYSTAL_GEO, mat);
+      const s = 0.4 + Math.random()*0.6;
+      c.scale.set(s, s*(1.5+Math.random()*1.5), s);
+      c.rotation.y = Math.random()*Math.PI*2;
+      c.rotation.z = (Math.random()-0.5)*0.3;
+      const ang = Math.random()*Math.PI*2;
+      const rad = 4 + Math.random()*(arenaSize-6);
+      c.position.set(Math.cos(ang)*rad, c.scale.y*0.4, Math.sin(ang)*rad);
+      scene.add(c);
+      decorMeshes.push(c);
+    }
+  }
+
+  // Coral: small branching clusters built from cones+spheres, cycling
+  // through a bright palette per theme.
+  if(theme.coral && theme.coral.count > 0){
+    theme.coral.colors.forEach(()=>{}); // (palette read below per-instance)
+    for(let i=0;i<theme.coral.count;i++){
+      const color = theme.coral.colors[i % theme.coral.colors.length];
+      const mat = new THREE.MeshLambertMaterial({color});
+      const group = new THREE.Group();
+      const branches = 3 + Math.floor(Math.random()*3);
+      for(let b=0;b<branches;b++){
+        const h = 0.3 + Math.random()*0.5;
+        const branch = new THREE.Mesh(new THREE.ConeGeometry(0.09,h,5), mat);
+        branch.position.set((Math.random()-0.5)*0.3, h/2, (Math.random()-0.5)*0.3);
+        branch.rotation.z = (Math.random()-0.5)*0.6;
+        group.add(branch);
+      }
+      const ang = Math.random()*Math.PI*2;
+      const rad = 4 + Math.random()*(arenaSize-6);
+      group.position.set(Math.cos(ang)*rad, 0, Math.sin(ang)*rad);
+      scene.add(group);
+      decorMeshes.push(group);
+    }
+  }
+
+  // Small grass tufts — cheap thin-box clusters for open/plains themes.
+  if(theme.grassTufts && theme.grassTufts.count > 0){
+    const mat = new THREE.MeshLambertMaterial({color:theme.grassTufts.color});
+    for(let i=0;i<theme.grassTufts.count;i++){
+      const tuft = new THREE.Mesh(GRASS_GEO, mat);
+      const s = 0.7 + Math.random()*0.8;
+      tuft.scale.set(1, s, 1);
+      tuft.rotation.y = Math.random()*Math.PI*2;
+      const ang = Math.random()*Math.PI*2;
+      const rad = 3 + Math.random()*(arenaSize-5);
+      tuft.position.set(Math.cos(ang)*rad, 0.15*s, Math.sin(ang)*rad);
+      scene.add(tuft);
+      decorMeshes.push(tuft);
+    }
+  }
+
+  // Floating bioluminescent dots for deep, dark themes.
+  if(theme.glowDots && theme.glowDots.count > 0){
+    const mats = theme.glowDots.colors.map(c=>new THREE.MeshBasicMaterial({color:c}));
+    for(let i=0;i<theme.glowDots.count;i++){
+      const dot = new THREE.Mesh(GLOWDOT_GEO, mats[i % mats.length]);
+      const baseY = 0.5 + Math.random()*4;
+      dot.position.set(
+        (Math.random()-0.5)*arenaSize*1.7,
+        baseY,
+        (Math.random()-0.5)*arenaSize*1.7
+      );
+      dot.userData.bob = Math.random()*Math.PI*2;
+      dot.userData.baseY = baseY;
+      scene.add(dot);
+      decorMeshes.push(dot);
+    }
+  }
+
+  // Iconic ground props (Halloween jack-o'-lanterns, Egypt pyramids).
+  if(theme.pumpkins && theme.pumpkins.count > 0){
+    for(let i=0;i<theme.pumpkins.count;i++){
+      const p = buildPumpkin();
+      const ang = Math.random()*Math.PI*2;
+      const rad = 4 + Math.random()*(arenaSize-6);
+      p.position.set(Math.cos(ang)*rad, 0, Math.sin(ang)*rad);
+      p.rotation.y = Math.random()*Math.PI*2;
+      scene.add(p);
+      decorMeshes.push(p);
+    }
+  }
+  if(theme.pyramids && theme.pyramids.count > 0){
+    for(let i=0;i<theme.pyramids.count;i++){
+      const p = buildPyramid();
+      const ang = Math.random()*Math.PI*2;
+      const rad = 8 + Math.random()*(arenaSize-10);
+      p.position.set(Math.cos(ang)*rad, 0, Math.sin(ang)*rad);
+      p.rotation.y = Math.random()*Math.PI*2;
+      scene.add(p);
+      decorMeshes.push(p);
+    }
+  }
+
+  buildHorizon(theme);
+  buildWeather(theme.weather);
+}
+
+// Jack-o'-lantern: squashed sphere body, small stem, and a bright
+// unlit "carved glow" face so it reads even in Halloween's dim light.
+function buildPumpkin(){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.32,10,8), new THREE.MeshLambertMaterial({color:0xff7518}));
+  body.scale.set(1, 0.8, 1);
+  body.position.y = 0.26;
+  g.add(body);
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.06,0.14,5), new THREE.MeshLambertMaterial({color:0x3a6b2a}));
+  stem.position.y = 0.26 + 0.26;
+  g.add(stem);
+  const faceMat = new THREE.MeshBasicMaterial({color:0xffdf6b});
+  const eyeGeo = new THREE.ConeGeometry(0.05,0.08,4);
+  const eyeL = new THREE.Mesh(eyeGeo, faceMat);
+  eyeL.rotation.x = Math.PI;
+  eyeL.position.set(-0.11, 0.3, 0.27);
+  g.add(eyeL);
+  const eyeR = eyeL.clone();
+  eyeR.position.x = 0.11;
+  g.add(eyeR);
+  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.04,0.03), faceMat);
+  mouth.position.set(0, 0.18, 0.29);
+  g.add(mouth);
+  return g;
+}
+
+// Ancient Egypt pyramid — a 4-sided cone (radialSegments=4) reusing
+// the rock texture for a sandstone-block look, sized up as a distant
+// monument rather than a climbable obstacle.
+function buildPyramid(){
+  const g = new THREE.Group();
+  const s = 2.2 + Math.random()*1.4;
+  const h = s*0.75;
+  const mat = new THREE.MeshLambertMaterial({color:0xd9b56a, map:ROCK_TEX});
+  const body = new THREE.Mesh(new THREE.ConeGeometry(s*0.72, h, 4), mat);
+  body.rotation.y = Math.PI/4;
+  body.position.y = h/2;
+  g.add(body);
+  return g;
+}
+
+// A ring of large, low-detail hill silhouettes just past the play area
+// — gives every theme a horizon and sense of scale instead of a flat
+// color meeting a flat ground. Colored as a darkened, desaturated
+// version of the theme's ground so it recedes into the fog naturally.
+function buildHorizon(theme){
+  const base = new THREE.Color(theme.ground).offsetHSL(0, -0.15, -0.22);
+  const mat = new THREE.MeshBasicMaterial({color: base});
+  const count = 16;
+  for(let i=0;i<count;i++){
+    const hill = new THREE.Mesh(HILL_GEO, mat);
+    const ang = (i/count)*Math.PI*2 + Math.random()*0.2;
+    const rad = arenaSize + 6 + Math.random()*10;
+    const s = 6 + Math.random()*8;
+    hill.scale.set(s, s*(0.7+Math.random()*0.6), s);
+    hill.position.set(Math.cos(ang)*rad, -1, Math.sin(ang)*rad);
+    scene.add(hill);
+    decorMeshes.push(hill);
+  }
+}
+
+// A slow, continuously-falling particle system for any theme that
+// wants ambient falling weather — cherry blossom petals, snow, ash,
+// etc. Config controls color/count/size/fall speed/side-to-side sway
+// so one system covers all of them, just with different numbers.
+let weatherMeshes = [], weatherGeo = null, weatherMat = null;
+function buildWeather(config){
+  if(weatherGeo){ weatherGeo.dispose(); weatherGeo = null; }
+  if(weatherMat){ weatherMat.dispose(); weatherMat = null; }
+  weatherMeshes.forEach(p=>scene.remove(p));
+  weatherMeshes = [];
+  if(!config || !config.count) return;
+  const size = config.size || 0.14;
+  weatherGeo = new THREE.PlaneGeometry(size, size);
+  weatherMat = new THREE.MeshBasicMaterial({
+    color: config.color, transparent:true, opacity: config.opacity!==undefined ? config.opacity : 0.9,
+    side: THREE.DoubleSide
+  });
+  for(let i=0;i<config.count;i++){
+    const p = new THREE.Mesh(weatherGeo, weatherMat);
+    p.position.set((Math.random()-0.5)*arenaSize*1.6, Math.random()*8+1, (Math.random()-0.5)*arenaSize*1.6);
+    p.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
+    p.userData.drift = Math.random()*Math.PI*2;
+    p.userData.fallSpeed = config.speed || 0.45;
+    p.userData.sway = config.sway!==undefined ? config.sway : 0.12;
+    scene.add(p);
+    weatherMeshes.push(p);
+  }
+}
+function updateWeather(dt){
+  for(const p of weatherMeshes){
+    p.position.y -= p.userData.fallSpeed*dt;
+    p.userData.drift += dt;
+    p.position.x += Math.sin(p.userData.drift)*p.userData.sway*dt;
+    p.rotation.z += dt*0.35;
+    if(p.position.y < 0) p.position.y = 8 + Math.random()*4;
+  }
+}
+
+// Gentle, cheap ambient life for the scenery: trees sway a couple
+// degrees, water/glow-dots bob slightly — makes even a static-camera
+// moment feel alive instead of a frozen diorama.
+const _decorClock = {t:0};
+function updateDecorMotion(dt){
+  _decorClock.t += dt;
+  for(const m of decorMeshes){
+    if(m.userData.sway !== undefined){
+      m.rotation.z = Math.sin(_decorClock.t*1.2 + m.userData.sway) * 0.035;
+    } else if(m.userData.bob !== undefined){
+      m.position.y = m.userData.baseY + Math.sin(_decorClock.t*1.5 + m.userData.bob) * 0.06;
+    }
+  }
+}
+
+// Rebuilds the scenery obstacles with a fresh random layout + given
+// color, and records their bounding boxes for solid collision.
+function buildObstacles(colorHex){
+  obstacleMeshes.forEach(m=>{ scene.remove(m); m.geometry.dispose(); m.material.dispose(); });
+  obstacleMeshes = [];
+  obstacleBoxes = [];
+  const mat = new THREE.MeshLambertMaterial({color:colorHex, map:OBSTACLE_TEX});
+  for(let i=0;i<14;i++){
+    const s = 1.2 + Math.random()*1.6;
+    const box = new THREE.Mesh(new THREE.BoxGeometry(s,s,s), mat);
+    const ang = Math.random()*Math.PI*2;
+    const rad = 6 + Math.random()*(arenaSize-8);
+    const x = Math.cos(ang)*rad, z = Math.sin(ang)*rad;
+    box.position.set(x, s/2, z);
+    scene.add(box);
+    obstacleMeshes.push(box);
+    obstacleBoxes.push({minX:x-s/2, maxX:x+s/2, minZ:z-s/2, maxZ:z+s/2, base:0, top:s});
+  }
+}
+
+// Pushes a candidate (x,z) position out of any solid obstacle it would
+// otherwise clip into — but only when the player's current height
+// actually falls within that obstacle's vertical span (base..top). If
+// you're below a floating platform's base, it doesn't block you; if
+// you're at or above its top (standing on it), no side-collision
+// applies either, so you can stand there instead of being shoved off.
+function resolveCollision(x,z,y){
+  const r = 0.35;
+  for(const b of obstacleBoxes){
+    const base = b.base||0;
+    if(y < base - 0.05 || y > b.top - 0.05) continue;
+    if(x > b.minX-r && x < b.maxX+r && z > b.minZ-r && z < b.maxZ+r){
+      const overLeft = x-(b.minX-r), overRight = (b.maxX+r)-x;
+      const overTop = z-(b.minZ-r), overBottom = (b.maxZ+r)-z;
+      const m = Math.min(overLeft, overRight, overTop, overBottom);
+      if(m===overLeft) x = b.minX-r;
+      else if(m===overRight) x = b.maxX+r;
+      else if(m===overTop) z = b.minZ-r;
+      else z = b.maxZ+r;
+    }
+  }
+  return {x, z};
+}
+
+// The height of solid ground directly under a given (x,z) that you'd
+// actually land on falling from your current height — either flat
+// ground (0), a grounded obstacle's top, or a floating platform's top
+// if you're at/above it (never one hovering above your head).
+function groundHeightAt(x,z,currentY){
+  let h = 0;
+  for(const b of obstacleBoxes){
+    if(x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ){
+      if(b.top <= currentY + 0.4 && b.top > h) h = b.top;
+    }
+  }
+  return h;
+}
+
+// Elevated solid platforms (currently used by Floating Islands). Reuse
+// the same obstacleBoxes/obstacleMeshes arrays as ground obstacles so
+// they get collision, disposal, and the "stand on top" behavior for free.
+function buildFloaters(theme){
+  if(!theme.floaters) return;
+  const mat = new THREE.MeshLambertMaterial({color:theme.floaters.color});
+  for(let i=0;i<theme.floaters.count;i++){
+    const s = 1.8 + Math.random()*1.4;
+    const h = 0.7;
+    const base = 1.8 + Math.random()*2.4;
+    const box = new THREE.Mesh(new THREE.BoxGeometry(s,h,s), mat);
+    const ang = Math.random()*Math.PI*2;
+    const rad = 5 + Math.random()*(arenaSize-8);
+    const x = Math.cos(ang)*rad, z = Math.sin(ang)*rad;
+    box.position.set(x, base+h/2, z);
+    scene.add(box);
+    obstacleMeshes.push(box);
+    obstacleBoxes.push({minX:x-s/2, maxX:x+s/2, minZ:z-s/2, maxZ:z+s/2, base, top:base+h});
+  }
+}
+
+function initEngine(){
+  const canvas = document.getElementById('gl');
+  renderer = new THREE.WebGLRenderer({canvas, antialias:false, powerPreference:'high-performance'});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.5));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x9fd6ea);
+  scene.fog = new THREE.Fog(0x9fd6ea, 20, 55);
+
+  camera = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 200);
+
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x445566, 0.9);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+  sun.position.set(10,18,6);
+  scene.add(sun);
+  hemiLight = hemi; sunLight = sun;
+
+  buildProceduralTextures();
+
+  // Ground: textured, tinted plane. Color is re-applied per round by
+  // applyTheme() rather than fixed here.
+  const groundGeo = new THREE.PlaneGeometry(arenaSize*2, arenaSize*2);
+  groundMat = new THREE.MeshLambertMaterial({color:0xeaf6fb, map:GROUND_TEX});
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI/2;
+  scene.add(ground);
+
+  buildObstacles(0xbfe8f5);
+
+  window.addEventListener('resize', onResize);
+  clock = new THREE.Clock();
+
+  // Shared, reused geometry/material for bullets & particle effects.
+  // Creating a fresh geometry+material on every single shot (the old
+  // code) is expensive — that repeated allocation, several times a
+  // second, was the real cause of the choppy shooting. Everything here
+  // is built once and reused for every bullet/particle instance.
+  BULLET_GEO = new THREE.SphereGeometry(0.1, 8, 8);
+  BULLET_MAT = new THREE.MeshBasicMaterial({color:0xffe066});
+  MUZZLE_GEO = new THREE.SphereGeometry(0.16, 8, 8);
+  MUZZLE_MAT = new THREE.MeshBasicMaterial({color:0xfff6c9, transparent:true, opacity:0.95});
+  FX_GEO = new THREE.BoxGeometry(0.09,0.09,0.09);
+  FX_MAT_ZOMBIE = new THREE.MeshBasicMaterial({color:0x8fdc8f});
+  FX_MAT_DUST = new THREE.MeshBasicMaterial({color:0xe8f6fb, transparent:true, opacity:0.85});
+  FX_MAT_SPARK = new THREE.MeshBasicMaterial({color:0xffd23f});
+
+  // Shared decoration geometries — scaled per-instance rather than
+  // rebuilt, since scenery now regenerates every single round.
+  ROCK_GEO = new THREE.IcosahedronGeometry(0.6, 0);
+  CRYSTAL_GEO = new THREE.ConeGeometry(0.22, 1, 5);
+  GRASS_GEO = new THREE.BoxGeometry(0.06, 0.4, 0.06);
+  GLOWDOT_GEO = new THREE.SphereGeometry(0.07, 6, 6);
+  HILL_GEO = new THREE.ConeGeometry(1, 1, 7);
+}
+function onResize(){
+  if(!renderer) return;
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+}
+
+// Frees GPU-side geometry/material buffers for every mesh in a group.
+// Without this, each zombie spawn/kill cycle leaks ~10 geometries and
+// materials — harmless for a few rounds, but compounds badly over a
+// long survival run and is the most likely cause of things grinding to
+// a crawl the longer a match goes.
+function disposeGroup(g){
+  if(!g) return;
+  g.traverse(obj=>{
+    if(obj.geometry) obj.geometry.dispose();
+    if(obj.material){
+      if(Array.isArray(obj.material)) obj.material.forEach(m=>m.dispose());
+      else obj.material.dispose();
+    }
+  });
+}
+
+// ---- Human avatar builder ----
+// Chibi-proportioned, stacked bottom-up (shoe -> legs -> torso -> head ->
+// hair) so every segment's pivot lines up flush with zero gaps. Legs are
+// grouped (pants+shoe together) so the whole leg swings from the hip;
+// arms pivot from the shoulder. Named parts (armR etc.) mirror the old
+// file's convention so future weapon-attachment code has a stable hook.
+function buildHuman(skinHex, outfitHex, tint){
+  const g = new THREE.Group();
+  const skinMat = new THREE.MeshLambertMaterial({color: tint || skinHex});
+  const outfitMat = new THREE.MeshLambertMaterial({color: tint || outfitHex});
+  const pantsMat = new THREE.MeshLambertMaterial({color: tint || 0x2b3a4a});
+  const shoeMat = new THREE.MeshLambertMaterial({color: tint || 0x1c2530});
+  const hairMat = new THREE.MeshLambertMaterial({color: tint || 0x3b2a1f});
+  const eyeMat = new THREE.MeshLambertMaterial({color:0x141414});
+
+  // Box whose local origin sits at its bottom-center (so position.y can
+  // be the height of the surface it rests on, with no manual offset math).
+  function boxOnFloor(w,h,d,mat){
+    const geo = new THREE.BoxGeometry(w,h,d);
+    geo.translate(0,h/2,0);
+    return new THREE.Mesh(geo, mat);
+  }
+
+  const torsoW=0.56, torsoD=0.32, torsoH=0.5;
+  const legW=0.2, legD=0.22, legH=0.34, shoeH=0.12, legGap=0.04;
+  const headSize=0.46, hairH=0.14;
+  const armW=0.16, armD=0.16;
+
+  const legsBaseY = 0;
+  const torsoBaseY = shoeH + legH;
+  const headBaseY = torsoBaseY + torsoH;
+
+  // Legs: grouped so pivot (hip) is at the top, shoe hangs at the bottom —
+  // rotating the group swings the entire leg as one piece.
+  function buildLeg(x){
+    const grp = new THREE.Group();
+    const pants = boxOnFloor(legW, legH, legD, pantsMat);
+    pants.geometry.translate(0,-legH,0); // reposition so top is at pivot (y=0, the hip)
+    const shoe = boxOnFloor(legW, shoeH, legD, shoeMat);
+    shoe.geometry.translate(0,-(legH+shoeH),0);
+    grp.add(pants, shoe);
+    grp.position.set(x, torsoBaseY, 0);
+    return grp;
+  }
+  const legL = buildLeg(-(legW/2+legGap/2));
+  const legR = buildLeg(legW/2+legGap/2);
+  g.add(legL, legR);
+
+  const torso = boxOnFloor(torsoW, torsoH, torsoD, outfitMat);
+  torso.position.set(0, torsoBaseY, 0);
+  g.add(torso);
+
+  // Arms pivot at the shoulder (top) and hang down to hip height, flush
+  // against the torso's sides.
+  function buildArm(x){
+    const geo = new THREE.BoxGeometry(armW, torsoH, armD);
+    geo.translate(0,-torsoH/2,0); // origin at top of the arm
+    const mesh = new THREE.Mesh(geo, skinMat);
+    mesh.position.set(x, headBaseY, 0);
+    return mesh;
+  }
+  const armL = buildArm(-(torsoW/2+armW/2));
+  const armR = buildArm(torsoW/2+armW/2);
+  g.add(armL, armR);
+
+  const head = boxOnFloor(headSize, headSize, headSize, skinMat);
+  head.position.set(0, headBaseY, 0);
+  g.add(head);
+
+  const hair = boxOnFloor(headSize+0.02, hairH, headSize+0.02, hairMat);
+  hair.position.set(0, headBaseY+headSize, 0);
+  g.add(hair);
+
+  const eyeGeo = new THREE.BoxGeometry(0.06,0.06,0.02);
+  const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+  eyeL.position.set(-0.11, headBaseY+headSize*0.55, headSize/2+0.01);
+  const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+  eyeR.position.set(0.11, headBaseY+headSize*0.55, headSize/2+0.01);
+  g.add(eyeL, eyeR);
+
+  g.userData.parts = {head, torso, armL, armR, legL, legR};
+  return g;
+}
+
+// A flat-colored silhouette that only renders where something else is
+// already in front of it in the depth buffer — i.e. it's invisible in
+// the open, and pops through walls/obstacles the moment the real body
+// is blocked from view. Standard "see them through cover" trick.
+function addXray(group, colorHex){
+  const geo = new THREE.BoxGeometry(0.85, 1.56, 0.4);
+  geo.translate(0, 0.78, 0);
+  const mat = new THREE.MeshBasicMaterial({
+    color: colorHex, transparent:true, opacity:0.55,
+    depthWrite:false, depthTest:true
+  });
+  mat.depthFunc = THREE.GreaterDepth;
+  mat.userData.isXray = true;
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.renderOrder = 10;
+  group.add(mesh);
+  return mesh;
+}
+
+// ---- Player ----
+function attachPistol(armR){
+  const grp = new THREE.Group();
+  const bodyMat = new THREE.MeshLambertMaterial({color:0x2c2c2c});
+  const gripMat = new THREE.MeshLambertMaterial({color:0x1a1a1a});
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.07,0.09,0.2), bodyMat);
+  body.position.set(0,0,0.06);
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.1,0.06), gripMat);
+  grip.position.set(0,-0.08,-0.03);
+  grp.add(body, grip);
+  grp.position.set(0.02,-0.48,0.06); // roughly at the hand, near the bottom of the arm
+  armR.add(grp);
+}
+
+function spawnPlayer(){
+  const p = Store.getProfile(state.currentName);
+  player = buildHuman(SKINS[p.skin||state.skin], OUTFITS[p.outfit||state.outfit]);
+  player.position.set(0,0,0);
+  player.userData.facing = 0;
+  player.userData.hp = 3;
+  player.userData.attackCooldown = 0;
+  scene.add(player);
+  attachPistol(player.userData.parts.armR);
+  addXray(player, 0x5fd4ff);
+}
+
+// ---- Zombies ----
+function spawnZombie(){
+  const z = buildHuman(0,0, 0x5f7a5f);
+  const ang = Math.random()*Math.PI*2;
+  const rad = arenaSize - 2;
+  z.position.set(Math.cos(ang)*rad, 0, Math.sin(ang)*rad);
+  z.userData.hp = 2 + Math.floor(round/3);
+  z.userData.speed = Math.min(1.0 + Math.random()*0.4 + Math.max(0, round-5)*0.05, PLAYER_SPEED);
+  z.userData.attackCooldown = 0;
+  scene.add(z);
+  zombies.push(z);
+  addXray(z, 0xff5555);
+}
+function clearZombies(){
+  zombies.forEach(z=>{ scene.remove(z); disposeGroup(z); });
+  zombies = [];
+}
+
+function startRound(){
+  clearZombies();
+  applyTheme(round);
+  // Each wave is 1.5x the previous wave's count (round 1 sets the
+  // baseline). Capped so a very long run doesn't spawn an unplayable
+  // number of zombies at once / tank performance.
+  roundKillTarget = round === 1 ? 4 : Math.min(Math.ceil(roundKillTarget*1.5), 30);
+  roundKillsDone = 0;
+  for(let i=0;i<roundKillTarget;i++) spawnZombie();
+  const theme = themeForRound(round, state.themeIndex||0);
+  toast('Round '+round+' · '+theme.name+' — '+roundKillTarget+' incoming');
+}
+
+function renderHearts(){
+  const row = document.getElementById('heartsRow');
+  row.innerHTML = '';
+  for(let i=0;i<3;i++){
+    const h = document.createElement('div');
+    h.className = 'heart' + (i<hearts?'':' dead');
+    row.appendChild(h);
+  }
+}
+
+let toastTimer = null;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 1600);
+}
+
+// ---- Touch controls ----
+let moveVec = {x:0,y:0};
+let lookActive = false, lookLast = {x:0,y:0};
+
+function setupControls(){
+  const moveZone = document.getElementById('moveZone');
+  const knob = document.getElementById('moveKnob');
+  const knobDot = document.getElementById('moveKnobDot');
+  let stickActive = false, stickId = null, center = {x:0,y:0};
+  const maxRadius = 48;
+
+  moveZone.addEventListener('touchstart', e=>{
+    const t = e.changedTouches[0];
+    stickActive = true; stickId = t.identifier;
+    center = {x:t.clientX, y:t.clientY};
+    // Knob appears wherever you actually touched down — no fixed
+    // button to hunt for, same feel as Minecraft's mobile controls.
+    knob.style.left = (center.x-44)+'px';
+    knob.style.top = (center.y-44)+'px';
+    knob.classList.add('active');
+    knobDot.style.left='28px'; knobDot.style.top='28px';
+  });
+  window.addEventListener('touchmove', e=>{
+    for(const t of e.changedTouches){
+      if(stickActive && t.identifier===stickId){
+        let dx=t.clientX-center.x, dy=t.clientY-center.y;
+        const len=Math.hypot(dx,dy);
+        if(len>maxRadius){ dx=dx/len*maxRadius; dy=dy/len*maxRadius; }
+        knobDot.style.left = (28+dx)+'px'; knobDot.style.top=(28+dy)+'px';
+        moveVec.x = dx/maxRadius; moveVec.y = dy/maxRadius;
+      }
+    }
+  }, {passive:true});
+  window.addEventListener('touchend', e=>{
+    for(const t of e.changedTouches){
+      if(stickActive && t.identifier===stickId){
+        stickActive = false; moveVec.x=0; moveVec.y=0;
+        knob.classList.remove('active');
+      }
+    }
+  });
+
+  const lookZone = document.getElementById('lookZone');
+  let lookId = null;
+  lookZone.addEventListener('touchstart', e=>{
+    const t = e.changedTouches[0];
+    lookId = t.identifier; lookActive = true;
+    lookLast = {x:t.clientX,y:t.clientY};
+  });
+  window.addEventListener('touchmove', e=>{
+    for(const t of e.changedTouches){
+      if(lookActive && t.identifier===lookId){
+        const dx = t.clientX-lookLast.x, dy = t.clientY-lookLast.y;
+        camYaw += dx*0.008;
+        camPitch = Math.max(0.1,Math.min(0.9,camPitch + dy*0.005));
+        lookLast = {x:t.clientX,y:t.clientY};
+      }
+    }
+  }, {passive:true});
+  window.addEventListener('touchend', e=>{
+    for(const t of e.changedTouches){
+      if(lookActive && t.identifier===lookId) lookActive=false;
+    }
+  });
+
+  document.getElementById('actBtn').addEventListener('touchstart', e=>{
+    e.preventDefault(); doShoot();
+  });
+  document.getElementById('jumpBtn').addEventListener('touchstart', e=>{
+    e.preventDefault(); doJump();
+  });
+  document.getElementById('lookFwdBtn').addEventListener('touchstart', e=>{
+    e.preventDefault();
+    camYaw = player.rotation.y;
+    camPitch = 0.35;
+  });
+  document.getElementById('camBtn').addEventListener('touchstart', e=>{
+    e.preventDefault(); cycleCamera();
+  });
+  document.getElementById('dashBtn').addEventListener('touchstart', e=>{
+    e.preventDefault(); doDash();
+  });
+  document.getElementById('pauseBtn').addEventListener('touchstart', e=>{
+    e.preventDefault(); openPauseMenu();
+  });
+  document.getElementById('btnResume').addEventListener('touchstart', e=>{
+    e.preventDefault(); closePauseMenu();
+  });
+  document.getElementById('btnRestart').addEventListener('touchstart', e=>{
+    e.preventDefault();
+    document.getElementById('pauseOverlay').classList.remove('show');
+    startSurvival();
+  });
+  document.getElementById('btnChangeThemeMid').addEventListener('touchstart', e=>{
+    e.preventDefault();
+    document.getElementById('pauseOverlay').classList.remove('show');
+    gameRunning = false;
+    renderThemeGrid();
+    show('screenTheme');
+  });
+  document.getElementById('btnQuitMid').addEventListener('touchstart', e=>{
+    e.preventDefault();
+    document.getElementById('pauseOverlay').classList.remove('show');
+    gameRunning = false;
+    refreshTokenPills();
+    show('screenHome');
+  });
+}
+
+// Pausing just stops the animate() loop (it already exits early when
+// !gameRunning) and shows the overlay — no state is reset, so Resume
+// picks up exactly where you left off. clock.getDelta() on resume
+// discards the paused-time gap so the next frame's dt isn't huge.
+function openPauseMenu(){
+  if(!gameRunning) return;
+  gameRunning = false;
+  document.getElementById('pauseOverlay').classList.add('show');
+}
+function closePauseMenu(){
+  document.getElementById('pauseOverlay').classList.remove('show');
+  gameRunning = true;
+  clock.getDelta();
+  animate();
+}
+
+function cycleCamera(){
+  camMode = camMode % 4 + 1;
+  document.getElementById('camLabel').textContent = camMode;
+  toast('View: '+CAM_LABELS[camMode]);
+}
+
+let vy = 0, onGround = true, wasAirborne = false, jumpsUsed = 0;
+const MAX_JUMPS = 2;
+let dashActive = false, dashTimer = 0, dashCooldownTimer = 0, dashDir = {x:0,z:1};
+const DASH_SPEED = 24, DASH_DURATION = 0.16, DASH_COOLDOWN = 0.55;
+
+function doDash(){
+  if(!gameRunning || dashActive || dashCooldownTimer>0) return;
+  dashActive = true;
+  dashTimer = DASH_DURATION;
+  dashCooldownTimer = DASH_COOLDOWN;
+  dashDir.x = Math.sin(player.rotation.y);
+  dashDir.z = Math.cos(player.rotation.y);
+  player.scale.set(1.35,0.8,1.35);
+  setTimeout(()=>{ if(player) player.scale.set(1,1,1); }, 130);
+  spawnBurst(player.position.x, 0.4, player.position.z, 6, FX_MAT_DUST, 3);
+  const btn = document.getElementById('dashBtn');
+  btn.classList.add('cooling');
+  setTimeout(()=>btn.classList.remove('cooling'), DASH_COOLDOWN*1000);
+  navigator.vibrate && navigator.vibrate(18);
+}
+
+function doJump(){
+  if(!gameRunning || jumpsUsed >= MAX_JUMPS) return;
+  vy = 7.4; onGround = false; wasAirborne = true; jumpsUsed++;
+  player.scale.set(0.85,1.25,0.85);
+  setTimeout(()=>{ if(player) player.scale.set(1,1,1); }, 140);
+  if(jumpsUsed === 2) spawnBurst(player.position.x, player.position.y+0.5, player.position.z, 5, FX_MAT_DUST, 2.2);
+}
+
+let bullets = [];
+
+// Simple shared-geometry particle burst — used for hit sparks, zombie
+// death poofs, and landing dust. Particles fade by shrinking (not by
+// opacity), since opacity lives on the shared material and would fade
+// every particle using it at once.
+function spawnBurst(x,y,z,count,mat,spread){
+  for(let i=0;i<count;i++){
+    const m = new THREE.Mesh(FX_GEO, mat);
+    m.position.set(x,y,z);
+    const ang = Math.random()*Math.PI*2;
+    const spd = (spread||2.2) * (0.5+Math.random()*0.7);
+    scene.add(m);
+    fx.push({mesh:m, vx:Math.cos(ang)*spd, vz:Math.sin(ang)*spd, vy:2+Math.random()*1.8, life:0.45, maxLife:0.45});
+  }
+}
+function updateFx(dt){
+  for(let i=fx.length-1;i>=0;i--){
+    const f = fx[i];
+    f.vy -= 7*dt;
+    f.mesh.position.x += f.vx*dt;
+    f.mesh.position.y += f.vy*dt;
+    f.mesh.position.z += f.vz*dt;
+    f.life -= dt;
+    f.mesh.scale.setScalar(Math.max(f.life/f.maxLife,0));
+    if(f.life<=0){ scene.remove(f.mesh); fx.splice(i,1); }
+  }
+}
+
+// Brief red color-flash on a zombie's own materials so a hit is obvious
+// even in the middle of a chaotic fight, separate from the x-ray tint.
+function flashZombie(z){
+  z.traverse(o=>{
+    if(o.material && o.material.color && !o.material.userData.isXray){
+      if(o.userData.origColor===undefined) o.userData.origColor = o.material.color.getHex();
+      o.material.color.setHex(0xff2b2b);
+    }
+  });
+  setTimeout(()=>{
+    if(z.userData.dead) return;
+    z.traverse(o=>{
+      if(o.material && o.userData.origColor!==undefined) o.material.color.setHex(o.userData.origColor);
+    });
+  }, 130);
+}
+
+// Soft auto-aim: pixel-precise directional aiming feels bad on a phone
+// stick, especially at close range where a zombie is right in front of
+// you but a few degrees off your exact facing. If there's a zombie
+// within a wide forward cone, snap the shot to it instead of firing
+// dead-straight — this is standard arcade/console aim-assist, and is
+// what makes this read as "fantasy game" rather than "realistic sim."
+function findAutoAimTarget(){
+  const fx = Math.sin(player.rotation.y), fz = Math.cos(player.rotation.y);
+  let best = null, bestScore = -Infinity;
+  zombies.forEach(z=>{
+    if(z.userData.dead) return;
+    const dx = z.position.x-player.position.x, dz = z.position.z-player.position.z;
+    const dist = Math.hypot(dx,dz);
+    if(dist < 0.05 || dist > 16) return;
+    const dot = (dx*fx + dz*fz) / dist; // 1 = dead ahead, 0 = perpendicular
+    if(dot < 0.77) return; // outside 40-degree forward cone
+    const score = dot - dist*0.015; // prefer well-aligned, then closer
+    if(score > bestScore){ bestScore = score; best = z; }
+  });
+  return best;
+}
+
+function doShoot(){
+  if(!gameRunning || player.userData.attackCooldown>0) return;
+  player.userData.attackCooldown = 0.22; // fire rate; no ammo count = unlimited shots
+  const armR = player.userData.parts.armR;
+  armR.rotation.x = -0.9;
+  setTimeout(()=>{ armR.rotation.x = 0; }, 90);
+
+  let dx = Math.sin(player.rotation.y), dz = Math.cos(player.rotation.y);
+  const target = findAutoAimTarget();
+  if(target){
+    const tdx = target.position.x-player.position.x, tdz = target.position.z-player.position.z;
+    const len = Math.hypot(tdx,tdz)||1;
+    dx = tdx/len; dz = tdz/len;
+  }
+  const startX = player.position.x + dx*0.5;
+  const startY = player.position.y + 1.05;
+  const startZ = player.position.z + dz*0.5;
+
+  const bullet = new THREE.Mesh(BULLET_GEO, BULLET_MAT); // shared geo/mat — no per-shot allocation
+  bullet.position.set(startX, startY, startZ);
+  bullet.lookAt(startX+dx, startY, startZ+dz);
+  bullet.scale.set(1,1,2.4); // stretched "streak" look, oriented along travel direction
+  scene.add(bullet);
+  bullets.push({mesh:bullet, dx, dz, life:1.1});
+
+  const flash = new THREE.Mesh(MUZZLE_GEO, MUZZLE_MAT);
+  flash.position.set(startX, startY, startZ);
+  scene.add(flash);
+  fx.push({mesh:flash, vx:0, vy:0, vz:0, life:0.07, maxLife:0.07});
+
+  navigator.vibrate && navigator.vibrate(12);
+}
+
+function updateBullets(dt){
+  const speed = 18;
+  for(let i=bullets.length-1;i>=0;i--){
+    const b = bullets[i];
+    b.mesh.position.x += b.dx*speed*dt;
+    b.mesh.position.z += b.dz*speed*dt;
+    b.life -= dt;
+    let hit = false;
+    for(const z of zombies){
+      if(z.userData.dead) continue;
+      const ddx = z.position.x-b.mesh.position.x, ddz = z.position.z-b.mesh.position.z;
+      if(Math.hypot(ddx,ddz) < 0.85){ // generous arcade hitbox — bigger than the zombie's actual body
+        z.userData.hp -= 1;
+        z.scale.set(1.15,0.85,1.15);
+        setTimeout(()=>{ if(!z.userData.dead) z.scale.set(1,1,1); },120);
+        flashZombie(z);
+        spawnBurst(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 5, FX_MAT_SPARK, 2.5);
+        if(z.userData.hp<=0) killZombie(z);
+        hit = true;
+        break;
+      }
+    }
+    if(hit || b.life<=0){
+      scene.remove(b.mesh); // BULLET_GEO/MAT are shared — never dispose them here
+      bullets.splice(i,1);
+    }
+  }
+}
+
+function killZombie(z){
+  z.userData.dead = true;
+  spawnBurst(z.position.x, z.position.y+0.7, z.position.z, 9, FX_MAT_ZOMBIE, 3);
+  scene.remove(z);
+  disposeGroup(z);
+  zombies = zombies.filter(o=>o!==z);
+  kills++; roundKillsDone++;
+  if(roundKillsDone >= roundKillTarget){
+    round++;
+    setTimeout(()=>{ if(gameRunning) startRound(); }, 900);
+  }
+}
+
+function playerTakeHit(){
+  hearts--;
+  renderHearts();
+  const flash = document.getElementById('hitFlash');
+  flash.classList.add('show');
+  setTimeout(()=>flash.classList.remove('show'), 220);
+  navigator.vibrate && navigator.vibrate(80);
+  if(hearts<=0){ endSurvival(); }
+}
+
+// ---- Main update ----
+function update(dt){
+  // camera
+  if(camMode === 1){
+    // POV: sit at head height, look where the drag-controlled yaw/pitch
+    // points. Hide the player mesh so the model doesn't block the view.
+    player.visible = false;
+    const headY = player.position.y + 1.45;
+    camera.position.set(player.position.x, headY, player.position.z);
+    const lookDir = new THREE.Vector3(Math.sin(camYaw), 0, Math.cos(camYaw));
+    const target = camera.position.clone().add(lookDir.multiplyScalar(5));
+    target.y += (camPitch - 0.35) * 4;
+    camera.lookAt(target);
+  } else {
+    player.visible = true;
+    const dist = CAM_DISTS[camMode];
+    const cx = player.position.x - Math.sin(camYaw)*dist;
+    const cz = player.position.z - Math.cos(camYaw)*dist;
+    const cy = player.position.y + 1.3 + camPitch*3;
+    camera.position.set(cx, cy, cz);
+    camera.lookAt(player.position.x, player.position.y+1.1, player.position.z);
+  }
+
+  // Movement-direction facing: the character turns to face wherever
+  // you push the stick (not wherever the camera happens to be aimed) —
+  // this is the Penguin Paradise / Minecraft Dungeons feel: one stick
+  // drives both movement and facing, and the camera auto-follows below
+  // rather than needing to be manually dragged into place.
+  // Dash: a quick burst in the facing direction, overrides normal
+  // movement input while active.
+  if(dashCooldownTimer>0) dashCooldownTimer -= dt;
+  if(dashActive){
+    const nx = player.position.x + dashDir.x*DASH_SPEED*dt;
+    const nz = player.position.z + dashDir.z*DASH_SPEED*dt;
+    const resolved = resolveCollision(nx, nz, player.position.y);
+    player.position.x = resolved.x; player.position.z = resolved.z;
+    dashTimer -= dt;
+    if(dashTimer<=0) dashActive = false;
+  } else if(moveVec.x || moveVec.y){
+    const forward = -moveVec.y, strafe = moveVec.x;
+    const mx = Math.sin(camYaw)*forward - Math.cos(camYaw)*strafe;
+    const mz = Math.cos(camYaw)*forward + Math.sin(camYaw)*strafe;
+    const len = Math.hypot(mx,mz)||1;
+    const speed = PLAYER_SPEED;
+    const nx = player.position.x + (mx/len)*speed*dt;
+    const nz = player.position.z + (mz/len)*speed*dt;
+    const resolved = resolveCollision(nx, nz, player.position.y);
+    player.position.x = resolved.x; player.position.z = resolved.z;
+    player.userData.facing = Math.atan2(mx,mz);
+    player.rotation.y = player.userData.facing;
+    // walk bob
+    const t = performance.now()*0.01;
+    player.userData.parts.legL.rotation.x = Math.sin(t)*0.5;
+    player.userData.parts.legR.rotation.x = -Math.sin(t)*0.5;
+
+    // Camera auto-follow: swing camYaw to catch up behind the character
+    // as they turn, unless the player is actively dragging to look
+    // around. Constant (not proportional) turn rate so quick direction
+    // changes don't whip the camera around fast enough to be dizzying.
+    if(!lookActive){
+      let diff = ((player.userData.facing - camYaw + Math.PI) % (Math.PI*2)) - Math.PI;
+      if(diff < -Math.PI) diff += Math.PI*2;
+      const maxTurnRate = 1.6; // radians/sec, capped regardless of how big the turn is
+      const step = Math.sign(diff) * Math.min(Math.abs(diff), maxTurnRate*dt);
+      camYaw += step;
+    }
+  } else {
+    player.userData.parts.legL.rotation.x = 0;
+    player.userData.parts.legR.rotation.x = 0;
+  }
+  // clamp to arena
+  const r = Math.hypot(player.position.x, player.position.z);
+  if(r > arenaSize-1){
+    const k = (arenaSize-1)/r;
+    player.position.x *= k; player.position.z *= k;
+  }
+
+  // gravity/jump — snappier arcade arc rather than realistic fall speed.
+  // Ground height is dynamic: it's either flat ground (0) or the top of
+  // whatever obstacle you're currently over, so jumping onto a box and
+  // landing on it actually works.
+  const groundY = groundHeightAt(player.position.x, player.position.z, player.position.y);
+  vy -= 15*dt;
+  player.position.y += vy*dt;
+  if(player.position.y <= groundY){
+    player.position.y = groundY;
+    if(wasAirborne){
+      wasAirborne = false;
+      player.scale.set(1.2,0.8,1.2);
+      setTimeout(()=>{ if(player) player.scale.set(1,1,1); }, 110);
+      spawnBurst(player.position.x, groundY+0.05, player.position.z, 6, FX_MAT_DUST, 1.8);
+    }
+    vy = 0; onGround = true; jumpsUsed = 0;
+  }
+
+  if(player.userData.attackCooldown>0) player.userData.attackCooldown -= dt;
+  updateBullets(dt);
+  updateFx(dt);
+  updateWeather(dt);
+  updateDecorMotion(dt);
+
+  // zombies chase + contact damage
+  zombies.forEach(z=>{
+    const dx = player.position.x-z.position.x, dz = player.position.z-z.position.z;
+    const dist = Math.hypot(dx,dz);
+    if(dist>0.01){
+      const nx = z.position.x + (dx/dist)*z.userData.speed*dt;
+      const nz = z.position.z + (dz/dist)*z.userData.speed*dt;
+      const resolved = resolveCollision(nx, nz, z.position.y); // zombies are solid-blocked too now
+      z.position.x = resolved.x; z.position.z = resolved.z;
+      z.rotation.y = Math.atan2(dx,dz);
+    }
+    z.userData.attackCooldown = Math.max(0,(z.userData.attackCooldown||0)-dt);
+    // Zombies stay at ground level, so a big vertical gap means the
+    // player is up on an elevated platform they can't actually reach.
+    const verticalGap = Math.abs(player.position.y - z.position.y);
+    if(dist < 0.9 && verticalGap < 1.0 && z.userData.attackCooldown<=0){
+      z.userData.attackCooldown = 1.0;
+      playerTakeHit();
+    }
+  });
+}
+
+function animate(){
+  if(!gameRunning) return;
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  update(dt);
+  renderer.render(scene, camera);
+}
+
+// ---- Survival lifecycle ----
+let engineInited = false;
+function startSurvival(){
+  if(!engineInited){ initEngine(); setupControls(); engineInited = true; }
+  clearZombies();
+  bullets.forEach(b=>scene.remove(b.mesh)); // BULLET_GEO/MAT are shared — never dispose
+  bullets = [];
+  fx.forEach(f=>scene.remove(f.mesh));
+  fx = [];
+  hearts = 3; round = 1; kills = 0;
+  vy = 0; onGround = true; wasAirborne = false; jumpsUsed = 0;
+  dashActive = false; dashTimer = 0; dashCooldownTimer = 0;
+  if(player){ scene.remove(player); disposeGroup(player); }
+  spawnPlayer();
+  renderHearts();
+  startRound();
+  gameRunning = true;
+  onResize();
+  clock.getDelta();
+  animate();
+}
+
+function endSurvival(){
+  gameRunning = false;
+  const score = (round-1)*100 + kills*10;
+  let rank, tokens;
+  if(score >= 1500){ rank='platinum'; tokens=400; }
+  else if(score >= 800){ rank='gold'; tokens=250; }
+  else if(score >= 350){ rank='silver'; tokens=150; }
+  else { rank='bronze'; tokens=75; }
+
+  const p = Store.getProfile(state.currentName);
+  p.tokens = (p.tokens||0) + tokens;
+  Store.saveProfile(p);
+  const lb = Store.submitScore('survival', state.currentName, score);
+
+  document.getElementById('rankBadge').className = 'rankBadge '+rank;
+  document.getElementById('rankBadge').textContent = rank[0].toUpperCase();
+  document.getElementById('rankName').textContent = rank.toUpperCase()+' RANK';
+  document.getElementById('statRounds').textContent = round-1;
+  document.getElementById('statKills').textContent = kills;
+  document.getElementById('statScore').textContent = score;
+  document.getElementById('statTokens').textContent = '+'+tokens;
+
+  const lbList = document.getElementById('lbList');
+  lbList.innerHTML = '<div class="subtitle" style="margin:10px 0 4px;">Family Leaderboard</div>';
+  lb.slice(0,5).forEach(row=>{
+    const div = document.createElement('div');
+    div.className = 'lbRow' + (row.name===state.currentName && row.score===score ? ' me':'');
+    div.innerHTML = `<span>${row.name}</span><span>${row.score}</span>`;
+    lbList.appendChild(div);
+  });
+
+  show('screenResults');
+}
+
+document.getElementById('btnPlayAgain').onclick = ()=>{
+  show('screenGame');
+  startSurvival();
+};
+document.getElementById('btnResultsHome').onclick = ()=>{
+  refreshTokenPills();
+  show('screenHome');
+};
+
+})();
+</script>
+</body>
+</html>
+
