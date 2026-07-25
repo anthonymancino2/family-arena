@@ -12,7 +12,8 @@
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
   html,body{margin:0;height:100%;background:#050b12;color:var(--snow);
-    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; overflow:hidden;}
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; overflow:hidden;
+    overscroll-behavior:none;}
   #app{position:fixed;inset:0;background:#050b12;}
   .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
     justify-content:center;padding:24px;padding-top:calc(24px + env(safe-area-inset-top));
@@ -65,7 +66,7 @@
   #avatarPreview .legL{left:33px;} #avatarPreview .legR{left:67px;}
 
   #gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
-  #hud{position:absolute;inset:0;pointer-events:none;}
+  #hud{position:absolute;inset:0;pointer-events:none;touch-action:none;}
   .hitFlash{position:absolute;inset:0;background:radial-gradient(ellipse at center, rgba(255,30,30,0) 40%, rgba(255,20,20,0.55) 100%);
     opacity:0;transition:opacity 0.12s;pointer-events:none;}
   .hitFlash.show{opacity:1;transition:opacity 0.02s;}
@@ -1521,6 +1522,7 @@ function setupControls(){
   const maxRadius = 48;
 
   moveZone.addEventListener('touchstart', e=>{
+    e.preventDefault();
     const t = e.changedTouches[0];
     stickActive = true; stickId = t.identifier;
     center = {x:t.clientX, y:t.clientY};
@@ -1530,10 +1532,11 @@ function setupControls(){
     knob.style.top = (center.y-44)+'px';
     knob.classList.add('active');
     knobDot.style.left='28px'; knobDot.style.top='28px';
-  });
+  }, {passive:false});
   window.addEventListener('touchmove', e=>{
     for(const t of e.changedTouches){
       if(stickActive && t.identifier===stickId){
+        e.preventDefault();
         let dx=t.clientX-center.x, dy=t.clientY-center.y;
         const len=Math.hypot(dx,dy);
         if(len>maxRadius){ dx=dx/len*maxRadius; dy=dy/len*maxRadius; }
@@ -1541,7 +1544,7 @@ function setupControls(){
         moveVec.x = dx/maxRadius; moveVec.y = dy/maxRadius;
       }
     }
-  }, {passive:true});
+  }, {passive:false});
   window.addEventListener('touchend', e=>{
     for(const t of e.changedTouches){
       if(stickActive && t.identifier===stickId){
@@ -1554,20 +1557,22 @@ function setupControls(){
   const lookZone = document.getElementById('lookZone');
   let lookId = null;
   lookZone.addEventListener('touchstart', e=>{
+    e.preventDefault();
     const t = e.changedTouches[0];
     lookId = t.identifier; lookActive = true;
     lookLast = {x:t.clientX,y:t.clientY};
-  });
+  }, {passive:false});
   window.addEventListener('touchmove', e=>{
     for(const t of e.changedTouches){
       if(lookActive && t.identifier===lookId){
+        e.preventDefault();
         const dx = t.clientX-lookLast.x, dy = t.clientY-lookLast.y;
         camYaw += dx*0.008;
         camPitch = Math.max(0.1,Math.min(0.9,camPitch + dy*0.005));
         lookLast = {x:t.clientX,y:t.clientY};
       }
     }
-  }, {passive:true});
+  }, {passive:false});
   window.addEventListener('touchend', e=>{
     for(const t of e.changedTouches){
       if(lookActive && t.identifier===lookId) lookActive=false;
