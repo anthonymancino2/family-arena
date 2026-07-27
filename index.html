@@ -37,8 +37,8 @@
   .tokenPill{position:absolute;top:calc(14px + env(safe-area-inset-top));right:14px;
     background:var(--panel);border:1px solid rgba(255,207,77,0.4);border-radius:999px;
     padding:8px 14px;font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;}
-  .tokenPill .coin{width:16px;height:16px;border-radius:50%;background:var(--gold);
-    box-shadow:inset 0 0 0 2px #b8892a;}
+  .tokenPill .crystal{width:13px;height:13px;background:linear-gradient(135deg,#8fe8ff,#7a5cff);
+    transform:rotate(45deg);border-radius:3px;box-shadow:inset 0 0 0 2px rgba(255,255,255,0.5);}
 
   .bigBtn{background:var(--ice);color:#052233;border:none;border-radius:16px;
     padding:16px 36px;font-size:18px;font-weight:800;margin:8px 0;min-width:220px;}
@@ -66,6 +66,11 @@
   .swatchRow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:18px;}
   .swatch{width:40px;height:40px;border-radius:50%;border:3px solid transparent;}
   .swatch.sel{border-color:var(--ice);}
+  .hairBtn{background:var(--panel);color:var(--snow);border:2px solid rgba(255,255,255,0.18);
+    border-radius:12px;padding:10px 18px;font-weight:700;font-size:14px;}
+  .hairBtn.sel{border-color:var(--ice);background:rgba(127,216,240,0.15);color:var(--ice);}
+  .hairBtn.locked{opacity:0.55;}
+  .hairBtn .lockNote{font-size:10px;font-weight:600;opacity:0.85;}
 
   #avatarPreview{width:120px;height:170px;position:relative;margin-bottom:8px;}
   #avatarPreview .head{position:absolute;top:0;left:35px;width:50px;height:44px;border-radius:12px;}
@@ -173,14 +178,20 @@
   .pausePanel .bigBtn, .pausePanel .ghostBtn{width:100%;}
 
   /* ---- Run economy / progression HUD ---- */
-  .coinsPill{position:absolute;top:calc(58px + env(safe-area-inset-top));left:14px;
+  .runTokensPill{position:absolute;top:calc(58px + env(safe-area-inset-top));left:14px;
     background:var(--panel);border-radius:14px;padding:6px 12px;display:flex;
     align-items:center;gap:6px;font-weight:800;font-size:14px;color:#fff;}
-  .coinsPill .coin{width:15px;height:15px;border-radius:50%;background:var(--gold);
+  .runTokensPill .coin{width:15px;height:15px;border-radius:50%;background:var(--gold);
     box-shadow:inset 0 0 0 2px #b8892a;}
   .weaponPill{position:absolute;top:calc(96px + env(safe-area-inset-top));left:14px;
     background:rgba(20,22,28,0.55);border:1.5px solid rgba(255,255,255,0.35);
     border-radius:12px;padding:5px 11px;font-weight:700;font-size:12px;color:#fff;}
+  .invinciblePill{position:absolute;top:calc(112px + env(safe-area-inset-top));left:50%;
+    transform:translateX(-50%);background:rgba(74,255,234,0.18);
+    border:2px solid #4affea;border-radius:16px;padding:8px 16px;display:none;
+    align-items:center;gap:8px;font-weight:800;font-size:15px;color:#4affea;
+    box-shadow:0 0 14px rgba(74,255,234,0.5);}
+  .invinciblePill.show{display:flex;}
 
   .shopPromptBtn{position:absolute;left:50%;top:62%;transform:translateX(-50%);
     background:var(--gold);color:#3a2a06;border:3px solid #fff;border-radius:16px;
@@ -202,9 +213,9 @@
 
   .shopPanel{background:var(--panel);border-radius:20px;padding:22px 18px;
     text-align:center;width:92%;max-width:420px;max-height:82vh;overflow-y:auto;}
-  .shopCoinsRow{display:flex;align-items:center;justify-content:center;gap:8px;
+  .shopTokensRow{display:flex;align-items:center;justify-content:center;gap:8px;
     font-weight:800;font-size:18px;margin-bottom:14px;color:#fff;}
-  .shopCoinsRow .coin{width:18px;height:18px;border-radius:50%;background:var(--gold);
+  .shopTokensRow .coin{width:18px;height:18px;border-radius:50%;background:var(--gold);
     box-shadow:inset 0 0 0 2px #b8892a;}
   .weaponRow{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.06);
     border-radius:14px;padding:12px;margin:8px 0;text-align:left;}
@@ -262,19 +273,19 @@
 
   <!-- HOME -->
   <div class="screen active" id="screenHome">
-    <div class="tokenPill" id="tokenPillHome"><span class="coin"></span><span id="tokenCountHome">0</span></div>
+    <div class="tokenPill" id="crystalPillHome"><span class="crystal"></span><span id="crystalCountHome">0</span></div>
     <h1 class="title">🏔️ Family Arena</h1>
     <div class="subtitle">Highest rank wins the biggest reward. Nobody loses.</div>
     <div class="nameRow" id="nameRow"></div>
     <input id="newName" placeholder="Add player name" maxlength="14">
     <div style="height:14px"></div>
     <button class="bigBtn" id="btnGoModes">Play</button>
-    <button class="ghostBtn" id="btnGoShop">Token Shop</button>
+    <button class="ghostBtn" id="btnGoShop">Crystal Shop</button>
   </div>
 
   <!-- MODE SELECT -->
   <div class="screen" id="screenModes">
-    <div class="tokenPill"><span class="coin"></span><span id="tokenCountModes">0</span></div>
+    <div class="tokenPill"><span class="crystal"></span><span id="crystalCountModes">0</span></div>
     <div class="backRow"><button class="ghostBtn" id="backHome1">← Back</button></div>
     <h1 class="title" style="font-size:24px;margin-bottom:18px;">Choose a mode</h1>
     <div class="modeGrid">
@@ -305,8 +316,14 @@
       <div class="armL"></div><div class="armR"></div>
       <div class="legL"></div><div class="legR"></div>
     </div>
+    <div class="subtitle" style="margin-bottom:6px;">Avatar</div>
+    <div class="swatchRow" id="typeRow"></div>
     <div class="subtitle" style="margin-bottom:6px;">Skin tone</div>
     <div class="swatchRow" id="skinRow"></div>
+    <div id="hairSection">
+      <div class="subtitle" style="margin-bottom:6px;">Hair style</div>
+      <div class="swatchRow" id="hairRow"></div>
+    </div>
     <div class="subtitle" style="margin-bottom:6px;">Outfit color</div>
     <div class="swatchRow" id="outfitRow"></div>
     <button class="bigBtn" id="btnStartGame">Choose Theme →</button>
@@ -316,7 +333,7 @@
   <div class="screen" id="screenTheme">
     <div class="backRow"><button class="ghostBtn" id="backCustomize">← Back</button></div>
     <h1 class="title" style="font-size:22px;">Pick a starting theme</h1>
-    <div class="subtitle">The world changes theme every 5 rounds, cycling forward from here.</div>
+    <div class="subtitle">The world changes theme every round, cycling forward from here.</div>
     <div class="themeGrid" id="themeGrid"></div>
     <button class="bigBtn" id="btnBeginSurvival">Begin</button>
   </div>
@@ -332,8 +349,9 @@
         <div class="hitFlash" id="hitFlash"></div>
         <div class="heartsWrap"><div class="heartsRow" id="heartsRow"></div></div>
         <div class="roundPill" id="roundPill">Round 1</div>
-        <div class="coinsPill"><div class="coin"></div><span id="coinsCount">0</span></div>
+        <div class="runTokensPill"><div class="coin"></div><span id="runTokensCount">0</span></div>
         <div class="weaponPill" id="weaponPill">Pistol</div>
+        <div class="invinciblePill" id="invinciblePill">🛡 <span id="invincibleTime">0</span>s</div>
         <div class="toast" id="toast"></div>
         <div class="freeBanner" id="freeBanner">FREE ROAM · INVINCIBLE</div>
         <div class="shopPromptBtn" id="shopPromptBtn">🛒 TAP TO SHOP</div>
@@ -385,7 +403,7 @@
         <div class="shopOverlay" id="shopOverlay">
           <div class="shopPanel">
             <h2 style="margin:0 0 6px;">Weapon Shop</h2>
-            <div class="shopCoinsRow"><div class="coin"></div><span id="shopCoinsCount">0</span></div>
+            <div class="shopTokensRow"><div class="coin"></div><span id="shopTokensCount">0</span></div>
             <div id="shopList"></div>
             <button class="ghostBtn" id="btnCloseShop" style="width:100%;margin-top:6px;">Close</button>
           </div>
@@ -404,7 +422,7 @@
       <div class="statLine"><span>Zombies defeated</span><span id="statKills">0</span></div>
       <div class="statLine"><span>Score</span><span id="statScore">0</span></div>
       <div class="statLine" style="color:var(--gold);font-weight:800;">
-        <span>Tokens earned</span><span id="statTokens">+0</span></div>
+        <span>Crystals earned</span><span id="statCrystals">+0</span></div>
       <div style="height:14px"></div>
       <div id="lbList"></div>
       <div style="height:10px"></div>
@@ -415,10 +433,10 @@
 
   <!-- SHOP -->
   <div class="screen" id="screenShop">
-    <div class="tokenPill"><span class="coin"></span><span id="tokenCountShop">0</span></div>
+    <div class="tokenPill"><span class="crystal"></span><span id="crystalCountShop">0</span></div>
     <div class="backRow"><button class="ghostBtn" id="backHome3">← Back</button></div>
-    <h1 class="title" style="font-size:22px;">Token Shop</h1>
-    <div class="subtitle">Spend tokens on new characters.</div>
+    <h1 class="title" style="font-size:22px;">Crystal Shop</h1>
+    <div class="subtitle">Spend crystals on new characters.</div>
     <div class="shopGrid" id="shopGrid"></div>
   </div>
 
@@ -446,9 +464,9 @@ const Store = {
   getProfile(name){
     try{
       const raw = localStorage.getItem(this._key('profile:'+name));
-      if(!raw) return { name, tokens:0, unlocked:['human'], skin:0, outfit:0 };
+      if(!raw) return { name, crystals:0, unlocked:['human','penguin'], skin:0, outfit:0, hairStyle:'short', avatarType:'penguin' };
       return JSON.parse(raw);
-    }catch(e){ return { name, tokens:0, unlocked:['human'], skin:0, outfit:0 }; }
+    }catch(e){ return { name, crystals:0, unlocked:['human','penguin'], skin:0, outfit:0, hairStyle:'short', avatarType:'penguin' }; }
   },
   saveProfile(p){
     localStorage.setItem(this._key('profile:'+p.name), JSON.stringify(p));
@@ -469,13 +487,22 @@ const Store = {
 // ---------------------------------------------------------------------
 // APP STATE
 // ---------------------------------------------------------------------
-const SKINS = ['#f2c9a0','#c68a5a','#8d5a3c','#5a3826'];
+const SKINS = ['#ffe3c4','#f2c9a0','#c68a5a','#8d5a3c','#5a3826','#2b1d16'];
 const OUTFITS = ['#3fa9d6','#e0533d','#4caf50','#9b59b6','#f1c40f','#ecf0f1'];
+const HAIR_STYLES = ['short','medium','long'];
+const HAIR_STYLE_LABELS = {short:'Short', medium:'Medium', long:'Long'};
+const AVATAR_TYPES = ['human','penguin','bunny','dog'];
+const AVATAR_TYPE_LABELS = {human:'🧑 Human', penguin:'🐧 Penguin', bunny:'🐰 Bunny', dog:'🐶 Dog'};
+// human and penguin are free by default; bunny/dog must be unlocked
+// with crystals (prices live in CATALOG, shared with the Crystal Shop).
+const FREE_AVATAR_TYPES = ['human','penguin'];
 
 let state = {
   currentName: null,
   skin: 0,
   outfit: 0,
+  hairStyle: 'short',
+  avatarType: 'human',
   mode: null,
   themeIndex: 0
 };
@@ -485,11 +512,11 @@ function show(id){
   document.getElementById(id).classList.add('active');
 }
 
-function refreshTokenPills(){
-  const p = state.currentName ? Store.getProfile(state.currentName) : {tokens:0};
-  ['tokenCountHome','tokenCountModes','tokenCountShop'].forEach(id=>{
+function refreshCrystalPills(){
+  const p = state.currentName ? Store.getProfile(state.currentName) : {crystals:0};
+  ['crystalCountHome','crystalCountModes','crystalCountShop'].forEach(id=>{
     const el = document.getElementById(id);
-    if(el) el.textContent = p.tokens;
+    if(el) el.textContent = p.crystals;
   });
 }
 
@@ -502,12 +529,33 @@ function renderNameRow(){
     const chip = document.createElement('div');
     chip.className = 'nameChip' + (state.currentName===n ? ' sel':'');
     chip.textContent = n;
-    chip.onclick = ()=>{ state.currentName = n; renderNameRow(); refreshTokenPills(); };
+    chip.onclick = ()=>{ state.currentName = n; loadAvatarFromProfile(); renderNameRow(); refreshCrystalPills(); };
     row.appendChild(chip);
   });
 }
+
+// The avatar picker (skin, outfit color, hair style, avatar type) sticks
+// per-player until manually changed — loaded here whenever a profile
+// becomes active, and saved immediately on every pick in buildCustomizeUI.
+function loadAvatarFromProfile(){
+  if(!state.currentName) return;
+  const p = Store.getProfile(state.currentName);
+  state.skin = p.skin || 0;
+  state.outfit = p.outfit || 0;
+  state.hairStyle = p.hairStyle || 'short';
+  const savedType = p.avatarType || 'human';
+  const isUnlocked = FREE_AVATAR_TYPES.includes(savedType) || (p.unlocked||[]).includes(savedType);
+  state.avatarType = isUnlocked ? savedType : 'human';
+}
+function saveAvatarToProfile(){
+  if(!state.currentName) return;
+  const p = Store.getProfile(state.currentName);
+  p.skin = state.skin; p.outfit = state.outfit;
+  p.hairStyle = state.hairStyle; p.avatarType = state.avatarType;
+  Store.saveProfile(p);
+}
 renderNameRow();
-refreshTokenPills();
+refreshCrystalPills();
 
 document.getElementById('newName').addEventListener('keydown', e=>{
   if(e.key === 'Enter') addName();
@@ -523,19 +571,20 @@ function addName(){
     Store.saveProfile(Store.getProfile(name));
   }
   state.currentName = name;
+  loadAvatarFromProfile();
   input.value = '';
   renderNameRow();
-  refreshTokenPills();
+  refreshCrystalPills();
 }
 document.getElementById('newName').addEventListener('blur', addName);
 
 document.getElementById('btnGoModes').onclick = ()=>{
   if(!state.currentName){
     const names = Store.listProfiles();
-    if(names.length){ state.currentName = names[0]; }
+    if(names.length){ state.currentName = names[0]; loadAvatarFromProfile(); }
     else { alert('Add a player name first.'); return; }
   }
-  refreshTokenPills();
+  refreshCrystalPills();
   show('screenModes');
 };
 document.getElementById('btnGoShop').onclick = ()=>{
@@ -549,27 +598,55 @@ document.getElementById('backHome3').onclick = ()=>show('screenHome');
 
 document.getElementById('btnPlaySurvival').onclick = ()=>{
   state.mode = 'survival';
+  loadAvatarFromProfile();
   buildCustomizeUI();
   show('screenCustomize');
 };
 
 // ---- CUSTOMIZE ----
 function buildCustomizeUI(){
+  const typeRow = document.getElementById('typeRow');
   const skinRow = document.getElementById('skinRow');
+  const hairRow = document.getElementById('hairRow');
   const outfitRow = document.getElementById('outfitRow');
-  skinRow.innerHTML = ''; outfitRow.innerHTML = '';
+  typeRow.innerHTML = ''; skinRow.innerHTML = ''; hairRow.innerHTML = ''; outfitRow.innerHTML = '';
+  const profileForLocks = state.currentName ? Store.getProfile(state.currentName) : {unlocked:['human','penguin']};
+  AVATAR_TYPES.forEach(typeId=>{
+    const isFree = FREE_AVATAR_TYPES.includes(typeId);
+    const isUnlocked = isFree || profileForLocks.unlocked.includes(typeId);
+    const catalogEntry = CATALOG.find(c=>c.id===typeId);
+    const btn = document.createElement('button');
+    btn.className = 'hairBtn' + (state.avatarType===typeId?' sel':'') + (isUnlocked?'':' locked');
+    btn.innerHTML = isUnlocked
+      ? AVATAR_TYPE_LABELS[typeId]
+      : `${AVATAR_TYPE_LABELS[typeId]}<br><span class="lockNote">🔒 ${catalogEntry?catalogEntry.price:''} crystals</span>`;
+    btn.onclick = ()=>{
+      if(!isUnlocked){ toast('Locked — unlock it in the Crystal Shop first'); return; }
+      state.avatarType=typeId; saveAvatarToProfile(); buildCustomizeUI();
+    };
+    typeRow.appendChild(btn);
+  });
   SKINS.forEach((c,i)=>{
     const sw = document.createElement('div');
     sw.className = 'swatch' + (state.skin===i?' sel':'');
     sw.style.background = c;
-    sw.onclick = ()=>{ state.skin=i; buildCustomizeUI(); };
+    sw.onclick = ()=>{ state.skin=i; saveAvatarToProfile(); buildCustomizeUI(); };
     skinRow.appendChild(sw);
+  });
+  const hairSection = document.getElementById('hairSection');
+  hairSection.style.display = state.avatarType==='human' ? '' : 'none';
+  HAIR_STYLES.forEach(styleId=>{
+    const btn = document.createElement('button');
+    btn.className = 'hairBtn' + (state.hairStyle===styleId?' sel':'');
+    btn.textContent = HAIR_STYLE_LABELS[styleId];
+    btn.onclick = ()=>{ state.hairStyle=styleId; saveAvatarToProfile(); buildCustomizeUI(); };
+    hairRow.appendChild(btn);
   });
   OUTFITS.forEach((c,i)=>{
     const sw = document.createElement('div');
     sw.className = 'swatch' + (state.outfit===i?' sel':'');
     sw.style.background = c;
-    sw.onclick = ()=>{ state.outfit=i; buildCustomizeUI(); };
+    sw.onclick = ()=>{ state.outfit=i; saveAvatarToProfile(); buildCustomizeUI(); };
     outfitRow.appendChild(sw);
   });
   const pv = document.getElementById('avatarPreview');
@@ -610,6 +687,8 @@ document.getElementById('btnBeginSurvival').onclick = ()=>{
 // ---- SHOP (stub catalogue — purchase logic works now, character
 // swap into gameplay is the fresh-avatar-set hook for a later chunk) ----
 const CATALOG = [
+  { id:'bunny', name:'Bunny Avatar', icon:'🐰', price:250 },
+  { id:'dog', name:'Dog Avatar', icon:'🐶', price:300 },
   { id:'knight', name:'Knight', icon:'⚔️', price:500 },
   { id:'wizard', name:'Wizard', icon:'🧙', price:750 },
   { id:'ranger', name:'Ranger', icon:'🏹', price:600 },
@@ -624,16 +703,16 @@ function renderShop(){
     const card = document.createElement('div');
     card.className = 'shopCard';
     card.innerHTML = `<div class="icon">${item.icon}</div><h4>${item.name}</h4>
-      <div class="price">${item.price} tokens</div>
-      <button class="${owned?'owned':(p.tokens<item.price?'cant':'')}">
+      <div class="price">${item.price} crystals</div>
+      <button class="${owned?'owned':(p.crystals<item.price?'cant':'')}">
         ${owned?'Owned':'Buy'}</button>`;
     card.querySelector('button').onclick = ()=>{
       if(owned) return;
-      if(p.tokens < item.price){ toast('Not enough tokens'); return; }
-      p.tokens -= item.price;
+      if(p.crystals < item.price){ toast('Not enough crystals'); return; }
+      p.crystals -= item.price;
       p.unlocked.push(item.id);
       Store.saveProfile(p);
-      refreshTokenPills();
+      refreshCrystalPills();
       renderShop();
     };
     grid.appendChild(card);
@@ -648,11 +727,14 @@ let player, playerMixer = null;
 let arenaSize = 30;
 let zombies = [];
 let hearts = 3, maxHearts = 3, round = 1, kills = 0, roundKillTarget = 0, roundKillsDone = 0;
+const MAX_CONCURRENT_ZOMBIES = 30; // hard cap on simultaneous zombies, regardless of round target
+let zombiesRemainingToSpawn = 0;   // queued zombies still owed this round, fed in as others die
 // ---- Player progression: 1 point in each stat by default (3 total),
 // +1 unspent point awarded every round clear for the player to place.
 let playerStats = {power:1, speed:1, hp:1};
 let unspentStatPoints = 0;
-let coins = 0;                 // per-run currency, earned by killing zombies, spent at the shop
+let runTokens = 0;             // per-run currency, earned by killing zombies, spent at the shop
+let crystalsEarned = 0;        // this run's crystal total, earned per round cleared, saved to the profile at run end
 let currentWeaponId = 'pistol';
 let runStartTime = 0;
 let gameRunning = false;
@@ -691,7 +773,10 @@ const WEAPONS = {
 };
 // Coins earned per kill — a flat rate that inches up in later rounds so
 // the pricier weapons stay reachable in a long run.
-function coinsPerKill(){ return 5 + Math.floor(round/5); }
+function tokensPerKill(){ return 5 + Math.floor(round/5); }
+// Crystals: the persistent currency, earned once per round cleared
+// (not per kill) — a flat rate that inches up for later, harder rounds.
+function crystalsPerRound(){ return 15 + Math.floor(round/10)*5; }
 const CAM_LABELS = {1:'POV', 2:'Close', 3:'Far', 4:'Wide', 5:'Wider',
   6:'Distant', 7:'Panorama', 8:'Far out', 9:"Bird's eye"};
 let BULLET_GEO, BULLET_MAT, MUZZLE_GEO, MUZZLE_MAT, FX_GEO, FX_MAT_ZOMBIE, FX_MAT_DUST, FX_MAT_SPARK;
@@ -2550,6 +2635,9 @@ CRITTER_BUILDERS.tumbleweed = function(){
 // of what world you're standing in.
 // ---------------------------------------------------------------------
 let shopStallPos = null; // {x,z} world position, used by the proximity check in update()
+let powerUps = [];       // active pickups: {mesh, type}
+let powerUpSpawnTimer = 0; // seconds until the next periodic power-up drop
+let invincibleTimer = 0; // seconds of power-up invincibility remaining
 let shopStallCoin = null; // the rotating coin mesh, spun each frame
 
 function buildShopStall(){
@@ -2605,6 +2693,94 @@ function placeShopStall(){
     minX:_p.x-s.w/2, maxX:_p.x+s.w/2, minZ:_p.z-s.d/2, maxZ:_p.z+s.d/2, base:0, top:s.h
   });
   shopStallPos = _p;
+}
+
+// ---------------------------------------------------------------------
+// Power-ups: a few pickups scatter around the map every round — a
+// spinning coin stack (bonus run tokens) or a glowing star (temporary
+// invincibility). Not solid, not tied to the theme, cleared and
+// re-rolled fresh each round like everything else in decorMeshes.
+// ---------------------------------------------------------------------
+function buildTokenPickup(){
+  const g = new THREE.Group();
+  const gold = GMAT(0xffd700);
+  const goldDk = GMAT(0xc9a24a);
+  for(let i=0;i<3;i++)
+    _a(g, CYLG(0.16,0.16,0.05,10), i===1?goldDk:gold, 0, 0.1+i*0.06, 0, 0,0,Math.PI/2);
+  g.userData.pType = 'tokens';
+  return g;
+}
+function buildInvinciblePickup(){
+  const g = new THREE.Group();
+  const glow = GMAT(0x4affea);
+  // simple 5-point star, extruded as two thin cones back-to-back
+  function star(r0,r1,y){
+    const pts = [];
+    for(let i=0;i<10;i++){
+      const a = Math.PI*2*i/10 - Math.PI/2;
+      const r = i%2===0 ? r1 : r0;
+      pts.push(new THREE.Vector2(Math.cos(a)*r, Math.sin(a)*r));
+    }
+    const shape = new THREE.Shape(pts);
+    return new THREE.Mesh(new THREE.ShapeGeometry(shape), glow);
+  }
+  const s = star(0.09, 0.22, 0);
+  s.rotation.x = -Math.PI/2;
+  s.position.y = 0.28;
+  g.add(s);
+  const ring = _a(g, new THREE.TorusGeometry(0.26, 0.02, 6, 16), glow, 0, 0.28, 0, Math.PI/2, 0, 0);
+  g.userData.pType = 'invincible';
+  return g;
+}
+const MAX_POWERUPS = 6; // cap so periodic respawns can't pile up forever if ignored
+function spawnOnePowerUp(){
+  if(powerUps.length >= MAX_POWERUPS) return;
+  const type = Math.random() < 0.6 ? 'tokens' : 'invincible';
+  const g = type==='tokens' ? buildTokenPickup() : buildInvinciblePickup();
+  const _p = scatterXZ(4, arenaSize-4);
+  g.position.set(_p.x, 0, _p.z);
+  scene.add(g);
+  powerUps.push({mesh:g, type, x:_p.x, z:_p.z});
+}
+function spawnPowerUps(){
+  powerUps.forEach(p=>{ scene.remove(p.mesh); disposeGroup(p.mesh); });
+  powerUps = [];
+  const count = 2 + Math.floor(round/8); // a few more on longer runs
+  for(let i=0;i<count;i++) spawnOnePowerUp();
+  resetPowerUpSpawnTimer();
+}
+// Periodic respawn on top of the round-start batch — a fresh one drops
+// somewhere on the map every 15-25 seconds (randomized so it doesn't
+// feel like a metronome), independent of round transitions.
+function resetPowerUpSpawnTimer(){ powerUpSpawnTimer = 15 + Math.random()*10; }
+function updatePowerUps(dt){
+  const t = _decorClock.t;
+  powerUpSpawnTimer -= dt;
+  if(powerUpSpawnTimer <= 0){
+    spawnOnePowerUp();
+    resetPowerUpSpawnTimer();
+  }
+  for(let i=powerUps.length-1;i>=0;i--){
+    const p = powerUps[i];
+    p.mesh.rotation.y = t*1.8;
+    p.mesh.position.y = 0.15 + Math.sin(t*2.4 + i)*0.08;
+    if(!player) continue;
+    const dx = player.position.x-p.x, dz = player.position.z-p.z;
+    if(Math.hypot(dx,dz) < 0.85){
+      if(p.type === 'tokens'){
+        const amt = 20 + Math.floor(round/3)*5;
+        runTokens += amt;
+        updateRunTokensHud();
+        toast('+'+amt+' 🪙 Tokens!');
+      } else {
+        invincibleTimer = 8;
+        toast('🛡 Invincible for 8s!');
+      }
+      scene.remove(p.mesh);
+      disposeGroup(p.mesh);
+      powerUps.splice(i,1);
+    }
+  }
 }
 
 function placeLandmark(theme){
@@ -6502,7 +6678,10 @@ function disposeGroup(g){
 // grouped (pants+shoe together) so the whole leg swings from the hip;
 // arms pivot from the shoulder. Named parts (armR etc.) mirror the old
 // file's convention so future weapon-attachment code has a stable hook.
-function buildHuman(skinHex, outfitHex, tint){
+function buildHuman(skinHex, outfitHex, tint, hairStyle){
+  // Zombies call this without a hair style — give them a random one each
+  // so the horde has some visual variety instead of identical heads.
+  hairStyle = hairStyle || HAIR_STYLES[Math.floor(Math.random()*HAIR_STYLES.length)];
   const g = new THREE.Group();
   const skinMat   = LMAT(tint || skinHex);
   const outfitMat = LMAT(tint || outfitHex);
@@ -6626,7 +6805,8 @@ function buildHuman(skinHex, outfitHex, tint){
   // fringe, matching every reference, instead of spikes radiating out
   // in random directions like a sea urchin. Cap and fringe both pulled
   // down closer to the brow line — the previous version left too much
-  // bare forehead between the hairline and the eyes.
+  // bare forehead between the hairline and the eyes. The fringe is
+  // shared by all three lengths; medium/long add strands on top.
   const hairCap = _a(head, new THREE.IcosahedronGeometry(headR*1.05, 1), hairMat, 0, headR*0.1, -headR*0.16);
   hairCap.scale.set(1.0, 0.95, 0.94);
   const sweepDir = 0.5; // radians — every shard leans this same way
@@ -6641,6 +6821,27 @@ function buildHuman(skinHex, outfitHex, tint){
     _a(head, CONEG(headR*0.16, headR*0.55, 5), hairMat, sx, sy, sz, sweepDir*0.9, 0, -sweepDir*0.7);
   }
 
+  if(hairStyle === 'medium'){
+    // Side strands down to jaw length — a bit more coverage/volume at
+    // the back too, but nothing hanging past the shoulders yet.
+    hairCap.scale.set(1.05, 1.0, 1.0);
+    for(const sx of [-1,1])
+      _a(head, CYLG(0.05, 0.02, headR*1.3, 5), hairMat,
+        sx*headR*0.9, -headR*0.35, -headR*0.05, 0, 0, sx*0.1);
+  } else if(hairStyle === 'long'){
+    // Fuller back mass plus long strands hanging well past the
+    // shoulders down along the torso — the "long hair" silhouette from
+    // the reference sheets.
+    hairCap.scale.set(1.08, 1.05, 1.05);
+    _a(head, new THREE.IcosahedronGeometry(headR*0.85, 1), hairMat, 0, -headR*0.25, -headR*0.35);
+    for(const sx of [-1,1]){
+      _a(head, CYLG(0.06, 0.02, headR*2.6, 5), hairMat,
+        sx*headR*0.82, -headR*0.9, -headR*0.15, 0, 0, sx*0.06);
+      _a(head, CYLG(0.05, 0.015, headR*2.2, 5), hairMat,
+        sx*headR*0.55, -headR*1.05, -headR*0.4, 0, 0, sx*0.04);
+    }
+  }
+
   g.userData.parts = {head, torso, armL, armR: armR_, legL, legR: legR_};
   return g;
 }
@@ -6649,6 +6850,310 @@ function buildHuman(skinHex, outfitHex, tint){
 // already in front of it in the depth buffer — i.e. it's invisible in
 // the open, and pops through walls/obstacles the moment the real body
 // is blocked from view. Standard "see them through cover" trick.
+// ---------------------------------------------------------------------
+// Bunny & Dog avatars. Same tiny-body/big-head rig as buildHuman (same
+// proportions, same shoulder/hip pivot math) so the existing walk-cycle
+// and shooting-recoil animation code works unchanged — only the head
+// decoration and paws differ. skinHex doubles as fur color; outfitHex
+// is still the "shirt" on the torso, same as the human avatar.
+// ---------------------------------------------------------------------
+
+// A simple rounded paw — no fingers, just a soft fur-colored blob —
+// used by both animal avatars instead of buildHuman's fingered hand.
+function buildPaw(parent, y, furMat, r){
+  const palm = _a(parent, new THREE.IcosahedronGeometry(r*0.95, 0), furMat, 0, y, 0);
+  palm.scale.set(1, 0.85, 1.1);
+}
+// A simple rounded foot-paw at the base of a leg — fur-colored, no
+// separate boot shape, with a small toe bump for a bit of silhouette.
+function buildAnimalFoot(parent, legH, legR, furMat){
+  const paw = _a(parent, new THREE.IcosahedronGeometry(legR*1.3, 0), furMat, 0, -legH, legR*0.1);
+  paw.scale.set(1, 0.55, 1.25);
+  _a(parent, SPHG(legR*0.6, 6, 5), furMat, 0, -legH+legR*0.15, legR*1.15);
+}
+
+function buildBunny(skinHex, outfitHex, tint){
+  const g = new THREE.Group();
+  const furMat    = LMAT(tint || skinHex);
+  const outfitMat = LMAT(tint || outfitHex);
+  const pupilMat  = GMAT(0x141414);
+  const eyeWhiteMat = GMAT(0xffffff);
+  const cheekMat  = GMAT(0xff9e9e, 0.55);
+  const innerEarMat = LMAT(tint || 0xffc2d1);
+  const noseMat   = LMAT(tint || 0xff8fa3);
+
+  const headR = 0.36;
+  const torsoTopR = 0.15, torsoBotR = 0.18, torsoH = 0.28;
+  const legR = 0.082, legH = 0.22;
+  const armR = 0.07, armLen = 0.27, handR = 0.075;
+  const legGap = 0.13;
+
+  const torsoBaseY = 0.09 + legH; // matches buildHuman's footH offset
+  const headBaseY = torsoBaseY + torsoH;
+
+  function buildLeg(x){
+    const grp = new THREE.Group();
+    _a(grp, CYLG(legR*0.88, legR, legH, 6), furMat, 0, -legH/2, 0);
+    grp.position.set(x, torsoBaseY, 0);
+    buildAnimalFoot(grp, legH, legR, furMat);
+    return grp;
+  }
+  const legL = buildLeg(-legGap/2);
+  const legR_ = buildLeg(legGap/2);
+  g.add(legL, legR_);
+
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(torsoTopR, torsoBotR, torsoH, 7), outfitMat);
+  torso.position.set(0, torsoBaseY+torsoH/2, 0);
+  g.add(torso);
+  // Cottontail poking out the back of the shirt
+  _a(torso, new THREE.IcosahedronGeometry(0.09, 1), LMAT(0xffffff), 0, 0, -torsoBotR*0.85);
+
+  function buildArm(x, sign){
+    const geo = new THREE.CylinderGeometry(armR*0.88, armR, armLen, 6);
+    geo.translate(0, -armLen/2, 0);
+    const mesh = new THREE.Mesh(geo, furMat);
+    mesh.position.set(x, headBaseY-0.01, 0);
+    buildPaw(mesh, -armLen+handR*0.4, furMat, handR);
+    return mesh;
+  }
+  const armL = buildArm(-(torsoTopR+armR*1.2), -1);
+  const armR_ = buildArm(torsoTopR+armR*1.2, 1);
+  g.add(armL, armR_);
+
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(headR, 1), furMat);
+  head.position.set(0, headBaseY+headR*0.9, 0);
+  g.add(head);
+
+  // Tall bunny ears with a pink inner-ear panel — the signature
+  // silhouette element, unmissable from any angle.
+  for(const sx of [-1,1]){
+    const ear = _a(head, CYLG(headR*0.16, headR*0.22, headR*1.5, 6), furMat,
+      sx*headR*0.34, headR*1.15, -headR*0.05, 0, 0, sx*0.15);
+    const inner = _a(head, BOXG(headR*0.16, headR*1.1, 0.01), innerEarMat,
+      sx*headR*0.34, headR*1.13, headR*0.02, 0, 0, sx*0.15);
+  }
+  // Small round ears at the sides too, same spot as the human's
+  for(const sx of [-1,1]){
+    const ear = _a(head, SPHG(headR*0.12, 6, 5), furMat, sx*headR*0.98, -headR*0.1, headR*0.05);
+    ear.scale.set(0.6, 1, 0.8);
+  }
+
+  const eyeY = -headR*0.02, eyeZ = headR*0.94, eyeDX = headR*0.37;
+  for(const sx of [-1,1]){
+    const eye = _a(head, SPHG(headR*0.17, 8, 6), pupilMat, sx*eyeDX, eyeY, eyeZ);
+    eye.scale.set(1, 1.25, 0.4);
+    _a(head, SPHG(headR*0.035, 5, 4), eyeWhiteMat, sx*eyeDX+sx*headR*0.045, eyeY+headR*0.06, eyeZ+0.05);
+  }
+  for(const sx of [-1,1]){
+    const cheek = _a(head, SPHG(headR*0.16, 7, 5), cheekMat, sx*headR*0.65, eyeY-headR*0.22, headR*0.76);
+    cheek.scale.set(1, 0.7, 0.3);
+  }
+  // Small triangular nose
+  _a(head, CONEG(headR*0.07, headR*0.1, 4), noseMat, 0, eyeY-headR*0.12, headR*0.98, Math.PI/2, 0, 0);
+
+  g.userData.parts = {head, torso, armL, armR: armR_, legL, legR: legR_};
+  return g;
+}
+
+function buildDog(skinHex, outfitHex, tint){
+  const g = new THREE.Group();
+  const furMat    = LMAT(tint || skinHex);
+  const outfitMat = LMAT(tint || outfitHex);
+  const pupilMat  = GMAT(0x141414);
+  const eyeWhiteMat = GMAT(0xffffff);
+  const cheekMat  = GMAT(0xff9e9e, 0.55);
+  const snoutMat  = LMAT(tint || 0xf0e4d0);
+  const noseMat   = LMAT(0x2a2420);
+  const collarMat = LMAT(tint || 0xe0533d);
+
+  const headR = 0.36;
+  const torsoTopR = 0.15, torsoBotR = 0.18, torsoH = 0.28;
+  const legR = 0.082, legH = 0.22;
+  const armR = 0.07, armLen = 0.27, handR = 0.075;
+  const legGap = 0.13;
+
+  const torsoBaseY = 0.09 + legH;
+  const headBaseY = torsoBaseY + torsoH;
+
+  function buildLeg(x){
+    const grp = new THREE.Group();
+    _a(grp, CYLG(legR*0.88, legR, legH, 6), furMat, 0, -legH/2, 0);
+    grp.position.set(x, torsoBaseY, 0);
+    buildAnimalFoot(grp, legH, legR, furMat);
+    return grp;
+  }
+  const legL = buildLeg(-legGap/2);
+  const legR_ = buildLeg(legGap/2);
+  g.add(legL, legR_);
+
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(torsoTopR, torsoBotR, torsoH, 7), outfitMat);
+  torso.position.set(0, torsoBaseY+torsoH/2, 0);
+  g.add(torso);
+  // Wagging tail — a tapered cylinder curling up from the back
+  _a(torso, CYLG(0.02,0.045,0.32,5), furMat, 0, 0.05, -torsoBotR*0.9, 0.9, 0, 0);
+
+  function buildArm(x, sign){
+    const geo = new THREE.CylinderGeometry(armR*0.88, armR, armLen, 6);
+    geo.translate(0, -armLen/2, 0);
+    const mesh = new THREE.Mesh(geo, furMat);
+    mesh.position.set(x, headBaseY-0.01, 0);
+    buildPaw(mesh, -armLen+handR*0.4, furMat, handR);
+    return mesh;
+  }
+  const armL = buildArm(-(torsoTopR+armR*1.2), -1);
+  const armR_ = buildArm(torsoTopR+armR*1.2, 1);
+  g.add(armL, armR_);
+
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(headR, 1), furMat);
+  head.position.set(0, headBaseY+headR*0.9, 0);
+  g.add(head);
+
+  // Floppy ears hanging down the sides — flattened teardrop shapes,
+  // the dog's signature silhouette element.
+  for(const sx of [-1,1]){
+    const ear = _a(head, new THREE.IcosahedronGeometry(headR*0.42, 1), furMat,
+      sx*headR*0.92, headR*0.25, -headR*0.02, 0, 0, sx*0.3);
+    ear.scale.set(0.55, 1.3, 0.7);
+  }
+
+  const eyeY = -headR*0.02, eyeZ = headR*0.9, eyeDX = headR*0.34;
+  for(const sx of [-1,1]){
+    const eye = _a(head, SPHG(headR*0.16, 8, 6), pupilMat, sx*eyeDX, eyeY, eyeZ);
+    eye.scale.set(1, 1.2, 0.4);
+    _a(head, SPHG(headR*0.03, 5, 4), eyeWhiteMat, sx*eyeDX+sx*headR*0.04, eyeY+headR*0.05, eyeZ+0.045);
+  }
+  for(const sx of [-1,1]){
+    const cheek = _a(head, SPHG(headR*0.14, 7, 5), cheekMat, sx*headR*0.6, eyeY-headR*0.3, headR*0.72);
+    cheek.scale.set(1, 0.7, 0.3);
+  }
+  // Protruding snout with a dark nose tip
+  const snout = _a(head, new THREE.CylinderGeometry(headR*0.24, headR*0.3, headR*0.5, 8), snoutMat,
+    0, eyeY-headR*0.32, headR*0.75, Math.PI/2, 0, 0);
+  _a(head, SPHG(headR*0.11, 6, 5), noseMat, 0, eyeY-headR*0.32, headR*1.0);
+
+  // Collar around the neck
+  _a(g, new THREE.TorusGeometry(torsoTopR*1.05, 0.025, 6, 12), collarMat, 0, headBaseY+0.02, 0, Math.PI/2, 0, 0);
+
+  g.userData.parts = {head, torso, armL, armR: armR_, legL, legR: legR_};
+  return g;
+}
+
+function buildPenguin(skinHex, outfitHex, tint){
+  const g = new THREE.Group();
+  // skinHex still doubles as a color pick (from the same tone swatches),
+  // but a penguin reads best in classic black/cream regardless — the
+  // chosen tone tints the belly patch instead of the whole body.
+  const bodyMat   = LMAT(tint || 0x1c1e20);
+  const bellyMat  = LMAT(tint || skinHex || 0xf2ecd8);
+  const outfitMat = LMAT(tint || outfitHex);
+  const pupilMat  = GMAT(0x141414);
+  const cheekMat  = GMAT(0xff9e9e, 0.45);
+  const beakMat   = LMAT(tint || 0xff8f2c);
+  const footMat   = LMAT(tint || 0xff8f2c);
+
+  const headR = 0.30;
+  const legR = 0.075, legH = 0.15; // short waddly legs
+  const armR = 0.06, armLen = 0.30;
+  const legGap = 0.12;
+
+  const torsoBaseY = 0.09 + legH;
+  const torsoH = 0.40; // taller nominal span — the egg-shaped body fills well past this
+  const headBaseY = torsoBaseY + torsoH;
+
+  // Big flat webbed feet — wide and forward-facing, the whole waddle
+  // silhouette lives in these.
+  function buildWebFoot(parent){
+    const foot = _a(parent, new THREE.IcosahedronGeometry(legR*2.0, 0), footMat, 0, -legH, legR*0.55);
+    foot.scale.set(1.2, 0.32, 2.0);
+  }
+  function buildLeg(x){
+    const grp = new THREE.Group();
+    _a(grp, CYLG(legR*0.9, legR, legH, 6), bodyMat, 0, -legH/2, 0);
+    grp.position.set(x, torsoBaseY, 0);
+    buildWebFoot(grp);
+    return grp;
+  }
+  const legL = buildLeg(-legGap/2);
+  const legR_ = buildLeg(legGap/2);
+  g.add(legL, legR_);
+
+  // ---- Body: ONE unified rounded egg shape (a stretched low-poly
+  // icosahedron) instead of a distinct cylinder torso + separate head —
+  // this is the single biggest fix versus the reference: a real penguin
+  // silhouette has no neck line, just one continuous rounded form.
+  const torsoCY = torsoBaseY + torsoH*0.46; // torso mesh's world-space center
+  const torso = new THREE.Mesh(new THREE.IcosahedronGeometry(0.30, 1), bodyMat);
+  torso.position.set(0, torsoCY, 0);
+  torso.scale.set(1.08, 1.24, 1.02);
+  g.add(torso);
+
+  // Big cream belly patch — the dominant front feature, running from
+  // upper chest down toward the base and tapering at the bottom, per
+  // every reference image. Parented to the top-level group (NOT to the
+  // scaled torso mesh) with explicit world-space coordinates — a child
+  // of a scaled parent has its own local offsets multiplied by that
+  // parent's scale, which is what silently sent the old outfit ribbon
+  // flying up near y=1.3 (off the top of the screen) instead of sitting
+  // at the throat. Absolute coordinates here sidestep that entirely.
+  const belly = new THREE.Mesh(new THREE.IcosahedronGeometry(0.235, 1), bellyMat);
+  belly.position.set(0, torsoCY + 0.05, 0.185);
+  belly.scale.set(0.9, 1.35, 0.6);
+  g.add(belly);
+  // A colored band at the belly's lower hem — keeps outfit-color
+  // customization visible without the positioning risk of a separate
+  // throat accessory.
+  const hem = new THREE.Mesh(new THREE.TorusGeometry(0.135, 0.032, 6, 12), outfitMat);
+  hem.position.set(0, torsoCY - 0.16, 0.135);
+  hem.rotation.set(Math.PI/2, 0, 0);
+  hem.scale.set(1, 1, 0.45); // flattened against the belly's curve, not a full free-floating ring
+  g.add(hem);
+
+  // Wing-shaped flippers that sweep back and down against the body,
+  // like real folded bird wings — tapered wide-to-narrow (not a uniform
+  // capsule) and angled backward, not just hanging straight down.
+  // Pivoted at torso-center height (well below the head) so they read
+  // as attached to the body, not as ears on the head.
+  function buildArm(x, sign){
+    const geo = new THREE.CylinderGeometry(armR*1.7, armR*0.35, armLen, 6);
+    geo.translate(0, -armLen/2, 0);
+    const mesh = new THREE.Mesh(geo, bodyMat);
+    mesh.position.set(x, torsoCY + 0.1, -0.02);
+    mesh.rotation.z = -sign*0.32;  // swept outward from the shoulder
+    mesh.rotation.x = 0.45;        // swept BACK along the body, wing-like
+    mesh.scale.set(1.9, 1, 0.4);   // wide flat wing silhouette
+    return mesh;
+  }
+  const armL = buildArm(-(0.27), -1);
+  const armR_ = buildArm(0.27, 1);
+  g.add(armL, armR_);
+
+  // `head` stays a real anchor object (kept small and folded deep into
+  // the top of the egg body, same dark color) so eyes/beak/cheeks have
+  // a stable local coordinate space, without reintroducing a neck seam.
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(headR*0.6, 1), bodyMat);
+  head.position.set(0, headBaseY+headR*0.15, 0.04);
+  g.add(head);
+
+  const eyeY = headR*0.28, eyeZ = headR*0.62, eyeDX = headR*0.24;
+  for(const sx of [-1,1]){
+    // Small, simple dot eyes set close together — not the big cartoon
+    // eye style used elsewhere, matching every reference here.
+    const eye = _a(head, SPHG(headR*0.1, 7, 6), pupilMat, sx*eyeDX, eyeY, eyeZ);
+  }
+  for(const sx of [-1,1]){
+    const cheek = _a(head, SPHG(headR*0.13, 7, 5), cheekMat, sx*headR*0.5, eyeY-headR*0.22, eyeZ*0.9);
+    cheek.scale.set(1, 0.7, 0.3);
+  }
+  // Bigger, blockier beak — a flattened 4-sided pyramid rather than a
+  // rounder cone, matching the chunky angular beak in the reference.
+  const beak = _a(head, CONEG(headR*0.22, headR*0.38, 4), beakMat,
+    0, eyeY-headR*0.34, headR*0.86, Math.PI/2, Math.PI/4, 0);
+  beak.scale.set(1.15, 0.62, 1);
+
+  g.userData.parts = {head, torso, armL, armR: armR_, legL, legR: legR_};
+  return g;
+}
+
 function addXray(group, colorHex){
   const geo = new THREE.BoxGeometry(0.85, 1.56, 0.4);
   geo.translate(0, 0.78, 0);
@@ -6679,8 +7184,9 @@ function attachPistol(armR){
 }
 
 function spawnPlayer(){
-  const p = Store.getProfile(state.currentName);
-  player = buildHuman(SKINS[p.skin||state.skin], OUTFITS[p.outfit||state.outfit]);
+  const builders = {human:buildHuman, penguin:buildPenguin, bunny:buildBunny, dog:buildDog};
+  const build = builders[state.avatarType] || buildHuman;
+  player = build(SKINS[state.skin], OUTFITS[state.outfit], null, state.hairStyle);
   player.position.set(0,0,0);
   player.userData.facing = 0;
   player.userData.hp = 3;
@@ -6737,12 +7243,23 @@ function clearZombies(){
 function startRound(){
   clearZombies();
   applyTheme(round);
-  // Each round adds exactly one more zombie than the last (round 1
-  // starts at 4). Simple, predictable escalation instead of the old
-  // 1.5x-per-round multiplier.
-  roundKillTarget = round === 1 ? 4 : roundKillTarget + 1;
+  // Rounds 1-3 add one zombie at a time (4, 5, 6). From round 4 on, the
+  // target jumps by 10 every round — but see MAX_CONCURRENT_ZOMBIES
+  // below for why they don't all appear on screen simultaneously.
+  if(round === 1) roundKillTarget = 4;
+  else if(round <= 3) roundKillTarget += 1;
+  else roundKillTarget += 10;
   roundKillsDone = 0;
-  for(let i=0;i<roundKillTarget;i++) spawnZombie();
+  // Spawning the full target at once would mean 200+ zombies (and,
+  // at ~35 meshes each, 7000+ mesh objects) appearing in a single frame
+  // by round 20 — spawn up to the cap immediately, and killZombie() below
+  // tops up the rest as slots free up, so the total-kills goal for the
+  // round stays the same but the concurrent crowd stays render-friendly.
+  zombiesRemainingToSpawn = roundKillTarget;
+  const initialSpawn = Math.min(zombiesRemainingToSpawn, MAX_CONCURRENT_ZOMBIES);
+  for(let i=0;i<initialSpawn;i++) spawnZombie();
+  zombiesRemainingToSpawn -= initialSpawn;
+  spawnPowerUps();
   const theme = themeForRound(round, state.themeIndex||0);
   toast('Round '+round+' · '+theme.name+' — '+roundKillTarget+' incoming');
 }
@@ -6773,13 +7290,22 @@ function pickStat(stat){
   if(gameRunning) startRound();
 }
 
-function updateCoinsHud(){
-  document.getElementById('coinsCount').textContent = coins;
-  const shopCoins = document.getElementById('shopCoinsCount');
-  if(shopCoins) shopCoins.textContent = coins;
+function updateRunTokensHud(){
+  document.getElementById('runTokensCount').textContent = runTokens;
+  const shopTokens = document.getElementById('shopTokensCount');
+  if(shopTokens) shopTokens.textContent = runTokens;
 }
 function updateWeaponHud(){
   document.getElementById('weaponPill').textContent = WEAPONS[currentWeaponId].name;
+}
+function updateInvincibleHud(){
+  const pill = document.getElementById('invinciblePill');
+  if(invincibleTimer > 0){
+    pill.classList.add('show');
+    document.getElementById('invincibleTime').textContent = invincibleTimer.toFixed(1);
+  } else {
+    pill.classList.remove('show');
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -6797,15 +7323,20 @@ function updateShopPrompt(){
   btn.classList.toggle('show', near && !document.getElementById('shopOverlay').classList.contains('show'));
 }
 function openShop(){
+  if(!gameRunning) return;
+  gameRunning = false; // same pause mechanism as the pause menu — nothing moves or hurts you while shopping
   renderShopList();
   document.getElementById('shopOverlay').classList.add('show');
   document.getElementById('shopPromptBtn').classList.remove('show');
 }
 function closeShop(){
   document.getElementById('shopOverlay').classList.remove('show');
+  gameRunning = true;
+  clock.getDelta();
+  animate();
 }
 function renderShopList(){
-  updateCoinsHud();
+  updateRunTokensHud();
   const list = document.getElementById('shopList');
   list.innerHTML = '';
   for(const id in WEAPONS){
@@ -6832,13 +7363,13 @@ function renderShopList(){
     } else {
       btn.className = 'weaponBuyBtn';
       btn.textContent = w.price+'🪙';
-      btn.disabled = coins < w.price;
+      btn.disabled = runTokens < w.price;
       btn.onclick = ()=>{
-        if(coins < w.price) return;
-        coins -= w.price;
+        if(runTokens < w.price) return;
+        runTokens -= w.price;
         ownedWeapons[id] = true;
         currentWeaponId = id;
-        updateCoinsHud(); updateWeaponHud(); renderShopList();
+        updateRunTokensHud(); updateWeaponHud(); renderShopList();
         toast('Bought '+w.name+'!');
       };
     }
@@ -6990,7 +7521,7 @@ function setupControls(){
     e.preventDefault();
     document.getElementById('pauseOverlay').classList.remove('show');
     gameRunning = false;
-    refreshTokenPills();
+    refreshCrystalPills();
     show('screenHome');
   });
 
@@ -7087,7 +7618,11 @@ function doDash(){
 
 function doJump(){
   if(!gameRunning || jumpsUsed >= MAX_JUMPS) return;
-  vy = 7.4; onGround = false; wasAirborne = true; jumpsUsed++;
+  // Bunny jumps twice as high as any other avatar. Height = v²/(2g) under
+  // constant gravity, so doubling the HEIGHT takes a √2 velocity bump,
+  // not a 2x one (which would quadruple it).
+  const jumpMult = state.avatarType==='bunny' ? Math.SQRT2 : 1;
+  vy = 7.4 * jumpMult; onGround = false; wasAirborne = true; jumpsUsed++;
   player.scale.set(0.85,1.25,0.85);
   setTimeout(()=>{ if(player) player.scale.set(1,1,1); }, 140);
   if(jumpsUsed === 2) spawnBurst(player.position.x, player.position.y+0.5, player.position.z, 5, FX_MAT_DUST, 2.2);
@@ -7291,17 +7826,29 @@ function killZombie(z){
   disposeGroup(z);
   zombies = zombies.filter(o=>o!==z);
   kills++; roundKillsDone++;
-  coins += coinsPerKill();
-  updateCoinsHud();
+  runTokens += tokensPerKill();
+  updateRunTokensHud();
+  // Feed the spawn queue: keeps the on-screen crowd near the cap
+  // without ever exceeding it, however large the round's real target is.
+  if(zombiesRemainingToSpawn > 0 && roundKillsDone < roundKillTarget){
+    spawnZombie();
+    zombiesRemainingToSpawn--;
+  }
   if(roundKillsDone >= roundKillTarget){
     round++;
     unspentStatPoints++;
+    // Crystals are the persistent, cross-run currency (spent in the
+    // main-menu Crystal Shop) — earned once per round cleared, not per
+    // kill, so a long careful run earns steadily even if it's not a
+    // speed-kill run.
+    crystalsEarned += crystalsPerRound();
     setTimeout(()=>{ if(gameRunning) showLevelUp(); }, 900);
   }
 }
 
 function playerTakeHit(){
   if(freeMode) return; // invincible while free-roaming
+  if(invincibleTimer > 0) return; // invincible from a power-up pickup
   hearts--;
   renderHearts();
   const flash = document.getElementById('hitFlash');
@@ -7383,7 +7930,8 @@ function update(dt){
     const mx = Math.sin(camYaw)*forward - Math.cos(camYaw)*strafe;
     const mz = Math.cos(camYaw)*forward + Math.sin(camYaw)*strafe;
     const len = Math.hypot(mx,mz)||1;
-    const speed = PLAYER_SPEED * (1 + (playerStats.speed-1)*0.15);
+    const speedStat = playerStats.speed + (state.avatarType==='dog' ? 1 : 0);
+    const speed = PLAYER_SPEED * (1 + (speedStat-1)*0.15);
     const nx = player.position.x + (mx/len)*speed*dt;
     const nz = player.position.z + (mz/len)*speed*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
@@ -7450,6 +7998,12 @@ function update(dt){
   updateDecorMotion(dt);
   updateCritters(dt);
   updateShopPrompt();
+  updatePowerUps(dt);
+  if(invincibleTimer > 0){
+    invincibleTimer -= dt;
+    if(invincibleTimer < 0) invincibleTimer = 0;
+    updateInvincibleHud();
+  }
 
   // Zombies chase + contact damage — frozen in place while free roaming,
   // so the player can fly around and actually look at a moment in the
@@ -7499,9 +8053,14 @@ function startSurvival(){
   hearts = 3; maxHearts = 3; round = 1; kills = 0;
   playerStats = {power:1, speed:1, hp:1};
   unspentStatPoints = 0;
-  coins = 0;
+  runTokens = 0;
+  crystalsEarned = 0;
   ownedWeapons = {pistol:true};
   currentWeaponId = 'pistol';
+  powerUps.forEach(p=>{ scene.remove(p.mesh); disposeGroup(p.mesh); });
+  powerUps = [];
+  invincibleTimer = 0;
+  updateInvincibleHud();
   document.getElementById('levelUpOverlay').classList.remove('show');
   document.getElementById('shopOverlay').classList.remove('show');
   vy = 0; onGround = true; wasAirborne = false; jumpsUsed = 0;
@@ -7511,7 +8070,7 @@ function startSurvival(){
   if(player){ scene.remove(player); disposeGroup(player); }
   spawnPlayer();
   renderHearts();
-  updateCoinsHud();
+  updateRunTokensHud();
   updateWeaponHud();
   runStartTime = performance.now();
   startRound();
@@ -7533,20 +8092,23 @@ function endSurvival(){
   const mins = Math.floor(elapsedSec/60), secs = Math.floor(elapsedSec%60);
   const timeStr = mins+':'+String(secs).padStart(2,'0');
 
-  let rank, tokens;
-  if(round-1 >= 15){ rank='platinum'; tokens=400; }
-  else if(round-1 >= 8){ rank='gold'; tokens=250; }
-  else if(round-1 >= 4){ rank='silver'; tokens=150; }
-  else { rank='bronze'; tokens=75; }
+  // Rank is still a flavor badge based on how far the run got — it no
+  // longer determines the crystal payout, which now comes from the
+  // per-round total earned as you played (crystalsEarned).
+  let rank;
+  if(round-1 >= 15) rank='platinum';
+  else if(round-1 >= 8) rank='gold';
+  else if(round-1 >= 4) rank='silver';
+  else rank='bronze';
 
   // A run where free roam (invincible) was used is practice only — it
-  // must not award tokens or post to the shared family leaderboard, or
-  // the whole competition is meaningless.
+  // must not award crystals or post to the shared family leaderboard,
+  // or the whole competition is meaningless.
   const practice = runUsedFreeMode;
-  if(practice) tokens = 0;
+  const crystalsAwarded = practice ? 0 : crystalsEarned;
   const p = Store.getProfile(state.currentName);
   if(!practice){
-    p.tokens = (p.tokens||0) + tokens;
+    p.crystals = (p.crystals||0) + crystalsAwarded;
     Store.saveProfile(p);
   }
   const lb = practice ? Store.getLeaderboard('survival')
@@ -7559,7 +8121,7 @@ function endSurvival(){
   document.getElementById('statTime').textContent = timeStr;
   document.getElementById('statKills').textContent = kills;
   document.getElementById('statScore').textContent = score;
-  document.getElementById('statTokens').textContent = practice ? '—' : '+'+tokens;
+  document.getElementById('statCrystals').textContent = practice ? '—' : '+'+crystalsAwarded;
   document.getElementById('rankName').textContent = practice
     ? 'PRACTICE RUN' : rank.toUpperCase()+' RANK';
 
@@ -7588,7 +8150,7 @@ document.getElementById('btnPlayAgain').onclick = ()=>{
   startSurvival();
 };
 document.getElementById('btnResultsHome').onclick = ()=>{
-  refreshTokenPills();
+  refreshCrystalPills();
   show('screenHome');
 };
 
