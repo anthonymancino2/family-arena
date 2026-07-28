@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Family Arena — Alex Sprint V6</title>
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
@@ -341,6 +344,11 @@
 </style>
 </head>
 <body>
+<div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
+background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
+padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
+KAYKIT TEST V9
+</div>
 <div id="app">
 
   <!-- HOME -->
@@ -8103,11 +8111,11 @@ function buildKayKitRoguePlayer(){
     };
 
     wrapper.userData.playKayClip('Idle', true);
-    toast('KayKit Rogue loaded · real rig + baked animations');
+    toast('V9: KayKit Rogue loaded · real rig + baked animations');
   }).catch(err => {
     console.error('KayKit asset load failed:', err);
     const detail = (err && err.message) ? err.message : String(err);
-    toast('KayKit load error: ' + detail.slice(0, 90));
+    toast('V9 LOAD ERROR: ' + detail.slice(0, 120));
   });
 
   return wrapper;
