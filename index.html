@@ -100,13 +100,15 @@
   .hairBtn.locked{opacity:0.55;}
   .hairBtn .lockNote{font-size:10px;font-weight:600;opacity:0.85;}
 
-  #avatarPreview{width:120px;height:170px;position:relative;margin-bottom:8px;}
-  #avatarPreview .head{position:absolute;top:0;left:35px;width:50px;height:44px;border-radius:12px;}
-  #avatarPreview .torso{position:absolute;top:46px;left:26px;width:68px;height:66px;border-radius:14px;}
-  #avatarPreview .armL,#avatarPreview .armR{position:absolute;top:50px;width:16px;height:56px;border-radius:8px;}
-  #avatarPreview .armL{left:8px;} #avatarPreview .armR{left:96px;}
-  #avatarPreview .legL,#avatarPreview .legR{position:absolute;top:112px;width:20px;height:52px;border-radius:8px;}
-  #avatarPreview .legL{left:33px;} #avatarPreview .legR{left:67px;}
+  #avatarPreview{width:132px;height:176px;position:relative;margin:4px 0 12px;filter:drop-shadow(0 12px 9px rgba(0,0,0,.28));}
+  #avatarPreview .head{position:absolute;top:0;left:31px;width:70px;height:66px;border-radius:46% 46% 42% 42%;box-shadow:inset -10px -8px 0 rgba(0,0,0,.08),inset 8px 7px 0 rgba(255,255,255,.12);z-index:3;}
+  #avatarPreview .head:before,#avatarPreview .head:after{content:"";position:absolute;top:25px;width:14px;height:20px;border-radius:50%;background:#211714;box-shadow:inset 4px 4px 0 #fff;}
+  #avatarPreview .head:before{left:15px} #avatarPreview .head:after{right:15px}
+  #avatarPreview .torso{position:absolute;top:62px;left:38px;width:56px;height:58px;border-radius:18px 18px 22px 22px;box-shadow:inset -9px -5px 0 rgba(0,0,0,.12);z-index:2;}
+  #avatarPreview .armL,#avatarPreview .armR{position:absolute;top:68px;width:15px;height:53px;border-radius:10px;}
+  #avatarPreview .armL{left:23px;transform:rotate(5deg);} #avatarPreview .armR{left:94px;transform:rotate(-5deg);}
+  #avatarPreview .legL,#avatarPreview .legR{position:absolute;top:116px;width:18px;height:48px;border-radius:9px;}
+  #avatarPreview .legL{left:43px;} #avatarPreview .legR{left:71px;}
 
   #gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
   #hud{position:absolute;inset:0;pointer-events:none;touch-action:none;}
@@ -7554,6 +7556,138 @@ function buildForestRanger(skinHex, outfitHex, tint){
   g.userData.parts = {head, torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
   return g;
 }
+
+
+// =====================================================================
+// AVATAR MODEL OVERHAUL V3
+// Entirely new reference-driven chibi construction system. These models
+// do not reuse the previous avatar geometry. Shared proportions follow
+// the supplied polished low-poly sheets: large faceted head, compact
+// tapered torso, short limbs, oversized layered eyes, clean silhouettes.
+// =====================================================================
+function RC_MAT(color, emissive=0x000000, emissiveIntensity=0){
+  return new THREE.MeshStandardMaterial({
+    color, roughness:0.76, metalness:0.02, flatShading:true,
+    emissive, emissiveIntensity
+  });
+}
+function RC_GLOSS(color, emissive=0x000000, emissiveIntensity=0){
+  return new THREE.MeshStandardMaterial({
+    color, roughness:0.28, metalness:0.06, flatShading:true,
+    emissive, emissiveIntensity
+  });
+}
+function rcAdd(parent, geo, mat, x=0,y=0,z=0, rx=0,ry=0,rz=0){
+  const m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); m.rotation.set(rx,ry,rz); parent.add(m); return m;
+}
+function rcColor(hex, mul=1){ return new THREE.Color(hex).multiplyScalar(mul).getHex(); }
+
+function buildReferenceChibi(cfg={}){
+  const g=new THREE.Group();
+  const skin=cfg.skin ?? 0xf2c9a0, outfit=cfg.outfit ?? 0x3fa9d6;
+  const skinM=RC_MAT(skin), outfitM=RC_MAT(outfit), darkM=RC_MAT(cfg.dark ?? rcColor(outfit,.55));
+  const pantsM=RC_MAT(cfg.pants ?? 0x273443), shoeM=RC_MAT(cfg.shoes ?? 0x1b2430);
+  const headM=RC_MAT(cfg.headColor ?? skin), eyeWhite=RC_GLOSS(0xfffbf4), iris=RC_GLOSS(cfg.eyeColor ?? 0x211714);
+  const blush=RC_GLOSS(cfg.blush ?? 0xff8f98), mouthM=RC_GLOSS(0x633333);
+
+  const S=cfg.scale||1, headR=(cfg.headR||0.39)*S;
+  const torsoH=(cfg.torsoH||0.31)*S, torsoTop=(cfg.torsoTop||0.14)*S, torsoBot=(cfg.torsoBot||0.205)*S;
+  const legH=(cfg.legH||0.23)*S, legR=(cfg.legR||0.069)*S, footH=.082*S, footL=.18*S;
+  const armL=(cfg.armLen||0.285)*S, armR=.061*S, handR=.073*S, legGap=.14*S;
+  const torsoBase=footH+legH, shoulderY=torsoBase+torsoH*.83, headY=torsoBase+torsoH+headR*.91;
+
+  function pivotCylinder(parent, mat, top, bot, len){
+    const geo=new THREE.CylinderGeometry(top,bot,len,7,1,false); geo.translate(0,-len/2,0);
+    return rcAdd(parent,geo,mat);
+  }
+  function leg(x){
+    const p=new THREE.Group(); pivotCylinder(p,pantsM,legR*.83,legR,legH);
+    const shoe=rcAdd(p,new THREE.BoxGeometry(legR*2.05,footH,footL),shoeM,0,-legH-footH/2,footL*.32);
+    shoe.geometry.translate(0,0,0); shoe.scale.set(1,1,1);
+    const toe=rcAdd(p,new THREE.IcosahedronGeometry(legR*1.05,1),shoeM,0,-legH-footH*.52,footL*.77);
+    toe.scale.set(1.08,.58,.95); p.position.set(x,torsoBase,0); return p;
+  }
+  const legL=leg(-legGap/2), legRr=leg(legGap/2); g.add(legL,legRr);
+
+  const torso=rcAdd(g,new THREE.CylinderGeometry(torsoTop,torsoBot,torsoH,8),outfitM,0,torsoBase+torsoH/2,0);
+  rcAdd(g,new THREE.CylinderGeometry(torsoBot*.98,torsoBot*1.02,.052*S,8),darkM,0,torsoBase+.048*S,0);
+  if(cfg.chestPanel!==false){ const p=rcAdd(torso,new THREE.BoxGeometry(torsoTop*1.05,torsoH*.52,.026*S),darkM,0,0,torsoBot*.92); p.rotation.x=-.03; }
+
+  function arm(x,sign){
+    const p=new THREE.Group();
+    const sleeve=.095*S; pivotCylinder(p,outfitM,armR*1.08,armR*1.18,sleeve);
+    const fore=pivotCylinder(p,skinM,armR*.82,armR,armL-sleeve); fore.position.y=-sleeve;
+    const hand=rcAdd(fore,new THREE.IcosahedronGeometry(handR,1),skinM,0,-(armL-sleeve)+handR*.18,0); hand.scale.set(.88,1.02,.8);
+    const thumb=rcAdd(fore,new THREE.CylinderGeometry(handR*.2,handR*.24,handR*.72,5),skinM,sign*handR*.62,-(armL-sleeve)+handR*.3,handR*.08,.32,0,sign*.9);
+    p.position.set(x,shoulderY,0); p.rotation.z=sign*.035; return p;
+  }
+  const armLeft=arm(-(torsoTop+armR*1.2),-1), armRight=arm(torsoTop+armR*1.2,1); g.add(armLeft,armRight);
+
+  const head=rcAdd(g,new THREE.IcosahedronGeometry(headR,2),headM,0,headY,0); head.scale.set(1.03,.98,.94);
+  if(!cfg.noEars) for(const sx of [-1,1]){ const e=rcAdd(head,new THREE.IcosahedronGeometry(headR*.17,1),headM,sx*headR*.97,-headR*.035,0); e.scale.set(.56,1,.72); }
+
+  if(!cfg.noFace){
+    const eyeY=headR*.025, eyeZ=headR*.86, dx=headR*.355;
+    for(const sx of [-1,1]){
+      const w=rcAdd(head,new THREE.SphereGeometry(headR*.18,12,8),eyeWhite,sx*dx,eyeY,eyeZ); w.scale.set(1,1.24,.35);
+      const q=rcAdd(head,new THREE.SphereGeometry(headR*.132,10,7),iris,sx*dx,eyeY-headR*.012,eyeZ+.038); q.scale.set(1,1.22,.27);
+      rcAdd(head,new THREE.SphereGeometry(headR*.037,6,4),eyeWhite,sx*dx-sx*headR*.035,eyeY+headR*.067,eyeZ+.074);
+      rcAdd(head,new THREE.SphereGeometry(headR*.017,5,4),eyeWhite,sx*dx+sx*headR*.035,eyeY-headR*.027,eyeZ+.08);
+      const b=rcAdd(head,new THREE.BoxGeometry(headR*.23,headR*.035,headR*.018),cfg.browMat||darkM,sx*dx,eyeY+headR*.25,eyeZ+.015,0,0,sx*.08);
+      const c=rcAdd(head,new THREE.SphereGeometry(headR*.14,8,5),blush,sx*headR*.61,eyeY-headR*.225,headR*.76); c.scale.set(1,.62,.22); c.material.transparent=true; c.material.opacity=.34;
+    }
+    const smile=rcAdd(head,new THREE.TorusGeometry(headR*.087,headR*.011,5,14,Math.PI),mouthM,0,eyeY-headR*.255,headR*.91,0,0,Math.PI);
+  }
+
+  g.traverse(o=>{ if(o.isMesh){o.castShadow=true;o.receiveShadow=true;} });
+  g.userData.parts={head,torso,armL:armLeft,armR:armRight,legL,legR:legRr};
+  g.userData.rc={headR,headY,torsoH,torsoBase,skinM,outfitM,darkM,headM};
+  return g;
+}
+
+function rcHair(g, style='short', color=0x2c211d){
+  const {head}=g.userData.parts, {headR}=g.userData.rc, m=RC_MAT(color);
+  const cap=rcAdd(head,new THREE.IcosahedronGeometry(headR*1.045,2),m,0,headR*.17,-headR*.18); cap.scale.set(1,.92,.93);
+  const locks=[[-.58,.53,.57,.38],[-.28,.68,.54,.46],[.02,.72,.5,.48],[.31,.63,.38,.42],[.57,.44,.17,.34]];
+  locks.forEach(([x,y,z,h],i)=>{const q=rcAdd(head,new THREE.ConeGeometry(headR*.19,headR*h,5),m,x*headR,y*headR,z*headR,.5,0,-.16+i*.075);q.scale.z=.7;});
+  if(style!=='short') for(const sx of [-1,1]){const q=rcAdd(head,new THREE.IcosahedronGeometry(headR*.34,1),m,sx*headR*.79,-headR*.18,-headR*.2);q.scale.set(.62,style==='long'?1.45:1.03,.78);}
+  if(style==='long'){const q=rcAdd(head,new THREE.IcosahedronGeometry(headR*.77,2),m,0,-headR*.45,-headR*.5);q.scale.set(.94,1.36,.48);}
+}
+function rcAnimalFace(g, muzzleColor, noseColor=0x3b241b){
+  const {head}=g.userData.parts,{headR}=g.userData.rc;
+  const mu=rcAdd(head,new THREE.IcosahedronGeometry(headR*.31,1),RC_MAT(muzzleColor),0,-headR*.19,headR*.72);mu.scale.set(1.05,.74,.52);
+  rcAdd(head,new THREE.IcosahedronGeometry(headR*.085,1),RC_GLOSS(noseColor),0,-headR*.11,headR*.98);
+}
+function rcHelmet(g,color,dark=0x26313e,visor=0x8eeaff){
+  const {head}=g.userData.parts,{headR}=g.userData.rc;
+  const shell=rcAdd(head,new THREE.IcosahedronGeometry(headR*1.06,2),RC_MAT(color),0,headR*.09,-headR*.08); shell.scale.set(1,.96,.96);
+  const v=rcAdd(head,new THREE.BoxGeometry(headR*1.15,headR*.35,headR*.08),RC_GLOSS(visor,visor,.35),0,headR*.03,headR*.9);v.scale.x=.92;
+  rcAdd(head,new THREE.BoxGeometry(headR*.9,headR*.12,headR*.12),RC_MAT(dark),0,-headR*.38,headR*.72);
+}
+function rcCape(g,color){const {torso}=g.userData.parts,{torsoH}=g.userData.rc;const q=rcAdd(torso,new THREE.ConeGeometry(.25,torsoH*.95,6,1,true),RC_MAT(color),0,0,-.18,0,0,Math.PI);q.scale.z=.35;}
+
+// Human and animal avatars
+function buildHuman(skinHex,outfitHex,tint,hairStyle){const g=buildReferenceChibi({skin:tint||skinHex,outfit:tint||outfitHex});rcHair(g,hairStyle||'short',tint||0x2c211d);return g;}
+function buildPenguin(skinHex,outfitHex,tint){const g=buildReferenceChibi({skin:0xf4f1e8,outfit:0x202b35,headColor:0x202b35,pants:0x202b35,shoes:0xf2a83b,noEars:true});const {head}=g.userData.parts,{headR}=g.userData.rc;const face=rcAdd(head,new THREE.IcosahedronGeometry(headR*.72,1),RC_MAT(0xf7f1df),0,-headR*.08,headR*.36);face.scale.set(.88,.9,.55);rcAdd(head,new THREE.ConeGeometry(headR*.1,headR*.22,4),RC_MAT(0xf2a83b),0,-headR*.19,headR*.98,Math.PI/2,0,0);return g;}
+function buildBunny(skinHex,outfitHex,tint){const fur=tint||skinHex||0xf7e8e8,g=buildReferenceChibi({skin:fur,outfit:tint||outfitHex,headColor:fur,noEars:true});const {head}=g.userData.parts,{headR}=g.userData.rc;for(const sx of [-1,1]){const e=rcAdd(head,new THREE.CapsuleGeometry(headR*.12,headR*.65,4,7),RC_MAT(fur),sx*headR*.33,headR*1.05,-headR*.05,0,0,sx*.08);const i=rcAdd(e,new THREE.CapsuleGeometry(headR*.055,headR*.43,3,6),RC_MAT(0xffb8c8),0,0,headR*.1);};rcAnimalFace(g,0xfff3f3,0xff89a2);return g;}
+function buildDog(skinHex,outfitHex,tint){const fur=tint||0xd9aa79,g=buildReferenceChibi({skin:fur,outfit:tint||outfitHex,headColor:fur,noEars:true});const {head}=g.userData.parts,{headR}=g.userData.rc;for(const sx of [-1,1]){const e=rcAdd(head,new THREE.IcosahedronGeometry(headR*.35,1),RC_MAT(0x9d6847),sx*headR*.78,headR*.05,-headR*.08);e.scale.set(.52,1.22,.72);e.rotation.z=sx*.22;}rcAnimalFace(g,0xf0d2b4);return g;}
+
+// Armored / pop-culture-inspired archetypes rebuilt on the same polished rig
+function buildEnforcerUnit(a,b,t){const g=buildReferenceChibi({skin:0xbfc7cf,outfit:0x394551,headColor:0x88939e,noFace:true,noEars:true,pants:0x2d3741,shoes:0x202830});rcHelmet(g,0x9ba5ae,0x37404a,0x78e9ff);return g;}
+function buildShadowLord(a,b,t){const g=buildReferenceChibi({skin:0xd6c1ad,outfit:0x191b22,headColor:0x1a1c23,noFace:true,noEars:true,pants:0x111319,shoes:0x0c0e13});rcHelmet(g,0x15171e,0x050609,0xff3b3b);rcCape(g,0x111218);return g;}
+function buildTitanGuardian(a,b,t){const g=buildReferenceChibi({skin:0xaeb8c2,outfit:0x52687d,headColor:0x687b8d,noFace:true,noEars:true,scale:1.08,torsoTop:.17,torsoBot:.24});rcHelmet(g,0x7e8f9e,0x34414d,0xffc94d);return g;}
+function buildStarTrooper(a,b,t){const g=buildReferenceChibi({skin:0xd8b291,outfit:0xe8ecef,headColor:0xe8ecef,noFace:true,noEars:true,pants:0xb8c0c8,shoes:0x29313a});rcHelmet(g,0xe8ecef,0x53606c,0x5dc8ff);return g;}
+function buildHellMarauder(a,b,t){const g=buildReferenceChibi({skin:0xb94a35,outfit:0x5a3327,headColor:0xb94a35,eyeColor:0xffd45c,scale:1.04,torsoTop:.17,torsoBot:.23});const {head}=g.userData.parts,{headR}=g.userData.rc;for(const sx of [-1,1])rcAdd(head,new THREE.ConeGeometry(headR*.12,headR*.48,5),RC_MAT(0x30231d),sx*headR*.55,headR*.78,-headR*.05,0,0,sx*.25);return g;}
+function buildNightGuardian(a,b,t){const g=buildReferenceChibi({skin:0xc9a183,outfit:0x20232c,headColor:0x20232c,noFace:true,noEars:true,pants:0x151820});rcHelmet(g,0x20232c,0x0c0e13,0xd8ecff);const {head}=g.userData.parts,{headR}=g.userData.rc;for(const sx of [-1,1])rcAdd(head,new THREE.ConeGeometry(headR*.13,headR*.45,4),RC_MAT(0x20232c),sx*headR*.42,headR*.96,-headR*.08,0,0,sx*.08);rcCape(g,0x151820);return g;}
+function buildJumpHero(a,b,t){const g=buildReferenceChibi({skin:a||0xf2c9a0,outfit:0xe64f3b,pants:0x2f5ea8,shoes:0x5b2d23});rcHair(g,'short',0x5b3425);const {head}=g.userData.parts,{headR}=g.userData.rc;rcAdd(head,new THREE.CylinderGeometry(headR*.78,headR*.78,headR*.16,10),RC_MAT(0xe64f3b),0,headR*.72,0);return g;}
+function buildSpeedSpike(a,b,t){const g=buildReferenceChibi({skin:0xf0c6a0,outfit:0x2f67cf,headColor:0x2f67cf,pants:0x2451a6,shoes:0xd84d3e,noEars:true});const {head}=g.userData.parts,{headR}=g.userData.rc;for(let i=0;i<6;i++){const ang=(i-2.5)*.28;rcAdd(head,new THREE.ConeGeometry(headR*.13,headR*.58,5),RC_MAT(0x1e4aa8),Math.sin(ang)*headR*.45,headR*(.55-Math.abs(i-2.5)*.06),-headR*.35,1.2,0,-ang);}rcAnimalFace(g,0xf0c6a0,0x2d2623);return g;}
+function buildVoltBuddy(a,b,t){const g=buildReferenceChibi({skin:0xf2cf2f,outfit:0xf2cf2f,headColor:0xf2cf2f,pants:0xe0b925,shoes:0x9a5d2d,noEars:true});const {head}=g.userData.parts,{headR}=g.userData.rc;for(const sx of [-1,1]){rcAdd(head,new THREE.ConeGeometry(headR*.15,headR*.72,4),RC_MAT(0xf2cf2f),sx*headR*.4,headR*.98,-headR*.05,0,0,sx*.08);const c=rcAdd(head,new THREE.SphereGeometry(headR*.14,8,5),RC_GLOSS(0xff4d4d),sx*headR*.61,-headR*.2,headR*.78);c.scale.set(1,.65,.24);}rcAnimalFace(g,0xf8dc62,0x342820);return g;}
+function buildEmberNinja(a,b,t){const g=buildReferenceChibi({skin:0xc99b7b,outfit:0xc49628,headColor:0x17191d,noFace:true,noEars:true,pants:0x2a2b30,shoes:0x16171b});rcHelmet(g,0x17191d,0xc49628,0xffd85b);return g;}
+function buildFrostNinja(a,b,t){const g=buildReferenceChibi({skin:0xc99b7b,outfit:0x2e68c7,headColor:0x16283b,noFace:true,noEars:true,pants:0x1e477f,shoes:0x12273b});rcHelmet(g,0x16283b,0x2e68c7,0xa9efff);return g;}
+function buildBoltBuster(a,b,t){const g=buildReferenceChibi({skin:0x8db8e8,outfit:0x3569c4,headColor:0x3569c4,noFace:true,noEars:true,pants:0x28529b,shoes:0x1f3f79,scale:.94});rcHelmet(g,0x3569c4,0x21477e,0xbdefff);return g;}
+function buildCyberHunter(a,b,t){const g=buildReferenceChibi({skin:0xc7cbd0,outfit:0x8f969e,headColor:0xbec3c8,noFace:true,noEars:true,pants:0x6c737b,shoes:0x3b4148});const {head}=g.userData.parts,{headR}=g.userData.rc;rcAdd(head,new THREE.SphereGeometry(headR*.12,8,6),RC_GLOSS(0xff3030,0xff0000,.75),-headR*.3,0,headR*.9);rcAdd(head,new THREE.BoxGeometry(headR*.58,headR*.28,.025),RC_MAT(0x777e86),headR*.16,-headR*.32,headR*.9);return g;}
+function buildRageTitan(a,b,t){const g=buildReferenceChibi({skin:0x4f9f43,outfit:0x613c83,headColor:0x4f9f43,pants:0x613c83,shoes:0x3d2a2a,scale:1.14,torsoTop:.19,torsoBot:.26,armLen:.3,legR:.08});const {head}=g.userData.parts,{headR}=g.userData.rc;for(const sx of [-1,1])rcAdd(head,new THREE.BoxGeometry(headR*.34,headR*.08,.025),RC_MAT(0x295826),sx*headR*.32,headR*.3,headR*.87,0,0,-sx*.28);return g;}
+function buildForestRanger(a,b,t){const g=buildReferenceChibi({skin:a||0xf2c9a0,outfit:0x3f7c43,pants:0xb88b4b,shoes:0x5b3b25});rcHair(g,'medium',0xc79a52);const {head}=g.userData.parts,{headR}=g.userData.rc;for(const sx of [-1,1]){const e=rcAdd(head,new THREE.ConeGeometry(headR*.1,headR*.42,4),RC_MAT(a||0xf2c9a0),sx*headR*.93,0,0,0,0,sx*.9);}rcAdd(head,new THREE.ConeGeometry(headR*.82,headR*.72,7),RC_MAT(0x3f7c43),0,headR*.82,-headR*.05);return g;}
 
 function addXray(group, colorHex){
   const geo = new THREE.BoxGeometry(0.85, 1.56, 0.4);
