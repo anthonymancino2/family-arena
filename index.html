@@ -95,6 +95,9 @@
   .roundPill{position:absolute;top:calc(14px + env(safe-area-inset-top));left:50%;
     transform:translateX(-50%);background:var(--panel);padding:8px 18px;border-radius:999px;
     font-weight:800;font-size:14px;}
+  .roundTimerPill{position:absolute;top:calc(58px + env(safe-area-inset-top));left:50%;
+    transform:translateX(-50%);background:rgba(255,214,74,0.15);border:1.5px solid rgba(255,214,74,0.6);
+    padding:5px 14px;border-radius:999px;font-weight:800;font-size:13px;color:#ffd64a;}
   .toast{position:absolute;top:80px;left:50%;transform:translateX(-50%);
     background:var(--panel);padding:10px 20px;border-radius:12px;font-weight:700;
     opacity:0;transition:opacity 0.25s;}
@@ -349,6 +352,7 @@
         <div class="hitFlash" id="hitFlash"></div>
         <div class="heartsWrap"><div class="heartsRow" id="heartsRow"></div></div>
         <div class="roundPill" id="roundPill">Round 1</div>
+        <div class="roundTimerPill" id="roundTimerPill">⏱ 0.0s</div>
         <div class="runTokensPill"><div class="coin"></div><span id="runTokensCount">0</span></div>
         <div class="weaponPill" id="weaponPill">Pistol</div>
         <div class="invinciblePill" id="invinciblePill">🛡 <span id="invincibleTime">0</span>s</div>
@@ -491,11 +495,38 @@ const SKINS = ['#ffe3c4','#f2c9a0','#c68a5a','#8d5a3c','#5a3826','#2b1d16'];
 const OUTFITS = ['#3fa9d6','#e0533d','#4caf50','#9b59b6','#f1c40f','#ecf0f1'];
 const HAIR_STYLES = ['short','medium','long'];
 const HAIR_STYLE_LABELS = {short:'Short', medium:'Medium', long:'Long'};
-const AVATAR_TYPES = ['human','penguin','bunny','dog'];
-const AVATAR_TYPE_LABELS = {human:'🧑 Human', penguin:'🐧 Penguin', bunny:'🐰 Bunny', dog:'🐶 Dog'};
+const AVATAR_TYPES = ['human','penguin','bunny','dog',
+  'enforcer','shadowlord','titan','startrooper','marauder','nightguardian',
+  'jumphero','speedspike','voltbuddy','embernnja','frostninja','boltbuster',
+  'cyberhunter','ragetitan','forestranger'];
+const AVATAR_TYPE_LABELS = {
+  human:'🧑 Human', penguin:'🐧 Penguin', bunny:'🐰 Bunny', dog:'🐶 Dog',
+  enforcer:'🤖 Enforcer Unit', shadowlord:'⚫ Shadow Lord', titan:'🤖 Titan Guardian',
+  startrooper:'🛡️ Star Trooper', marauder:'👹 Hell Marauder', nightguardian:'🦇 Night Guardian',
+  jumphero:'⭐ Jump Hero', speedspike:'🦔 Speed Spike', voltbuddy:'⚡ Volt Buddy',
+  embernnja:'🦂 Ember Ninja', frostninja:'❄️ Frost Ninja', boltbuster:'🤖 Bolt Buster',
+  cyberhunter:'💀 Cyber Hunter', ragetitan:'💚 Rage Titan', forestranger:'⚔️ Forest Ranger'
+};
+// Uniform scale applied on top of each avatar's own build — every value
+// here was checked numerically against the penguin's actual rendered
+// height (0.85) as the floor, and Titan Guardian's is nowhere near an
+// elephant's real ~1.76x-human shoulder-height ratio, just noticeably
+// bigger than the rest as its own "giant mech" identity calls for.
+const AVATAR_SCALE = {
+  human:1.0, penguin:1.0, bunny:1.0, dog:1.0,
+  enforcer:1.0, shadowlord:1.05, titan:1.55, startrooper:1.05, marauder:1.1,
+  nightguardian:1.0, jumphero:0.95, speedspike:0.9, voltbuddy:0.85,
+  embernnja:1.0, frostninja:1.0, boltbuster:0.85, cyberhunter:1.05,
+  ragetitan:1.35, forestranger:1.0
+};
 // human and penguin are free by default; bunny/dog must be unlocked
 // with crystals (prices live in CATALOG, shared with the Crystal Shop).
 const FREE_AVATAR_TYPES = ['human','penguin'];
+// TESTING ONLY: sET this back to false to re-lock Bunny/Dog/all 15 heroes
+// behind crystals. Everything else about the unlock system (CATALOG
+// prices, the Crystal Shop, profile.unlocked) is untouched — this just
+// bypasses the lock CHECK so every avatar is selectable for testing.
+const UNLOCK_ALL_AVATARS_FOR_TESTING = true;
 
 let state = {
   currentName: null,
@@ -544,7 +575,7 @@ function loadAvatarFromProfile(){
   state.outfit = p.outfit || 0;
   state.hairStyle = p.hairStyle || 'short';
   const savedType = p.avatarType || 'human';
-  const isUnlocked = FREE_AVATAR_TYPES.includes(savedType) || (p.unlocked||[]).includes(savedType);
+  const isUnlocked = UNLOCK_ALL_AVATARS_FOR_TESTING || FREE_AVATAR_TYPES.includes(savedType) || (p.unlocked||[]).includes(savedType);
   state.avatarType = isUnlocked ? savedType : 'human';
 }
 function saveAvatarToProfile(){
@@ -613,7 +644,7 @@ function buildCustomizeUI(){
   const profileForLocks = state.currentName ? Store.getProfile(state.currentName) : {unlocked:['human','penguin']};
   AVATAR_TYPES.forEach(typeId=>{
     const isFree = FREE_AVATAR_TYPES.includes(typeId);
-    const isUnlocked = isFree || profileForLocks.unlocked.includes(typeId);
+    const isUnlocked = UNLOCK_ALL_AVATARS_FOR_TESTING || isFree || profileForLocks.unlocked.includes(typeId);
     const catalogEntry = CATALOG.find(c=>c.id===typeId);
     const btn = document.createElement('button');
     btn.className = 'hairBtn' + (state.avatarType===typeId?' sel':'') + (isUnlocked?'':' locked');
@@ -689,10 +720,21 @@ document.getElementById('btnBeginSurvival').onclick = ()=>{
 const CATALOG = [
   { id:'bunny', name:'Bunny Avatar', icon:'🐰', price:250 },
   { id:'dog', name:'Dog Avatar', icon:'🐶', price:300 },
-  { id:'knight', name:'Knight', icon:'⚔️', price:500 },
-  { id:'wizard', name:'Wizard', icon:'🧙', price:750 },
-  { id:'ranger', name:'Ranger', icon:'🏹', price:600 },
-  { id:'robot', name:'Robot', icon:'🤖', price:900 },
+  { id:'jumphero', name:'Jump Hero', icon:'⭐', price:300 },
+  { id:'speedspike', name:'Speed Spike', icon:'🦔', price:300 },
+  { id:'voltbuddy', name:'Volt Buddy', icon:'⚡', price:350 },
+  { id:'enforcer', name:'Enforcer Unit', icon:'🤖', price:350 },
+  { id:'boltbuster', name:'Bolt Buster', icon:'🤖', price:350 },
+  { id:'embernnja', name:'Ember Ninja', icon:'🦂', price:400 },
+  { id:'frostninja', name:'Frost Ninja', icon:'❄️', price:400 },
+  { id:'forestranger', name:'Forest Ranger', icon:'⚔️', price:450 },
+  { id:'startrooper', name:'Star Trooper', icon:'🛡️', price:500 },
+  { id:'nightguardian', name:'Night Guardian', icon:'🦇', price:500 },
+  { id:'cyberhunter', name:'Cyber Hunter', icon:'💀', price:500 },
+  { id:'shadowlord', name:'Shadow Lord', icon:'⚫', price:550 },
+  { id:'marauder', name:'Hell Marauder', icon:'👹', price:550 },
+  { id:'ragetitan', name:'Rage Titan', icon:'💚', price:650 },
+  { id:'titan', name:'Titan Guardian', icon:'🤖', price:750 },
 ];
 function renderShop(){
   const grid = document.getElementById('shopGrid');
@@ -737,6 +779,8 @@ let runTokens = 0;             // per-run currency, earned by killing zombies, s
 let crystalsEarned = 0;        // this run's crystal total, earned per round cleared, saved to the profile at run end
 let currentWeaponId = 'pistol';
 let runStartTime = 0;
+let roundStartTime = 0;      // when the current round began — the whole point of this mode
+let heartsLostThisRound = 0; // tracks whether this round was "flawless" (no damage taken)
 let gameRunning = false;
 let camYaw = 0, camPitch = 0.35, camDist = 7;
 const fogBase = {near:20, far:55}; // theme's own fog, before zoom scaling
@@ -765,8 +809,8 @@ const PLAYER_SPEED = 6.5;
 // ---------------------------------------------------------------------
 const WEAPONS = {
   pistol: {name:'Pistol',         price:0,   cooldown:0.22, damage:1,   dual:false, splash:0,   rangeMult:1.0, color:0xff5b5b, desc:'Your starting sidearm.'},
-  uzi:    {name:'Uzi',            price:150, cooldown:0.07, damage:1,   dual:false, splash:0,   rangeMult:1.0, color:0xffe066, desc:'Very fast firing rate.'},
-  ak47:   {name:'AK-47',          price:250, cooldown:0.15, damage:2,   dual:false, splash:0,   rangeMult:1.0, color:0xc9a24a, desc:'Harder-hitting and faster than the pistol.'},
+  uzi:    {name:'Uzi',            price:150, cooldown:0.07, damage:1,   dual:false, splash:0,   rangeMult:1.0, color:0xffe066, desc:'Very fast firing rate. Hold to keep firing.', auto:true},
+  ak47:   {name:'AK-47',          price:250, cooldown:0.15, damage:2,   dual:false, splash:0,   rangeMult:1.0, color:0xc9a24a, desc:'Harder-hitting and faster than the pistol. Hold to keep firing.', auto:true},
   dual:   {name:'Dual Pistol',    price:300, cooldown:0.22, damage:1,   dual:true,  splash:0,   rangeMult:1.0, color:0x6fd8ff, desc:'Fires in two directions at once.'},
   sniper: {name:'Sniper Rifle',   price:450, cooldown:1.0,  damage:999, dual:false, splash:0,   rangeMult:2.2, color:0x9affea, desc:'One shot, one kill, from way further away.'},
   rocket: {name:'Rocket Launcher',price:700, cooldown:1.2,  damage:999, dual:false, splash:3.2, rangeMult:1.0, color:0xff8a3c, desc:'Instant kill with a big splash — clears a crowd in one hit.'}
@@ -2732,11 +2776,25 @@ function buildInvinciblePickup(){
   g.userData.pType = 'invincible';
   return g;
 }
+function buildHeartPickup(){
+  const g = new THREE.Group();
+  const glow = GMAT(0xff4d6d);
+  // Two lobes + a diamond base, same trick as the CSS heart shape
+  // elsewhere in this game — reads unmistakably as a heart at a glance.
+  for(const sx of [-1,1])
+    _a(g, SPHG(0.14, 8, 6), glow, sx*0.1, 0.32, 0);
+  const point = _a(g, BOXG(0.19, 0.19, 0.05), glow, 0, 0.2, 0, 0, 0, Math.PI/4);
+  g.userData.pType = 'heart';
+  return g;
+}
 const MAX_POWERUPS = 6; // cap so periodic respawns can't pile up forever if ignored
 function spawnOnePowerUp(){
   if(powerUps.length >= MAX_POWERUPS) return;
-  const type = Math.random() < 0.6 ? 'tokens' : 'invincible';
-  const g = type==='tokens' ? buildTokenPickup() : buildInvinciblePickup();
+  // Hearts spawn less often than tokens/invincibility — this mode is
+  // about staying alive, not never having to be careful.
+  const roll = Math.random();
+  const type = roll < 0.5 ? 'tokens' : (roll < 0.75 ? 'invincible' : 'heart');
+  const g = type==='tokens' ? buildTokenPickup() : type==='invincible' ? buildInvinciblePickup() : buildHeartPickup();
   const _p = scatterXZ(4, arenaSize-4);
   g.position.set(_p.x, 0, _p.z);
   scene.add(g);
@@ -2772,9 +2830,22 @@ function updatePowerUps(dt){
         runTokens += amt;
         updateRunTokensHud();
         toast('+'+amt+' 🪙 Tokens!');
-      } else {
+      } else if(p.type === 'invincible'){
         invincibleTimer = 8;
         toast('🛡 Invincible for 8s!');
+      } else { // heart
+        if(hearts < maxHearts){
+          hearts++;
+          renderHearts();
+          toast('❤️ +1 Heart!');
+        } else {
+          // Never waste a pickup at full health — a small token
+          // consolation instead.
+          const amt = 15;
+          runTokens += amt;
+          updateRunTokensHud();
+          toast('Already full health! +'+amt+' 🪙 instead');
+        }
       }
       scene.remove(p.mesh);
       disposeGroup(p.mesh);
@@ -7154,6 +7225,333 @@ function buildPenguin(skinHex, outfitHex, tint){
   return g;
 }
 
+// =====================================================================
+// Shared "hero" rig — reused by all 15 pop-culture-inspired avatars
+// below, so each one only needs to specify colors/proportions/props
+// instead of re-deriving the whole body. Segment counts throughout are
+// noticeably higher than the earlier avatars (icosahedron detail 2,
+// 8-10 sided limbs vs the earlier 6-7) for visibly denser silhouettes,
+// and every character gets 4-8 bespoke accessory meshes on top.
+// =====================================================================
+function buildHeroBody(opts){
+  const bodyMat = LMAT(opts.tint || opts.bodyColor);
+  const limbMat = LMAT(opts.tint || opts.limbColor || opts.bodyColor);
+  const headMat = LMAT(opts.tint || opts.headColor || opts.bodyColor);
+  const g = new THREE.Group();
+
+  const bulk = opts.bulk || 1.0;
+  const headR = 0.30;
+  const torsoTopR = 0.155*bulk, torsoBotR = 0.20*bulk, torsoH = 0.30;
+  const legR = 0.082*bulk, legH = 0.20*(opts.legLenMult||1);
+  const armR = 0.075*bulk*(opts.armBulk||1), armLen = 0.28*(opts.armLenMult||1), handR = 0.078*bulk;
+  const legGap = 0.13*bulk;
+
+  const torsoBaseY = 0.09 + legH;
+  const headBaseY = torsoBaseY + torsoH;
+
+  function buildHand(parent, y){
+    _a(parent, new THREE.IcosahedronGeometry(handR*0.92, 1), limbMat, 0, y, 0);
+    for(let i=0;i<3;i++){
+      const a=(i-1)*0.32;
+      _a(parent, CYLG(handR*0.26,handR*0.2,handR*1.05,6), limbMat,
+        Math.sin(a)*handR*0.55, y-handR*0.72, Math.cos(a)*handR*0.32+handR*0.28, 0.5,0,a*0.6);
+    }
+  }
+  function buildFoot(parent){
+    _a(parent, BOXG(legR*2.3, 0.11, 0.22), limbMat, 0, -legH-0.055, legR*0.4);
+    _a(parent, new THREE.IcosahedronGeometry(legR*1.25,1), limbMat, 0, -legH-0.1, legR*0.68);
+  }
+  function buildLeg(x){
+    const grp = new THREE.Group();
+    _a(grp, CYLG(legR*0.9, legR, legH, 8), limbMat, 0, -legH/2, 0);
+    grp.position.set(x, torsoBaseY, 0);
+    buildFoot(grp);
+    return grp;
+  }
+  const legL = buildLeg(-legGap/2);
+  const legR_ = buildLeg(legGap/2);
+  g.add(legL, legR_);
+
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(torsoTopR, torsoBotR, torsoH, 10), bodyMat);
+  torso.position.set(0, torsoBaseY+torsoH/2, 0);
+  g.add(torso);
+  const shoulderCap = _a(torso, SPHG(torsoTopR*1.05, 10, 8), bodyMat, 0, torsoH/2-0.01, 0);
+  shoulderCap.scale.set(1, 0.5, 1);
+
+  function buildArm(x, sign){
+    const geo = new THREE.CylinderGeometry(armR*0.85, armR, armLen, 8);
+    geo.translate(0, -armLen/2, 0);
+    const mesh = new THREE.Mesh(geo, limbMat);
+    mesh.position.set(x, headBaseY-0.01, 0);
+    buildHand(mesh, -armLen+handR*0.4);
+    return mesh;
+  }
+  const armL = buildArm(-(torsoTopR+armR*1.25), -1);
+  const armR_ = buildArm(torsoTopR+armR*1.25, 1);
+  g.add(armL, armR_);
+
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(headR, 2), headMat);
+  head.position.set(0, headBaseY+headR*0.88, 0);
+  g.add(head);
+
+  return {g, torso, armL, armR:armR_, legL, legR:legR_, head,
+    headR, headBaseY, torsoBaseY, torsoH, torsoTopR, torsoBotR, bulk};
+}
+
+// Simple face — big-ish glowing "visor" eyes by default, reused across
+// most of the helmeted/masked characters below (an actual visor slit
+// reads more like these characters than the cartoon dot-eyes elsewhere).
+function addVisorEyes(head, headR, color){
+  const mat = GMAT(color);
+  _a(head, BOXG(headR*1.05, headR*0.22, headR*0.15), mat, 0, headR*0.05, headR*0.92);
+}
+function addDotEyes(head, headR, color){
+  const eyeY = -headR*0.02, eyeZ = headR*0.9, eyeDX = headR*0.3;
+  for(const sx of [-1,1])
+    _a(head, SPHG(headR*0.09, 7, 6), GMAT(color||0x141414), sx*eyeDX, eyeY, eyeZ);
+}
+// A cape hanging from the upper back — reused by several capepd characters.
+function addCape(parent, headBaseY, torsoBaseY, color, length){
+  const cape = new THREE.Mesh(
+    new THREE.BoxGeometry(0.34, length||0.5, 0.04),
+    new THREE.MeshLambertMaterial({flatShading:true, color, side:THREE.DoubleSide}));
+  cape.position.set(0, torsoBaseY + (headBaseY-torsoBaseY)*0.55, -0.17);
+  cape.rotation.x = 0.12;
+  parent.add(cape);
+  return cape;
+}
+
+
+// =====================================================================
+// 15 original hero avatars, each inspired by a well-known archetype but
+// built with distinct names/colors/proportions/props of their own.
+// =====================================================================
+
+// --- Enforcer Unit (cybernetic police android) ---
+function buildEnforcerUnit(skinHex, outfitHex, tint){
+  const b = buildHeroBody({bodyColor:0xb8bcc2, limbColor:0x8a8f98, headColor:0x3a3e44, tint, bulk:1.05});
+  const {g, head, headR, torso, torsoH} = b;
+  addVisorEyes(head, headR, 0x4aeaff);
+  _a(head, BOXG(headR*0.5, headR*0.12, 0.03), LMAT(0x2a2e33), 0, headR*0.55, headR*0.7);
+  _a(head, CYLG(0.02,0.02,0.16,4), LMAT(0x2a2e33), headR*0.5, headR*0.8, 0);
+  _a(torso, new THREE.IcosahedronGeometry(0.06,0), GMAT(tint||outfitHex), 0, torsoH*0.28, 0.19);
+  for(const xS of [-1,1])
+    _a(torso, BOXG(0.14,0.1,0.05), LMAT(0x8a8f98), xS*0.19, torsoH*0.42, 0.02);
+  _a(b.armR, BOXG(0.09,0.09,0.22), LMAT(0x5a5f66), 0, -0.05, 0.08);
+  g.userData.parts = {head, torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
+  return g;
+}
+
+// --- Shadow Lord (dark armored warrior) ---
+function buildShadowLord(skinHex, outfitHex, tint){
+  const b = buildHeroBody({bodyColor:0x141416, limbColor:0x1c1e21, headColor:0x101012, tint, bulk:1.1});
+  const {g, head, headR, torso, torsoH, torsoBaseY, headBaseY} = b;
+  addVisorEyes(head, headR, tint?0xff3b3b:0xff2e2e);
+  _a(head, SPHG(headR*1.05,10,7), LMAT(0x101012), 0, headR*0.1, -headR*0.05).scale.set(1.05,0.95,1.05);
+  for(const sx of [-1,1])
+    _a(head, CYLG(0.03,0.05,headR*0.5,6), LMAT(0x1c1e21), sx*headR*0.85, headR*0.05, -headR*0.2);
+  _a(torso, BOXG(0.16,0.2,0.04), GMAT(tint||outfitHex,0.85), 0, torsoH*0.15, 0.2);
+  addCape(g, headBaseY, torsoBaseY, 0x0a0a0c, 0.62);
+  g.userData.parts = {head, torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
+  return g;
+}
+
+// --- Titan Guardian (giant blocky transforming mech) ---
+function buildTitanGuardian(skinHex, outfitHex, tint){
+  const b = buildHeroBody({bodyColor:0xc0392b, limbColor:0x2e5c8a, headColor:0x4a4f56, tint, bulk:1.45, armBulk:1.3, legLenMult:1.05});
+  const {g, head, headR, torso, torsoH} = b;
+  addVisorEyes(head, headR, 0x4affea);
+  for(const sx of [-1,1])
+    _a(head, BOXG(headR*0.2,headR*0.5,headR*0.2), LMAT(0x3a3e44), sx*headR*0.65, headR*0.55, -headR*0.15);
+  _a(torso, BOXG(0.34,0.16,0.05), LMAT(0x2e5c8a), 0, torsoH*0.25, 0.205);
+  _a(torso, new THREE.IcosahedronGeometry(0.07,0), GMAT(tint||outfitHex), 0, torsoH*0.0, 0.21);
+  for(const xS of [-1,1])
+    _a(torso, BOXG(0.16,0.22,0.16), LMAT(0x2e5c8a), xS*0.24, torsoH*0.4, 0);
+  g.userData.parts = {head, torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
+  return g;
+}
+
+// --- Star Trooper (bulky green space-marine armor) ---
+function buildStarTrooper(skinHex, outfitHex, tint){
+  const b = buildHeroBody({bodyColor:0x3a5c3a, limbColor:0x2e4a2e, headColor:0x2a3a2a, tint, bulk:1.15});
+  const {g, head, headR, torso, torsoH} = b;
+  addVisorEyes(head, headR, 0xffd24a);
+  _a(head, BOXG(headR*0.9,headR*0.15,headR*0.3), LMAT(0x1a2a1a), 0, headR*0.42, headR*0.75);
+  _a(torso, new THREE.IcosahedronGeometry(0.08,1), GMAT(tint||outfitHex), 0, torsoH*0.3, 0.2);
+  for(const xS of [-1,1])
+    _a(torso, BOXG(0.18,0.24,0.18), LMAT(0x2e4a2e), xS*0.23, torsoH*0.42, 0);
+  g.userData.parts = {head, torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
+  return g;
+}
+
+// --- Hell Marauder (heavy demon-hunter armor) ---
+function buildHellMarauder(skinHex, outfitHex, tint){
+  const b = buildHeroBody({bodyColor:0x6b6b52, limbColor:0x4a4a38, headColor:0x3a3a2c, tint, bulk:1.2, armBulk:1.15});
+  const {g, head, headR, torso, torsoH} = b;
+  _a(head, BOXG(headR*1.1,headR*0.2,headR*0.1), LMAT(0xff3b1e), 0, headR*0.1, headR*0.95);
+  _a(head, BOXG(headR*1.6,headR*0.9,headR*0.15), LMAT(0x2a2a20), 0, -headR*0.1, headR*0.35);
+  _a(torso, new THREE.IcosahedronGeometry(0.09,1), LMAT(0xe8e0c8), 0, torsoH*0.3, 0.2);
+  for(const sx of [-1,1]) _a(torso, SPHG(0.02,5,4), LMAT(0x141410), sx*0.03, torsoH*0.32, 0.26);
+  _a(torso, BOXG(0.05,0.1,0.03), GMAT(tint||outfitHex), 0, torsoH*0.05, 0.2);
+  for(const xS of [-1,1])
+    _a(torso, CONEG(0.11,0.14,6), LMAT(0x5a5a44), xS*0.24, torsoH*0.44, 0, 0,0,xS*0.5);
+  g.userData.parts = {head, torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
+  return g;
+}
+
+
+// --- Night Guardian (dark caped vigilante) ---
+function buildNightGuardian(skinHex, outfitHex, tint){
+  const b = buildHeroBody({bodyColor:0x1c1e24, limbColor:0x24262c, headColor:0x1c1e24, tint, bulk:1.05});
+  const {g, head, headR, torso, torsoH, torsoBaseY, headBaseY} = b;
+  addDotEyes(head, headR, 0xe8e8e8);
+  for(const sx of [-1,1])
+    _a(head, CONEG(headR*0.16, headR*0.55, 5), LMAT(0x1c1e24), sx*headR*0.35, headR*0.85, -headR*0.1, 0,0,-sx*0.15);
+  const emblem = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09,0),
+    new THREE.MeshLambertMaterial({flatShading:true, color:tint||outfitHex}));
+  emblem.position.set(0, torsoH*0.25, 0.2);
+  emblem.scale.set(1.3,0.9,0.4);
+  torso.add(emblem);
+  addCape(g, headBaseY, torsoBaseY, 0x101114, 0.7);
+  g.userData.parts = {head, torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
+  return g;
+}
+
+// --- Jump Hero (mustached platformer hero) ---
+function buildJumpHero(skinHex, outfitHex, tint){
+  const b = buildHeroBody({bodyColor:tint||outfitHex||0xe0533d, limbColor:0x2e5c8a, headColor:skinHex||0xf2c9a0, tint, bulk:0.95});
+  const {g, head, headR, torso, torsoH} = b;
+  addDotEyes(head, headR, 0x141414);
+  _a(head, BOXG(headR*0.5,headR*0.14,0.03), LMAT(0x2a1a10), 0, -headR*0.15, headR*0.95);
+  _a(head, new THREE.SphereGeometry(headR*1.05,10,7,0,Math.PI*2,0,Math.PI*0.55), LMAT(tint||outfitHex||0xe0533d), 0, headR*0.15, -headR*0.05);
+  _a(head, CYLG(headR*0.5,headR*0.5,0.04,10), LMAT(tint||outfitHex||0xe0533d), 0, headR*0.15, headR*0.65);
+  _a(head, new THREE.IcosahedronGeometry(0.05,0), LMAT(0xffffff), 0, headR*0.55, -headR*0.1);
+  for(const xS of [-1,1])
+    _a(torso, BOXG(0.06,torsoH*0.7,0.03), LMAT(0x2e5c8a), xS*0.09, 0, 0.19);
+  g.userData.parts = {head, torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
+  return g;
+}
+
+// --- Speed Spike (fast blue quill-backed creature) ---
+function buildSpeedSpike(skinHex, outfitHex, tint){
+  const b = buildHeroBody({bodyColor:0x2e6adb, limbColor:0xf2c9a0, headColor:0x2e6adb, tint, bulk:0.9, legLenMult:0.9});
+  const {g, head, headR, torso, torsoH} = b;
+  addDotEyes(head, headR, 0x141414);
+  _a(head, new THREE.IcosahedronGeometry(headR*0.7,1), LMAT(0xf2c9a0), 0, -headR*0.15, headR*0.35).scale.set(0.9,0.8,0.75);
+  const spikes = [[-0.15,0.15,-0.15],[0.05,0.22,-0.2],[0.2,0.1,-0.15],[0,0.05,-0.28],[-0.22,0.0,-0.1]];
+  for(const [sx,sy,sz] of spikes)
+    _a(head, CONEG(headR*0.16, headR*0.6, 5), LMAT(0x1c4aa8), sx, headR*0.3+sy, sz, 0.9, 0, -sx*1.2);
+  g.userData.parts = {head, torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
+  return g;
+}
+
+// --- Volt Buddy (yellow electric rodent) ---
+function buildVoltBuddy(skinHex, outfitHex, tint){
+  const b = buildHeroBody({bodyColor:0xf5d020, limbColor:0xf5d020, headColor:0xf5d020, tint, bulk:0.85, legLenMult:0.85, armLenMult:0.85});
+  const {g, head, headR, torso, torsoH} = b;
+  addDotEyes(head, headR, 0x141414);
+  for(const sx of [-1,1]){
+    _a(head, CONEG(headR*0.22, headR*0.75, 4), LMAT(0xf5d020), sx*headR*0.4, headR*0.9, -headR*0.1, 0.15, 0, sx*0.1);
+    _a(head, CONEG(headR*0.12, headR*0.4, 4), LMAT(0x141414), sx*headR*0.4, headR*1.2, -headR*0.1, 0.15, 0, sx*0.1);
+    _a(head, SPHG(headR*0.16,7,5), GMAT(0xff4d4d), sx*headR*0.6, -headR*0.15, headR*0.75).scale.set(1,0.7,0.4);
+  }
+  const tail = new THREE.Group();
+  _a(tail, BOXG(0.07,0.16,0.03), LMAT(0xf5d020), 0,0,0, 0,0,0.3);
+  _a(tail, BOXG(0.07,0.16,0.03), LMAT(0xf5d020), 0.05,0.12,0, 0,0,-0.3);
+  tail.position.set(0, torsoH*0.15, -0.2);
+  torso.add(tail);
+  g.userData.parts = {head, torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
+  return g;
+}
+
+// --- Ember Ninja (fire-themed masked ninja) ---
+function buildEmberNinja(skinHex, outfitHex, tint){
+  const b = buildHeroBody({bodyColor:0xd9c22a, limbColor:0xb8a324, headColor:0x1a1a1a, tint, bulk:1.0});
+  const {g, head, headR, torso, torsoH} = b;
+  addVisorEyes(head, headR, 0xffe066);
+  _a(torso, BOXG(0.05,0.34,0.06), LMAT(0x2a2a2a), -0.1, torsoH*0.15, -0.22, 0.3,0,0);
+  _a(torso, BOXG(0.05,0.34,0.06), LMAT(0x2a2a2a), 0.1, torsoH*0.15, -0.22, -0.3,0,0);
+  for(const xS of [-1,1])
+    _a(torso, CYLG(0.08,0.1,0.04,8), LMAT(0x8a1a1a), xS*0.05, torsoH*0.32, -0.24);
+  g.userData.parts = {head, torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
+  return g;
+}
+
+
+// --- Frost Ninja (ice-themed masked ninja) ---
+function buildFrostNinja(skinHex, outfitHex, tint){
+  const b = buildHeroBody({bodyColor:0x2e6adb, limbColor:0x1c4aa8, headColor:0x1a2a3a, tint, bulk:1.0});
+  const {g, head, headR, torso, torsoH} = b;
+  addVisorEyes(head, headR, 0x9fe8ff);
+  for(const xS of [-1,1])
+    _a(torso, CONEG(0.07,0.16,5), GMAT(0xbfeeff,0.8), xS*0.22, torsoH*0.4, 0, 0,0,xS*0.4);
+  _a(torso, new THREE.IcosahedronGeometry(0.06,0), GMAT(0x9fe8ff), 0, torsoH*0.28, 0.19);
+  g.userData.parts = {head, torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
+  return g;
+}
+
+// --- Bolt Buster (small blue armored robot hero) ---
+function buildBoltBuster(skinHex, outfitHex, tint){
+  const b = buildHeroBody({bodyColor:0x3a6ac0, limbColor:0x2a4a8a, headColor:0x3a6ac0, tint, bulk:0.9, legLenMult:0.85, armLenMult:0.9});
+  const {g, head, headR, torso, torsoH} = b;
+  addDotEyes(head, headR, 0x141414);
+  _a(head, SPHG(headR*0.18,8,6), LMAT(0xffe066), 0, headR*0.95, 0);
+  _a(head, CYLG(0.015,0.02,headR*0.4,4), LMAT(0x2a4a8a), 0, headR*0.78, 0);
+  _a(head, BOXG(headR*1.3,headR*0.35,headR*0.15), LMAT(0x2a4a8a), 0, headR*0.35, headR*0.65);
+  // Arm cannon layered over the hand rather than removing it —
+  // reassigning .children directly to drop a child is unsafe in
+  // three.js (leaves a stale .parent reference on the removed node).
+  // The cannon is sized to fully cover the small hand anyway.
+  _a(b.armR, CYLG(0.1,0.12,0.3,8), LMAT(0xdcdcdc), 0, -0.44, 0);
+  _a(b.armR, CYLG(0.11,0.11,0.06,8), LMAT(0x8a1a1a), 0, -0.58, 0);
+  g.userData.parts = {head, torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
+  return g;
+}
+
+// --- Cyber Hunter (chrome cyborg with a glowing eye) ---
+function buildCyberHunter(skinHex, outfitHex, tint){
+  const b = buildHeroBody({bodyColor:0xc9cdd2, limbColor:0x9aa0a8, headColor:0xd8d4c8, tint, bulk:1.1});
+  const {g, head, headR} = b;
+  _a(head, SPHG(headR*0.13,8,6), GMAT(0xff2e2e), -headR*0.3, 0, headR*0.9);
+  _a(head, BOXG(headR*0.6,headR*0.3,0.02), LMAT(0x8a8f96), headR*0.15, -headR*0.35, headR*0.92);
+  for(let i=0;i<4;i++)
+    _a(head, BOXG(0.02,0.06,0.02), LMAT(0x6a6f76), headR*0.15-0.06+i*0.04, -headR*0.35, headR*0.95);
+  g.userData.parts = {head, torso:b.torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
+  return g;
+}
+
+// --- Rage Titan (huge green muscular brute) ---
+function buildRageTitan(skinHex, outfitHex, tint){
+  const b = buildHeroBody({bodyColor:0x4a9a3a, limbColor:0x4a9a3a, headColor:0x4a9a3a, tint, bulk:1.5, armBulk:1.9, legLenMult:0.95});
+  const {g, head, headR, torso, torsoH} = b;
+  addDotEyes(head, headR, 0xffffff);
+  for(const sx of [-1,1])
+    _a(head, BOXG(headR*0.35,headR*0.1,0.03), LMAT(0x2a5c1a), sx*headR*0.32, headR*0.32, headR*0.85, 0,0,-sx*0.35);
+  _a(torso, BOXG(0.4,0.16,0.02), LMAT(tint||outfitHex||0x6a3a8a), 0, -torsoH*0.42, 0.19);
+  g.userData.parts = {head, torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
+  return g;
+}
+
+// --- Forest Ranger (green-tunic hero with sword and shield) ---
+function buildForestRanger(skinHex, outfitHex, tint){
+  const b = buildHeroBody({bodyColor:0x3a7a3a, limbColor:0xf2c9a0, headColor:skinHex||0xf2c9a0, tint, bulk:0.95});
+  const {g, head, headR, torso, torsoH} = b;
+  addDotEyes(head, headR, 0x141414);
+  for(const sx of [-1,1])
+    _a(head, CONEG(headR*0.12, headR*0.4, 4), LMAT(skinHex||0xf2c9a0), sx*headR*0.95, headR*0.05, headR*0.1, 0,0, sx*0.9);
+  _a(head, CONEG(headR*1.0, headR*0.7, 6), LMAT(0x2e5c2e), 0, headR*0.75, 0);
+  _a(head, SPHG(headR*0.08,6,5), LMAT(0xffffff), 0, headR*1.05, headR*0.15);
+  const sword = new THREE.Group();
+  _a(sword, BOXG(0.05,0.5,0.03), LMAT(0xb8bcc2), 0, 0.25, 0);
+  _a(sword, BOXG(0.13,0.05,0.04), LMAT(0xd9ae3c), 0, 0.52, 0);
+  sword.position.set(-0.16, torsoH*0.2, -0.2);
+  sword.rotation.z = 0.15;
+  torso.add(sword);
+  _a(torso, CYLG(0.16,0.16,0.03,8), LMAT(tint||outfitHex||0x2e5c8a), 0.17, torsoH*0.1, -0.2, 0, 0, Math.PI/2);
+  g.userData.parts = {head, torso, armL:b.armL, armR:b.armR, legL:b.legL, legR:b.legR};
+  return g;
+}
+
 function addXray(group, colorHex){
   const geo = new THREE.BoxGeometry(0.85, 1.56, 0.4);
   geo.translate(0, 0.78, 0);
@@ -7184,15 +7582,25 @@ function attachPistol(armR){
 }
 
 function spawnPlayer(){
-  const builders = {human:buildHuman, penguin:buildPenguin, bunny:buildBunny, dog:buildDog};
+  const builders = {
+    human:buildHuman, penguin:buildPenguin, bunny:buildBunny, dog:buildDog,
+    enforcer:buildEnforcerUnit, shadowlord:buildShadowLord, titan:buildTitanGuardian,
+    startrooper:buildStarTrooper, marauder:buildHellMarauder, nightguardian:buildNightGuardian,
+    jumphero:buildJumpHero, speedspike:buildSpeedSpike, voltbuddy:buildVoltBuddy,
+    embernnja:buildEmberNinja, frostninja:buildFrostNinja, boltbuster:buildBoltBuster,
+    cyberhunter:buildCyberHunter, ragetitan:buildRageTitan, forestranger:buildForestRanger
+  };
   const build = builders[state.avatarType] || buildHuman;
   player = build(SKINS[state.skin], OUTFITS[state.outfit], null, state.hairStyle);
+  const avatarScale = AVATAR_SCALE[state.avatarType] || 1;
+  player.scale.setScalar(avatarScale);
+  player.userData.avatarScale = avatarScale;
   player.position.set(0,0,0);
   player.userData.facing = 0;
   player.userData.hp = 3;
   player.userData.attackCooldown = 0;
   enableShadows(player, false);
-  addContactShadow(player, 0.5);
+  addContactShadow(player, 0.5*avatarScale);
   scene.add(player);
   attachPistol(player.userData.parts.armR);
 
@@ -7260,6 +7668,9 @@ function startRound(){
   for(let i=0;i<initialSpawn;i++) spawnZombie();
   zombiesRemainingToSpawn -= initialSpawn;
   spawnPowerUps();
+  roundStartTime = performance.now();
+  heartsLostThisRound = 0;
+  updateRoundTimerHud();
   const theme = themeForRound(round, state.themeIndex||0);
   toast('Round '+round+' · '+theme.name+' — '+roundKillTarget+' incoming');
 }
@@ -7306,6 +7717,10 @@ function updateInvincibleHud(){
   } else {
     pill.classList.remove('show');
   }
+}
+function updateRoundTimerHud(){
+  const elapsed = (performance.now() - roundStartTime) / 1000;
+  document.getElementById('roundTimerPill').textContent = '⏱ ' + elapsed.toFixed(1) + 's';
 }
 
 // ---------------------------------------------------------------------
@@ -7466,8 +7881,27 @@ function setupControls(){
     }
   });
 
+  let autoFireInterval = null;
   document.getElementById('actBtn').addEventListener('touchstart', e=>{
-    e.preventDefault(); doShoot();
+    e.preventDefault();
+    doShoot();
+    // Automatic weapons (Uzi, AK-47) keep firing while held — the
+    // interval just re-attempts faster than any auto weapon's cooldown;
+    // doShoot()'s own attackCooldown check throttles it to the real
+    // fire rate, so this can't ever fire faster than the weapon allows.
+    if(WEAPONS[currentWeaponId].auto){
+      clearInterval(autoFireInterval);
+      autoFireInterval = setInterval(doShoot, 40);
+    }
+  });
+  document.getElementById('actBtn').addEventListener('touchend', e=>{
+    e.preventDefault();
+    clearInterval(autoFireInterval);
+    autoFireInterval = null;
+  });
+  document.getElementById('actBtn').addEventListener('touchcancel', ()=>{
+    clearInterval(autoFireInterval);
+    autoFireInterval = null;
   });
   const jumpBtnEl = document.getElementById('jumpBtn');
   jumpBtnEl.addEventListener('touchstart', e=>{ e.preventDefault(); doJump(); });
@@ -7724,8 +8158,9 @@ function doShoot(){
 
   let dx = Math.sin(player.rotation.y), dy = 0, dz = Math.cos(player.rotation.y);
   const target = findAutoAimTarget(16*weapon.rangeMult);
+  const avatarScale = player.userData.avatarScale || 1;
   const startX = player.position.x + dx*0.5;
-  const startY = player.position.y + 1.05;
+  const startY = player.position.y + 1.05*avatarScale;
   const startZ = player.position.z + dz*0.5;
   if(target){
     // Aim at roughly the target's torso height, not just its horizontal
@@ -7835,6 +8270,26 @@ function killZombie(z){
     zombiesRemainingToSpawn--;
   }
   if(roundKillsDone >= roundKillTarget){
+    const clearTime = (performance.now() - roundStartTime) / 1000;
+    let bonusMsg = 'Round '+round+' cleared in '+clearTime.toFixed(1)+'s!';
+    // Speed bonus: a pace budget of 3s/zombie — anything faster earns
+    // bonus tokens proportional to how much time was saved.
+    const paceBudget = roundKillTarget * 3;
+    if(clearTime < paceBudget){
+      const speedBonus = Math.floor(paceBudget - clearTime);
+      if(speedBonus > 0){
+        runTokens += speedBonus;
+        updateRunTokensHud();
+        bonusMsg += ' +'+speedBonus+'🪙 speed bonus!';
+      }
+    }
+    // Flawless bonus: took zero damage the whole round — the "stay
+    // alive" half of this mode's goal, rewarded the same way as speed.
+    if(heartsLostThisRound === 0){
+      crystalsEarned += 10;
+      bonusMsg += ' Flawless! +10💎';
+    }
+    toast(bonusMsg);
     round++;
     unspentStatPoints++;
     // Crystals are the persistent, cross-run currency (spent in the
@@ -7850,6 +8305,7 @@ function playerTakeHit(){
   if(freeMode) return; // invincible while free-roaming
   if(invincibleTimer > 0) return; // invincible from a power-up pickup
   hearts--;
+  heartsLostThisRound++;
   renderHearts();
   const flash = document.getElementById('hitFlash');
   flash.classList.add('show');
@@ -7895,10 +8351,11 @@ function update(dt){
     // Height ramps in only past 'Wide', and the ramp starts from exactly
     // the old value at 9.5 — so modes 2-4 are untouched and stepping from
     // 4 to 5 doesn't snap the camera upward.
-    const cy = player.position.y + 1.3 + camPitch*3
+    const avatarScale = player.userData.avatarScale || 1;
+    const cy = player.position.y + 1.3*avatarScale + camPitch*3
              + Math.max(0, dist - 9.5)*(0.34 + camPitch*0.5);
     camera.position.set(cx, cy, cz);
-    camera.lookAt(player.position.x, player.position.y+1.1, player.position.z);
+    camera.lookAt(player.position.x, player.position.y+1.1*avatarScale, player.position.z);
   }
 
   // Fog is tuned for a camera 5 metres back; at the pulled-back tiers it
@@ -7999,6 +8456,7 @@ function update(dt){
   updateCritters(dt);
   updateShopPrompt();
   updatePowerUps(dt);
+  updateRoundTimerHud();
   if(invincibleTimer > 0){
     invincibleTimer -= dt;
     if(invincibleTimer < 0) invincibleTimer = 0;
