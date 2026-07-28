@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Family Arena</title>
+<title>Family Arena — Penguin Sprint</title>
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -7668,7 +7668,103 @@ function rcCape(g,color){const {torso}=g.userData.parts,{torsoH}=g.userData.rc;c
 
 // Human and animal avatars
 function buildHuman(skinHex,outfitHex,tint,hairStyle){const g=buildReferenceChibi({skin:tint||skinHex,outfit:tint||outfitHex});rcHair(g,hairStyle||'short',tint||0x2c211d);return g;}
-function buildPenguin(skinHex,outfitHex,tint){const g=buildReferenceChibi({skin:0xf4f1e8,outfit:0x202b35,headColor:0x202b35,pants:0x202b35,shoes:0xf2a83b,noEars:true});const {head}=g.userData.parts,{headR}=g.userData.rc;const face=rcAdd(head,new THREE.IcosahedronGeometry(headR*.72,1),RC_MAT(0xf7f1df),0,-headR*.08,headR*.36);face.scale.set(.88,.9,.55);rcAdd(head,new THREE.ConeGeometry(headR*.1,headR*.22,4),RC_MAT(0xf2a83b),0,-headR*.19,headR*.98,Math.PI/2,0,0);return g;}
+function buildPenguin(skinHex,outfitHex,tint){
+  // Sprint 1 hero model: bespoke penguin anatomy, not the humanoid avatar rig.
+  const g = new THREE.Group();
+  const black = RC_MAT(0x24292d);
+  const blackSide = RC_MAT(0x1b2024);
+  const cream = RC_MAT(0xf5f0df);
+  const orange = RC_MAT(0xf2a13a);
+  const eye = RC_GLOSS(0x15181a);
+  const shine = RC_GLOSS(0xffffff);
+
+  // One continuous pear-shaped body creates the recognizable mascot silhouette.
+  const torso = new THREE.Mesh(new THREE.IcosahedronGeometry(0.38, 2), black);
+  torso.position.set(0, 0.54, 0);
+  torso.scale.set(0.92, 1.34, 0.82);
+  g.add(torso);
+
+  // Cream belly sits slightly forward so it reads clearly at gameplay distance.
+  const belly = new THREE.Mesh(new THREE.IcosahedronGeometry(0.30, 2), cream);
+  belly.position.set(0, 0.49, 0.265);
+  belly.scale.set(0.72, 1.16, 0.25);
+  g.add(belly);
+
+  // The head overlaps the body to avoid a visible neck seam.
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 2), black);
+  head.position.set(0, 0.93, 0.015);
+  head.scale.set(1.03, 0.92, 0.96);
+  g.add(head);
+
+  // Broad cream face mask, shaped like the reference penguin's soft heart pattern.
+  const mask = new THREE.Mesh(new THREE.IcosahedronGeometry(0.27, 2), cream);
+  mask.position.set(0, 0.91, 0.255);
+  mask.scale.set(0.88, 0.78, 0.24);
+  g.add(mask);
+
+  // Small, widely spaced eyes. Less geometry produces a cleaner, cuter face.
+  for(const sx of [-1,1]){
+    const e = new THREE.Mesh(new THREE.IcosahedronGeometry(0.038, 1), eye);
+    e.position.set(sx*0.105, 0.965, 0.487);
+    e.scale.set(0.9, 1.08, 0.45);
+    g.add(e);
+    const h = new THREE.Mesh(new THREE.IcosahedronGeometry(0.010, 0), shine);
+    h.position.set(sx*0.094, 0.981, 0.515);
+    g.add(h);
+  }
+
+  // Short wedge beak rather than a long cone.
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.145, 4), orange);
+  beak.position.set(0, 0.865, 0.492);
+  beak.rotation.x = Math.PI/2;
+  beak.rotation.y = Math.PI/4;
+  beak.scale.set(1.15, 1, 0.75);
+  g.add(beak);
+
+  // Wings pivot from the shoulders so existing movement/weapon code still works.
+  function makeWing(side){
+    const pivot = new THREE.Group();
+    pivot.position.set(side*0.29, 0.69, -0.01);
+    const wing = new THREE.Mesh(new THREE.IcosahedronGeometry(0.19, 1), blackSide);
+    wing.position.set(side*0.07, -0.10, 0);
+    wing.scale.set(0.42, 1.15, 0.72);
+    wing.rotation.z = side*0.18;
+    pivot.add(wing);
+    g.add(pivot);
+    return pivot;
+  }
+  const armL = makeWing(-1);
+  const armR = makeWing(1);
+
+  // Independent foot pivots let the existing walk cycle produce a natural waddle.
+  function makeFoot(side){
+    const pivot = new THREE.Group();
+    pivot.position.set(side*0.13, 0.20, 0.02);
+    const ankle = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.055,0.09,6), orange);
+    ankle.position.y = -0.035;
+    pivot.add(ankle);
+    const foot = new THREE.Mesh(new THREE.IcosahedronGeometry(0.13,1), orange);
+    foot.position.set(0,-0.095,0.075);
+    foot.scale.set(1.05,0.28,1.55);
+    pivot.add(foot);
+    g.add(pivot);
+    return pivot;
+  }
+  const legL = makeFoot(-1);
+  const legR = makeFoot(1);
+
+  // Tiny tail gives a readable rear silhouette when the camera rotates.
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.075,0.18,5), blackSide);
+  tail.position.set(0,0.42,-0.31);
+  tail.rotation.x = -0.65;
+  g.add(tail);
+
+  g.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+  g.userData.parts = {head, torso, armL, armR, legL, legR};
+  g.userData.rc = {headR:0.34, headY:0.93, torsoH:0.68, torsoBase:0.20};
+  g.userData.heroModel = 'penguin-v1';
+  return g;
+}
 function buildBunny(skinHex,outfitHex,tint){const fur=tint||skinHex||0xf7e8e8,g=buildReferenceChibi({skin:fur,outfit:tint||outfitHex,headColor:fur,noEars:true});const {head}=g.userData.parts,{headR}=g.userData.rc;for(const sx of [-1,1]){const e=rcAdd(head,new THREE.CapsuleGeometry(headR*.12,headR*.65,4,7),RC_MAT(fur),sx*headR*.33,headR*1.05,-headR*.05,0,0,sx*.08);const i=rcAdd(e,new THREE.CapsuleGeometry(headR*.055,headR*.43,3,6),RC_MAT(0xffb8c8),0,0,headR*.1);};rcAnimalFace(g,0xfff3f3,0xff89a2);return g;}
 function buildDog(skinHex,outfitHex,tint){const fur=tint||0xd9aa79,g=buildReferenceChibi({skin:fur,outfit:tint||outfitHex,headColor:fur,noEars:true});const {head}=g.userData.parts,{headR}=g.userData.rc;for(const sx of [-1,1]){const e=rcAdd(head,new THREE.IcosahedronGeometry(headR*.35,1),RC_MAT(0x9d6847),sx*headR*.78,headR*.05,-headR*.08);e.scale.set(.52,1.22,.72);e.rotation.z=sx*.22;}rcAnimalFace(g,0xf0d2b4);return g;}
 
