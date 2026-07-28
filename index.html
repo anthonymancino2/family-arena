@@ -6636,15 +6636,18 @@ fitHudChrome();
 function initEngine(){
   fitHudChrome(); // re-check once the game screen is actually visible
   const canvas = document.getElementById('gl');
-  renderer = new THREE.WebGLRenderer({canvas, antialias:false, powerPreference:'high-performance'});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.5));
+  renderer = new THREE.WebGLRenderer({canvas, antialias:true, powerPreference:'high-performance'});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.08;
   renderer.setSize(window.innerWidth, window.innerHeight);
   // Shadows are the single biggest thing separating our look from the
   // low-poly reference renders — objects need to be grounded. Kept
   // deliberately cheap for mobile: one shadow-casting light, a modest
   // 1024 map, and hard PCF rather than the pricier soft variant.
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x9fd6ea);
@@ -6652,10 +6655,10 @@ function initEngine(){
 
   camera = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 200);
 
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x445566, 0.9);
+  const hemi = new THREE.HemisphereLight(0xfff7ed, 0x526579, 1.05);
   scene.add(hemi);
   // Warm, low-angled sun for long readable shadows, like the references.
-  const sun = new THREE.DirectionalLight(0xfff0d8, 0.95);
+  const sun = new THREE.DirectionalLight(0xffead0, 1.28);
   sun.position.set(14,16,9);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024,1024);
@@ -6670,7 +6673,7 @@ function initEngine(){
   scene.add(sun);
   // Cool secondary fill from the opposite side — no single flat-lit
   // side, more of a real outdoor-render look. No shadow (cheap).
-  const fill = new THREE.DirectionalLight(0xaac8ff, 0.3);
+  const fill = new THREE.DirectionalLight(0xa9c9ff, 0.42);
   fill.position.set(-10,9,-9);
   scene.add(fill);
   hemiLight = hemi; sunLight = sun;
@@ -6750,197 +6753,169 @@ function disposeGroup(g){
 // arms pivot from the shoulder. Named parts (armR etc.) mirror the old
 // file's convention so future weapon-attachment code has a stable hook.
 function buildHuman(skinHex, outfitHex, tint, hairStyle){
-  // Zombies call this without a hair style — give them a random one each
-  // so the horde has some visual variety instead of identical heads.
   hairStyle = hairStyle || HAIR_STYLES[Math.floor(Math.random()*HAIR_STYLES.length)];
   const g = new THREE.Group();
-  const skinMat   = LMAT(tint || skinHex);
-  const outfitMat = LMAT(tint || outfitHex);
-  const pantsMat  = LMAT(tint || 0x2b3a4a);
-  const bootMat   = LMAT(tint || 0x1c2530);
-  const hairMat   = LMAT(tint || 0x3b2a1f);
-  const pupilMat  = GMAT(0x141414);
-  const eyeWhiteMat = GMAT(0xffffff);
-  const cheekMat  = GMAT(0xff9e9e, 0.55);
 
-  // ---------------------------------------------------------------
-  // Low-poly faceted chibi: big head with a strong ratio, but a
-  // properly-crafted small body — visible fingers, toed feet, a
-  // faceted geodesic head/hair instead of smooth spheres. Every low
-  // radial-segment count below is deliberate: it's what keeps the
-  // flat-shaded facets visible rather than reading as smoothly round.
-  // ---------------------------------------------------------------
-  const headR = 0.36;
-  const torsoTopR = 0.15, torsoBotR = 0.18, torsoH = 0.28;
-  const legR = 0.082, legH = 0.22, footLen = 0.18, footH = 0.09;
-  const armR = 0.07, armLen = 0.27, handR = 0.075;
-  const legGap = 0.13;
+  // Remastered material palette: warm skin, richer clothing, softer black,
+  // and restrained glossy accents. Flat shading keeps the deliberate low-poly look.
+  const skinMat    = LMAT(tint || skinHex);
+  const outfitMat  = LMAT(tint || outfitHex);
+  const outfitDark = LMAT(tint || new THREE.Color(outfitHex).multiplyScalar(0.62).getHex());
+  const pantsMat   = LMAT(tint || 0x263445);
+  const bootMat    = LMAT(tint || 0x17202b);
+  const hairMat    = LMAT(tint || 0x2c211d);
+  const eyeMat     = GMAT(0x1a1210);
+  const eyeWhite   = GMAT(0xfffbf4);
+  const cheekMat   = GMAT(0xff8f98, 0.38);
+  const mouthMat   = GMAT(0x5a2c2c);
 
+  // Proportions based on the supplied low-poly chibi references:
+  // head about half the full height, compact torso, short limbs, oversized eyes.
+  const headR = 0.39;
+  const torsoH = 0.31, torsoTopR = 0.145, torsoBotR = 0.205;
+  const legH = 0.23, legR = 0.072, footH = 0.085, footLen = 0.18;
+  const armLen = 0.29, armR = 0.061, handR = 0.071;
+  const legGap = 0.14;
   const torsoBaseY = footH + legH;
-  const headBaseY = torsoBaseY + torsoH;
+  const shoulderY = torsoBaseY + torsoH * 0.84;
+  const headY = torsoBaseY + torsoH + headR * 0.88;
 
-  // A small low-poly hand: a palm nub plus three fanned fingers and a
-  // thumb, instead of a plain round mitten.
-  function buildHand(parent, y, sign){
-    const palm = _a(parent, new THREE.IcosahedronGeometry(handR*0.85, 0), skinMat, 0, y, 0);
-    for(let i=0;i<3;i++){
-      const a = (i-1)*0.32;
-      _a(parent, CYLG(handR*0.28, handR*0.22, handR*1.1, 5), skinMat,
-        Math.sin(a)*handR*0.55, y-handR*0.75, Math.cos(a)*handR*0.35+handR*0.3,
-        0.5, 0, a*0.6);
-    }
-    _a(parent, CYLG(handR*0.3, handR*0.24, handR*0.9, 5), skinMat,
-      sign*handR*0.7, y-handR*0.15, 0, 0.3, 0, sign*1.1);
+  function limbMaterialPart(parent, mat, topR, botR, len, y){
+    const geo = new THREE.CylinderGeometry(topR, botR, len, 6, 1, false);
+    geo.translate(0, -len/2, 0);
+    const m = new THREE.Mesh(geo, mat);
+    m.position.y = y;
+    parent.add(m);
+    return m;
   }
 
-  // A toed low-poly foot: a wedge-shaped shoe with a distinct toe
-  // front. Positioned at the BOTTOM of the leg (-legH below the hip
-  // pivot) — a missing offset here was the bug that left the shoe
-  // floating up near the hip, detached from the leg entirely.
   function buildFoot(parent){
-    const shoe = _a(parent, BOXG(legR*2.1, footH, footLen), bootMat, 0, -legH-footH/2, footLen*0.22);
-    const toe = _a(parent, new THREE.IcosahedronGeometry(legR*1.15, 0), bootMat,
-      0, -legH-footH*0.55, footLen*0.62);
-    toe.scale.set(1, 0.6, 0.85);
+    const shoe = _a(parent, BOXG(legR*2.0, footH, footLen), bootMat,
+      0, -legH-footH/2, footLen*0.28);
+    shoe.rotation.x = -0.04;
+    const toe = _a(parent, new THREE.IcosahedronGeometry(legR*1.05, 0), bootMat,
+      0, -legH-footH*0.56, footLen*0.72);
+    toe.scale.set(1.05, 0.58, 0.9);
   }
 
-  // ---- Legs: tapered low-segment capsules (visibly faceted, not
-  // smoothly round), each ending in a toed foot ----
   function buildLeg(x){
-    const grp = new THREE.Group();
-    _a(grp, CYLG(legR*0.88, legR, legH, 6), pantsMat, 0, -legH/2, 0);
-    grp.position.set(x, torsoBaseY, 0);
-    buildFoot(grp);
-    return grp;
+    const leg = new THREE.Group();
+    limbMaterialPart(leg, pantsMat, legR*0.82, legR, legH, 0);
+    leg.position.set(x, torsoBaseY, 0);
+    buildFoot(leg);
+    return leg;
   }
+
   const legL = buildLeg(-legGap/2);
   const legR_ = buildLeg(legGap/2);
   g.add(legL, legR_);
 
-  // ---- Torso: tapered low-segment cylinder, faceted rather than
-  // smooth. One clean color block — the earlier collar/belt trim rings
-  // read as stripes at this small scale, not subtle accents, so cut.
+  // Tapered tunic with a darker side/bottom panel gives the body depth even at phone size.
   const torso = new THREE.Mesh(new THREE.CylinderGeometry(torsoTopR, torsoBotR, torsoH, 7), outfitMat);
-  torso.position.set(0, torsoBaseY+torsoH/2, 0);
+  torso.position.set(0, torsoBaseY + torsoH/2, 0);
   g.add(torso);
+  _a(g, new THREE.CylinderGeometry(torsoBotR*0.98, torsoBotR*1.02, 0.055, 7), outfitDark,
+    0, torsoBaseY+0.055, 0);
+  _a(g, new THREE.TorusGeometry(torsoTopR*0.67, 0.018, 5, 10), outfitDark,
+    0, torsoBaseY+torsoH-0.012, 0, Math.PI/2, 0, 0);
 
-  // ---- Arms: tapered low-segment capsules ending in a small
-  // fingered hand ----
-  function buildArm(x, sign){
-    const geo = new THREE.CylinderGeometry(armR*0.88, armR, armLen, 6);
-    geo.translate(0, -armLen/2, 0); // origin at the shoulder pivot
-    const mesh = new THREE.Mesh(geo, skinMat);
-    mesh.position.set(x, headBaseY-0.01, 0);
-    buildHand(mesh, -armLen+handR*0.4, sign);
-    return mesh;
+  function buildHand(parent, y, sign){
+    const palm = _a(parent, new THREE.IcosahedronGeometry(handR, 0), skinMat, 0, y, 0);
+    palm.scale.set(0.9, 1.05, 0.8);
+    const thumb = _a(parent, CYLG(handR*0.24, handR*0.2, handR*0.78, 5), skinMat,
+      sign*handR*0.62, y-handR*0.05, handR*0.08, 0.35, 0, sign*1.0);
   }
-  const armL = buildArm(-(torsoTopR+armR*1.2), -1);
-  const armR_ = buildArm(torsoTopR+armR*1.2, 1);
+
+  function buildArm(x, sign){
+    const arm = new THREE.Group();
+    const sleeveLen = armLen*0.34;
+    limbMaterialPart(arm, outfitMat, armR*1.05, armR*1.15, sleeveLen, 0);
+    const fore = limbMaterialPart(arm, skinMat, armR*0.85, armR, armLen-sleeveLen,
+      -sleeveLen);
+    buildHand(fore, -(armLen-sleeveLen)+handR*0.25, sign);
+    arm.position.set(x, shoulderY, 0);
+    arm.rotation.z = sign*0.035;
+    return arm;
+  }
+
+  const armL = buildArm(-(torsoTopR+armR*1.15), -1);
+  const armR_ = buildArm(torsoTopR+armR*1.15, 1);
   g.add(armL, armR_);
 
-  // ---- Head: a faceted low-poly geodesic sphere (detail-1 icosahedron
-  // — visibly flat-planed, matching the wireframe reference sheets),
-  // big eyes with a proper iris layer, eyebrows, ears, rosy cheeks.
-  // No mouth.
-  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(headR, 1), skinMat);
-  head.position.set(0, headBaseY+headR*0.9, 0);
+  // Head uses a slightly squashed faceted sphere. The subtle frontward scale
+  // produces the broad, appealing face seen in polished character sheets.
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(headR, 2), skinMat);
+  head.position.set(0, headY, 0);
+  head.scale.set(1.02, 0.98, 0.94);
   g.add(head);
 
-  // Ears — small rounded lobes at the sides, roughly eye height. Easy
-  // to miss when working head-on, but every reference has them and
-  // their absence is part of why the face reads as "flat sticker."
   for(const sx of [-1,1]){
-    const ear = _a(head, SPHG(headR*0.16, 7, 5), skinMat, sx*headR*0.98, -headR*0.05, headR*0.1);
-    ear.scale.set(0.6, 1, 0.8);
+    const ear = _a(head, SPHG(headR*0.17, 7, 5), skinMat,
+      sx*headR*0.98, -headR*0.03, headR*0.02);
+    ear.scale.set(0.55, 1.0, 0.72);
   }
 
-  // Eyes: plain solid black — simpler than the layered white/iris
-  // version, per direct request. Small highlight kept so they don't go
-  // completely flat/dead-looking.
-  const eyeY = -headR*0.02, eyeZ = headR*0.94, eyeDX = headR*0.37;
+  // Layered eyes: warm white sclera, dark iris, two highlights.
+  const eyeY = headR*0.02, eyeZ = headR*0.88, eyeDX = headR*0.36;
   for(const sx of [-1,1]){
-    const eye = _a(head, SPHG(headR*0.15, 8, 6), pupilMat, sx*eyeDX, eyeY, eyeZ);
-    eye.scale.set(1, 1.2, 0.4);
-    _a(head, SPHG(headR*0.03, 5, 4), eyeWhiteMat, sx*eyeDX+sx*headR*0.04, eyeY+headR*0.05, eyeZ+0.045);
-    _a(head, BOXG(headR*0.24, headR*0.045, headR*0.03), hairMat,
-      sx*eyeDX, eyeY+headR*0.24, eyeZ+0.01, 0, 0, sx*0.12);
-  }
-  for(const sx of [-1,1]){
-    const cheek = _a(head, SPHG(headR*0.16, 7, 5), cheekMat, sx*headR*0.62, eyeY-headR*0.22, headR*0.78);
-    cheek.scale.set(1, 0.7, 0.3);
+    const white = _a(head, SPHG(headR*0.175, 10, 7), eyeWhite,
+      sx*eyeDX, eyeY, eyeZ);
+    white.scale.set(1.0, 1.23, 0.36);
+    const iris = _a(head, SPHG(headR*0.13, 9, 7), eyeMat,
+      sx*eyeDX, eyeY-headR*0.012, eyeZ+0.038);
+    iris.scale.set(1.0, 1.22, 0.28);
+    _a(head, SPHG(headR*0.035, 5, 4), eyeWhite,
+      sx*eyeDX-sx*headR*0.035, eyeY+headR*0.065, eyeZ+0.075);
+    _a(head, SPHG(headR*0.017, 5, 4), eyeWhite,
+      sx*eyeDX+sx*headR*0.035, eyeY-headR*0.025, eyeZ+0.08);
+    _a(head, BOXG(headR*0.23, headR*0.038, headR*0.022), hairMat,
+      sx*eyeDX, eyeY+headR*0.245, eyeZ+0.01, 0, 0, sx*0.1);
+    const cheek = _a(head, SPHG(headR*0.145, 7, 5), cheekMat,
+      sx*headR*0.62, eyeY-headR*0.23, headR*0.76);
+    cheek.scale.set(1,0.64,0.24);
   }
 
-  // Hair: a low-poly (detail-1 icosahedron — enough facets to avoid one
-  // giant flat plane landing awkwardly on the forehead) mass, plus a
-  // handful of shards that all lean the SAME direction — a swept
-  // fringe, matching every reference, instead of spikes radiating out
-  // in random directions like a sea urchin. Cap and fringe both pulled
-  // down closer to the brow line — the previous version left too much
-  // bare forehead between the hairline and the eyes. The fringe is
-  // shared by all three lengths; medium/long add strands on top.
-  const hairCap = _a(head, new THREE.IcosahedronGeometry(headR*1.05, 1), hairMat, 0, headR*0.1, -headR*0.16);
-  hairCap.scale.set(1.0, 0.95, 0.94);
-  const sweepDir = 0.5; // radians — every shard leans this same way
-  const fringeSpots = [
-    [-headR*0.36, headR*0.58, headR*0.42],
-    [-headR*0.1, headR*0.72, headR*0.36],
-    [headR*0.18, headR*0.68, headR*0.3],
-    [headR*0.42, headR*0.5, headR*0.14],
-    [headR*0.58, headR*0.26, -headR*0.05]
+  // Tiny curved smile made from a torus segment, visible but not cartoonishly thick.
+  const smile = new THREE.Mesh(new THREE.TorusGeometry(headR*0.09, headR*0.012, 5, 12, Math.PI), mouthMat);
+  smile.position.set(0, eyeY-headR*0.26, headR*0.92);
+  smile.rotation.set(0, 0, Math.PI);
+  head.add(smile);
+
+  // Hair cap and designed fringe. Medium/long styles add side and rear masses
+  // instead of simply stretching random spikes.
+  const cap = _a(head, new THREE.IcosahedronGeometry(headR*1.035, 1), hairMat,
+    0, headR*0.13, -headR*0.18);
+  cap.scale.set(1.0, 0.93, 0.94);
+
+  const fringe = [
+    [-0.58,0.52,0.56, 0.12],[-0.29,0.67,0.54,0.18],
+    [ 0.02,0.72,0.48,0.20],[ 0.31,0.62,0.36,0.14],
+    [ 0.55,0.42,0.15,0.08]
   ];
-  for(const [sx,sy,sz] of fringeSpots){
-    _a(head, CONEG(headR*0.16, headR*0.55, 5), hairMat, sx, sy, sz, sweepDir*0.9, 0, -sweepDir*0.7);
-  }
+  fringe.forEach(([x,y,z,r],i)=>{
+    const lock = _a(head, new THREE.ConeGeometry(headR*(0.18+r), headR*0.48, 4), hairMat,
+      x*headR, y*headR, z*headR, 0.55, 0, -0.18+i*0.08);
+    lock.scale.z = 0.68;
+  });
 
-  if(hairStyle === 'medium'){
-    // Side strands down to jaw length — a bit more coverage/volume at
-    // the back too, but nothing hanging past the shoulders yet.
-    hairCap.scale.set(1.05, 1.0, 1.0);
-    for(const sx of [-1,1])
-      _a(head, CYLG(0.05, 0.02, headR*1.3, 5), hairMat,
-        sx*headR*0.9, -headR*0.35, -headR*0.05, 0, 0, sx*0.1);
-  } else if(hairStyle === 'long'){
-    // Fuller back mass plus long strands hanging well past the
-    // shoulders down along the torso — the "long hair" silhouette from
-    // the reference sheets.
-    hairCap.scale.set(1.08, 1.05, 1.05);
-    _a(head, new THREE.IcosahedronGeometry(headR*0.85, 1), hairMat, 0, -headR*0.25, -headR*0.35);
+  if(hairStyle === 'medium' || hairStyle === 'long'){
     for(const sx of [-1,1]){
-      _a(head, CYLG(0.06, 0.02, headR*2.6, 5), hairMat,
-        sx*headR*0.82, -headR*0.9, -headR*0.15, 0, 0, sx*0.06);
-      _a(head, CYLG(0.05, 0.015, headR*2.2, 5), hairMat,
-        sx*headR*0.55, -headR*1.05, -headR*0.4, 0, 0, sx*0.04);
+      const side = _a(head, new THREE.IcosahedronGeometry(headR*0.34, 1), hairMat,
+        sx*headR*0.78, -headR*0.15, -headR*0.2);
+      side.scale.set(0.62, hairStyle==='long'?1.42:1.02, 0.78);
     }
   }
+  if(hairStyle === 'long'){
+    const back = _a(head, new THREE.IcosahedronGeometry(headR*0.76, 1), hairMat,
+      0, -headR*0.42, -headR*0.48);
+    back.scale.set(0.93,1.32,0.48);
+  }
 
+  g.traverse(o=>{
+    if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; }
+  });
   g.userData.parts = {head, torso, armL, armR: armR_, legL, legR: legR_};
   return g;
-}
-
-// A flat-colored silhouette that only renders where something else is
-// already in front of it in the depth buffer — i.e. it's invisible in
-// the open, and pops through walls/obstacles the moment the real body
-// is blocked from view. Standard "see them through cover" trick.
-// ---------------------------------------------------------------------
-// Bunny & Dog avatars. Same tiny-body/big-head rig as buildHuman (same
-// proportions, same shoulder/hip pivot math) so the existing walk-cycle
-// and shooting-recoil animation code works unchanged — only the head
-// decoration and paws differ. skinHex doubles as fur color; outfitHex
-// is still the "shirt" on the torso, same as the human avatar.
-// ---------------------------------------------------------------------
-
-// A simple rounded paw — no fingers, just a soft fur-colored blob —
-// used by both animal avatars instead of buildHuman's fingered hand.
-function buildPaw(parent, y, furMat, r){
-  const palm = _a(parent, new THREE.IcosahedronGeometry(r*0.95, 0), furMat, 0, y, 0);
-  palm.scale.set(1, 0.85, 1.1);
-}
-// A simple rounded foot-paw at the base of a leg — fur-colored, no
-// separate boot shape, with a small toe bump for a bit of silhouette.
-function buildAnimalFoot(parent, legH, legR, furMat){
-  const paw = _a(parent, new THREE.IcosahedronGeometry(legR*1.3, 0), furMat, 0, -legH, legR*0.1);
-  paw.scale.set(1, 0.55, 1.25);
-  _a(parent, SPHG(legR*0.6, 6, 5), furMat, 0, -legH+legR*0.15, legR*1.15);
 }
 
 function buildBunny(skinHex, outfitHex, tint){
