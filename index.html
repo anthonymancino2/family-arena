@@ -347,7 +347,7 @@
 <div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
 background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
 padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
-KAYKIT TEST V10
+KAYKIT ROSTER V11
 </div>
 <div id="app">
 
@@ -410,14 +410,12 @@ KAYKIT TEST V10
     </div>
     <div class="subtitle" style="margin-bottom:6px;">Avatar</div>
     <div class="swatchRow" id="typeRow"></div>
-    <div class="subtitle" style="margin-bottom:6px;">Skin tone</div>
-    <div class="swatchRow" id="skinRow"></div>
-    <div id="hairSection">
-      <div class="subtitle" style="margin-bottom:6px;">Hair style</div>
-      <div class="swatchRow" id="hairRow"></div>
+    <div class="subtitle" style="margin:10px 0 14px;">
+      All characters below are real CC0 KayKit assets with bone rigs and baked animations.
     </div>
-    <div class="subtitle" style="margin-bottom:6px;">Outfit color</div>
-    <div class="swatchRow" id="outfitRow"></div>
+    <div class="swatchRow" id="skinRow" style="display:none"></div>
+    <div id="hairSection" style="display:none"><div class="swatchRow" id="hairRow"></div></div>
+    <div class="swatchRow" id="outfitRow" style="display:none"></div>
     <button class="bigBtn" id="btnStartGame">Choose Theme →</button>
   </div>
 
@@ -565,9 +563,9 @@ const Store = {
   getProfile(name){
     try{
       const raw = localStorage.getItem(this._key('profile:'+name));
-      if(!raw) return { name, crystals:0, unlocked:['human','penguin'], skin:0, outfit:0, hairStyle:'short', avatarType:'penguin' };
+      if(!raw) return { name, crystals:0, unlocked:['human','penguin'], skin:0, outfit:0, hairStyle:'short', avatarType:'rogue' };
       return JSON.parse(raw);
-    }catch(e){ return { name, crystals:0, unlocked:['human','penguin'], skin:0, outfit:0, hairStyle:'short', avatarType:'penguin' }; }
+    }catch(e){ return { name, crystals:0, unlocked:['human','penguin'], skin:0, outfit:0, hairStyle:'short', avatarType:'rogue' }; }
   },
   saveProfile(p){
     localStorage.setItem(this._key('profile:'+p.name), JSON.stringify(p));
@@ -592,17 +590,13 @@ const SKINS = ['#ffe3c4','#f2c9a0','#c68a5a','#8d5a3c','#5a3826','#2b1d16'];
 const OUTFITS = ['#3fa9d6','#e0533d','#4caf50','#9b59b6','#f1c40f','#ecf0f1'];
 const HAIR_STYLES = ['short','medium','long'];
 const HAIR_STYLE_LABELS = {short:'Short', medium:'Medium', long:'Long'};
-const AVATAR_TYPES = ['human','penguin','bunny','dog',
-  'enforcer','shadowlord','titan','startrooper','marauder','nightguardian',
-  'jumphero','speedspike','voltbuddy','embernnja','frostninja','boltbuster',
-  'cyberhunter','ragetitan','forestranger'];
+const AVATAR_TYPES = ['rogue','hooded','knight','mage','barbarian'];
 const AVATAR_TYPE_LABELS = {
-  human:'🧑 Human', penguin:'🐧 Penguin', bunny:'🐰 Bunny', dog:'🐶 Dog',
-  enforcer:'🤖 Enforcer Unit', shadowlord:'⚫ Shadow Lord', titan:'🤖 Titan Guardian',
-  startrooper:'🛡️ Star Trooper', marauder:'👹 Hell Marauder', nightguardian:'🦇 Night Guardian',
-  jumphero:'⭐ Jump Hero', speedspike:'🦔 Speed Spike', voltbuddy:'⚡ Volt Buddy',
-  embernnja:'🦂 Ember Ninja', frostninja:'❄️ Frost Ninja', boltbuster:'🤖 Bolt Buster',
-  cyberhunter:'💀 Cyber Hunter', ragetitan:'💚 Rage Titan', forestranger:'⚔️ Forest Ranger'
+  rogue:'🏹 Rogue',
+  hooded:'🥷 Hooded Rogue',
+  knight:'🛡️ Knight',
+  mage:'🔮 Mage',
+  barbarian:'🪓 Barbarian'
 };
 // Uniform scale applied on top of each avatar's own build — every value
 // here was checked numerically against the penguin's actual rendered
@@ -610,15 +604,15 @@ const AVATAR_TYPE_LABELS = {
 // elephant's real ~1.76x-human shoulder-height ratio, just noticeably
 // bigger than the rest as its own "giant mech" identity calls for.
 const AVATAR_SCALE = {
-  human:1.0, penguin:1.0, bunny:1.0, dog:1.0,
-  enforcer:1.0, shadowlord:1.05, titan:1.55, startrooper:1.05, marauder:1.1,
-  nightguardian:1.0, jumphero:0.95, speedspike:0.9, voltbuddy:0.85,
-  embernnja:1.0, frostninja:1.0, boltbuster:0.85, cyberhunter:1.05,
-  ragetitan:1.35, forestranger:1.0
+  rogue:1.0,
+  hooded:1.0,
+  knight:1.02,
+  mage:1.0,
+  barbarian:1.08
 };
 // human and penguin are free by default; bunny/dog must be unlocked
 // with crystals (prices live in CATALOG, shared with the Crystal Shop).
-const FREE_AVATAR_TYPES = ['human','penguin'];
+const FREE_AVATAR_TYPES = [...AVATAR_TYPES];
 // TESTING ONLY: sET this back to false to re-lock Bunny/Dog/all 15 heroes
 // behind crystals. Everything else about the unlock system (CATALOG
 // prices, the Crystal Shop, profile.unlocked) is untouched — this just
@@ -630,7 +624,7 @@ let state = {
   skin: 0,
   outfit: 0,
   hairStyle: 'short',
-  avatarType: 'human',
+  avatarType: 'rogue',
   mode: null,
   themeIndex: 0
 };
@@ -738,7 +732,7 @@ function buildCustomizeUI(){
   const hairRow = document.getElementById('hairRow');
   const outfitRow = document.getElementById('outfitRow');
   typeRow.innerHTML = ''; skinRow.innerHTML = ''; hairRow.innerHTML = ''; outfitRow.innerHTML = '';
-  const profileForLocks = state.currentName ? Store.getProfile(state.currentName) : {unlocked:['human','penguin']};
+  const profileForLocks = state.currentName ? Store.getProfile(state.currentName) : {unlocked:[...AVATAR_TYPES]};
   AVATAR_TYPES.forEach(typeId=>{
     const isFree = FREE_AVATAR_TYPES.includes(typeId);
     const isUnlocked = UNLOCK_ALL_AVATARS_FOR_TESTING || isFree || profileForLocks.unlocked.includes(typeId);
@@ -814,25 +808,7 @@ document.getElementById('btnBeginSurvival').onclick = ()=>{
 
 // ---- SHOP (stub catalogue — purchase logic works now, character
 // swap into gameplay is the fresh-avatar-set hook for a later chunk) ----
-const CATALOG = [
-  { id:'bunny', name:'Bunny Avatar', icon:'🐰', price:250 },
-  { id:'dog', name:'Dog Avatar', icon:'🐶', price:300 },
-  { id:'jumphero', name:'Jump Hero', icon:'⭐', price:300 },
-  { id:'speedspike', name:'Speed Spike', icon:'🦔', price:300 },
-  { id:'voltbuddy', name:'Volt Buddy', icon:'⚡', price:350 },
-  { id:'enforcer', name:'Enforcer Unit', icon:'🤖', price:350 },
-  { id:'boltbuster', name:'Bolt Buster', icon:'🤖', price:350 },
-  { id:'embernnja', name:'Ember Ninja', icon:'🦂', price:400 },
-  { id:'frostninja', name:'Frost Ninja', icon:'❄️', price:400 },
-  { id:'forestranger', name:'Forest Ranger', icon:'⚔️', price:450 },
-  { id:'startrooper', name:'Star Trooper', icon:'🛡️', price:500 },
-  { id:'nightguardian', name:'Night Guardian', icon:'🦇', price:500 },
-  { id:'cyberhunter', name:'Cyber Hunter', icon:'💀', price:500 },
-  { id:'shadowlord', name:'Shadow Lord', icon:'⚫', price:550 },
-  { id:'marauder', name:'Hell Marauder', icon:'👹', price:550 },
-  { id:'ragetitan', name:'Rage Titan', icon:'💚', price:650 },
-  { id:'titan', name:'Titan Guardian', icon:'🤖', price:750 },
-];
+const CATALOG = [];
 function renderShop(){
   const grid = document.getElementById('shopGrid');
   grid.innerHTML = '';
@@ -8024,7 +8000,33 @@ const kayKitAssetPromise = Promise.all([
   });
 });
 
-function buildKayKitRoguePlayer(){
+
+const KAYKIT_CHARACTER_URLS = {
+  hooded: 'https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/main/addons/kaykit_character_pack_adventures/Characters/gltf/Rogue_Hooded.glb',
+  knight: 'https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/main/addons/kaykit_character_pack_adventures/Characters/gltf/Knight.glb',
+  mage: 'https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/main/addons/kaykit_character_pack_adventures/Characters/gltf/Mage.glb',
+  barbarian: 'https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/main/addons/kaykit_character_pack_adventures/Characters/gltf/Barbarian.glb'
+};
+const kayKitRemoteCache = {};
+
+function getKayKitAssetPromise(characterId){
+  if(characterId === 'rogue') return kayKitAssetPromise;
+  if(kayKitRemoteCache[characterId]) return kayKitRemoteCache[characterId];
+
+  const url = KAYKIT_CHARACTER_URLS[characterId];
+  kayKitRemoteCache[characterId] = Promise.all([
+    import('three'),
+    import('three/addons/loaders/GLTFLoader.js'),
+    import('three/addons/utils/SkeletonUtils.js')
+  ]).then(async ([THREEModule, loaderModule, skeletonModule]) => {
+    const loader = new loaderModule.GLTFLoader();
+    const gltf = await loader.loadAsync(url);
+    return {gltf, THREEAsset:THREEModule, cloneSkinned:skeletonModule.clone};
+  });
+  return kayKitRemoteCache[characterId];
+}
+
+function buildKayKitPlayer(characterId){
   const wrapper = new THREE.Group();
 
   // Compatibility pivots keep existing shooting and movement code safe.
@@ -8044,7 +8046,7 @@ function buildKayKitRoguePlayer(){
   loadingMesh.position.y = 0.8;
   wrapper.add(loadingMesh);
 
-  kayKitAssetPromise.then(({gltf, THREEAsset, cloneSkinned}) => {
+  getKayKitAssetPromise(characterId).then(({gltf, THREEAsset, cloneSkinned}) => {
     if(!wrapper.parent) return;
 
     wrapper.remove(loadingMesh);
@@ -8114,11 +8116,11 @@ function buildKayKitRoguePlayer(){
     };
 
     wrapper.userData.playKayClip('Idle', true);
-    toast('V10: Forward-facing rig + real jump/dash animations');
+    toast(AVATAR_TYPE_LABELS[characterId] + ' loaded');
   }).catch(err => {
     console.error('KayKit asset load failed:', err);
     const detail = (err && err.message) ? err.message : String(err);
-    toast('V10 LOAD ERROR: ' + detail.slice(0, 120));
+    toast('Character load error: ' + detail.slice(0, 120));
   });
 
   return wrapper;
@@ -8139,20 +8141,8 @@ function attachPistol(armR){
 }
 
 function spawnPlayer(){
-  const builders = {
-    human:buildHuman, penguin:buildPenguin, bunny:buildBunny, dog:buildDog,
-    enforcer:buildEnforcerUnit, shadowlord:buildShadowLord, titan:buildTitanGuardian,
-    startrooper:buildStarTrooper, marauder:buildHellMarauder, nightguardian:buildNightGuardian,
-    jumphero:buildJumpHero, speedspike:buildSpeedSpike, voltbuddy:buildVoltBuddy,
-    embernnja:buildEmberNinja, frostninja:buildFrostNinja, boltbuster:buildBoltBuster,
-    cyberhunter:buildCyberHunter, ragetitan:buildRageTitan, forestranger:buildForestRanger
-  };
-  const build = builders[state.avatarType] || buildHuman;
-  // The Human slot now tests a genuine CC0, bone-rigged KayKit GLB.
-  // Every other avatar remains untouched for this focused proof build.
-  player = state.avatarType === 'human'
-    ? buildKayKitRoguePlayer()
-    : build(SKINS[state.skin], OUTFITS[state.outfit], null, state.hairStyle);
+  if(!AVATAR_TYPES.includes(state.avatarType)) state.avatarType = 'rogue';
+  player = buildKayKitPlayer(state.avatarType);
   const avatarScale = AVATAR_SCALE[state.avatarType] || 1;
   player.scale.setScalar(avatarScale);
   player.userData.avatarScale = avatarScale;
@@ -8163,8 +8153,8 @@ function spawnPlayer(){
   enableShadows(player, false);
   addContactShadow(player, 0.5*avatarScale);
   scene.add(player);
-  // KayKit Rogue already includes properly fitted weapons in the asset.
-  if(!player.userData.kayAsset) attachPistol(player.userData.parts.armR);
+  // Every selectable character is now a real KayKit asset. Their fitted
+  // weapon/accessory geometry is already part of the imported model.
 
   const loc = new THREE.Group();
   const ringMat = new THREE.MeshBasicMaterial({color:0x4affea, transparent:true,
@@ -8710,13 +8700,58 @@ function findAutoAimTarget(maxRange){
 // Fires one bullet in a given direction, tagged with this weapon's
 // damage (scaled by the player's power stat) and splash radius.
 function fireBullet(dx, dy, dz, startX, startY, startZ, weapon){
-  const bullet = new THREE.Mesh(BULLET_GEO, weapon.mat || BULLET_MAT);
+  const bullet = new THREE.Group();
+
+  const sourceMat = weapon.mat || BULLET_MAT;
+  const tracerColor = sourceMat && sourceMat.color ? sourceMat.color.clone() : new THREE.Color(0xffe36e);
+
+  const core = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.055, 0.32, 3, 6),
+    new THREE.MeshBasicMaterial({color:tracerColor})
+  );
+  core.rotation.x = Math.PI/2;
+  bullet.add(core);
+
+  const halo = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.11, 0.42, 3, 6),
+    new THREE.MeshBasicMaterial({
+      color:tracerColor,
+      transparent:true,
+      opacity:0.24,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending
+    })
+  );
+  halo.rotation.x = Math.PI/2;
+  bullet.add(halo);
+
+  const tail = new THREE.Mesh(
+    new THREE.ConeGeometry(0.085, 0.55, 7),
+    new THREE.MeshBasicMaterial({
+      color:tracerColor,
+      transparent:true,
+      opacity:0.48,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending
+    })
+  );
+  tail.rotation.x = -Math.PI/2;
+  tail.position.z = -0.38;
+  bullet.add(tail);
+
   bullet.position.set(startX, startY, startZ);
   bullet.lookAt(startX+dx, startY+dy, startZ+dz);
-  bullet.scale.set(1,1,2.4); // stretched "streak" look, oriented along travel direction
   scene.add(bullet);
+
+  // Fast muzzle flash makes the shot read clearly even on a phone screen.
+  spawnBurst(startX, startY, startZ, 5, FX_MAT_SPARK, 2.0);
+
   const dmg = weapon.damage >= 999 ? 999 : weapon.damage * playerStats.power;
-  bullets.push({mesh:bullet, dx, dy, dz, life:1.1, damage:dmg, splash:weapon.splash||0});
+  bullets.push({
+    mesh:bullet, dx, dy, dz, life:1.15,
+    damage:dmg, splash:weapon.splash||0,
+    pulse:Math.random()*Math.PI*2
+  });
 }
 
 function doShoot(){
@@ -8733,9 +8768,11 @@ function doShoot(){
   let dx = Math.sin(player.rotation.y), dy = 0, dz = Math.cos(player.rotation.y);
   const target = findAutoAimTarget(16*weapon.rangeMult);
   const avatarScale = player.userData.avatarScale || 1;
-  const startX = player.position.x + dx*0.5;
-  const startY = player.position.y + 1.05*avatarScale;
-  const startZ = player.position.z + dz*0.5;
+  const sideX = Math.cos(player.rotation.y);
+  const sideZ = -Math.sin(player.rotation.y);
+  const startX = player.position.x + dx*0.72 + sideX*0.16;
+  const startY = player.position.y + 1.02*avatarScale;
+  const startZ = player.position.z + dz*0.72 + sideZ*0.16;
   if(target){
     // Aim at roughly the target's torso height, not just its horizontal
     // position — this is what actually lets shots angle downward at
@@ -8793,6 +8830,11 @@ function updateBullets(dt){
     b.mesh.position.x += b.dx*speed*dt;
     b.mesh.position.y += b.dy*speed*dt;
     b.mesh.position.z += b.dz*speed*dt;
+    b.pulse = (b.pulse || 0) + dt*18;
+    if(b.mesh.children[1]){
+      const pulseScale = 0.9 + Math.sin(b.pulse)*0.15;
+      b.mesh.children[1].scale.setScalar(pulseScale);
+    }
     b.life -= dt;
     let hit = false;
     if(bulletBlockedAt(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z)){
