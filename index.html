@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V22.5 Startup + Frostwing Repair</title>
+<title>Family Arena — V22.1 Verified Frostwing Dash Fix</title>
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -358,7 +358,7 @@
 <div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
 background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
 padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
-V22.5 · STARTUP + FROSTWING REPAIR
+V22.1 · VERIFIED FROSTWING DASH FIX
 </div>
 <div id="app">
 
@@ -381,7 +381,7 @@ V22.5 · STARTUP + FROSTWING REPAIR
           <button class="bigBtn" id="btnGoModes">Play</button>
           <button class="ghostBtn" id="btnGoShop">Crystal<br>Shop</button>
         </div>
-        <div class="homeVersion">FAMILY ARENA · V22.5 STARTUP + FROSTWING REPAIR</div>
+        <div class="homeVersion">FAMILY ARENA · V22.1 VERIFIED FROSTWING DASH FIX</div>
       </div>
     </div>
   </div>
@@ -8340,7 +8340,14 @@ function buildImportedFrostwing(options={}){
     const root=cloneSkinned(gltf.scene);
     root.rotation.y=0;
     normalizeImportedHero(root,THREEAsset,1.48);
-    root.position.y += 0.10; // keep Frostwing feet/belly above terrain
+    // Keep Frostwing's normalized transform as the permanent baseline.
+    // The old slide reset the imported GLB to scale 1, making it enormous
+    // and effectively freezing mobile Safari. A small local lift also keeps
+    // the feet/belly above the arena floor without changing player physics.
+    root.position.y += 0.16;
+    wrapper.userData.frostBaseScale = root.scale.clone();
+    wrapper.userData.frostBaseRotationX = root.rotation.x;
+    wrapper.userData.frostBaseY = root.position.y;
     root.traverse(o=>{
       if(!o.isMesh) return;
       o.visible=true; o.frustumCulled=false; o.castShadow=true; o.receiveShadow=false;
@@ -9090,20 +9097,18 @@ function doDash(){
   dashCooldownTimer = DASH_COOLDOWN;
   dashDir.x = Math.sin(player.rotation.y);
   dashDir.z = Math.cos(player.rotation.y);
-  if(state.avatarType==='frostwing'){
-    // Frostwing uses code-driven movement only. Imported dodge/root-motion
-    // clips previously locked the mobile game loop.
-    if(player.userData.playKayClip) player.userData.playKayClip('Running_A', true, false, 0);
-  } else if(player.userData.playKayClip){
+  if(player.userData.playKayClip && state.avatarType!=='frostwing'){
     player.userData.playKayClip('Dodge_Forward', true, true, 0.34);
-  } else {
+  } else if(!player.userData.playKayClip) {
     player.scale.set(1.35,0.8,1.35);
-    setTimeout(()=>{ if(player) player.scale.set(player.userData.avatarScale||1,player.userData.avatarScale||1,player.userData.avatarScale||1); }, 130);
+    setTimeout(()=>{ if(player) player.scale.set(1,1,1); }, 130);
   }
   if(state.avatarType==='hooded'){spawnShadowSmoke(player.position.x,player.position.y+.55,player.position.z,24);spawnAfterimage();shadowAfterimageTimer=.04;invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.12);}
   else if(state.avatarType==='frostwing'){
     invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.10);
     player.userData.frostSlideVisual=DASH_DURATION+.06;
+    // Do not trigger an imported root-motion clip here; it can fight the
+    // code-driven dash transform on iOS. The belly-slide pose is applied in update().
     spawnBurst(player.position.x,player.position.y+.12,player.position.z,22,FX_MAT_DUST,4.5); toast('BELLY SLIDE!');
   } else spawnBurst(player.position.x,0.4,player.position.z,9,FX_MAT_DUST,3.4);
   const btn = document.getElementById('dashBtn');
@@ -9147,8 +9152,6 @@ let hoodedUltimateActive = 0;
 let hoodedUltimatePulse = 0;
 let shadowAfterimageTimer = 0;
 let frostwingUltimateCharge = 0, frostwingUltimateActive = 0, frostwingUltimatePulse = 0;
-const ULTIMATE_COOLDOWN_SECONDS = 15;
-let ultimateCooldownTimer = 0;
 let frostwingKillChain = 0, fishFrenzyTimer = 0;
 let snowTurrets = [];
 
@@ -9379,7 +9382,6 @@ function updateHoodedHud(){
   else if(isKnight){btn.textContent=pct>=100?"KING'S JUDGMENT!":"JUDGMENT";meter.textContent='VALOR '+Math.round(pct)+'%';}
   else if(isBarbarian){btn.textContent=pct>=100?"PRIMAL RAGE!":"RAGE";meter.textContent='FURY '+Math.round(pct)+'%';}
   else if(isFrostwing){btn.textContent=pct>=100?'BLIZZARD!':'BLIZZARD';meter.textContent=(fishFrenzyTimer>0?'FISH FRENZY '+fishFrenzyTimer.toFixed(1)+'s':'FROST '+Math.round(pct)+'%');}
-  if(cooling){btn.textContent=Math.ceil(ultimateCooldownTimer)+'s';meter.textContent='ULTIMATE COOLDOWN '+Math.ceil(ultimateCooldownTimer)+'s';}
 }
 function spawnAfterimage(){
   if(!player||!player.userData.kayRoot)return; const ghost=player.userData.kayRoot.clone(true);
@@ -9425,9 +9427,8 @@ function spawnArrowRainVolley(){
 }
 function triggerArrowStorm(){
   if(!gameRunning||state.avatarType!=='rogue'||archerUltimateActive>0)return;
-  if(ultimateCooldownTimer>0){toast('Ultimate ready in '+Math.ceil(ultimateCooldownTimer)+'s');return;}
   if(archerUltimateCharge<99.5){toast('Arrow Storm is still charging');return;}
-  archerUltimateCharge=0;ultimateCooldownTimer=ULTIMATE_COOLDOWN_SECONDS;archerUltimateActive=4.0;archerUltimatePulse=0;updateHoodedHud();
+  archerUltimateCharge=0;archerUltimateActive=4.0;archerUltimatePulse=0;updateHoodedHud();
   document.body.style.filter='brightness(.78) saturate(1.55) contrast(1.08)';
   spawnArcherMuzzleFan(true);triggerCombatShake(12,300);navigator.vibrate&&navigator.vibrate([60,35,100]);toast('TEMPEST ARROW STORM!');
 }
@@ -9488,9 +9489,8 @@ function spawnJudgmentSword(target,i=0){
 }
 function triggerKingsJudgment(){
   if(!gameRunning||state.avatarType!=='knight'||knightUltimateActive>0)return;
-  if(ultimateCooldownTimer>0){toast('Ultimate ready in '+Math.ceil(ultimateCooldownTimer)+'s');return;}
   if(knightUltimateCharge<99.5){toast("King's Judgment is still charging");return;}
-  knightUltimateCharge=0;ultimateCooldownTimer=ULTIMATE_COOLDOWN_SECONDS;knightUltimateActive=4.0;knightUltimatePulse=0;updateHoodedHud();document.body.style.filter='brightness(.72) saturate(1.55) contrast(1.08)';
+  knightUltimateCharge=0;knightUltimateActive=4.0;knightUltimatePulse=0;updateHoodedHud();document.body.style.filter='brightness(.72) saturate(1.55) contrast(1.08)';
   spawnKnightGuardBurst(player.position,5.8);damageNearby(player.position,5.8,1.5);triggerCombatShake(15,360);navigator.vibrate&&navigator.vibrate([70,35,140]);toast("KING'S JUDGMENT!");
 }
 function updateKingsJudgment(dt){
@@ -9532,9 +9532,8 @@ function doBarbarianAttack(w){
 }
 function triggerPrimalRage(){
   if(!gameRunning||state.avatarType!=='barbarian'||barbarianUltimateActive>0)return;
-  if(ultimateCooldownTimer>0){toast('Ultimate ready in '+Math.ceil(ultimateCooldownTimer)+'s');return;}
   if(barbarianUltimateCharge<99.5){toast('Primal Rage is still charging');return;}
-  barbarianUltimateCharge=0;ultimateCooldownTimer=ULTIMATE_COOLDOWN_SECONDS;barbarianUltimateActive=4.4;barbarianUltimatePulse=0;updateHoodedHud();document.body.style.filter='brightness(.72) saturate(1.8) contrast(1.12)';spawnEarthbreaker(player.position,5.5);damageNearby(player.position,5.5,1.8);triggerCombatShake(18,380);navigator.vibrate&&navigator.vibrate([80,35,160]);toast('PRIMAL RAGE!');
+  barbarianUltimateCharge=0;barbarianUltimateActive=4.4;barbarianUltimatePulse=0;updateHoodedHud();document.body.style.filter='brightness(.72) saturate(1.8) contrast(1.12)';spawnEarthbreaker(player.position,5.5);damageNearby(player.position,5.5,1.8);triggerCombatShake(18,380);navigator.vibrate&&navigator.vibrate([80,35,160]);toast('PRIMAL RAGE!');
 }
 function updatePrimalRage(dt){
   if(barbarianUltimateActive<=0)return;barbarianUltimateActive-=dt;barbarianUltimatePulse-=dt;
@@ -9609,9 +9608,8 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
 }
 function triggerArcaneCataclysm(){
   if(!gameRunning||state.avatarType!=='mage'||mageUltimateActive>0)return;
-  if(ultimateCooldownTimer>0){toast('Ultimate ready in '+Math.ceil(ultimateCooldownTimer)+'s');return;}
   if(mageUltimateCharge<99.5){toast('Arcane Cataclysm is still charging');return;}
-  mageUltimateCharge=0;ultimateCooldownTimer=ULTIMATE_COOLDOWN_SECONDS;mageUltimateActive=4.2;mageUltimatePulse=0;updateHoodedHud();
+  mageUltimateCharge=0;mageUltimateActive=4.2;mageUltimatePulse=0;updateHoodedHud();
   document.body.style.filter='brightness(.62) saturate(1.65) contrast(1.12)';
   spawnArcaneSigil(player.position.x,player.position.y,player.position.z,5.5);spawnChainLightning(player.position,10,1.8);
   triggerCombatShake(14,360);navigator.vibrate&&navigator.vibrate([70,35,140]);toast('ARCANE CATACLYSM!');
@@ -9660,9 +9658,8 @@ function updateSnowTurrets(dt){
 }
 function triggerBlizzardProtocol(){
   if(!gameRunning||state.avatarType!=='frostwing'||frostwingUltimateActive>0)return;
-  if(ultimateCooldownTimer>0){toast('Ultimate ready in '+Math.ceil(ultimateCooldownTimer)+'s');return;}
   if(frostwingUltimateCharge<99.5){toast('Blizzard Protocol is still charging');return;}
-  frostwingUltimateCharge=0;ultimateCooldownTimer=ULTIMATE_COOLDOWN_SECONDS;frostwingUltimateActive=3.6;frostwingUltimatePulse=0;fishFrenzyTimer=Math.max(fishFrenzyTimer,2.5);updateHoodedHud();
+  frostwingUltimateCharge=0;frostwingUltimateActive=3.6;frostwingUltimatePulse=0;fishFrenzyTimer=Math.max(fishFrenzyTimer,2.5);updateHoodedHud();
   document.body.style.filter='brightness(.82) saturate(1.45) contrast(1.08)';
   spawnArcaneSigil(player.position.x,player.position.y,player.position.z,7.0);spawnBurst(player.position.x,player.position.y+.8,player.position.z,110,FX_MAT_DUST,11);triggerCombatShake(16,420);navigator.vibrate&&navigator.vibrate([90,35,180]);toast('BLIZZARD PROTOCOL!');
 }
@@ -9671,17 +9668,16 @@ function updateBlizzardProtocol(dt){
   if(frostwingUltimatePulse<=0){
     frostwingUltimatePulse=.26;
     const live=zombies.filter(z=>!z.userData.dead&&!z.userData.spawnPending).slice(0,12);
-    live.forEach((z,i)=>{applyBulletDamage(z,1.15*playerStats.power);spawnBurst(z.position.x,z.position.y+.8,z.position.z,16,FX_MAT_DUST,5.2);if(i%2===0)z.userData.speed=Math.max(.45,z.userData.speed*.9);});
-    damageNearby(player.position,7.5,.55);spawnBurst(player.position.x,player.position.y+.65,player.position.z,44,FX_MAT_DUST,9);triggerCombatShake(5,80);
+    live.forEach((z,i)=>{applyBulletDamage(z,.34*playerStats.power);spawnBurst(z.position.x,z.position.y+.8,z.position.z,16,FX_MAT_DUST,5.2);if(i%2===0)z.userData.speed=Math.max(.45,z.userData.speed*.9);});
+    damageNearby(player.position,7.5,.12);spawnBurst(player.position.x,player.position.y+.65,player.position.z,44,FX_MAT_DUST,9);triggerCombatShake(5,80);
   }
-  if(frostwingUltimateActive<=0){document.body.style.filter='';damageNearby(player.position,8,4.5);spawnArcaneSigil(player.position.x,player.position.y,player.position.z,8.0);spawnBurst(player.position.x,player.position.y+.8,player.position.z,120,FX_MAT_DUST,12);triggerCombatShake(13,240);}
+  if(frostwingUltimateActive<=0){document.body.style.filter='';damageNearby(player.position,8,1.25);spawnArcaneSigil(player.position.x,player.position.y,player.position.z,8.0);spawnBurst(player.position.x,player.position.y+.8,player.position.z,120,FX_MAT_DUST,12);triggerCombatShake(13,240);}
 }
 
 function triggerShadowEclipse(){
   if(!gameRunning||state.avatarType!=='hooded'||hoodedUltimateActive>0)return;
-  if(ultimateCooldownTimer>0){toast('Ultimate ready in '+Math.ceil(ultimateCooldownTimer)+'s');return;}
   if(hoodedUltimateCharge<99.5){ toast('Eclipse is still charging'); return; }
-  hoodedUltimateCharge=0;ultimateCooldownTimer=ULTIMATE_COOLDOWN_SECONDS;hoodedUltimateActive=3.2;hoodedUltimatePulse=0;updateHoodedHud();document.body.style.filter='brightness(.58) saturate(1.35)';
+  hoodedUltimateCharge=0;hoodedUltimateActive=3.2;hoodedUltimatePulse=0;updateHoodedHud();document.body.style.filter='brightness(.58) saturate(1.35)';
   spawnShadowSmoke(player.position.x,player.position.y+.7,player.position.z,48);triggerCombatShake(15,420);navigator.vibrate&&navigator.vibrate([80,40,160]);toast('SHADOW ECLIPSE!');
 }
 function updateShadowEclipse(dt){
@@ -10182,7 +10178,6 @@ function updateSceneryOcclusion(dt){
 // ---- Main update ----
 function update(dt){
   updateShadowClones(dt);
-  if(ultimateCooldownTimer>0){ultimateCooldownTimer=Math.max(0,ultimateCooldownTimer-dt);updateHoodedHud();}
   updateShadowEclipse(dt);
   updateArrowStorm(dt);
   updateArcaneCataclysm(dt);
@@ -10264,9 +10259,23 @@ function update(dt){
     const nz = player.position.z + dashDir.z*DASH_SPEED*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
     player.position.x = resolved.x; player.position.z = resolved.z;
-    if(state.avatarType==='frostwing'&&player.userData.kayRoot){player.userData.kayRoot.rotation.x=-.32;}
+    if(state.avatarType==='frostwing'&&player.userData.kayRoot){
+      const root=player.userData.kayRoot;
+      const base=player.userData.frostBaseScale;
+      root.rotation.x=(player.userData.frostBaseRotationX||0)-.48;
+      if(base) root.scale.set(base.x,base.y*.78,base.z*1.15);
+    }
     dashTimer -= dt;
-    if(dashTimer<=0){dashActive=false;if(state.avatarType==='frostwing'&&player.userData.kayRoot){player.userData.kayRoot.rotation.x=0;}}
+    if(dashTimer<=0){
+      dashActive=false;
+      if(state.avatarType==='frostwing'&&player.userData.kayRoot){
+        const root=player.userData.kayRoot;
+        const base=player.userData.frostBaseScale;
+        root.rotation.x=player.userData.frostBaseRotationX||0;
+        if(base) root.scale.copy(base);
+        if(Number.isFinite(player.userData.frostBaseY)) root.position.y=player.userData.frostBaseY;
+      }
+    }
   } else if(moveVec.x || moveVec.y){
     const forward = -moveVec.y, strafe = moveVec.x;
     const mx = Math.sin(camYaw)*forward - Math.cos(camYaw)*strafe;
@@ -10461,7 +10470,7 @@ function startSurvival(){
   enemyProjectiles.forEach(p=>{scene.remove(p.mesh);disposeGroup(p.mesh);});enemyProjectiles=[];
   fx.forEach(f=>scene.remove(f.mesh));
   fx = [];
-  hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;mageUltimateCharge=0;mageUltimateActive=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;frostwingUltimateCharge=0;frostwingUltimateActive=0;frostwingUltimatePulse=0;ultimateCooldownTimer=0;frostwingKillChain=0;fishFrenzyTimer=0;snowTurrets.forEach(t=>{scene.remove(t.mesh);disposeGroup(t.mesh);});snowTurrets=[];document.body.style.filter='';updateHoodedHud();
+  hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;mageUltimateCharge=0;mageUltimateActive=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;frostwingUltimateCharge=0;frostwingUltimateActive=0;frostwingUltimatePulse=0;frostwingKillChain=0;fishFrenzyTimer=0;snowTurrets.forEach(t=>{scene.remove(t.mesh);disposeGroup(t.mesh);});snowTurrets=[];document.body.style.filter='';updateHoodedHud();
   playerStats = {power:1, speed:1, hp:1};
   unspentStatPoints = 0;
   runTokens = 0;
@@ -10485,27 +10494,8 @@ function startSurvival(){
   updateRunTokensHud();
   updateWeaponHud();
   runStartTime = performance.now();
-  // Mark the run active before round setup. A round-setup exception used to
-  // leave the HUD visible at 0.0s with no world or enemies.
+  startRound();
   gameRunning = true;
-  try {
-    startRound();
-  } catch(startErr) {
-    console.error('Round startup recovered:', startErr);
-    // Minimal safe round fallback so the player can still play rather than
-    // getting trapped on an empty HUD screen.
-    clearZombies();
-    roundKillTarget = 4;
-    roundKillsDone = 0;
-    zombiesRemainingToSpawn = 0;
-    for(let i=0;i<4;i++){
-      try { spawnZombie(); } catch(enemyErr) { console.error('Enemy spawn skipped:', enemyErr); }
-    }
-    roundStartTime = performance.now();
-    heartsLostThisRound = 0;
-    updateRoundTimerHud();
-    updateEnemyCountHud();
-  }
   onResize();
   clock.getDelta();
   animate();
