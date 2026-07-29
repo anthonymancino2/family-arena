@@ -918,8 +918,8 @@ const CHARACTER_COMBAT = {
     defaultId:'hooded_blade',
     baseMoveMult:1.35,
     weapons:{
-      hooded_blade:{name:'Fast Blade', price:0, kind:'melee', cooldown:0.34, damage:1, radius:1.45,
-        desc:'Fast close-range slash. Speed upgrades increase attack speed.'},
+      hooded_blade:{name:'Shadow Slash', price:0, kind:'melee', cooldown:0.34, damage:1, radius:2.90, arc:Math.PI*2/3,
+        desc:'Enchanted daggers launch a wide purple slash with double reach.'},
       ninja_uzi:{name:'Ninja Star Uzi', price:180, kind:'star', cooldown:0.075, damage:0.72, auto:true,
         desc:'Hold FIRE to spray fast ninja stars.'},
       spin:{name:'Whirlwind Spin', price:320, kind:'spin', cooldown:0.12, damage:1.5, radius:1.75, auto:true,
@@ -8743,6 +8743,8 @@ function doJump(){
 }
 
 let bullets = [];
+let hoodedMeleeHits = 0;
+let hoodedComboStep = 0;
 
 // Simple shared-geometry particle burst — used for hit sparks, zombie
 // death poofs, and landing dust. Particles fade by shrinking (not by
@@ -8761,13 +8763,26 @@ function spawnBurst(x,y,z,count,mat,spread){
 function updateFx(dt){
   for(let i=fx.length-1;i>=0;i--){
     const f = fx[i];
-    f.vy -= 7*dt;
-    f.mesh.position.x += f.vx*dt;
-    f.mesh.position.y += f.vy*dt;
-    f.mesh.position.z += f.vz*dt;
-    f.life -= dt;
-    f.mesh.scale.setScalar(Math.max(f.life/f.maxLife,0));
-    if(f.life<=0){ scene.remove(f.mesh); fx.splice(i,1); }
+    if(f.kind==='shadowSlash'){
+      f.life -= dt;
+      const p = 1-Math.max(f.life,0)/f.maxLife;
+      f.mesh.position.x += f.vx*dt;
+      f.mesh.position.z += f.vz*dt;
+      f.mesh.scale.setScalar(0.72 + p*0.72);
+      f.mesh.traverse(o=>{ if(o.material) o.material.opacity=Math.max(0,1-p); });
+    } else {
+      f.vy -= 7*dt;
+      f.mesh.position.x += f.vx*dt;
+      f.mesh.position.y += f.vy*dt;
+      f.mesh.position.z += f.vz*dt;
+      f.life -= dt;
+      f.mesh.scale.setScalar(Math.max(f.life/f.maxLife,0));
+    }
+    if(f.life<=0){
+      scene.remove(f.mesh);
+      f.mesh.traverse(o=>{ if(o.geometry && f.kind==='shadowSlash') o.geometry.dispose(); if(o.material && f.kind==='shadowSlash') o.material.dispose(); });
+      fx.splice(i,1);
+    }
   }
 }
 
@@ -8894,6 +8909,40 @@ function damageNearby(origin, radius, damage){
   }
   return hitCount;
 }
+function spawnShadowSlash(origin, yaw, comboStep=0){
+  const group=new THREE.Group();
+  const purple=new THREE.MeshBasicMaterial({color:0x9a4dff,transparent:true,opacity:0.82,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const white=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.92,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const slash=new THREE.Mesh(new THREE.RingGeometry(0.72,1.18,28,1,-1.05,2.10),purple);
+  const edge=new THREE.Mesh(new THREE.RingGeometry(1.13,1.24,28,1,-1.05,2.10),white);
+  slash.rotation.z=(comboStep%2?0.34:-0.34);
+  edge.rotation.z=slash.rotation.z;
+  group.add(slash,edge);
+  const fxdirX=Math.sin(yaw), fxdirZ=Math.cos(yaw);
+  group.position.set(origin.x+fxdirX*1.05,origin.y+0.82,origin.z+fxdirZ*1.05);
+  group.rotation.y=yaw;
+  scene.add(group);
+  fx.push({kind:'shadowSlash',mesh:group,vx:fxdirX*5.2,vz:fxdirZ*5.2,life:0.20,maxLife:0.20});
+}
+function damageMeleeArc(origin,yaw,radius,arc,damage){
+  let hitCount=0;
+  const fxdirX=Math.sin(yaw), fxdirZ=Math.cos(yaw);
+  for(const z of zombies){
+    if(z.userData.dead) continue;
+    const dx=z.position.x-origin.x, dz=z.position.z-origin.z;
+    const dist=Math.hypot(dx,dz);
+    if(dist>radius || dist<0.001) continue;
+    const dot=(dx*fxdirX+dz*fxdirZ)/dist;
+    if(dot < Math.cos((arc||Math.PI*2)/2)) continue;
+    applyBulletDamage(z,damage*playerStats.power);
+    const push=0.34;
+    const resolved=resolveCollision(z.position.x+(dx/dist)*push,z.position.z+(dz/dist)*push,z.position.y);
+    z.position.x=resolved.x; z.position.z=resolved.z;
+    spawnBurst(z.position.x,z.position.y+0.75,z.position.z,8,FX_MAT_SPARK,3.0);
+    hitCount++;
+  }
+  return hitCount;
+}
 function doMeleeAttack(w, origin=player.position, isClone=false){
   const spin = w.kind==='spin';
   if(!isClone && player.userData.playKayClip){
@@ -8903,8 +8952,27 @@ function doMeleeAttack(w, origin=player.position, isClone=false){
     player.userData.playKayClip(clip,true,true,spin?0.14:0.26);
   }
   const pos={x:origin.x,y:origin.y,z:origin.z};
-  damageNearby(pos,w.radius,w.damage);
-  spawnBurst(pos.x,pos.y+0.65,pos.z,spin?12:7,FX_MAT_SPARK,spin?3.2:2.2);
+  let hits=0;
+  if(!spin && state.avatarType==='hooded'){
+    const yaw=isClone?player.rotation.y:player.rotation.y;
+    spawnShadowSlash(pos,yaw,hoodedComboStep++);
+    hits=damageMeleeArc(pos,yaw,w.radius,w.arc||Math.PI*2/3,w.damage);
+    if(!isClone){
+      const lx=Math.sin(yaw)*0.24, lz=Math.cos(yaw)*0.24;
+      const moved=resolveCollision(player.position.x+lx,player.position.z+lz,player.position.y);
+      player.position.x=moved.x; player.position.z=moved.z;
+    }
+  } else {
+    hits=damageNearby(pos,w.radius,w.damage);
+  }
+  if(!isClone && state.avatarType==='hooded' && hits>0){
+    hoodedMeleeHits += hits;
+    while(hoodedMeleeHits>=25){
+      hoodedMeleeHits-=25;
+      if(hearts<maxHearts){ hearts++; renderHearts(); toast('Shadow vitality restored 1 heart!'); }
+    }
+  }
+  spawnBurst(pos.x,pos.y+0.65,pos.z,spin?12:9,FX_MAT_SPARK,spin?3.2:2.8);
 }
 function shootFromPosition(w, pos, angleOffset=0){
   let yaw=player.rotation.y+angleOffset;
@@ -9371,7 +9439,7 @@ function startSurvival(){
   bullets = [];
   fx.forEach(f=>scene.remove(f.mesh));
   fx = [];
-  hearts = 3; maxHearts = 3; round = 1; kills = 0;
+  hearts = 3; maxHearts = 3; round = 1; kills = 0; hoodedMeleeHits = 0; hoodedComboStep = 0;
   playerStats = {power:1, speed:1, hp:1};
   unspentStatPoints = 0;
   runTokens = 0;
