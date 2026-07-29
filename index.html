@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — Alex Sprint V6</title>
+<title>Family Arena — V14 Shadow Awakens</title>
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -347,7 +347,7 @@
 <div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
 background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
 padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
-HERO COMBAT V13
+V14 · SHADOW AWAKENS
 </div>
 <div id="app">
 
@@ -370,7 +370,7 @@ HERO COMBAT V13
           <button class="bigBtn" id="btnGoModes">Play</button>
           <button class="ghostBtn" id="btnGoShop">Crystal<br>Shop</button>
         </div>
-        <div class="homeVersion">FAMILY ARENA · ALEX SPRINT V6</div>
+        <div class="homeVersion">FAMILY ARENA · V14 SHADOW AWAKENS</div>
       </div>
     </div>
   </div>
@@ -988,7 +988,7 @@ function tokensPerKill(){ return 5 + Math.floor(round/5); }
 function crystalsPerRound(){ return 15 + Math.floor(round/10)*5; }
 const CAM_LABELS = {1:'POV', 2:'Close', 3:'Far', 4:'Wide', 5:'Wider',
   6:'Distant', 7:'Panorama', 8:'Far out', 9:"Bird's eye"};
-let BULLET_GEO, BULLET_MAT, MUZZLE_GEO, MUZZLE_MAT, FX_GEO, FX_MAT_ZOMBIE, FX_MAT_DUST, FX_MAT_SPARK;
+let BULLET_GEO, BULLET_MAT, MUZZLE_GEO, MUZZLE_MAT, FX_GEO, FX_MAT_ZOMBIE, FX_MAT_DUST, FX_MAT_SPARK, FX_MAT_SHADOW;
 let fx = [];
 let groundMat = null;
 let hemiLight = null, sunLight = null;
@@ -6889,6 +6889,7 @@ function initEngine(){
   FX_MAT_ZOMBIE = new THREE.MeshBasicMaterial({color:0x8fdc8f});
   FX_MAT_DUST = new THREE.MeshBasicMaterial({color:0xe8f6fb, transparent:true, opacity:0.85});
   FX_MAT_SPARK = new THREE.MeshBasicMaterial({color:0xffd23f});
+  FX_MAT_SHADOW = new THREE.MeshBasicMaterial({color:0x9a4dff, transparent:true, opacity:0.9});
 
   // Shared decoration geometries — scaled per-instance rather than
   // rebuilt, since scenery now regenerates every single round.
@@ -8909,13 +8910,31 @@ function damageNearby(origin, radius, damage){
   }
   return hitCount;
 }
+function triggerCombatShake(strength=6, duration=110){
+  if(!renderer || !renderer.domElement) return;
+  const el=renderer.domElement;
+  const start=performance.now();
+  function tick(now){
+    const left=1-(now-start)/duration;
+    if(left<=0){ el.style.transform=''; return; }
+    const x=(Math.random()*2-1)*strength*left;
+    const y=(Math.random()*2-1)*strength*0.65*left;
+    el.style.transform=`translate(${x}px,${y}px)`;
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+function spawnShadowSmoke(x,y,z,count=8){
+  spawnBurst(x,y,z,count,FX_MAT_SHADOW,2.2);
+}
 function spawnShadowSlash(origin, yaw, comboStep=0){
   const group=new THREE.Group();
   const purple=new THREE.MeshBasicMaterial({color:0x9a4dff,transparent:true,opacity:0.82,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
   const white=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.92,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
   const slash=new THREE.Mesh(new THREE.RingGeometry(0.72,1.18,28,1,-1.05,2.10),purple);
   const edge=new THREE.Mesh(new THREE.RingGeometry(1.13,1.24,28,1,-1.05,2.10),white);
-  slash.rotation.z=(comboStep%2?0.34:-0.34);
+  const comboRot=[-0.46,0.46,0.0,1.15][comboStep%4];
+  slash.rotation.z=comboRot;
   edge.rotation.z=slash.rotation.z;
   group.add(slash,edge);
   const fxdirX=Math.sin(yaw), fxdirZ=Math.cos(yaw);
@@ -8935,45 +8954,60 @@ function damageMeleeArc(origin,yaw,radius,arc,damage){
     const dot=(dx*fxdirX+dz*fxdirZ)/dist;
     if(dot < Math.cos((arc||Math.PI*2)/2)) continue;
     applyBulletDamage(z,damage*playerStats.power);
-    const push=0.34;
+    const push=0.72;
     const resolved=resolveCollision(z.position.x+(dx/dist)*push,z.position.z+(dz/dist)*push,z.position.y);
     z.position.x=resolved.x; z.position.z=resolved.z;
-    spawnBurst(z.position.x,z.position.y+0.75,z.position.z,8,FX_MAT_SPARK,3.0);
+    z.rotation.x=-0.32;
+    setTimeout(()=>{ if(!z.userData.dead) z.rotation.x=0; },150);
+    flashZombie(z);
+    spawnBurst(z.position.x,z.position.y+0.75,z.position.z,10,FX_MAT_SPARK,3.5);
+    spawnShadowSmoke(z.position.x,z.position.y+0.55,z.position.z,5);
     hitCount++;
   }
   return hitCount;
 }
 function doMeleeAttack(w, origin=player.position, isClone=false){
   const spin = w.kind==='spin';
+  const comboIndex=hoodedComboStep%4;
   if(!isClone && player.userData.playKayClip){
-    const clip = spin
-      ? findClipByWords(['melee','spin'], findClipByWords(['attack','spin']))
-      : findClipByWords(['melee','chop']);
-    player.userData.playKayClip(clip,true,true,spin?0.14:0.26);
+    const comboClips=[
+      findClipByWords(['melee','chop']),
+      findClipByWords(['melee','slash'],findClipByWords(['melee','chop'])),
+      findClipByWords(['melee','attack'],findClipByWords(['melee','chop'])),
+      findClipByWords(['melee','spin'],findClipByWords(['attack','spin']))
+    ];
+    const clip = spin ? findClipByWords(['melee','spin'],findClipByWords(['attack','spin'])) : comboClips[comboIndex];
+    player.userData.playKayClip(clip,true,true,spin?0.14:0.24);
   }
   const pos={x:origin.x,y:origin.y,z:origin.z};
   let hits=0;
   if(!spin && state.avatarType==='hooded'){
-    const yaw=isClone?player.rotation.y:player.rotation.y;
+    const yaw=player.rotation.y;
     spawnShadowSlash(pos,yaw,hoodedComboStep++);
+    spawnShadowSmoke(pos.x+Math.sin(yaw)*0.65,pos.y+0.55,pos.z+Math.cos(yaw)*0.65,8);
     hits=damageMeleeArc(pos,yaw,w.radius,w.arc||Math.PI*2/3,w.damage);
     if(!isClone){
-      const lx=Math.sin(yaw)*0.24, lz=Math.cos(yaw)*0.24;
+      const lx=Math.sin(yaw)*0.38, lz=Math.cos(yaw)*0.38;
       const moved=resolveCollision(player.position.x+lx,player.position.z+lz,player.position.y);
       player.position.x=moved.x; player.position.z=moved.z;
+      triggerCombatShake(hits>0?7:3,hits>0?125:75);
     }
   } else {
     hits=damageNearby(pos,w.radius,w.damage);
+    if(!isClone && spin) triggerCombatShake(hits>0?5:2,80);
   }
   if(!isClone && state.avatarType==='hooded' && hits>0){
     hoodedMeleeHits += hits;
+    if(hoodedMeleeHits%5 < hits) toast(`Shadow vitality ${hoodedMeleeHits}/25`);
     while(hoodedMeleeHits>=25){
       hoodedMeleeHits-=25;
       if(hearts<maxHearts){ hearts++; renderHearts(); toast('Shadow vitality restored 1 heart!'); }
     }
   }
-  spawnBurst(pos.x,pos.y+0.65,pos.z,spin?12:9,FX_MAT_SPARK,spin?3.2:2.8);
+  spawnBurst(pos.x,pos.y+0.65,pos.z,spin?14:10,FX_MAT_SPARK,spin?3.5:3.0);
+  if(!isClone) navigator.vibrate && navigator.vibrate(hits>0?[18,22,30]:12);
 }
+
 function shootFromPosition(w, pos, angleOffset=0){
   let yaw=player.rotation.y+angleOffset;
   let dx=Math.sin(yaw),dy=0,dz=Math.cos(yaw);
@@ -9041,7 +9075,7 @@ function doShoot(){
     shootFromPosition(w,player.position,0);
     if(w.clones==='stars') cloneAttack(w);
   }
-  navigator.vibrate && navigator.vibrate(w.kind==='spin'?18:10);
+  if(w.kind!=='melee' && w.kind!=='spin') navigator.vibrate && navigator.vibrate(10);
 }
 
 // True if (x,y,z) sits inside any solid obstacle/landmark box — used to
