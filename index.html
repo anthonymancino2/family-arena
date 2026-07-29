@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V21.1 Frostwing Polished</title>
+<title>Family Arena — V21.2 Frostwing Option 3</title>
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -421,7 +421,7 @@ V20 · UNDEAD UPRISING
       <div id="heroInfoDesc" style="margin-top:7px;color:#d3e1ec;font-size:13px;line-height:1.35;"></div>
     </div>
     <div class="subtitle" style="margin:10px 0 14px;">
-      Frostwing uses the polished Arctic Gunslinger model. The other heroes use animated CC0 KayKit assets.
+      Frostwing uses the clean Option 3 penguin with oversized dual frost pistols. No other avatar models were changed.
     </div>
     <div class="swatchRow" id="skinRow" style="display:none"></div>
     <div id="hairSection" style="display:none"><div class="swatchRow" id="hairRow"></div></div>
@@ -8066,90 +8066,59 @@ function buildHuman(skinHex,outfitHex,tint,hairStyle){
   return g;
 }
 function buildPenguin(skinHex,outfitHex,tint){
-  // Frostwing polished mascot model: compact, expressive, and self-contained.
-  // Built directly in Three.js so the single-file game remains offline-friendly.
+  // Frostwing base model: clean, unmodified low-poly penguin.
+  // No scarf, backpack, facial additions, or body accessories.
   const g = new THREE.Group();
-  const navy = RC_MAT(0x182631);
-  const navySide = RC_MAT(0x101b24);
-  const cream = RC_MAT(0xf4f0df);
-  const creamFace = RC_MAT(0xfff8e8);
+  const black = RC_MAT(0x24292d);
+  const blackSide = RC_MAT(0x1b2024);
+  const cream = RC_MAT(0xf5f0df);
   const orange = RC_MAT(0xf2a13a);
-  const eyeDark = RC_GLOSS(0x101820);
-  const eyeBlue = RC_GLOSS(0x55c9ff);
+  const eye = RC_GLOSS(0x15181a);
   const shine = RC_GLOSS(0xffffff);
-  const scarfBlue = RC_MAT(0x1768ad);
-  const scarfDark = RC_MAT(0x0d477d);
-  const tankBlue = RC_MAT(0x237fbd);
-  const tankDark = RC_MAT(0x263744);
-  const metal = RC_MAT(0x8ca4b3);
 
-  // Rounded pear body.
-  const torso = new THREE.Mesh(new THREE.IcosahedronGeometry(0.39, 2), navy);
+  const torso = new THREE.Mesh(new THREE.IcosahedronGeometry(0.38, 2), black);
   torso.position.set(0, 0.54, 0);
-  torso.scale.set(0.94, 1.34, 0.84);
+  torso.scale.set(0.92, 1.34, 0.82);
   g.add(torso);
 
-  // Large clean belly plate.
-  const belly = new THREE.Mesh(new THREE.IcosahedronGeometry(0.305, 2), cream);
-  belly.position.set(0, 0.49, 0.274);
-  belly.scale.set(0.74, 1.17, 0.24);
+  const belly = new THREE.Mesh(new THREE.IcosahedronGeometry(0.30, 2), cream);
+  belly.position.set(0, 0.49, 0.265);
+  belly.scale.set(0.72, 1.16, 0.25);
   g.add(belly);
 
-  // Head overlaps body so there is no neck seam.
-  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.345, 2), navy);
-  head.position.set(0, 0.94, 0.018);
-  head.scale.set(1.03, 0.94, 0.98);
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 2), black);
+  head.position.set(0, 0.93, 0.015);
+  head.scale.set(1.03, 0.92, 0.96);
   g.add(head);
 
-  // Two separate cream cheek panels create a natural penguin face without a black center blotch.
+  const mask = new THREE.Mesh(new THREE.IcosahedronGeometry(0.27, 2), cream);
+  mask.position.set(0, 0.91, 0.255);
+  mask.scale.set(0.88, 0.78, 0.24);
+  g.add(mask);
+
   for(const sx of [-1,1]){
-    const cheek = new THREE.Mesh(new THREE.IcosahedronGeometry(0.205, 2), creamFace);
-    cheek.position.set(sx*0.105, 0.925, 0.275);
-    cheek.scale.set(0.78, 0.92, 0.25);
-    g.add(cheek);
+    const e = new THREE.Mesh(new THREE.IcosahedronGeometry(0.038, 1), eye);
+    e.position.set(sx*0.105, 0.965, 0.487);
+    e.scale.set(0.9, 1.08, 0.45);
+    g.add(e);
+    const h = new THREE.Mesh(new THREE.IcosahedronGeometry(0.010, 0), shine);
+    h.position.set(sx*0.094, 0.981, 0.515);
+    g.add(h);
   }
 
-  // Eyes are seated directly into the face, with no stalks or floating geometry.
-  for(const sx of [-1,1]){
-    const socket = new THREE.Mesh(new THREE.IcosahedronGeometry(0.067, 2), eyeDark);
-    socket.position.set(sx*0.105, 0.985, 0.492);
-    socket.scale.set(0.92, 1.12, 0.40);
-    g.add(socket);
-    const iris = new THREE.Mesh(new THREE.IcosahedronGeometry(0.035, 2), eyeBlue);
-    iris.position.set(sx*0.105, 0.985, 0.522);
-    iris.scale.set(0.88, 1.05, 0.34);
-    g.add(iris);
-    const glint = new THREE.Mesh(new THREE.IcosahedronGeometry(0.010, 1), shine);
-    glint.position.set(sx*0.094, 1.005, 0.548);
-    g.add(glint);
-  }
-
-  // Short centered wedge beak.
-  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.078, 0.145, 4), orange);
-  beak.position.set(0, 0.875, 0.515);
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.145, 4), orange);
+  beak.position.set(0, 0.865, 0.492);
   beak.rotation.x = Math.PI/2;
   beak.rotation.y = Math.PI/4;
-  beak.scale.set(1.18, 1.0, 0.74);
+  beak.scale.set(1.15, 1, 0.75);
   g.add(beak);
 
-  // Thick scarf ring and a short front fold.
-  const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.285, 0.055, 8, 20), scarfBlue);
-  scarf.position.set(0, 0.765, 0.005);
-  scarf.rotation.x = Math.PI/2;
-  scarf.scale.set(1.0, 1.0, 0.78);
-  g.add(scarf);
-  const scarfFold = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.18,0.055), scarfDark);
-  scarfFold.position.set(-0.12,0.69,0.31);
-  scarfFold.rotation.z = -0.18;
-  g.add(scarfFold);
-
-  // Shoulder pivots preserve the existing animation and weapon attachment system.
   function makeWing(side){
     const pivot = new THREE.Group();
-    pivot.position.set(side*0.295, 0.70, 0.005);
-    const wing = new THREE.Mesh(new THREE.IcosahedronGeometry(0.19, 2), navySide);
-    wing.position.set(side*0.065, -0.105, 0.0);
-    wing.scale.set(0.42, 1.18, 0.70);
+    pivot.position.set(side*0.29, 0.69, -0.01);
+    const wing = new THREE.Mesh(new THREE.IcosahedronGeometry(0.19, 1), blackSide);
+    wing.position.set(side*0.07, -0.10, 0);
+    wing.scale.set(0.42, 1.15, 0.72);
     wing.rotation.z = side*0.18;
     pivot.add(wing);
     g.add(pivot);
@@ -8160,13 +8129,13 @@ function buildPenguin(skinHex,outfitHex,tint){
 
   function makeFoot(side){
     const pivot = new THREE.Group();
-    pivot.position.set(side*0.13, 0.20, 0.025);
+    pivot.position.set(side*0.13, 0.20, 0.02);
     const ankle = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.055,0.09,6), orange);
     ankle.position.y = -0.035;
     pivot.add(ankle);
     const foot = new THREE.Mesh(new THREE.IcosahedronGeometry(0.13,1), orange);
-    foot.position.set(0,-0.095,0.078);
-    foot.scale.set(1.08,0.28,1.58);
+    foot.position.set(0,-0.095,0.075);
+    foot.scale.set(1.05,0.28,1.55);
     pivot.add(foot);
     g.add(pivot);
     return pivot;
@@ -8174,35 +8143,15 @@ function buildPenguin(skinHex,outfitHex,tint){
   const legL = makeFoot(-1);
   const legR = makeFoot(1);
 
-  // Compact frost tank backpack, mounted close to the body.
-  const pack = new THREE.Group();
-  pack.position.set(0,0.61,-0.30);
-  const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.16,0.46,10), tankBlue);
-  tank.rotation.z = Math.PI/2;
-  tank.rotation.y = Math.PI/2;
-  pack.add(tank);
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.07,8), metal);
-  cap.position.set(0,0.24,0);
-  pack.add(cap);
-  const valve = new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.09,6), tankDark);
-  valve.position.set(0,0.31,0);
-  pack.add(valve);
-  const badge = new THREE.Mesh(new THREE.OctahedronGeometry(0.075,0), creamFace);
-  badge.position.set(0,0,0.155);
-  badge.scale.set(0.75,1.0,0.20);
-  pack.add(badge);
-  g.add(pack);
-
-  // Small rear tail.
-  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.075,0.18,5), navySide);
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.075,0.18,5), blackSide);
   tail.position.set(0,0.42,-0.31);
   tail.rotation.x = -0.65;
   g.add(tail);
 
   g.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
   g.userData.parts = {head, torso, armL, armR, legL, legR};
-  g.userData.rc = {headR:0.345, headY:0.94, torsoH:0.68, torsoBase:0.20};
-  g.userData.heroModel = 'frostwing-polished-v2';
+  g.userData.rc = {headR:0.34, headY:0.93, torsoH:0.68, torsoBase:0.20};
+  g.userData.heroModel = 'frostwing-option3-clean';
   return g;
 }
 function buildBunny(skinHex,outfitHex,tint){const fur=tint||skinHex||0xf7e8e8,g=buildReferenceChibi({skin:fur,outfit:tint||outfitHex,headColor:fur,noEars:true});const {head}=g.userData.parts,{headR}=g.userData.rc;for(const sx of [-1,1]){const e=rcAdd(head,new THREE.CapsuleGeometry(headR*.12,headR*.65,4,7),RC_MAT(fur),sx*headR*.33,headR*1.05,-headR*.05,0,0,sx*.08);const i=rcAdd(e,new THREE.CapsuleGeometry(headR*.055,headR*.43,3,6),RC_MAT(0xffb8c8),0,0,headR*.1);};rcAnimalFace(g,0xfff3f3,0xff89a2);return g;}
