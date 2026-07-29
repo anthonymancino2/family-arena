@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V14.1 Shadow Storm</title>
+<title>Family Arena — V15 Shadow Assassin</title>
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -176,6 +176,12 @@
     pointer-events:auto;display:flex;align-items:center;justify-content:center;
     transition:opacity 0.15s;text-shadow:none;}
   .dashBtn.cooling{opacity:0.3;}
+  .ultimateBtn{position:absolute;bottom:calc(118px + env(safe-area-inset-bottom));right:72px;width:82px;height:82px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:20;font-size:13px;font-weight:1000;letter-spacing:.6px;color:#fff;border:3px solid rgba(255,255,255,.8);background:conic-gradient(#b95cff var(--charge,0%),rgba(33,11,52,.92) 0);box-shadow:0 0 20px rgba(164,72,255,.65),inset 0 0 0 5px rgba(0,0,0,.28);text-shadow:0 2px 4px #000;user-select:none;-webkit-user-select:none;touch-action:none;}
+  .ultimateBtn.ready{animation:ultimatePulse .75s infinite alternate;box-shadow:0 0 34px rgba(209,108,255,1),0 0 70px rgba(126,36,255,.72),inset 0 0 0 5px rgba(255,255,255,.18);}
+  .ultimateBtn.hidden{display:none;}
+  @keyframes ultimatePulse{from{transform:scale(1)}to{transform:scale(1.09)}}
+  .soulMeter{position:absolute;bottom:calc(205px + env(safe-area-inset-bottom));right:64px;z-index:20;color:#e6c7ff;font-size:12px;font-weight:900;text-shadow:0 2px 4px #000;display:none;}
+  .soulMeter.on{display:block;}
   .freeBtn{width:52px;height:52px;border-radius:14px;background:rgba(20,22,28,0.5);
     border:2.5px solid rgba(255,255,255,0.75);font-weight:800;font-size:11px;color:#fff;
     pointer-events:auto;display:flex;align-items:center;justify-content:center;}
@@ -455,6 +461,8 @@ V14 · SHADOW AWAKENS
           <div class="camZoomBtn" id="camInBtn">&plus;</div>
         </div>
         <div class="dashBtn" id="dashBtn">DASH</div>
+        <div class="ultimateBtn hidden" id="ultimateBtn" style="--charge:0%">ECLIPSE</div>
+        <div class="soulMeter" id="soulMeter">SOULS 0/25</div>
         <div class="lookFwdBtn" id="lookFwdBtn">LOOK<br>FWD</div>
         <div class="leftCluster">
           <div class="freeBtn" id="freeBtn">FREE</div>
@@ -8595,8 +8603,11 @@ function setupControls(){
   document.getElementById('camOutBtn').addEventListener('touchstart', e=>{
     e.preventDefault(); cycleCamera(1);
   }, {passive:false});
-  const dashBtnEl = document.getElementById('dashBtn');
-  dashBtnEl.addEventListener('touchstart', e=>{ e.preventDefault(); doDash(); });
+  const dashBtnEl=document.getElementById('dashBtn');
+  dashBtnEl.addEventListener('touchstart',e=>{e.preventDefault();doDash();});
+  const ultimateBtnEl=document.getElementById('ultimateBtn');
+  ultimateBtnEl.addEventListener('touchstart',e=>{e.preventDefault();triggerShadowEclipse();},{passive:false});
+  ultimateBtnEl.addEventListener('click',triggerShadowEclipse);
   document.getElementById('freeBtn').addEventListener('touchstart', e=>{
     e.preventDefault(); toggleFreeMode();
   });
@@ -8722,7 +8733,8 @@ function doDash(){
     player.scale.set(1.35,0.8,1.35);
     setTimeout(()=>{ if(player) player.scale.set(1,1,1); }, 130);
   }
-  spawnBurst(player.position.x, 0.4, player.position.z, 9, FX_MAT_DUST, 3.4);
+  if(state.avatarType==='hooded'){spawnShadowSmoke(player.position.x,player.position.y+.55,player.position.z,24);spawnAfterimage();shadowAfterimageTimer=.04;invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.12);}
+  else spawnBurst(player.position.x,0.4,player.position.z,9,FX_MAT_DUST,3.4);
   const btn = document.getElementById('dashBtn');
   btn.classList.add('cooling');
   setTimeout(()=>btn.classList.remove('cooling'), DASH_COOLDOWN*1000);
@@ -8749,6 +8761,10 @@ function doJump(){
 let bullets = [];
 let hoodedMeleeHits = 0;
 let hoodedComboStep = 0;
+let hoodedUltimateCharge = 0;
+let hoodedUltimateActive = 0;
+let hoodedUltimatePulse = 0;
+let shadowAfterimageTimer = 0;
 
 // Simple shared-geometry particle burst — used for hit sparks, zombie
 // death poofs, and landing dust. Particles fade by shrinking (not by
@@ -8776,11 +8792,12 @@ function updateFx(dt){
       f.mesh.rotation.z += (f.spin||0)*dt;
       f.mesh.traverse(o=>{ if(o.material) o.material.opacity=Math.max(0,1-p); });
     } else if(f.kind==='whirlwind'){
-      f.life -= dt;
-      const p = 1-Math.max(f.life,0)/f.maxLife;
-      f.mesh.rotation.y += dt*18;
-      f.mesh.scale.setScalar(0.68 + p*1.05);
-      f.mesh.traverse(o=>{ if(o.material) o.material.opacity=Math.max(0,(1-p)*0.92); });
+      f.life -= dt; const p=1-Math.max(f.life,0)/f.maxLife; f.mesh.rotation.y+=dt*24; f.mesh.scale.setScalar(.68+p*1.20);
+      f.mesh.traverse(o=>{if(o.material)o.material.opacity=Math.max(0,(1-p)*.92);});
+    } else if(f.kind==='afterimage'){
+      f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.scale.setScalar(1+(1-q)*.18);f.mesh.traverse(o=>{if(o.material)o.material.opacity=.28*q;});
+    } else if(f.kind==='soul'){
+      f.life-=dt;const q=Math.max(0,f.life/f.maxLife);if(player)f.mesh.position.lerp(new THREE.Vector3(player.position.x,player.position.y+1,player.position.z),Math.min(1,dt*7));f.mesh.scale.setScalar(.7+.5*Math.sin((1-q)*Math.PI));if(f.mesh.material)f.mesh.material.opacity=q;
     } else {
       f.vy -= 7*dt;
       f.mesh.position.x += f.vx*dt;
@@ -8895,7 +8912,7 @@ function fireBullet(dx, dy, dz, startX, startY, startZ, weapon){
   bullets.push({
     mesh:bullet, dx, dy, dz, life:1.15,
     damage:dmg, splash:weapon.splash||0,
-    pulse:Math.random()*Math.PI*2
+    pulse:Math.random()*Math.PI*2, ricochets:weapon.kind==='star'?1:0
   });
 }
 
@@ -8936,6 +8953,31 @@ function triggerCombatShake(strength=6, duration=110){
 }
 function spawnShadowSmoke(x,y,z,count=8){
   spawnBurst(x,y,z,count,FX_MAT_SHADOW,2.2);
+}
+function updateHoodedHud(){
+  const isHooded=state.avatarType==='hooded',btn=document.getElementById('ultimateBtn'),meter=document.getElementById('soulMeter');
+  if(!btn||!meter)return; btn.classList.toggle('hidden',!isHooded); meter.classList.toggle('on',isHooded);
+  const pct=Math.max(0,Math.min(100,hoodedUltimateCharge)); btn.style.setProperty('--charge',pct+'%'); btn.classList.toggle('ready',pct>=100);
+  btn.textContent=pct>=100?'ECLIPSE!':'ECLIPSE'; meter.textContent='VITALITY '+hoodedMeleeHits+'/25';
+}
+function spawnAfterimage(){
+  if(!player||!player.userData.kayRoot)return; const ghost=player.userData.kayRoot.clone(true);
+  ghost.traverse(o=>{if(o.isMesh&&o.material){const mats=(Array.isArray(o.material)?o.material:[o.material]).map(m=>{const c=m.clone();c.transparent=true;c.opacity=.28;c.depthWrite=false;if(c.color)c.color.setHex(0x7b2cff);if(c.emissive)c.emissive.setHex(0x3c0878);return c;});o.material=Array.isArray(o.material)?mats:mats[0];}});
+  const wrap=new THREE.Group();wrap.add(ghost);wrap.position.copy(player.position);wrap.rotation.y=player.rotation.y;scene.add(wrap);fx.push({kind:'afterimage',mesh:wrap,life:.24,maxLife:.24});
+}
+function spawnSoulOrb(from){
+  if(!player)return;const mat=new THREE.MeshBasicMaterial({color:0xd16cff,transparent:true,opacity:1,depthWrite:false,blending:THREE.AdditiveBlending});
+  const orb=new THREE.Mesh(new THREE.SphereGeometry(.14,10,8),mat);orb.position.set(from.x,from.y+.8,from.z);scene.add(orb);fx.push({kind:'soul',mesh:orb,life:.72,maxLife:.72});
+}
+function triggerShadowEclipse(){
+  if(!gameRunning||state.avatarType!=='hooded'||hoodedUltimateCharge<100||hoodedUltimateActive>0)return;
+  hoodedUltimateCharge=0;hoodedUltimateActive=3.2;hoodedUltimatePulse=0;updateHoodedHud();document.body.style.filter='brightness(.58) saturate(1.35)';
+  spawnShadowSmoke(player.position.x,player.position.y+.7,player.position.z,48);triggerCombatShake(15,420);navigator.vibrate&&navigator.vibrate([80,40,160]);toast('SHADOW ECLIPSE!');
+}
+function updateShadowEclipse(dt){
+  if(hoodedUltimateActive<=0)return;hoodedUltimateActive-=dt;hoodedUltimatePulse-=dt;
+  if(hoodedUltimatePulse<=0){hoodedUltimatePulse=.22;const a=Math.random()*Math.PI*2,o={x:player.position.x+Math.cos(a)*(1+Math.random()*2.2),y:player.position.y,z:player.position.z+Math.sin(a)*(1+Math.random()*2.2)};spawnShadowSlash(o,a+Math.PI,(Math.random()*4)|0);damageNearby(player.position,6.2,1.35);spawnWhirlwindBurst(player.position,false);}
+  if(hoodedUltimateActive<=0){document.body.style.filter='';triggerCombatShake(9,180);}
 }
 function spawnShadowSlash(origin, yaw, comboStep=0){
   const group=new THREE.Group();
@@ -9027,7 +9069,9 @@ function doMeleeAttack(w, origin=player.position, isClone=false){
   let hits=0;
   if(!spin && state.avatarType==='hooded'){
     const yaw=player.rotation.y;
-    spawnShadowSlash(pos,yaw,hoodedComboStep++);
+    const step=hoodedComboStep++%4;
+    spawnShadowSlash(pos,yaw,step);
+    if(step===3){spawnShadowSlash(pos,yaw+Math.PI/2,3);damageNearby(pos,w.radius*1.2,w.damage*1.35);triggerCombatShake(12,180);}
     spawnShadowSmoke(pos.x+Math.sin(yaw)*0.65,pos.y+0.55,pos.z+Math.cos(yaw)*0.65,8);
     hits=damageMeleeArc(pos,yaw,w.radius,w.arc||Math.PI*2/3,w.damage);
     if(!isClone){
@@ -9049,10 +9093,10 @@ function doMeleeAttack(w, origin=player.position, isClone=false){
   }
   if(!isClone && state.avatarType==='hooded' && hits>0){
     hoodedMeleeHits += hits;
-    if(hoodedMeleeHits%5 < hits) toast(`Shadow vitality ${hoodedMeleeHits}/25`);
+    if(hoodedMeleeHits%5 < hits) toast(`Shadow vitality ${hoodedMeleeHits}/25`); updateHoodedHud();
     while(hoodedMeleeHits>=25){
       hoodedMeleeHits-=25;
-      if(hearts<maxHearts){ hearts++; renderHearts(); toast('Shadow vitality restored 1 heart!'); }
+      if(hearts<maxHearts){hearts++;renderHearts();toast('Shadow vitality restored 1 heart!');spawnShadowSmoke(player.position.x,player.position.y+1,player.position.z,18);}
     }
   }
   spawnBurst(pos.x,pos.y+0.65,pos.z,spin?14:10,FX_MAT_SPARK,spin?3.5:3.0);
@@ -9069,7 +9113,7 @@ function shootFromPosition(w, pos, angleOffset=0){
     const len=Math.hypot(tx,ty,tz)||1; dx=tx/len;dy=ty/len;dz=tz/len;
   }
   const fake={
-    damage:w.damage, splash:w.splash||0, rangeMult:1,
+    damage:w.damage, splash:w.splash||0, rangeMult:1, kind:w.kind,
     mat:new THREE.MeshBasicMaterial({color:
       w.kind==='rocket_arrow'||w.kind==='giant_fireball'?0xff6b32:
       w.kind==='elemental'?(mageElementToggle?0x66d9ff:0xff723d):
@@ -9111,7 +9155,7 @@ function doShoot(){
 
   if(w.kind==='melee' || w.kind==='spin'){
     doMeleeAttack(w);
-    if(w.clones==='spin') cloneAttack(w);
+    if(state.avatarType==='hooded') cloneAttack(w);
   } else if(w.kind==='multi_arrow'){
     [-0.24,-0.08,0.08,0.24].forEach(a=>shootFromPosition(w,player.position,a));
   } else if(w.kind==='chain'){
@@ -9124,7 +9168,7 @@ function doShoot(){
     }
     if(w.kind==='elemental') mageElementToggle=!mageElementToggle;
     shootFromPosition(w,player.position,0);
-    if(w.clones==='stars') cloneAttack(w);
+    if(state.avatarType==='hooded') cloneAttack(w);
   }
   if(w.kind!=='melee' && w.kind!=='spin') navigator.vibrate && navigator.vibrate(10);
 }
@@ -9188,6 +9232,7 @@ function updateBullets(dt){
           }
           spawnBurst(b.mesh.position.x, b.mesh.position.y+0.3, b.mesh.position.z, 14, FX_MAT_SPARK, 4.5);
         }
+        if(b.kind==='star'&&b.ricochets>0){const next=zombies.filter(n=>!n.userData.dead&&n!==z).sort((a,c)=>a.position.distanceTo(b.mesh.position)-c.position.distanceTo(b.mesh.position))[0];if(next){const tx=next.position.x-b.mesh.position.x,ty=(next.position.y+.8)-b.mesh.position.y,tz=next.position.z-b.mesh.position.z,l=Math.hypot(tx,ty,tz)||1;b.dx=tx/l;b.dy=ty/l;b.dz=tz/l;b.mesh.lookAt(next.position.x,next.position.y+.8,next.position.z);b.ricochets--;spawnShadowSmoke(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,6);continue;}}
         hit = true;
         break;
       }
@@ -9206,6 +9251,7 @@ function killZombie(z){
   disposeGroup(z);
   zombies = zombies.filter(o=>o!==z);
   kills++; roundKillsDone++;
+  if(state.avatarType==='hooded'){spawnSoulOrb(z.position);hoodedUltimateCharge=Math.min(100,hoodedUltimateCharge+8);updateHoodedHud();}
   runTokens += tokensPerKill();
   updateRunTokensHud();
   // Feed the spawn queue: keeps the on-screen crowd near the cap
@@ -9270,16 +9316,18 @@ function tintCloneBlack(root){
       if(Array.isArray(o.material)) o.material=o.material.map(m=>m.clone());
       else o.material=o.material.clone();
       (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{
-        if(m.color) m.color.setHex(0x08090d);
-        if(m.emissive) m.emissive.setHex(0x06060a);
+        if(m.color)m.color.setHex(0x13051f);
+        if(m.emissive)m.emissive.setHex(0x4b0b80);
+        m.transparent=true;m.opacity=.58;m.depthWrite=false;
       });
     }
   });
 }
 function syncShadowClones(){
   clearShadowClones();
+  updateHoodedHud();
   const w=weaponForAvatar();
-  if(!w.clones || !player) return;
+  if(state.avatarType!=='hooded' || !player) return;
   getKayKitAssetPromise('hooded').then(({gltf,THREEAsset,cloneSkinned})=>{
     [-1,1].forEach(side=>{
       const wrap=new THREE.Group();
@@ -9309,6 +9357,7 @@ function updateShadowClones(dt){
 // ---- Main update ----
 function update(dt){
   updateShadowClones(dt);
+  updateShadowEclipse(dt);
   if(player && player.userData.kayMixer){
     player.userData.kayMixer.update(dt);
     player.userData.kayActionLock = Math.max(0, (player.userData.kayActionLock || 0) - dt);
@@ -9374,6 +9423,7 @@ function update(dt){
   // movement input while active.
   if(dashCooldownTimer>0) dashCooldownTimer -= dt;
   if(dashActive){
+    if(state.avatarType==='hooded'){shadowAfterimageTimer-=dt;if(shadowAfterimageTimer<=0){spawnAfterimage();shadowAfterimageTimer=.045;spawnShadowSmoke(player.position.x,player.position.y+.45,player.position.z,3);}}
     const nx = player.position.x + dashDir.x*DASH_SPEED*dt;
     const nz = player.position.z + dashDir.z*DASH_SPEED*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
@@ -9539,7 +9589,7 @@ function startSurvival(){
   bullets = [];
   fx.forEach(f=>scene.remove(f.mesh));
   fx = [];
-  hearts = 3; maxHearts = 3; round = 1; kills = 0; hoodedMeleeHits = 0; hoodedComboStep = 0;
+  hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;document.body.style.filter='';updateHoodedHud();
   playerStats = {power:1, speed:1, hp:1};
   unspentStatPoints = 0;
   runTokens = 0;
