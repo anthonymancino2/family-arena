@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V17 Arcane Cataclysm</title>
+<title>Family Arena — V19 Barbarian Fury</title>
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -353,7 +353,7 @@
 <div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
 background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
 padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
-V17 · ARCANE CATACLYSM
+V19 · BARBARIAN FURY
 </div>
 <div id="app">
 
@@ -597,18 +597,20 @@ const SKINS = ['#ffe3c4','#f2c9a0','#c68a5a','#8d5a3c','#5a3826','#2b1d16'];
 const OUTFITS = ['#3fa9d6','#e0533d','#4caf50','#9b59b6','#f1c40f','#ecf0f1'];
 const HAIR_STYLES = ['short','medium','long'];
 const HAIR_STYLE_LABELS = {short:'Short', medium:'Medium', long:'Long'};
-const AVATAR_TYPES = ['rogue','hooded','mage'];
+const AVATAR_TYPES = ['rogue','hooded','mage','knight','barbarian'];
 const AVATAR_TYPE_LABELS = {
   rogue:'🏹 Archer',
   hooded:'🥷 Hooded Rogue',
-  mage:'🔮 Mage'
+  mage:'🔮 Mage',
+  knight:'🛡️ Knight',
+  barbarian:'🪓 Barbarian'
 };
 // Uniform scale applied on top of each avatar's own build — every value
 // here was checked numerically against the penguin's actual rendered
 // height (0.85) as the floor, and Titan Guardian's is nowhere near an
 // elephant's real ~1.76x-human shoulder-height ratio, just noticeably
 // bigger than the rest as its own "giant mech" identity calls for.
-const AVATAR_SCALE = { rogue:1.0, hooded:1.0, mage:1.0 };
+const AVATAR_SCALE = { rogue:1.0, hooded:1.0, mage:1.0, knight:1.05, barbarian:1.08 };
 // human and penguin are free by default; bunny/dog must be unlocked
 // with crystals (prices live in CATALOG, shared with the Crystal Shop).
 const FREE_AVATAR_TYPES = [...AVATAR_TYPES];
@@ -949,6 +951,34 @@ const CHARACTER_COMBAT = {
         desc:'Fires four arrows in a wide arc. Hold FIRE to continue.'},
       rocket_arrow:{name:'Phoenix Arrows', price:500, kind:'rocket_arrow', cooldown:0.42, damage:2.2, splash:3.4, splashMult:2, pierce:0, auto:true,
         desc:'Explodes on impact. Nearby zombies take double splash damage.'}
+    }
+  },
+  knight: {
+    defaultId:'radiant_cleave',
+    baseMoveMult:0.96,
+    weapons:{
+      radiant_cleave:{name:'Radiant Cleave', price:0, kind:'knight_melee', cooldown:0.30, damage:1.35, radius:2.45, arc:2.25,
+        desc:'Three-hit golden sword combo. The final swing releases a radiant cross.'},
+      shield_bash:{name:'Lion Shield Bash', price:210, kind:'shield_bash', cooldown:0.46, damage:1.75, radius:2.2, arc:1.75,
+        desc:'A fantasy shield strike that stuns and launches enemies backward.'},
+      blade_cyclone:{name:'Royal Blade Cyclone', price:390, kind:'knight_spin', cooldown:0.13, damage:1.35, radius:2.7, auto:true,
+        desc:'Hold FIRE to spin with a bright golden damage circle.'},
+      holy_wave:{name:'Dawnblade Wave', price:560, kind:'holy_wave', cooldown:0.55, damage:2.0, splash:2.4, pierce:2, auto:true,
+        desc:'Launches a giant crescent of light through multiple enemies.'}
+    }
+  },
+  barbarian: {
+    defaultId:'rage_cleave',
+    baseMoveMult:1.04,
+    weapons:{
+      rage_cleave:{name:'Rage Cleave', price:0, kind:'barbarian_melee', cooldown:0.28, damage:1.5, radius:2.65, arc:2.35,
+        desc:'A brutal three-hit axe combo with fiery red-orange shock arcs.'},
+      earthbreaker:{name:'Earthbreaker Slam', price:220, kind:'earthbreaker', cooldown:0.62, damage:2.1, radius:3.25, arc:Math.PI*2,
+        desc:'Smash the ground and erupt a clear circular damage zone.'},
+      war_cyclone:{name:'War Axe Cyclone', price:400, kind:'barbarian_spin', cooldown:0.12, damage:1.5, radius:2.9, auto:true,
+        desc:'Hold FIRE to become a moving ring of axes and flame.'},
+      primal_wave:{name:'Primal Axe Wave', price:570, kind:'primal_wave', cooldown:0.52, damage:2.25, splash:2.8, pierce:3, auto:true,
+        desc:'Launch a huge flaming axe-shaped shockwave through a crowd.'}
     }
   },
   mage: {
@@ -8608,7 +8638,7 @@ function setupControls(){
   const ultimateBtnEl=document.getElementById('ultimateBtn');
   const activateUltimate=e=>{
     if(e){ e.preventDefault(); e.stopPropagation(); }
-    if(state.avatarType==='rogue') triggerArrowStorm(); else if(state.avatarType==='mage') triggerArcaneCataclysm(); else triggerShadowEclipse();
+    if(state.avatarType==='rogue') triggerArrowStorm(); else if(state.avatarType==='mage') triggerArcaneCataclysm(); else if(state.avatarType==='knight') triggerKingsJudgment(); else if(state.avatarType==='barbarian') triggerPrimalRage(); else triggerShadowEclipse();
   };
   if(window.PointerEvent) ultimateBtnEl.addEventListener('pointerdown',activateUltimate,{passive:false});
   else ultimateBtnEl.addEventListener('touchstart',activateUltimate,{passive:false});
@@ -8767,6 +8797,8 @@ let bullets = [];
 let hoodedMeleeHits = 0;
 let hoodedComboStep = 0;
 let hoodedUltimateCharge = 0;
+let knightUltimateCharge = 0, knightUltimateActive = 0, knightUltimatePulse = 0, knightComboStep = 0;
+let barbarianUltimateCharge = 0, barbarianUltimateActive = 0, barbarianUltimatePulse = 0, barbarianComboStep = 0;
 let archerUltimateCharge = 0;
 let archerUltimateActive = 0;
 let archerUltimatePulse = 0;
@@ -8828,6 +8860,12 @@ function updateFx(dt){
       f.life-=dt;f.mesh.position.x+=f.vx*dt;f.mesh.position.z+=f.vz*dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.scale.setScalar(1+(1-q)*.8);f.mesh.traverse(o=>{if(o.material)o.material.opacity=q*.9;});
     } else if(f.kind==='arrowRain'){
       f.life-=dt;f.mesh.position.y-=dt*22;const q=Math.max(0,f.life/f.maxLife);if(f.mesh.material)f.mesh.material.opacity=Math.min(1,q*2);if(f.mesh.position.y<=f.targetY){spawnArcherSpark(f.mesh.position.x,f.targetY+.2,f.mesh.position.z);f.life=0;}
+    } else if(f.kind==='knightCleave'){
+      f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.position.x+=f.vx*dt;f.mesh.position.z+=f.vz*dt;f.mesh.rotation.z+=(f.spin||0)*dt;f.mesh.scale.setScalar(1+(1-q)*.75);f.mesh.traverse(o=>{if(o.material)o.material.opacity=q*.95;});
+    } else if(f.kind==='knightGuard'){
+      f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.rotation.y+=(f.spin||5)*dt;f.mesh.scale.setScalar(.72+(1-q)*.85);f.mesh.traverse(o=>{if(o.material)o.material.opacity=q*.85;});
+    } else if(f.kind==='judgmentSword'){
+      f.life-=dt;f.mesh.position.y-=dt*24;const q=Math.max(0,f.life/f.maxLife);f.mesh.traverse(o=>{if(o.material)o.material.opacity=Math.min(1,q*2);});if(f.mesh.position.y<=f.targetY){spawnKnightGuardBurst(f.mesh.position,1.15);f.life=0;}
     } else {
       f.vy -= 7*dt;
       f.mesh.position.x += f.vx*dt;
@@ -8987,13 +9025,15 @@ function spawnShadowSmoke(x,y,z,count=8){
 function updateHoodedHud(){
   const btn=document.getElementById('ultimateBtn'),meter=document.getElementById('soulMeter');
   if(!btn||!meter)return;
-  const isHooded=state.avatarType==='hooded', isArcher=state.avatarType==='rogue', isMage=state.avatarType==='mage';
-  btn.classList.toggle('hidden',!(isHooded||isArcher||isMage)); meter.classList.toggle('on',isHooded||isArcher||isMage);
-  const pct=Math.max(0,Math.min(100,isHooded?hoodedUltimateCharge:(isArcher?archerUltimateCharge:mageUltimateCharge)));
+  const isHooded=state.avatarType==='hooded', isArcher=state.avatarType==='rogue', isMage=state.avatarType==='mage', isKnight=state.avatarType==='knight', isBarbarian=state.avatarType==='barbarian';
+  btn.classList.toggle('hidden',!(isHooded||isArcher||isMage||isKnight||isBarbarian)); meter.classList.toggle('on',isHooded||isArcher||isMage||isKnight||isBarbarian);
+  const pct=Math.max(0,Math.min(100,isHooded?hoodedUltimateCharge:(isArcher?archerUltimateCharge:(isMage?mageUltimateCharge:(isKnight?knightUltimateCharge:barbarianUltimateCharge)))));
   btn.style.setProperty('--charge',pct+'%'); btn.classList.toggle('ready',pct>=100);
   if(isHooded){btn.textContent=pct>=100?'ECLIPSE!':'ECLIPSE';meter.textContent='VITALITY '+hoodedMeleeHits+'/25';}
   else if(isArcher){btn.textContent=pct>=100?'ARROW STORM!':'ARROW STORM';meter.textContent='FOCUS '+Math.round(pct)+'%';}
   else if(isMage){btn.textContent=pct>=100?'CATACLYSM!':'CATACLYSM';meter.textContent='ARCANA '+Math.round(pct)+'%';}
+  else if(isKnight){btn.textContent=pct>=100?"KING'S JUDGMENT!":"JUDGMENT";meter.textContent='VALOR '+Math.round(pct)+'%';}
+  else if(isBarbarian){btn.textContent=pct>=100?"PRIMAL RAGE!":"RAGE";meter.textContent='FURY '+Math.round(pct)+'%';}
 }
 function spawnAfterimage(){
   if(!player||!player.userData.kayRoot)return; const ghost=player.userData.kayRoot.clone(true);
@@ -9049,6 +9089,109 @@ function updateArrowStorm(dt){
   archerUltimateActive-=dt;archerUltimatePulse-=dt;
   if(archerUltimatePulse<=0){archerUltimatePulse=.20;spawnArrowRainVolley();}
   if(archerUltimateActive<=0){document.body.style.filter='';triggerCombatShake(6,140);}
+}
+
+function spawnKnightCleave(origin,yaw,step=0,scale=1){
+  const g=new THREE.Group();
+  const gold=new THREE.MeshBasicMaterial({color:0xffc83d,transparent:true,opacity:.94,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const white=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.98,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const amber=new THREE.MeshBasicMaterial({color:0xff7b28,transparent:true,opacity:.72,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const rot=[-.72,.68,.08,1.55][step%4];
+  const arc=new THREE.Mesh(new THREE.RingGeometry(.72*scale,1.72*scale,44,1,-1.06,2.12),gold);arc.rotation.z=rot;arc.scale.y=1.16;g.add(arc);
+  const edge=new THREE.Mesh(new THREE.RingGeometry(1.66*scale,1.84*scale,44,1,-1.06,2.12),white);edge.rotation.z=rot;edge.scale.y=1.16;g.add(edge);
+  const core=new THREE.Mesh(new THREE.RingGeometry(1.16*scale,1.45*scale,40,1,-1.06,2.12),amber);core.rotation.z=rot;core.scale.y=1.16;g.add(core);
+  const dx=Math.sin(yaw),dz=Math.cos(yaw);g.position.set(origin.x+dx*1.0,origin.y+.95,origin.z+dz*1.0);g.rotation.y=yaw;scene.add(g);
+  fx.push({kind:'knightCleave',mesh:g,vx:dx*5.6,vz:dz*5.6,life:.30,maxLife:.30,spin:step%2?1.7:-1.7});
+  spawnBurst(g.position.x,g.position.y,g.position.z,16,FX_MAT_SPARK,4.0);
+}
+function spawnKnightGuardBurst(origin,radius=2.2){
+  const g=new THREE.Group();
+  const gold=new THREE.MeshBasicMaterial({color:0xffd35a,transparent:true,opacity:.82,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const white=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.92,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const disk=new THREE.Mesh(new THREE.CircleGeometry(radius,48),new THREE.MeshBasicMaterial({color:0xffc13b,transparent:true,opacity:.13,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));disk.rotation.x=-Math.PI/2;disk.position.y=.06;g.add(disk);
+  const rim=new THREE.Mesh(new THREE.RingGeometry(radius-.1,radius+.04,64),white);rim.rotation.x=-Math.PI/2;rim.position.y=.08;g.add(rim);
+  for(let i=0;i<8;i++){const ray=new THREE.Mesh(new THREE.PlaneGeometry(.08,radius*1.7),i%2?gold:white);ray.rotation.x=-Math.PI/2;ray.rotation.z=i*Math.PI/4;ray.position.y=.09;g.add(ray);}
+  g.position.copy(origin);scene.add(g);fx.push({kind:'knightGuard',mesh:g,life:.45,maxLife:.45,spin:5.2});
+}
+function doKnightAttack(w){
+  const yaw=player.rotation.y,pos={x:player.position.x,y:player.position.y,z:player.position.z};
+  if(player.userData.playKayClip){
+    const clip=w.kind==='shield_bash'?findClipByWords(['shield'],findClipByWords(['melee','attack'])):findClipByWords(['melee','slash'],findClipByWords(['melee','chop']));
+    player.userData.playKayClip(clip,true,true,w.kind==='shield_bash'?.34:.25);
+  }
+  if(w.kind==='knight_spin'){
+    const hits=damageNearby(pos,w.radius,w.damage);spawnKnightGuardBurst(player.position,w.radius);player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,.34);player.userData.spinVisualSpeed=22;triggerCombatShake(hits?8:4,110);return;
+  }
+  if(w.kind==='shield_bash'){
+    spawnKnightGuardBurst(player.position,w.radius);const hits=damageMeleeArc(pos,yaw,w.radius,w.arc,w.damage);
+    const dx=Math.sin(yaw),dz=Math.cos(yaw);zombies.forEach(z=>{if(z.userData.dead)return;const ox=z.position.x-pos.x,oz=z.position.z-pos.z,d=Math.hypot(ox,oz);if(d<w.radius+0.3){const r=resolveCollision(z.position.x+dx*1.25,z.position.z+dz*1.25,z.position.y);z.position.x=r.x;z.position.z=r.z;}});
+    triggerCombatShake(hits?12:5,170);navigator.vibrate&&navigator.vibrate(hits?[35,20,55]:18);return;
+  }
+  const step=knightComboStep++%3;spawnKnightCleave(pos,yaw,step,step===2?1.22:1);
+  let hits=damageMeleeArc(pos,yaw,w.radius,w.arc,w.damage*(step===2?1.35:1));
+  if(step===2){spawnKnightCleave(pos,yaw+Math.PI/2,3,1.2);damageNearby(pos,w.radius*1.12,w.damage*.75);spawnKnightGuardBurst(player.position,2.8);triggerCombatShake(13,190);}
+  else triggerCombatShake(hits?7:3,110);
+  const lunge=resolveCollision(player.position.x+Math.sin(yaw)*.32,player.position.z+Math.cos(yaw)*.32,player.position.y);player.position.x=lunge.x;player.position.z=lunge.z;
+  navigator.vibrate&&navigator.vibrate(hits?[18,18,30]:12);
+}
+function spawnJudgmentSword(target,i=0){
+  const mat=new THREE.MeshBasicMaterial({color:i%3===0?0xffffff:0xffc83d,transparent:true,opacity:.98,depthWrite:false,blending:THREE.AdditiveBlending});
+  const g=new THREE.Group();const blade=new THREE.Mesh(new THREE.BoxGeometry(.14,3.5,.32),mat);blade.position.y=1.7;g.add(blade);const cross=new THREE.Mesh(new THREE.BoxGeometry(1.25,.16,.25),mat.clone());cross.position.y=.45;g.add(cross);
+  g.position.set(target.x+(Math.random()-.5)*.5,8+Math.random()*2,target.z+(Math.random()-.5)*.5);scene.add(g);fx.push({kind:'judgmentSword',mesh:g,targetY:target.y,life:.50,maxLife:.50});
+}
+function triggerKingsJudgment(){
+  if(!gameRunning||state.avatarType!=='knight'||knightUltimateActive>0)return;
+  if(knightUltimateCharge<99.5){toast("King's Judgment is still charging");return;}
+  knightUltimateCharge=0;knightUltimateActive=4.0;knightUltimatePulse=0;updateHoodedHud();document.body.style.filter='brightness(.72) saturate(1.55) contrast(1.08)';
+  spawnKnightGuardBurst(player.position,5.8);damageNearby(player.position,5.8,1.5);triggerCombatShake(15,360);navigator.vibrate&&navigator.vibrate([70,35,140]);toast("KING'S JUDGMENT!");
+}
+function updateKingsJudgment(dt){
+  if(knightUltimateActive<=0)return;knightUltimateActive-=dt;knightUltimatePulse-=dt;
+  if(knightUltimatePulse<=0){knightUltimatePulse=.22;const live=zombies.filter(z=>!z.userData.dead).slice(0,10);live.forEach((z,i)=>{spawnJudgmentSword(z.position,i);applyBulletDamage(z,1.55*playerStats.power);});damageNearby(player.position,6.0,.45);triggerCombatShake(6,90);}
+  if(knightUltimateActive<=0){document.body.style.filter='';spawnKnightGuardBurst(player.position,6.4);damageNearby(player.position,6.4,2.6);triggerCombatShake(13,240);}
+}
+
+
+function spawnBarbarianArc(origin,yaw,step=0,scale=1){
+  const g=new THREE.Group();
+  const hot=new THREE.MeshBasicMaterial({color:step===2?0xffffff:0xff7a20,transparent:true,opacity:.96,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const red=new THREE.MeshBasicMaterial({color:0xff2f18,transparent:true,opacity:.72,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const arc=new THREE.Mesh(new THREE.RingGeometry(1.25*scale,2.75*scale,42,1,-1.12,2.24),hot);arc.rotation.x=-Math.PI/2;arc.rotation.z=-yaw+step*.42;g.add(arc);
+  const inner=new THREE.Mesh(new THREE.RingGeometry(.95*scale,2.25*scale,36,1,-1.02,2.04),red);inner.rotation.x=-Math.PI/2;inner.rotation.z=-yaw+step*.42;inner.position.y=.025;g.add(inner);
+  g.position.set(origin.x,origin.y+.14,origin.z);scene.add(g);fx.push({kind:'barbarianArc',mesh:g,life:.34,maxLife:.34,spin:step===2?5:2.2});
+}
+function spawnEarthbreaker(origin,radius=3.25){
+  const g=new THREE.Group();
+  const fire=new THREE.MeshBasicMaterial({color:0xff6723,transparent:true,opacity:.9,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const white=new THREE.MeshBasicMaterial({color:0xffe0a0,transparent:true,opacity:.94,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const ring=new THREE.Mesh(new THREE.RingGeometry(radius*.75,radius,64),fire);ring.rotation.x=-Math.PI/2;g.add(ring);
+  const core=new THREE.Mesh(new THREE.RingGeometry(.25,radius*.38,48),white);core.rotation.x=-Math.PI/2;core.position.y=.03;g.add(core);
+  for(let i=0;i<10;i++){const a=i*Math.PI/5;const spike=new THREE.Mesh(new THREE.ConeGeometry(.13,.85,5),i%2?fire:white);spike.position.set(Math.sin(a)*radius*.72,.38,Math.cos(a)*radius*.72);spike.rotation.z=(Math.random()-.5)*.5;g.add(spike);}
+  g.position.set(origin.x,origin.y+.06,origin.z);scene.add(g);fx.push({kind:'earthbreakerFx',mesh:g,life:.62,maxLife:.62,spin:1.4});
+}
+function doBarbarianAttack(w){
+  const pos={x:player.position.x,y:player.position.y,z:player.position.z},yaw=player.rotation.y;
+  if(player.userData.playKayClip){const clip=findClipByWords(w.kind==='earthbreaker'?['melee','smash']:['melee','chop'],findClipByWords(['melee','slash']));player.userData.playKayClip(clip,true,true,w.kind==='earthbreaker'?.46:.27);}
+  if(w.kind==='barbarian_spin'){
+    const hits=damageNearby(pos,w.radius,w.damage);spawnEarthbreaker(player.position,w.radius);player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,.38);player.userData.spinVisualSpeed=28;triggerCombatShake(hits?9:4,115);return;
+  }
+  if(w.kind==='earthbreaker'){
+    spawnEarthbreaker(player.position,w.radius);const hits=damageNearby(pos,w.radius,w.damage);zombies.forEach(z=>{if(z.userData.dead)return;const dx=z.position.x-pos.x,dz=z.position.z-pos.z,d=Math.hypot(dx,dz)||1;if(d<w.radius+.25){const r=resolveCollision(z.position.x+dx/d*1.45,z.position.z+dz/d*1.45,z.position.y);z.position.x=r.x;z.position.z=r.z;}});triggerCombatShake(hits?16:8,240);navigator.vibrate&&navigator.vibrate([45,25,90]);return;
+  }
+  const step=barbarianComboStep++%3;spawnBarbarianArc(pos,yaw,step,step===2?1.2:1);let hits=damageMeleeArc(pos,yaw,w.radius,w.arc,w.damage*(step===2?1.5:1));
+  if(step===2){spawnEarthbreaker(player.position,2.7);damageNearby(pos,2.7,w.damage*.85);triggerCombatShake(15,210);}else triggerCombatShake(hits?8:4,115);
+  const lunge=resolveCollision(player.position.x+Math.sin(yaw)*.38,player.position.z+Math.cos(yaw)*.38,player.position.y);player.position.x=lunge.x;player.position.z=lunge.z;navigator.vibrate&&navigator.vibrate(hits?[22,18,38]:12);
+}
+function triggerPrimalRage(){
+  if(!gameRunning||state.avatarType!=='barbarian'||barbarianUltimateActive>0)return;
+  if(barbarianUltimateCharge<99.5){toast('Primal Rage is still charging');return;}
+  barbarianUltimateCharge=0;barbarianUltimateActive=4.4;barbarianUltimatePulse=0;updateHoodedHud();document.body.style.filter='brightness(.72) saturate(1.8) contrast(1.12)';spawnEarthbreaker(player.position,5.5);damageNearby(player.position,5.5,1.8);triggerCombatShake(18,380);navigator.vibrate&&navigator.vibrate([80,35,160]);toast('PRIMAL RAGE!');
+}
+function updatePrimalRage(dt){
+  if(barbarianUltimateActive<=0)return;barbarianUltimateActive-=dt;barbarianUltimatePulse-=dt;
+  player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,.12);player.userData.spinVisualSpeed=18;
+  if(barbarianUltimatePulse<=0){barbarianUltimatePulse=.28;spawnEarthbreaker(player.position,3.7+Math.random()*1.2);damageNearby(player.position,4.8,.62*playerStats.power);const live=zombies.filter(z=>!z.userData.dead).slice(0,8);live.forEach((z,i)=>{spawnBarbarianArc(z.position,i*Math.PI/4,i%3,.7);applyBulletDamage(z,1.15*playerStats.power);});triggerCombatShake(7,100);}
+  if(barbarianUltimateActive<=0){document.body.style.filter='';spawnEarthbreaker(player.position,6.2);damageNearby(player.position,6.2,3.0);triggerCombatShake(17,280);}
 }
 
 function spawnArcaneSigil(x,y,z,radius=3.2){
@@ -9263,6 +9406,8 @@ function shootFromPosition(w, pos, angleOffset=0){
   const fake={
     damage:w.damage, splash:w.splash||0, rangeMult:1, kind:w.kind,
     mat:new THREE.MeshBasicMaterial({color:
+      w.kind==='primal_wave'?0xff5622:
+      w.kind==='holy_wave'?0xffd04a:
       w.kind==='rocket_arrow'||w.kind==='giant_fireball'?0xff6b32:
       w.kind==='elemental'?(mageElementToggle?0x66d9ff:0xff723d):
       w.kind==='star'?0xcaa7ff:
@@ -9277,6 +9422,8 @@ function shootFromPosition(w, pos, angleOffset=0){
     if(w.kind==='giant_fireball'){ b.mesh.scale.setScalar(3.0); spawnArcaneSigil(startX,0,startZ,1.25); }
     if(w.kind==='elemental'){ b.mesh.scale.setScalar(1.45); spawnBurst(startX,startY,startZ,10,mageElementToggle?FX_MAT_DUST:FX_MAT_SPARK,3.0); }
     if(w.kind==='rocket_arrow') b.mesh.scale.setScalar(1.55);
+    if(w.kind==='holy_wave'){b.mesh.scale.set(3.4,1.8,.55);b.pierces=2;spawnKnightCleave({x:startX,y:startY-.9,z:startZ},player.rotation.y,0,1.25);}
+    if(w.kind==='primal_wave'){b.mesh.scale.set(3.8,2.05,.7);b.pierces=3;spawnBarbarianArc({x:startX,y:startY-.9,z:startZ},player.rotation.y,2,1.3);}
     if(state.avatarType==='rogue'&&w.kind!=='rocket_arrow') b.mesh.scale.set(0.82,0.82,1.45);
   }
 }
@@ -9306,7 +9453,11 @@ function doShoot(){
   const w=weaponForAvatar();
   player.userData.attackCooldown=attackCooldownFor(w);
 
-  if(w.kind==='melee' || w.kind==='spin'){
+  if(w.kind==='barbarian_melee' || w.kind==='earthbreaker' || w.kind==='barbarian_spin'){
+    doBarbarianAttack(w);
+  } else if(w.kind==='knight_melee' || w.kind==='shield_bash' || w.kind==='knight_spin'){
+    doKnightAttack(w);
+  } else if(w.kind==='melee' || w.kind==='spin'){
     doMeleeAttack(w);
     if(state.avatarType==='hooded') cloneAttack(w);
   } else if(w.kind==='multi_arrow'){
@@ -9410,6 +9561,8 @@ function killZombie(z){
   if(state.avatarType==='hooded'){spawnSoulOrb(z.position);hoodedUltimateCharge=Math.min(100,hoodedUltimateCharge+8);updateHoodedHud();}
   if(state.avatarType==='rogue'){archerUltimateCharge=Math.min(100,archerUltimateCharge+10);spawnArcherSpark(z.position.x,z.position.y+0.8,z.position.z);updateHoodedHud();}
   if(state.avatarType==='mage'){mageUltimateCharge=Math.min(100,mageUltimateCharge+9);spawnArcaneSigil(z.position.x,z.position.y,z.position.z,1.05);updateHoodedHud();}
+  if(state.avatarType==='knight'){knightUltimateCharge=Math.min(100,knightUltimateCharge+10);spawnBurst(z.position.x,z.position.y+.8,z.position.z,12,FX_MAT_SPARK,3.5);updateHoodedHud();}
+  if(state.avatarType==='barbarian'){barbarianUltimateCharge=Math.min(100,barbarianUltimateCharge+10);spawnBurst(z.position.x,z.position.y+.8,z.position.z,16,FX_MAT_SPARK,4.2);updateHoodedHud();}
   runTokens += tokensPerKill();
   updateRunTokensHud();
   // Feed the spawn queue: keeps the on-screen crowd near the cap
@@ -9518,6 +9671,8 @@ function update(dt){
   updateShadowEclipse(dt);
   updateArrowStorm(dt);
   updateArcaneCataclysm(dt);
+  updateKingsJudgment(dt);
+  updatePrimalRage(dt);
   if(player && player.userData.kayMixer){
     player.userData.kayMixer.update(dt);
     player.userData.kayActionLock = Math.max(0, (player.userData.kayActionLock || 0) - dt);
@@ -9749,7 +9904,7 @@ function startSurvival(){
   bullets = [];
   fx.forEach(f=>scene.remove(f.mesh));
   fx = [];
-  hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;mageUltimateCharge=0;mageUltimateActive=0;mageCastStep=0;document.body.style.filter='';updateHoodedHud();
+  hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;mageUltimateCharge=0;mageUltimateActive=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;document.body.style.filter='';updateHoodedHud();
   playerStats = {power:1, speed:1, hp:1};
   unspentStatPoints = 0;
   runTokens = 0;
