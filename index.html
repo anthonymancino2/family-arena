@@ -358,7 +358,7 @@
 <div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
 background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
 padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
-V22.2 · FROSTWING STABILITY FIX
+V22.3 · SAFE FROSTWING REPAIR
 </div>
 <div id="app">
 
@@ -8340,11 +8340,10 @@ function buildImportedFrostwing(options={}){
     const root=cloneSkinned(gltf.scene);
     root.rotation.y=0;
     normalizeImportedHero(root,THREEAsset,1.48);
-    // Keep a fixed gameplay-space baseline. Some downloaded GLB clips contain
-    // root-motion tracks that push the visible penguin below the arena floor.
-    wrapper.userData.frostRootBasePosition=root.position.clone();
-    wrapper.userData.frostRootBaseRotation=root.rotation.clone();
-    wrapper.userData.frostRootBaseScale=root.scale.clone();
+    // Preserve the normalized floor position so animation tracks cannot sink Frostwing.
+    wrapper.userData.frostRootBaseY=root.position.y;
+    root.position.y+=0.10;
+    wrapper.userData.frostRootBaseY=root.position.y;
     root.traverse(o=>{
       if(!o.isMesh) return;
       o.visible=true; o.frustumCulled=false; o.castShadow=true; o.receiveShadow=false;
@@ -9094,8 +9093,8 @@ function doDash(){
   dashCooldownTimer = DASH_COOLDOWN;
   dashDir.x = Math.sin(player.rotation.y);
   dashDir.z = Math.cos(player.rotation.y);
-  // Frostwing deliberately avoids the imported dodge clip. That GLB's
-  // root-motion track could bury the model and lock mobile gameplay.
+  // Frostwing uses a code-driven slide. Imported dodge/root-motion clips are
+  // intentionally skipped because they can move the model below the floor.
   if(state.avatarType!=='frostwing'){
     if(player.userData.playKayClip){
       player.userData.playKayClip('Dodge_Forward', true, true, 0.34);
@@ -9108,8 +9107,6 @@ function doDash(){
   else if(state.avatarType==='frostwing'){
     invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.10);
     player.userData.frostSlideVisual=DASH_DURATION+.06;
-    player.userData.frostSlideLean=1;
-    if(player.userData.playKayClip) player.userData.playKayClip('Running_A',true,false,0);
     spawnBurst(player.position.x,player.position.y+.12,player.position.z,22,FX_MAT_DUST,4.5); toast('BELLY SLIDE!');
   } else spawnBurst(player.position.x,0.4,player.position.z,9,FX_MAT_DUST,3.4);
   const btn = document.getElementById('dashBtn');
@@ -10200,17 +10197,8 @@ function update(dt){
   if(player && player.userData.kayMixer){
     player.userData.kayMixer.update(dt);
     player.userData.kayActionLock = Math.max(0, (player.userData.kayActionLock || 0) - dt);
-    if(state.avatarType==='frostwing' && player.userData.kayRoot && player.userData.frostRootBasePosition){
-      const root=player.userData.kayRoot, base=player.userData.frostRootBasePosition;
-      // Strip root motion every frame so animation can never sink or launch the model.
-      root.position.copy(base);
-      const lean=player.userData.frostSlideLean||0;
-      root.rotation.x=-0.34*lean;
-      root.rotation.y=player.userData.frostRootBaseRotation.y;
-      root.rotation.z=0;
-      root.scale.copy(player.userData.frostRootBaseScale);
-      root.scale.y*=1-0.12*lean;
-      root.scale.z*=1+0.10*lean;
+    if(state.avatarType==='frostwing' && player.userData.kayRoot && Number.isFinite(player.userData.frostRootBaseY)){
+      player.userData.kayRoot.position.y=player.userData.frostRootBaseY;
     }
   }
 
@@ -10276,20 +10264,15 @@ function update(dt){
   // movement input while active.
   if(dashCooldownTimer>0) dashCooldownTimer -= dt;
   if(dashActive){
-    // Mobile safety watchdog: a bad frame or malformed collision result must
-    // end the dash instead of leaving the entire update loop stuck.
-    if(!Number.isFinite(dt) || dt<=0 || dt>0.25 || !Number.isFinite(player.position.x) || !Number.isFinite(player.position.z)){
-      dashActive=false; dashTimer=0; player.userData.frostSlideLean=0;
-    }
     if(state.avatarType==='hooded'){shadowAfterimageTimer-=dt;if(shadowAfterimageTimer<=0){spawnAfterimage();shadowAfterimageTimer=.045;spawnShadowSmoke(player.position.x,player.position.y+.45,player.position.z,3);}}
     if(state.avatarType==='frostwing' && (Math.abs(moveX)+Math.abs(moveY)>.18)){shadowAfterimageTimer-=dt;if(shadowAfterimageTimer<=0){shadowAfterimageTimer=.11;spawnBurst(player.position.x,player.position.y+.08,player.position.z,3,FX_MAT_DUST,1.2);}}
     const nx = player.position.x + dashDir.x*DASH_SPEED*dt;
     const nz = player.position.z + dashDir.z*DASH_SPEED*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
     player.position.x = resolved.x; player.position.z = resolved.z;
-    if(state.avatarType==='frostwing'){ player.userData.frostSlideLean=Math.min(1,(player.userData.frostSlideLean||0)+dt*12); }
+    if(state.avatarType==='frostwing'&&player.userData.kayRoot){player.userData.kayRoot.rotation.x=-.48;player.userData.kayRoot.scale.y=.78;player.userData.kayRoot.scale.z=1.15;}
     dashTimer -= dt;
-    if(dashTimer<=0){dashActive=false;if(state.avatarType==='frostwing'){player.userData.frostSlideLean=0;if(player.userData.playKayClip)player.userData.playKayClip('Idle',true);}}
+    if(dashTimer<=0){dashActive=false;if(state.avatarType==='frostwing'&&player.userData.kayRoot){player.userData.kayRoot.rotation.x=0;player.userData.kayRoot.scale.set(1,1,1);}}
   } else if(moveVec.x || moveVec.y){
     const forward = -moveVec.y, strafe = moveVec.x;
     const mx = Math.sin(camYaw)*forward - Math.cos(camYaw)*strafe;
