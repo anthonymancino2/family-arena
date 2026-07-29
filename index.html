@@ -347,7 +347,7 @@
 <div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
 background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
 padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
-KAYKIT ROSTER V11
+KAYKIT ZOMBIES V12
 </div>
 <div id="app">
 
@@ -2383,7 +2383,7 @@ function updateCritters(dt){
       } else {
         c.position.x += (dx/d)*ud.speed*dt;
         c.position.z += (dz/d)*ud.speed*dt;
-        c.rotation.y = Math.atan2(dx,dz);
+        c.rotation.y = Math.atan2(dx,dz) + (ud.forwardOffset || 0);
       }
     }
     if(ud.anim) ud.anim(t, dt);
@@ -2458,6 +2458,7 @@ function buildQuadruped(opts){
   }
   g.userData.legs = legs;
   g.userData.speed = opts.speed || 0.7;
+  g.userData.forwardOffset = -Math.PI/2;
   g.userData.seed = Math.random()*6;
   g.userData.anim = (t)=>{
     const moving = g.userData.pauseTimer <= 0;
@@ -2496,6 +2497,7 @@ CRITTER_BUILDERS.bird = function(){
   inner.position.y = baseH;
   const seed = Math.random()*6;
   outer.userData.speed = 1.8 + Math.random()*0.8;
+  outer.userData.forwardOffset = -Math.PI/2;
   outer.userData.anim = (t)=>{
     inner.position.y = baseH + Math.sin(t*1.1+seed)*0.4;
     const flap = Math.sin(t*11+seed);
@@ -2520,6 +2522,7 @@ CRITTER_BUILDERS.bat = function(){
   inner.position.y = baseH;
   const seed = Math.random()*6;
   outer.userData.speed = 2.0 + Math.random()*1.0;
+  outer.userData.forwardOffset = -Math.PI/2;
   outer.userData.homeR = 6;
   outer.userData.anim = (t)=>{
     inner.position.y = baseH + Math.sin(t*3.2+seed)*0.5 + Math.sin(t*0.6+seed)*0.6;
@@ -2637,6 +2640,7 @@ CRITTER_BUILDERS.fish = function(){
   inner.position.y = -0.3;
   const seed = Math.random()*6;
   outer.userData.speed = 0.7 + Math.random()*0.5;
+  outer.userData.forwardOffset = -Math.PI/2;
   outer.userData.homeR = 2.2;
   outer.userData.anim = (t)=>{
     tail.rotation.y = Math.sin(t*6+seed)*0.5;
@@ -2661,6 +2665,7 @@ CRITTER_BUILDERS.crab = function(){
     legs.push(leg);
   }
   g.userData.speed = 0.9;
+  g.userData.forwardOffset = 0;
   g.userData.homeR = 3;
   const seed = Math.random()*6;
   g.userData.anim = (t)=>{
@@ -2686,10 +2691,16 @@ CRITTER_BUILDERS.penguin = function(){
   }
   for(const s of [1,-1]) _a(g, CONEG(0.04,0.1,4), orange, s*0.05,0.02,0.1);
   g.userData.speed = 0.45;
+  g.userData.forwardOffset = 0;
   g.userData.homeR = 3;
   const seed = Math.random()*6;
+  const visual = new THREE.Group();
+  // Keep navigation rotation on the outer group; apply waddle only to
+  // the visible meshes so it does not turn sideways while walking.
+  while(g.children.length) visual.add(g.children[0]);
+  g.add(visual);
   g.userData.anim = (t)=>{
-    g.rotation.z = Math.sin(t*8+seed)*0.12;
+    visual.rotation.z = Math.sin(t*8+seed)*0.12;
     flippers.forEach((f,i)=>{ f.rotation.x = Math.sin(t*8+seed+i*3)*0.4; });
   };
   return g;
@@ -2734,6 +2745,7 @@ CRITTER_BUILDERS.tumbleweed = function(){
     _a(g, CYLG(0.01,0.01,0.5+Math.random()*0.2,3), mat, 0,0.3,0, a,b,0);
   }
   g.userData.speed = 1.4;
+  g.userData.forwardOffset = 0;
   g.userData.homeR = 8;
   const seed = Math.random()*6;
   g.userData.anim = (t)=>{
@@ -8026,7 +8038,7 @@ function getKayKitAssetPromise(characterId){
   return kayKitRemoteCache[characterId];
 }
 
-function buildKayKitPlayer(characterId){
+function buildKayKitPlayer(characterId, options={}){
   const wrapper = new THREE.Group();
 
   // Compatibility pivots keep existing shooting and movement code safe.
@@ -8041,7 +8053,10 @@ function buildKayKitPlayer(characterId){
   wrapper.userData.kayActionLock = 0;
 
   // Small temporary marker while the embedded GLB is decoded.
-  const loadingMat = new THREE.MeshLambertMaterial({color:0x56d6ff, flatShading:true});
+  const loadingMat = new THREE.MeshLambertMaterial({
+    color: options.zombie ? 0x9bdf8f : 0x56d6ff,
+    flatShading:true
+  });
   const loadingMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(0.24, 1), loadingMat);
   loadingMesh.position.y = 0.8;
   wrapper.add(loadingMesh);
@@ -8067,16 +8082,32 @@ function buildKayKitPlayer(characterId){
     const placedBox = new THREEAsset.Box3().setFromObject(root);
     root.position.y -= placedBox.min.y;
 
+    let zombieMeshIndex = 0;
     root.traverse(obj => {
       if(obj.isMesh){
         obj.castShadow = true;
         obj.receiveShadow = false;
         if(obj.material){
+          // Clone materials so tinting one enemy never changes the player
+          // or another independently loaded character.
+          if(Array.isArray(obj.material)) obj.material = obj.material.map(m=>m.clone());
+          else obj.material = obj.material.clone();
+
           const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-          mats.forEach(m => {
+          mats.forEach((m, matIndex) => {
             if('roughness' in m) m.roughness = 0.82;
             if('metalness' in m) m.metalness = Math.min(m.metalness || 0, 0.15);
+
+            if(options.zombie && m.color){
+              // Bright mint green + playful violet. Deliberately not dark,
+              // muddy, or horror-themed.
+              const palette = [0x79d98a, 0xb985e8, 0x9fe6a8, 0xd0a4f2];
+              m.color.setHex(palette[(zombieMeshIndex + matIndex) % palette.length]);
+              if(m.emissive) m.emissive.setHex((zombieMeshIndex % 2) ? 0x16091f : 0x07170c);
+              if('emissiveIntensity' in m) m.emissiveIntensity = 0.08;
+            }
           });
+          zombieMeshIndex++;
         }
       }
     });
@@ -8116,11 +8147,11 @@ function buildKayKitPlayer(characterId){
     };
 
     wrapper.userData.playKayClip('Idle', true);
-    toast(AVATAR_TYPE_LABELS[characterId] + ' loaded');
+    if(!options.silent) toast(AVATAR_TYPE_LABELS[characterId] + ' loaded');
   }).catch(err => {
     console.error('KayKit asset load failed:', err);
     const detail = (err && err.message) ? err.message : String(err);
-    toast('Character load error: ' + detail.slice(0, 120));
+    if(!options.silent) toast('Character load error: ' + detail.slice(0, 120));
   });
 
   return wrapper;
@@ -8179,7 +8210,8 @@ function spawnPlayer(){
 
 // ---- Zombies ----
 function spawnZombie(){
-  const z = buildHuman(0,0, 0x5f7a5f);
+  const zombieCharacter = AVATAR_TYPES[Math.floor(Math.random()*AVATAR_TYPES.length)];
+  const z = buildKayKitPlayer(zombieCharacter, {zombie:true, silent:true});
   const ang = Math.random()*Math.PI*2;
   const rad = arenaSize - 2;
   z.position.set(Math.cos(ang)*rad, 0, Math.sin(ang)*rad);
@@ -8189,11 +8221,12 @@ function spawnZombie(){
   // still stops being a safe option forever.
   z.userData.speed = 1.0 + Math.random()*0.4 + Math.max(0, round-5)*0.2;
   z.userData.attackCooldown = 0;
+  z.userData.zombieCharacter = zombieCharacter;
   enableShadows(z, false);
   addContactShadow(z, 0.45);
   scene.add(z);
   zombies.push(z);
-  addXray(z, 0xff5555);
+  addXray(z, 0xb36cff);
 }
 function clearZombies(){
   zombies.forEach(z=>{ scene.remove(z); disposeGroup(z); });
@@ -9102,6 +9135,7 @@ function update(dt){
   // fight rather than the horde continuing to close in off-camera.
   if(!freeMode){
     zombies.forEach(z=>{
+      if(z.userData.kayMixer) z.userData.kayMixer.update(dt);
       const dx = player.position.x-z.position.x, dz = player.position.z-z.position.z;
       const dist = Math.hypot(dx,dz);
       if(dist>0.01){
@@ -9110,6 +9144,9 @@ function update(dt){
         const resolved = resolveCollision(nx, nz, z.position.y); // zombies are solid-blocked too now
         z.position.x = resolved.x; z.position.z = resolved.z;
         z.rotation.y = Math.atan2(dx,dz);
+        if(z.userData.playKayClip) z.userData.playKayClip('Running_A');
+      } else if(z.userData.playKayClip) {
+        z.userData.playKayClip('Idle');
       }
       z.userData.attackCooldown = Math.max(0,(z.userData.attackCooldown||0)-dt);
       // Zombies stay at ground level, so a big vertical gap means the
