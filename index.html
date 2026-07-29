@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V14 Shadow Awakens</title>
+<title>Family Arena — V14.1 Shadow Storm</title>
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -8274,6 +8274,9 @@ function spawnPlayer(){
   player.userData.facing = 0;
   player.userData.hp = 3;
   player.userData.attackCooldown = 0;
+  player.userData.spinVisualTimer = 0;
+  player.userData.spinVisualSpeed = 26;
+  player.userData.spinBaseY = undefined;
   enableShadows(player, false);
   addContactShadow(player, 0.5*avatarScale);
   scene.add(player);
@@ -8769,8 +8772,15 @@ function updateFx(dt){
       const p = 1-Math.max(f.life,0)/f.maxLife;
       f.mesh.position.x += f.vx*dt;
       f.mesh.position.z += f.vz*dt;
-      f.mesh.scale.setScalar(0.72 + p*0.72);
+      f.mesh.scale.setScalar(0.82 + p*1.05);
+      f.mesh.rotation.z += (f.spin||0)*dt;
       f.mesh.traverse(o=>{ if(o.material) o.material.opacity=Math.max(0,1-p); });
+    } else if(f.kind==='whirlwind'){
+      f.life -= dt;
+      const p = 1-Math.max(f.life,0)/f.maxLife;
+      f.mesh.rotation.y += dt*18;
+      f.mesh.scale.setScalar(0.68 + p*1.05);
+      f.mesh.traverse(o=>{ if(o.material) o.material.opacity=Math.max(0,(1-p)*0.92); });
     } else {
       f.vy -= 7*dt;
       f.mesh.position.x += f.vx*dt;
@@ -8929,19 +8939,53 @@ function spawnShadowSmoke(x,y,z,count=8){
 }
 function spawnShadowSlash(origin, yaw, comboStep=0){
   const group=new THREE.Group();
-  const purple=new THREE.MeshBasicMaterial({color:0x9a4dff,transparent:true,opacity:0.82,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
-  const white=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.92,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
-  const slash=new THREE.Mesh(new THREE.RingGeometry(0.72,1.18,28,1,-1.05,2.10),purple);
-  const edge=new THREE.Mesh(new THREE.RingGeometry(1.13,1.24,28,1,-1.05,2.10),white);
-  const comboRot=[-0.46,0.46,0.0,1.15][comboStep%4];
-  slash.rotation.z=comboRot;
-  edge.rotation.z=slash.rotation.z;
-  group.add(slash,edge);
+  const purple=new THREE.MeshBasicMaterial({color:0x9a4dff,transparent:true,opacity:0.95,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const hotPurple=new THREE.MeshBasicMaterial({color:0xd16cff,transparent:true,opacity:0.82,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const white=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:1,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const comboRot=[-0.62,0.62,0.0,1.30][comboStep%4];
+  for(let i=0;i<3;i++){
+    const slash=new THREE.Mesh(new THREE.RingGeometry(0.68+i*0.13,1.42+i*0.18,36,1,-1.12,2.24),i===1?hotPurple:purple);
+    slash.rotation.z=comboRot+(i-1)*0.10;
+    slash.position.z=-i*0.05;
+    slash.scale.y=1.18;
+    group.add(slash);
+  }
+  const edge=new THREE.Mesh(new THREE.RingGeometry(1.43,1.58,40,1,-1.12,2.24),white);
+  edge.rotation.z=comboRot;
+  edge.scale.y=1.18;
+  group.add(edge);
+  const core=new THREE.Mesh(new THREE.PlaneGeometry(0.18,2.65),white);
+  core.rotation.z=comboRot;
+  core.material.opacity=0.72;
+  group.add(core);
   const fxdirX=Math.sin(yaw), fxdirZ=Math.cos(yaw);
-  group.position.set(origin.x+fxdirX*1.05,origin.y+0.82,origin.z+fxdirZ*1.05);
+  group.position.set(origin.x+fxdirX*1.05,origin.y+0.92,origin.z+fxdirZ*1.05);
   group.rotation.y=yaw;
   scene.add(group);
-  fx.push({kind:'shadowSlash',mesh:group,vx:fxdirX*5.2,vz:fxdirZ*5.2,life:0.20,maxLife:0.20});
+  fx.push({kind:'shadowSlash',mesh:group,vx:fxdirX*6.4,vz:fxdirZ*6.4,spin:(comboStep%2?2.8:-2.8),life:0.28,maxLife:0.28});
+  spawnBurst(group.position.x,group.position.y,group.position.z,18,FX_MAT_SHADOW,4.2);
+}
+function spawnWhirlwindBurst(origin, isClone=false){
+  const group=new THREE.Group();
+  const purple=new THREE.MeshBasicMaterial({color:0x8d32ff,transparent:true,opacity:0.9,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const white=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.92,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  for(let i=0;i<3;i++){
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(1.15+i*0.28,0.075,8,40),i===1?white:purple);
+    ring.rotation.x=Math.PI/2;
+    ring.position.y=0.35+i*0.38;
+    group.add(ring);
+  }
+  for(let i=0;i<6;i++){
+    const blade=new THREE.Mesh(new THREE.RingGeometry(0.72,1.55,30,1,-0.55,1.1),i%3===0?white:purple);
+    blade.rotation.y=i*Math.PI/3;
+    blade.rotation.z=(i%2?-0.48:0.48);
+    blade.position.y=0.9;
+    group.add(blade);
+  }
+  group.position.set(origin.x,origin.y,origin.z);
+  scene.add(group);
+  fx.push({kind:'whirlwind',mesh:group,life:isClone?0.22:0.30,maxLife:isClone?0.22:0.30});
+  spawnBurst(origin.x,origin.y+0.75,origin.z,isClone?12:24,FX_MAT_SHADOW,isClone?3.4:5.0);
 }
 function damageMeleeArc(origin,yaw,radius,arc,damage){
   let hitCount=0;
@@ -8994,7 +9038,14 @@ function doMeleeAttack(w, origin=player.position, isClone=false){
     }
   } else {
     hits=damageNearby(pos,w.radius,w.damage);
-    if(!isClone && spin) triggerCombatShake(hits>0?5:2,80);
+    if(spin){
+      spawnWhirlwindBurst(pos,isClone);
+      if(!isClone){
+        player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,0.32);
+        player.userData.spinVisualSpeed=26;
+        triggerCombatShake(hits>0?8:4,105);
+      }
+    }
   }
   if(!isClone && state.avatarType==='hooded' && hits>0){
     hoodedMeleeHits += hits;
@@ -9410,6 +9461,21 @@ function update(dt){
   }
 
   if(player.userData.attackCooldown>0) player.userData.attackCooldown -= dt;
+  // Whirlwind is a real full-body spin, independent of whichever KayKit arm clip exists.
+  // Rotating only the imported visual root preserves movement direction and controls.
+  if(player.userData.spinVisualTimer>0){
+    player.userData.spinVisualTimer-=dt;
+    const root=player.userData.kayRoot;
+    if(root){
+      if(player.userData.spinBaseY===undefined) player.userData.spinBaseY=root.rotation.y;
+      root.rotation.y += (player.userData.spinVisualSpeed||26)*dt;
+      root.rotation.z=Math.sin(performance.now()*0.035)*0.10;
+    }
+  } else if(player.userData.kayRoot && player.userData.spinBaseY!==undefined){
+    player.userData.kayRoot.rotation.y=player.userData.spinBaseY;
+    player.userData.kayRoot.rotation.z=0;
+    player.userData.spinBaseY=undefined;
+  }
   updateBullets(dt);
   updateFx(dt);
   updateWeather(dt);
