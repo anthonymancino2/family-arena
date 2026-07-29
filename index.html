@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V21.4 Frostwing Direct GLB</title>
+<title>Family Arena — V21.8 Frostwing Bright Gameplay Fix</title>
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -228,6 +228,10 @@
   .weaponPill{position:absolute;top:calc(96px + env(safe-area-inset-top));left:14px;
     background:rgba(20,22,28,0.55);border:1.5px solid rgba(255,255,255,0.35);
     border-radius:12px;padding:5px 11px;font-weight:700;font-size:12px;color:#fff;}
+  .enemyCountPill{position:absolute;top:calc(130px + env(safe-area-inset-top));left:14px;
+    background:rgba(44,18,64,0.78);border:1.5px solid rgba(205,126,255,0.78);
+    border-radius:12px;padding:6px 11px;font-weight:900;font-size:12px;color:#f0d5ff;
+    letter-spacing:.035em;box-shadow:0 0 10px rgba(172,74,255,0.22);}
   .invinciblePill{position:absolute;top:calc(112px + env(safe-area-inset-top));left:50%;
     transform:translateX(-50%);background:rgba(74,255,234,0.18);
     border:2px solid #4affea;border-radius:16px;padding:8px 16px;display:none;
@@ -353,7 +357,7 @@
 <div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
 background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
 padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
-V21.4 · FROSTWING IMPORT
+V21.8 · FROSTWING BRIGHT FIX
 </div>
 <div id="app">
 
@@ -376,7 +380,7 @@ V21.4 · FROSTWING IMPORT
           <button class="bigBtn" id="btnGoModes">Play</button>
           <button class="ghostBtn" id="btnGoShop">Crystal<br>Shop</button>
         </div>
-        <div class="homeVersion">FAMILY ARENA · V21.4 FROSTWING IMPORT</div>
+        <div class="homeVersion">FAMILY ARENA · V21.8 FROSTWING BRIGHT FIX</div>
       </div>
     </div>
   </div>
@@ -421,7 +425,7 @@ V21.4 · FROSTWING IMPORT
       <div id="heroInfoDesc" style="margin-top:7px;color:#d3e1ec;font-size:13px;line-height:1.35;"></div>
     </div>
     <div class="subtitle" style="margin:10px 0 14px;">
-      Frostwing V21.4 loads a real external penguin GLB directly instead of downloading and unpacking a ZIP in the browser. The procedural penguin is not used for Frostwing gameplay or preview.
+      Frostwing V21.8 loads a real external penguin GLB directly instead of downloading and unpacking a ZIP in the browser. The procedural penguin is not used for Frostwing gameplay or preview.
     </div>
     <div class="swatchRow" id="skinRow" style="display:none"></div>
     <div id="hairSection" style="display:none"><div class="swatchRow" id="hairRow"></div></div>
@@ -452,6 +456,7 @@ V21.4 · FROSTWING IMPORT
         <div class="roundTimerPill" id="roundTimerPill">⏱ 0.0s</div>
         <div class="runTokensPill"><div class="coin"></div><span id="runTokensCount">0</span></div>
         <div class="weaponPill" id="weaponPill">Pistol</div>
+        <div class="enemyCountPill" id="enemyCountPill">ENEMIES 0</div>
         <div class="invinciblePill" id="invinciblePill">🛡 <span id="invincibleTime">0</span>s</div>
         <div class="toast" id="toast"></div>
         <div class="freeBanner" id="freeBanner">FREE ROAM · INVINCIBLE</div>
@@ -831,11 +836,15 @@ async function ensureAvatarPreview(){
   previewRenderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
   previewRenderer.setSize(220,245,false);
   previewRenderer.outputColorSpace=THREEP.SRGBColorSpace;
+  previewRenderer.toneMapping=THREEP.ACESFilmicToneMapping;
+  previewRenderer.toneMappingExposure=1.42;
   previewScene=new THREEP.Scene();
   previewCamera=new THREEP.PerspectiveCamera(30,220/245,.1,20);
   previewCamera.position.set(0,1.0,4.2);
-  previewScene.add(new THREEP.HemisphereLight(0xffffff,0x203040,2.0));
-  const key=new THREEP.DirectionalLight(0xffedd0,2.2);key.position.set(3,5,4);previewScene.add(key);
+  previewScene.add(new THREEP.HemisphereLight(0xffffff,0x5f7488,3.15));
+  const key=new THREEP.DirectionalLight(0xffffff,3.25);key.position.set(3,5,5);previewScene.add(key);
+  const previewFill=new THREEP.DirectionalLight(0xbfe8ff,1.55);previewFill.position.set(-4,3,4);previewScene.add(previewFill);
+  const previewRim=new THREEP.DirectionalLight(0x7fd9ff,1.1);previewRim.position.set(1,4,-4);previewScene.add(previewRim);
   const floor=new THREEP.Mesh(new THREEP.CircleGeometry(1.25,40),new THREEP.MeshStandardMaterial({color:0x263847,roughness:1}));
   floor.rotation.x=-Math.PI/2;previewScene.add(floor);
   const animate=()=>{
@@ -864,7 +873,7 @@ async function updateAvatarPreview(characterId){
       previewMixer=new THREEAsset.AnimationMixer(root);
       const idle=findImportedClip(gltf.animations,['idle','stand'])||gltf.animations[0];
       if(idle)previewMixer.clipAction(idle).play();
-      if(status)status.textContent='Frostwing — Imported CC0 Penguin';
+      if(status)status.textContent='Frostwing — Bright Imported Penguin';
       return;
     }
     const {gltf,THREEAsset,cloneSkinned}=await getKayKitAssetPromise(characterId);
@@ -6941,7 +6950,7 @@ function initEngine(){
   renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.08;
+  renderer.toneMappingExposure = 1.34;
   renderer.setSize(window.innerWidth, window.innerHeight);
   // Shadows are the single biggest thing separating our look from the
   // low-poly reference renders — objects need to be grounded. Kept
@@ -6956,10 +6965,10 @@ function initEngine(){
 
   camera = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 200);
 
-  const hemi = new THREE.HemisphereLight(0xfff7ed, 0x526579, 1.05);
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x667b90, 1.72);
   scene.add(hemi);
   // Warm, low-angled sun for long readable shadows, like the references.
-  const sun = new THREE.DirectionalLight(0xffead0, 1.28);
+  const sun = new THREE.DirectionalLight(0xfff3df, 1.78);
   sun.position.set(14,16,9);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024,1024);
@@ -6974,9 +6983,12 @@ function initEngine(){
   scene.add(sun);
   // Cool secondary fill from the opposite side — no single flat-lit
   // side, more of a real outdoor-render look. No shadow (cheap).
-  const fill = new THREE.DirectionalLight(0xa9c9ff, 0.42);
+  const fill = new THREE.DirectionalLight(0xbfe4ff, 0.92);
   fill.position.set(-10,9,-9);
   scene.add(fill);
+  const frontFill = new THREE.DirectionalLight(0xffffff, 1.15);
+  frontFill.position.set(0, 6, 10);
+  scene.add(frontFill);
   hemiLight = hemi; sunLight = sun;
   // Created once and retargeted per round by placeLandmark().
   landmarkLight = new THREE.PointLight(0xffffff, 0, 16, 1.6);
@@ -8249,7 +8261,7 @@ function getKayKitAssetPromise(characterId){
 
 
 // ---------------------------------------------------------------------
-// FROSTWING REAL-ASSET IMPORT — V21.4
+// FROSTWING REAL-ASSET IMPORT — V21.8
 // Source: Quaternius, Cute Animated Monsters Pack (CC0).
 // The game downloads the original asset pack, extracts the Penguin model,
 // and loads that file. No penguin body geometry is generated by the game.
@@ -8298,7 +8310,24 @@ function buildImportedFrostwing(options={}){
   wrapper.userData.kayAsset=true;
   wrapper.userData.kayActionLock=0;
 
-  const loadingMat=new THREE.MeshLambertMaterial({color:0x8eeeff,flatShading:true});
+  // Compatibility pivots are required by the shared movement loop. Without
+  // these, Frostwing throws during update() before renderer.render(), which
+  // made the entire arena appear empty even though the GLB loaded correctly.
+  const armR=new THREE.Group(), armL=new THREE.Group();
+  const legR=new THREE.Group(), legL=new THREE.Group();
+  armR.position.set(-.34,.92,.03); armL.position.set(.34,.92,.03);
+  legR.position.set(-.15,.22,0); legL.position.set(.15,.22,0);
+  wrapper.add(armR,armL,legR,legL);
+  wrapper.userData.parts={armR,armL,legR,legL};
+
+  // Character-local illumination keeps the dark feathers readable across
+  // every rotating environment without bleaching the rest of the arena.
+  const frostKey=new THREE.PointLight(0xffffff,2.2,7,1.5);
+  frostKey.position.set(0,2.4,2.6); wrapper.add(frostKey);
+  const frostRim=new THREE.PointLight(0x8fe7ff,1.25,6,1.7);
+  frostRim.position.set(0,2.0,-2.0); wrapper.add(frostRim);
+
+  const loadingMat=new THREE.MeshBasicMaterial({color:0x8eeeff});
   const loadingMesh=new THREE.Mesh(new THREE.IcosahedronGeometry(.22,1),loadingMat);
   loadingMesh.position.y=.75;
   wrapper.add(loadingMesh);
@@ -8309,8 +8338,23 @@ function buildImportedFrostwing(options={}){
     const root=cloneSkinned(gltf.scene);
     root.rotation.y=0;
     normalizeImportedHero(root,THREEAsset,1.48);
-    root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=false;}});
+    root.traverse(o=>{
+      if(!o.isMesh) return;
+      o.visible=true; o.frustumCulled=false; o.castShadow=true; o.receiveShadow=false;
+      const mats=Array.isArray(o.material)?o.material:[o.material];
+      mats.filter(Boolean).forEach(m=>{
+        if('color' in m && m.color) m.color.multiplyScalar(1.18);
+        if('emissive' in m && m.emissive){
+          m.emissive.copy(m.color||new THREEAsset.Color(0xffffff)).multiplyScalar(.10);
+          m.emissiveIntensity=.55;
+        }
+        if('roughness' in m) m.roughness=Math.min(.82,m.roughness??.7);
+        m.needsUpdate=true;
+      });
+    });
     wrapper.add(root);
+    attachFrostPistol(armR,-1);
+    attachFrostPistol(armL,1);
     wrapper.userData.kayRoot=root;
     const mixer=new THREEAsset.AnimationMixer(root);
     const clips={};
@@ -8563,6 +8607,9 @@ function spawnZombie(){
   z.userData.archetype = archetype;
   z.userData.zombieCharacter = zombieCharacter;
   z.userData.baseScale = spec.scale;
+  z.userData.lastSafePosition = z.position.clone();
+  z.userData.stuckTimer = 0;
+  z.userData.spawnedAt = performance.now();
   z.scale.setScalar(spec.scale);
   enableShadows(z, false);
   addContactShadow(z, 0.45*spec.scale);
@@ -8602,8 +8649,42 @@ function startRound(){
   roundStartTime = performance.now();
   heartsLostThisRound = 0;
   updateRoundTimerHud();
+  updateEnemyCountHud();
   const theme = themeForRound(round, state.themeIndex||0);
   toast('Round '+round+' · '+theme.name+' — '+roundKillTarget+' incoming · Mixed undead!');
+}
+
+// Round recovery watchdog. Long matches can expose rare cases where an
+// enemy model becomes invalid, clips outside the arena, or the spawn queue
+// gets out of sync. This repairs the live round instead of leaving the
+// player stranded with no enemies and no way to advance.
+let roundRecoveryClock = 0;
+function recoverRoundIfNeeded(dt){
+  if(!gameRunning || freeMode || roundKillsDone >= roundKillTarget) return;
+  roundRecoveryClock += dt;
+  if(roundRecoveryClock < 1.0) return;
+  roundRecoveryClock = 0;
+
+  // Remove broken/out-of-bounds enemies and put their slot back into the queue.
+  for(let i=zombies.length-1;i>=0;i--){
+    const z=zombies[i];
+    const p=z && z.position;
+    const invalid=!z || z.userData.dead || !p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z);
+    const escaped=!invalid && Math.hypot(p.x,p.z) > arenaSize+5;
+    if(invalid || escaped){
+      if(z){ scene.remove(z); disposeGroup(z); }
+      zombies.splice(i,1);
+    }
+  }
+
+  const needed=Math.max(0, roundKillTarget-roundKillsDone-zombies.length);
+  if(zombiesRemainingToSpawn < needed) zombiesRemainingToSpawn=needed;
+
+  // Never allow an active round to sit empty. Refill immediately up to the cap.
+  while(zombies.length < MAX_CONCURRENT_ZOMBIES && zombiesRemainingToSpawn>0){
+    spawnZombie();
+    zombiesRemainingToSpawn--;
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -8652,6 +8733,14 @@ function updateInvincibleHud(){
 function updateRoundTimerHud(){
   const elapsed = (performance.now() - roundStartTime) / 1000;
   document.getElementById('roundTimerPill').textContent = '⏱ ' + elapsed.toFixed(1) + 's';
+}
+
+function updateEnemyCountHud(){
+  const pill = document.getElementById('enemyCountPill');
+  if(!pill) return;
+  const remaining = Math.max(0, roundKillTarget - roundKillsDone);
+  pill.textContent = 'ENEMIES ' + remaining;
+  pill.setAttribute('aria-label', remaining + ' enemies remaining; ' + zombies.length + ' currently on the map');
 }
 
 // ---------------------------------------------------------------------
@@ -9062,6 +9151,8 @@ function updateFx(dt){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.scale.setScalar(1+(1-q)*.18);f.mesh.traverse(o=>{if(o.material)o.material.opacity=.28*q;});
     } else if(f.kind==='soul'){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);if(player)f.mesh.position.lerp(new THREE.Vector3(player.position.x,player.position.y+1,player.position.z),Math.min(1,dt*7));f.mesh.scale.setScalar(.7+.5*Math.sin((1-q)*Math.PI));if(f.mesh.material)f.mesh.material.opacity=q;
+    } else if(f.kind==='mageBasicCone'){
+      f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.scale.set(1+(1-q)*.18,1,1+(1-q)*.08);f.mesh.traverse(o=>{if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.opacity*=.86);else o.material.opacity*=.86;}});
     } else if(f.kind==='arcaneSigil'){
       f.mesh.rotation.y += (f.spin||3)*dt; f.mesh.scale.multiplyScalar(1+dt*.55);
       f.mesh.traverse(o=>{if(o.material)o.material.opacity=Math.max(0,f.life/f.maxLife)*.85;});
@@ -9415,6 +9506,38 @@ function updatePrimalRage(dt){
   if(barbarianUltimateActive<=0){document.body.style.filter='';spawnEarthbreaker(player.position,6.2);damageNearby(player.position,6.2,3.0);triggerCombatShake(17,280);}
 }
 
+function spawnMageBasicCone(elementIsIce){
+  if(!player || !scene) return;
+  const yaw=player.rotation.y;
+  const dirX=Math.sin(yaw), dirZ=Math.cos(yaw);
+  const g=new THREE.Group();
+  const tint=elementIsIce?0x8feaff:0xffa06a;
+  const glow=new THREE.MeshBasicMaterial({color:tint,transparent:true,opacity:.32,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const core=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.38,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  // Two layered triangular planes create the broad, readable casting wedge.
+  const verts=new Float32Array([
+    0,0,0,  -1.15,0,4.8,  1.15,0,4.8,
+    0,.04,0, -.62,.04,4.0, .62,.04,4.0
+  ]);
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(verts,3));
+  geo.setIndex([0,1,2,3,4,5]);
+  const mesh=new THREE.Mesh(geo,[glow,core]);
+  mesh.geometry.clearGroups();
+  mesh.geometry.addGroup(0,3,0);mesh.geometry.addGroup(3,3,1);
+  g.add(mesh);
+  // Soft rim makes the cone visible even on snowy/bright maps.
+  const rimMat=new THREE.LineBasicMaterial({color:tint,transparent:true,opacity:.8,depthWrite:false,blending:THREE.AdditiveBlending});
+  const rimGeo=new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0,.055,0),new THREE.Vector3(-1.15,.055,4.8),new THREE.Vector3(1.15,.055,4.8),new THREE.Vector3(0,.055,0)
+  ]);
+  g.add(new THREE.Line(rimGeo,rimMat));
+  g.position.set(player.position.x+dirX*.55,player.position.y+.12,player.position.z+dirZ*.55);
+  g.rotation.y=yaw;
+  scene.add(g);
+  fx.push({kind:'mageBasicCone',mesh:g,life:.22,maxLife:.22});
+}
+
 function spawnArcaneSigil(x,y,z,radius=3.2){
   const g=new THREE.Group();
   const cyan=new THREE.MeshBasicMaterial({color:0x6fe8ff,transparent:true,opacity:.82,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
@@ -9748,7 +9871,12 @@ function doShoot(){
       const words=state.avatarType==='mage'?['magic']:['ranged','shoot'];
       player.userData.playKayClip(findClipByWords(words,'1H_Ranged_Shoot'),true,true,0.25);
     }
-    if(w.kind==='elemental'){ mageElementToggle=!mageElementToggle; mageCastStep=(mageCastStep+1)%4; if(mageCastStep===0) spawnArcaneSigil(player.position.x,player.position.y,player.position.z,1.7); }
+    if(w.kind==='elemental'){
+      mageElementToggle=!mageElementToggle;
+      mageCastStep=(mageCastStep+1)%4;
+      spawnMageBasicCone(mageElementToggle);
+      if(mageCastStep===0) spawnArcaneSigil(player.position.x,player.position.y,player.position.z,1.7);
+    }
     shootFromPosition(w,player.position,0);
     if(state.avatarType==='rogue'){archerVolleyStep=(archerVolleyStep+1)%3;spawnArcherMuzzleFan(archerVolleyStep===0);}
     if(state.avatarType==='hooded') cloneAttack(w);
@@ -9837,6 +9965,7 @@ function killZombie(z){
   disposeGroup(z);
   zombies = zombies.filter(o=>o!==z);
   kills++; roundKillsDone++;
+  updateEnemyCountHud();
   if(state.avatarType==='hooded'){spawnSoulOrb(z.position);hoodedUltimateCharge=Math.min(100,hoodedUltimateCharge+8);updateHoodedHud();}
   if(state.avatarType==='rogue'){archerUltimateCharge=Math.min(100,archerUltimateCharge+10);spawnArcherSpark(z.position.x,z.position.y+0.8,z.position.z);updateHoodedHud();}
   if(state.avatarType==='mage'){mageUltimateCharge=Math.min(100,mageUltimateCharge+9);spawnArcaneSigil(z.position.x,z.position.y,z.position.z,1.05);updateHoodedHud();}
@@ -9950,6 +10079,65 @@ function updateShadowClones(dt){
   });
 }
 
+// Camera occlusion fading. Trees, rocks, buildings and other scenery
+// become translucent only when they sit directly between the camera and
+// the avatar. This preserves the environment while keeping the player visible.
+const sceneryRaycaster = new THREE.Raycaster();
+const sceneryRayDir = new THREE.Vector3();
+const sceneryFadeTargets = new Set();
+let sceneryFadeClock = 0;
+function setSceneryOpacity(root, faded){
+  if(!root) return;
+  root.traverse(o=>{
+    if(!o.isMesh || !o.material) return;
+    if(!o.userData.occlusionPrepared){
+      if(Array.isArray(o.material)) o.material=o.material.map(m=>m.clone());
+      else o.material=o.material.clone();
+      o.userData.occlusionPrepared=true;
+      const mats=Array.isArray(o.material)?o.material:[o.material];
+      mats.forEach(m=>{
+        m.userData.baseOpacity = m.opacity===undefined ? 1 : m.opacity;
+        m.userData.baseTransparent = !!m.transparent;
+        m.userData.baseDepthWrite = m.depthWrite;
+      });
+    }
+    const mats=Array.isArray(o.material)?o.material:[o.material];
+    mats.forEach(m=>{
+      const base=m.userData.baseOpacity===undefined?1:m.userData.baseOpacity;
+      m.transparent = faded || m.userData.baseTransparent;
+      m.opacity = faded ? Math.min(base,0.20) : base;
+      m.depthWrite = faded ? false : m.userData.baseDepthWrite;
+      m.needsUpdate=true;
+    });
+  });
+}
+function updateSceneryOcclusion(dt){
+  if(!player || camMode===1) return;
+  sceneryFadeClock += dt;
+  if(sceneryFadeClock < 0.09) return;
+  sceneryFadeClock=0;
+  const target=new THREE.Vector3(player.position.x,player.position.y+0.85*(player.userData.avatarScale||1),player.position.z);
+  sceneryRayDir.copy(target).sub(camera.position);
+  const maxDist=sceneryRayDir.length();
+  if(maxDist<0.1) return;
+  sceneryRayDir.normalize();
+  sceneryRaycaster.set(camera.position,sceneryRayDir);
+  sceneryRaycaster.near=0.05;
+  sceneryRaycaster.far=Math.max(0.05,maxDist-0.35);
+  const roots=[...obstacleMeshes,...decorMeshes].filter(Boolean);
+  const hits=sceneryRaycaster.intersectObjects(roots,true);
+  const next=new Set();
+  for(const hit of hits){
+    let root=hit.object;
+    while(root.parent && root.parent!==scene && !roots.includes(root)) root=root.parent;
+    if(roots.includes(root)) next.add(root);
+  }
+  sceneryFadeTargets.forEach(root=>{ if(!next.has(root)) setSceneryOpacity(root,false); });
+  next.forEach(root=>setSceneryOpacity(root,true));
+  sceneryFadeTargets.clear();
+  next.forEach(root=>sceneryFadeTargets.add(root));
+}
+
 // ---- Main update ----
 function update(dt){
   updateShadowClones(dt);
@@ -10007,6 +10195,8 @@ function update(dt){
     camera.position.set(cx, cy, cz);
     camera.lookAt(player.position.x, player.position.y+1.1*avatarScale, player.position.z);
   }
+
+  updateSceneryOcclusion(dt);
 
   // Fog is tuned for a camera 5 metres back; at the pulled-back tiers it
   // would swallow the whole arena, so push it out in step with the view.
@@ -10139,6 +10329,8 @@ function update(dt){
   updateShopPrompt();
   updatePowerUps(dt);
   updateRoundTimerHud();
+  updateEnemyCountHud();
+  recoverRoundIfNeeded(dt);
   if(invincibleTimer > 0){
     invincibleTimer -= dt;
     if(invincibleTimer < 0) invincibleTimer = 0;
@@ -10176,7 +10368,18 @@ function update(dt){
         const nx = z.position.x + mx*z.userData.speed*dt*moveDir;
         const nz = z.position.z + mz*z.userData.speed*dt*moveDir;
         const resolved = resolveCollision(nx, nz, z.position.y);
+        const moved=Math.hypot(resolved.x-z.position.x,resolved.z-z.position.z);
         z.position.x = resolved.x; z.position.z = resolved.z;
+        if(moved < 0.008 && dist > 1.5) z.userData.stuckTimer=(z.userData.stuckTimer||0)+dt;
+        else { z.userData.stuckTimer=0; z.userData.lastSafePosition=z.position.clone(); }
+        if(z.userData.stuckTimer > 4.0){
+          // Reposition stuck enemies near the player on a clear ring so the round can continue.
+          const a=Math.random()*Math.PI*2, rr=5+Math.random()*2;
+          const pos=resolveCollision(player.position.x+Math.cos(a)*rr,player.position.z+Math.sin(a)*rr,0);
+          z.position.set(pos.x,0,pos.z);
+          z.userData.stuckTimer=0;
+          spawnBurst(z.position.x,z.position.y+.5,z.position.z,8,FX_MAT_ZOMBIE,2.2);
+        }
         z.rotation.y = Math.atan2(dx,dz);
         if(z.userData.playKayClip) z.userData.playKayClip('Running_A');
       } else if(z.userData.playKayClip && type!=='spitter') z.userData.playKayClip('Idle');
