@@ -6,7 +6,8 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V22.1 Verified Frostwing Dash Fix</title>
+<title>Family Arena — V22.2 Frostwing Ground + Dash + Mage VFX</title>
+<!-- V22.2: Frostwing standard dash, persistent imported-model ground offset, readable Mage basic VFX. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -9097,19 +9098,17 @@ function doDash(){
   dashCooldownTimer = DASH_COOLDOWN;
   dashDir.x = Math.sin(player.rotation.y);
   dashDir.z = Math.cos(player.rotation.y);
-  if(player.userData.playKayClip && state.avatarType!=='frostwing'){
+  if(player.userData.playKayClip){
     player.userData.playKayClip('Dodge_Forward', true, true, 0.34);
-  } else if(!player.userData.playKayClip) {
+  } else {
     player.scale.set(1.35,0.8,1.35);
     setTimeout(()=>{ if(player) player.scale.set(1,1,1); }, 130);
   }
   if(state.avatarType==='hooded'){spawnShadowSmoke(player.position.x,player.position.y+.55,player.position.z,24);spawnAfterimage();shadowAfterimageTimer=.04;invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.12);}
   else if(state.avatarType==='frostwing'){
     invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.10);
-    player.userData.frostSlideVisual=DASH_DURATION+.06;
-    // Do not trigger an imported root-motion clip here; it can fight the
-    // code-driven dash transform on iOS. The belly-slide pose is applied in update().
-    spawnBurst(player.position.x,player.position.y+.12,player.position.z,22,FX_MAT_DUST,4.5); toast('BELLY SLIDE!');
+    spawnBurst(player.position.x,player.position.y+.22,player.position.z,18,FX_MAT_DUST,4.2);
+    toast('FROST DASH!');
   } else spawnBurst(player.position.x,0.4,player.position.z,9,FX_MAT_DUST,3.4);
   const btn = document.getElementById('dashBtn');
   btn.classList.add('cooling');
@@ -9547,33 +9546,80 @@ function spawnMageBasicCone(elementIsIce){
   const yaw=player.rotation.y;
   const dirX=Math.sin(yaw), dirZ=Math.cos(yaw);
   const g=new THREE.Group();
-  const tint=elementIsIce?0x8feaff:0xffa06a;
-  const glow=new THREE.MeshBasicMaterial({color:tint,transparent:true,opacity:.32,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
-  const core=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.38,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
-  // Two layered triangular planes create the broad, readable casting wedge.
-  const verts=new Float32Array([
-    0,0,0,  -1.15,0,4.8,  1.15,0,4.8,
-    0,.04,0, -.62,.04,4.0, .62,.04,4.0
-  ]);
-  const geo=new THREE.BufferGeometry();
-  geo.setAttribute('position',new THREE.BufferAttribute(verts,3));
-  geo.setIndex([0,1,2,3,4,5]);
-  const mesh=new THREE.Mesh(geo,[glow,core]);
-  mesh.geometry.clearGroups();
-  mesh.geometry.addGroup(0,3,0);mesh.geometry.addGroup(3,3,1);
-  g.add(mesh);
-  // Soft rim makes the cone visible even on snowy/bright maps.
-  const rimMat=new THREE.LineBasicMaterial({color:tint,transparent:true,opacity:.8,depthWrite:false,blending:THREE.AdditiveBlending});
-  const rimGeo=new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(0,.055,0),new THREE.Vector3(-1.15,.055,4.8),new THREE.Vector3(1.15,.055,4.8),new THREE.Vector3(0,.055,0)
-  ]);
-  g.add(new THREE.Line(rimGeo,rimMat));
-  g.position.set(player.position.x+dirX*.55,player.position.y+.12,player.position.z+dirZ*.55);
+  const tint=elementIsIce?0x79eaff:0xff7a3d;
+  const accent=elementIsIce?0xd8fbff:0xffd08a;
+  const glow=new THREE.MeshBasicMaterial({
+    color:tint,transparent:true,opacity:.72,depthWrite:false,
+    side:THREE.DoubleSide,blending:THREE.AdditiveBlending
+  });
+  const bright=new THREE.MeshBasicMaterial({
+    color:accent,transparent:true,opacity:.82,depthWrite:false,
+    side:THREE.DoubleSide,blending:THREE.AdditiveBlending
+  });
+
+  // A sequence of open arcane rings shows range and direction without
+  // placing a bright opaque shape over the battlefield.
+  for(let i=0;i<5;i++){
+    const progress=(i+1)/5;
+    const radius=.17+progress*.50;
+    const ring=new THREE.Mesh(
+      new THREE.RingGeometry(radius*.72,radius,22),
+      i%2?bright:glow
+    );
+    ring.rotation.x=-Math.PI/2;
+    ring.position.set(0,.04+i*.025,.45+progress*4.0);
+    ring.scale.x=1+progress*.45;
+    g.add(ring);
+  }
+
+  // Two narrow magical ribbons frame the shot, leaving the center and
+  // enemies fully visible.
+  for(const side of [-1,1]){
+    const points=[];
+    for(let i=0;i<8;i++){
+      const p=i/7;
+      points.push(new THREE.Vector3(
+        side*(.08+p*.58)+Math.sin(p*Math.PI*3)*.055,
+        .10+Math.sin(p*Math.PI)*.16,
+        .25+p*4.35
+      ));
+    }
+    const curve=new THREE.CatmullRomCurve3(points);
+    const ribbon=new THREE.Mesh(
+      new THREE.TubeGeometry(curve,20,.025,5,false),
+      side<0?glow:bright
+    );
+    g.add(ribbon);
+  }
+
+  // Small elemental shards provide the dramatic burst around the cast,
+  // but their footprint stays localized around the projectile path.
+  for(let i=0;i<10;i++){
+    const shard=new THREE.Mesh(
+      elementIsIce
+        ? new THREE.OctahedronGeometry(.045+Math.random()*.035,0)
+        : new THREE.TetrahedronGeometry(.05+Math.random()*.04,0),
+      i%3===0?bright:glow
+    );
+    const p=.15+Math.random()*.85;
+    shard.position.set(
+      (Math.random()-.5)*(1.0*p+.12),
+      .08+Math.random()*.30,
+      .35+p*4.25
+    );
+    shard.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+    g.add(shard);
+  }
+
+  g.position.set(
+    player.position.x+dirX*.45,
+    player.position.y+.08,
+    player.position.z+dirZ*.45
+  );
   g.rotation.y=yaw;
   scene.add(g);
-  fx.push({kind:'mageBasicCone',mesh:g,life:.22,maxLife:.22});
+  fx.push({kind:'mageBasicCone',mesh:g,life:.34,maxLife:.34,spin:elementIsIce?-1.4:1.4});
 }
-
 function spawnArcaneSigil(x,y,z,radius=3.2){
   const g=new THREE.Group();
   const cyan=new THREE.MeshBasicMaterial({color:0x6fe8ff,transparent:true,opacity:.82,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
@@ -10259,22 +10305,9 @@ function update(dt){
     const nz = player.position.z + dashDir.z*DASH_SPEED*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
     player.position.x = resolved.x; player.position.z = resolved.z;
-    if(state.avatarType==='frostwing'&&player.userData.kayRoot){
-      const root=player.userData.kayRoot;
-      const base=player.userData.frostBaseScale;
-      root.rotation.x=(player.userData.frostBaseRotationX||0)-.48;
-      if(base) root.scale.set(base.x,base.y*.78,base.z*1.15);
-    }
     dashTimer -= dt;
     if(dashTimer<=0){
       dashActive=false;
-      if(state.avatarType==='frostwing'&&player.userData.kayRoot){
-        const root=player.userData.kayRoot;
-        const base=player.userData.frostBaseScale;
-        root.rotation.x=player.userData.frostBaseRotationX||0;
-        if(base) root.scale.copy(base);
-        if(Number.isFinite(player.userData.frostBaseY)) root.position.y=player.userData.frostBaseY;
-      }
     }
   } else if(moveVec.x || moveVec.y){
     const forward = -moveVec.y, strafe = moveVec.x;
@@ -10296,7 +10329,12 @@ function update(dt){
       if(player.userData.parts.legL)player.userData.parts.legL.rotation.x = Math.sin(t)*0.5;
       if(player.userData.parts.legR)player.userData.parts.legR.rotation.x = -Math.sin(t)*0.5;
     }
-    if(state.avatarType==='frostwing'&&player.userData.kayRoot){player.userData.kayRoot.rotation.z=Math.sin(t*.55)*.055;player.userData.kayRoot.position.y=Math.abs(Math.sin(t*.55))*.035;}
+    if(state.avatarType==='frostwing'&&player.userData.kayRoot){
+      const root=player.userData.kayRoot;
+      const baseY=Number.isFinite(player.userData.frostBaseY)?player.userData.frostBaseY:0;
+      root.rotation.z=Math.sin(t*.55)*.055;
+      root.position.y=baseY+Math.abs(Math.sin(t*.55))*.035;
+    }
 
     // Camera auto-follow: swing camYaw to catch up behind the character
     // as they turn, unless the player is actively dragging to look
@@ -10311,7 +10349,12 @@ function update(dt){
     }
   } else {
     if(player.userData.parts){if(player.userData.parts.legL)player.userData.parts.legL.rotation.x=0;if(player.userData.parts.legR)player.userData.parts.legR.rotation.x=0;}
-    if(state.avatarType==='frostwing'&&player.userData.kayRoot){player.userData.kayRoot.rotation.z*=.82;player.userData.kayRoot.position.y*=.82;}
+    if(state.avatarType==='frostwing'&&player.userData.kayRoot){
+      const root=player.userData.kayRoot;
+      const baseY=Number.isFinite(player.userData.frostBaseY)?player.userData.frostBaseY:0;
+      root.rotation.z*=.82;
+      root.position.y += (baseY-root.position.y)*Math.min(1,dt*14);
+    }
   }
   // Drive the imported skeleton with its real baked clips.
   if(player.userData.playKayClip && player.userData.kayActionLock <= 0){
