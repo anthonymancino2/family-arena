@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V19 Barbarian Fury</title>
+<title>Family Arena — V20 Undead Uprising</title>
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -353,7 +353,7 @@
 <div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
 background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
 padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
-V19 · BARBARIAN FURY
+V20 · UNDEAD UPRISING
 </div>
 <div id="app">
 
@@ -883,6 +883,42 @@ let renderer, scene, camera, clock;
 let player, playerMixer = null;
 let arenaSize = 30;
 let zombies = [];
+let enemyProjectiles = [];
+const ZOMBIE_ARCHETYPES = {
+  walker:{label:'Walker', hp:1.0, speed:1.0, scale:1.0, color:0x79d98a, glow:0x0b3514},
+  runner:{label:'Runner', hp:0.72, speed:1.72, scale:0.82, color:0xffd45e, glow:0x4d2600},
+  brute:{label:'Brute', hp:3.1, speed:0.62, scale:1.42, color:0xef6a5b, glow:0x4a0904},
+  spitter:{label:'Spitter', hp:1.15, speed:0.78, scale:0.96, color:0x59e9c2, glow:0x003f34},
+  shadow:{label:'Shadow', hp:1.45, speed:1.18, scale:1.02, color:0xb985e8, glow:0x3b0758}
+};
+function chooseZombieArchetype(){
+  const r=Math.random();
+  if(round<2) return 'walker';
+  if(round<4) return r<0.72?'walker':'runner';
+  if(round<6) return r<0.48?'walker':r<0.72?'runner':r<0.88?'spitter':'brute';
+  return r<0.30?'walker':r<0.50?'runner':r<0.68?'spitter':r<0.84?'brute':'shadow';
+}
+function styleZombieArchetype(z){
+  const a=ZOMBIE_ARCHETYPES[z.userData.archetype]||ZOMBIE_ARCHETYPES.walker;
+  z.traverse(o=>{if(o.isMesh&&o.material){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.color)m.color.setHex(a.color);if(m.emissive)m.emissive.setHex(a.glow);if('emissiveIntensity' in m)m.emissiveIntensity=.18;});}});
+}
+function spawnEnemyShot(z){
+  if(!player||z.userData.dead)return;
+  const g=new THREE.Group();
+  const core=new THREE.Mesh(new THREE.SphereGeometry(.16,10,8),new THREE.MeshBasicMaterial({color:0x74ffd8}));
+  const halo=new THREE.Mesh(new THREE.SphereGeometry(.30,10,8),new THREE.MeshBasicMaterial({color:0x5affca,transparent:true,opacity:.25,depthWrite:false}));
+  g.add(core,halo);g.position.set(z.position.x,z.position.y+1.0,z.position.z);scene.add(g);
+  const dx=player.position.x-g.position.x,dy=(player.position.y+.65)-g.position.y,dz=player.position.z-g.position.z,l=Math.hypot(dx,dy,dz)||1;
+  enemyProjectiles.push({mesh:g,dx:dx/l,dy:dy/l,dz:dz/l,life:3.2,speed:7.2});
+  spawnBurst(g.position.x,g.position.y,g.position.z,7,FX_MAT_ZOMBIE,2.2);
+}
+function updateEnemyProjectiles(dt){
+  for(let i=enemyProjectiles.length-1;i>=0;i--){const p=enemyProjectiles[i];p.life-=dt;p.mesh.position.x+=p.dx*p.speed*dt;p.mesh.position.y+=p.dy*p.speed*dt;p.mesh.position.z+=p.dz*p.speed*dt;p.mesh.rotation.y+=dt*8;
+    const d=Math.hypot(player.position.x-p.mesh.position.x,(player.position.y+.55)-p.mesh.position.y,player.position.z-p.mesh.position.z);
+    if(d<.55){spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,10,FX_MAT_ZOMBIE,3);playerTakeHit();scene.remove(p.mesh);disposeGroup(p.mesh);enemyProjectiles.splice(i,1);continue;}
+    if(p.life<=0||bulletBlockedAt(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z)){scene.remove(p.mesh);disposeGroup(p.mesh);enemyProjectiles.splice(i,1);}
+  }
+}
 let hearts = 3, maxHearts = 3, round = 1, kills = 0, roundKillTarget = 0, roundKillsDone = 0;
 const MAX_CONCURRENT_ZOMBIES = 30; // hard cap on simultaneous zombies, regardless of round target
 let zombiesRemainingToSpawn = 0;   // queued zombies still owed this round, fed in as others die
@@ -8345,26 +8381,35 @@ function spawnPlayer(){
 // ---- Zombies ----
 function spawnZombie(){
   const zombieCharacter = AVATAR_TYPES[Math.floor(Math.random()*AVATAR_TYPES.length)];
+  const archetype = chooseZombieArchetype();
+  const spec = ZOMBIE_ARCHETYPES[archetype];
   const z = buildKayKitPlayer(zombieCharacter, {zombie:true, silent:true});
   const ang = Math.random()*Math.PI*2;
   const rad = arenaSize - 2;
   z.position.set(Math.cos(ang)*rad, 0, Math.sin(ang)*rad);
-  z.userData.hp = 2 + Math.floor(round/3);
-  // Speed climbs every round with no ceiling — by round ~30-35 it
-  // overtakes the player's own base speed, which is the point: standing
-  // still stops being a safe option forever.
-  z.userData.speed = 1.0 + Math.random()*0.4 + Math.max(0, round-5)*0.2;
-  z.userData.attackCooldown = 0;
+  const roundHp = 2 + Math.floor(round/3);
+  z.userData.hp = roundHp * spec.hp;
+  z.userData.maxHp = z.userData.hp;
+  z.userData.speed = (1.0 + Math.random()*0.35 + Math.max(0, round-5)*0.13) * spec.speed;
+  z.userData.attackCooldown = archetype==='spitter' ? 1.2+Math.random() : 0;
+  z.userData.specialTimer = archetype==='shadow' ? 1.8+Math.random()*1.5 : 0;
+  z.userData.archetype = archetype;
   z.userData.zombieCharacter = zombieCharacter;
+  z.userData.baseScale = spec.scale;
+  z.scale.setScalar(spec.scale);
   enableShadows(z, false);
-  addContactShadow(z, 0.45);
+  addContactShadow(z, 0.45*spec.scale);
   scene.add(z);
   zombies.push(z);
-  addXray(z, 0xb36cff);
+  addXray(z, spec.color);
+  setTimeout(()=>{if(!z.userData.dead)styleZombieArchetype(z);},180);
+  if(archetype!=='walker') spawnBurst(z.position.x,z.position.y+.5,z.position.z,8,FX_MAT_ZOMBIE,2.5);
 }
 function clearZombies(){
   zombies.forEach(z=>{ scene.remove(z); disposeGroup(z); });
   zombies = [];
+  enemyProjectiles.forEach(p=>{scene.remove(p.mesh);disposeGroup(p.mesh);});
+  enemyProjectiles=[];
 }
 
 function startRound(){
@@ -8391,7 +8436,7 @@ function startRound(){
   heartsLostThisRound = 0;
   updateRoundTimerHud();
   const theme = themeForRound(round, state.themeIndex||0);
-  toast('Round '+round+' · '+theme.name+' — '+roundKillTarget+' incoming');
+  toast('Round '+round+' · '+theme.name+' — '+roundKillTarget+' incoming · Mixed undead!');
 }
 
 // ---------------------------------------------------------------------
@@ -9496,8 +9541,9 @@ function bulletBlockedAt(x,y,z){
 // paths behave identically.
 function applyBulletDamage(z, dmg){
   z.userData.hp -= dmg;
-  z.scale.set(1.15,0.85,1.15);
-  setTimeout(()=>{ if(!z.userData.dead) z.scale.set(1,1,1); },120);
+  const bs=z.userData.baseScale||1;
+  z.scale.set(bs*1.15,bs*0.85,bs*1.15);
+  setTimeout(()=>{ if(!z.userData.dead) z.scale.setScalar(bs); },120);
   flashZombie(z);
   if(z.userData.hp<=0) killZombie(z);
 }
@@ -9553,7 +9599,8 @@ function updateBullets(dt){
 
 function killZombie(z){
   z.userData.dead = true;
-  spawnBurst(z.position.x, z.position.y+0.7, z.position.z, 9, FX_MAT_ZOMBIE, 3);
+  const deathCount=z.userData.archetype==='brute'?22:z.userData.archetype==='shadow'?16:9;
+  spawnBurst(z.position.x, z.position.y+0.7, z.position.z, deathCount, z.userData.archetype==='shadow'?FX_MAT_SHADOW:FX_MAT_ZOMBIE, z.userData.archetype==='brute'?5:3);
   scene.remove(z);
   disposeGroup(z);
   zombies = zombies.filter(o=>o!==z);
@@ -9842,6 +9889,7 @@ function update(dt){
     player.userData.spinBaseY=undefined;
   }
   updateBullets(dt);
+  updateEnemyProjectiles(dt);
   updateFx(dt);
   updateWeather(dt);
   updateDecorMotion(dt);
@@ -9861,24 +9909,40 @@ function update(dt){
   if(!freeMode){
     zombies.forEach(z=>{
       if(z.userData.kayMixer) z.userData.kayMixer.update(dt);
-      const dx = player.position.x-z.position.x, dz = player.position.z-z.position.z;
-      const dist = Math.hypot(dx,dz);
-      if(dist>0.01){
-        const nx = z.position.x + (dx/dist)*z.userData.speed*dt;
-        const nz = z.position.z + (dz/dist)*z.userData.speed*dt;
-        const resolved = resolveCollision(nx, nz, z.position.y); // zombies are solid-blocked too now
+      let dx = player.position.x-z.position.x, dz = player.position.z-z.position.z;
+      let dist = Math.hypot(dx,dz);
+      const type=z.userData.archetype||'walker';
+      z.userData.attackCooldown = Math.max(0,(z.userData.attackCooldown||0)-dt);
+      z.userData.specialTimer = Math.max(0,(z.userData.specialTimer||0)-dt);
+      if(type==='shadow' && z.userData.specialTimer<=0 && dist>2.4){
+        spawnBurst(z.position.x,z.position.y+.5,z.position.z,10,FX_MAT_SHADOW,3);
+        const a=Math.atan2(dx,dz)+(Math.random()-.5)*1.0;
+        const targetDist=1.8+Math.random()*1.2;
+        const rr=resolveCollision(player.position.x-Math.sin(a)*targetDist,player.position.z-Math.cos(a)*targetDist,z.position.y);
+        z.position.x=rr.x;z.position.z=rr.z;z.userData.specialTimer=3.4+Math.random()*1.8;
+        spawnBurst(z.position.x,z.position.y+.5,z.position.z,12,FX_MAT_SHADOW,3.2);
+        dx=player.position.x-z.position.x;dz=player.position.z-z.position.z;dist=Math.hypot(dx,dz);
+      }
+      let moveDir=1;
+      if(type==='spitter'){
+        if(dist<3.4) moveDir=-1; else if(dist<6.2) moveDir=0;
+        if(dist<8.5 && z.userData.attackCooldown<=0){spawnEnemyShot(z);z.userData.attackCooldown=2.0+Math.random()*.7;if(z.userData.playKayClip)z.userData.playKayClip('1H_Melee_Attack_Chop',true,true,.45);}
+      }
+      if(dist>0.01 && moveDir!==0){
+        let mx=dx/dist,mz=dz/dist;
+        if(type==='runner'){const sway=Math.sin(performance.now()*.008+z.id)*.45;const ox=-mz*sway,oz=mx*sway;mx+=ox;mz+=oz;const ml=Math.hypot(mx,mz)||1;mx/=ml;mz/=ml;}
+        const nx = z.position.x + mx*z.userData.speed*dt*moveDir;
+        const nz = z.position.z + mz*z.userData.speed*dt*moveDir;
+        const resolved = resolveCollision(nx, nz, z.position.y);
         z.position.x = resolved.x; z.position.z = resolved.z;
         z.rotation.y = Math.atan2(dx,dz);
         if(z.userData.playKayClip) z.userData.playKayClip('Running_A');
-      } else if(z.userData.playKayClip) {
-        z.userData.playKayClip('Idle');
-      }
-      z.userData.attackCooldown = Math.max(0,(z.userData.attackCooldown||0)-dt);
-      // Zombies stay at ground level, so a big vertical gap means the
-      // player is up on an elevated platform they can't actually reach.
+      } else if(z.userData.playKayClip && type!=='spitter') z.userData.playKayClip('Idle');
       const verticalGap = Math.abs(player.position.y - z.position.y);
-      if(dist < 0.9 && verticalGap < 1.0 && z.userData.attackCooldown<=0){
-        z.userData.attackCooldown = 1.0;
+      const hitRange=type==='brute'?1.28:.9;
+      if(dist < hitRange && verticalGap < 1.0 && z.userData.attackCooldown<=0){
+        z.userData.attackCooldown = type==='brute'?1.65:1.0;
+        if(type==='brute'){spawnBurst(z.position.x,z.position.y+.2,z.position.z,16,FX_MAT_SPARK,4.5);triggerCombatShake(10,150);}
         playerTakeHit();
       }
     });
@@ -9902,6 +9966,7 @@ function startSurvival(){
   clearCritters();
   bullets.forEach(b=>scene.remove(b.mesh)); // BULLET_GEO/MAT are shared — never dispose
   bullets = [];
+  enemyProjectiles.forEach(p=>{scene.remove(p.mesh);disposeGroup(p.mesh);});enemyProjectiles=[];
   fx.forEach(f=>scene.remove(f.mesh));
   fx = [];
   hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;mageUltimateCharge=0;mageUltimateActive=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;document.body.style.filter='';updateHoodedHud();
