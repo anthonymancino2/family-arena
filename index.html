@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V22.0 Combat Polish</title>
+<title>Family Arena — V22.4 Frostwing Dash + Ground Repair</title>
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -358,7 +358,7 @@
 <div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
 background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
 padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
-V22.3 · SAFE FROSTWING REPAIR
+V22.4 · FROSTWING DASH + GROUND FIX
 </div>
 <div id="app">
 
@@ -381,7 +381,7 @@ V22.3 · SAFE FROSTWING REPAIR
           <button class="bigBtn" id="btnGoModes">Play</button>
           <button class="ghostBtn" id="btnGoShop">Crystal<br>Shop</button>
         </div>
-        <div class="homeVersion">FAMILY ARENA · V22.0 FROSTWING BRIGHT FIX</div>
+        <div class="homeVersion">FAMILY ARENA · V22.4 FROSTWING DASH + GROUND FIX</div>
       </div>
     </div>
   </div>
@@ -8340,10 +8340,15 @@ function buildImportedFrostwing(options={}){
     const root=cloneSkinned(gltf.scene);
     root.rotation.y=0;
     normalizeImportedHero(root,THREEAsset,1.48);
-    // Preserve the normalized floor position so animation tracks cannot sink Frostwing.
-    wrapper.userData.frostRootBaseY=root.position.y;
-    root.position.y+=0.10;
-    wrapper.userData.frostRootBaseY=root.position.y;
+    // The imported penguin's animated skeleton can dip slightly below its
+    // bind-pose bounds. Give it a small permanent ground clearance and keep
+    // exact base transforms so temporary slide visuals can never destroy the
+    // normalized GLB scale (which previously made the model enormous and
+    // could freeze mobile Safari's renderer).
+    root.position.y += 0.16;
+    wrapper.userData.frostBaseRootY = root.position.y;
+    wrapper.userData.frostBaseRootRotX = root.rotation.x;
+    wrapper.userData.frostBaseRootScale = root.scale.clone();
     root.traverse(o=>{
       if(!o.isMesh) return;
       o.visible=true; o.frustumCulled=false; o.castShadow=true; o.receiveShadow=false;
@@ -9093,20 +9098,22 @@ function doDash(){
   dashCooldownTimer = DASH_COOLDOWN;
   dashDir.x = Math.sin(player.rotation.y);
   dashDir.z = Math.cos(player.rotation.y);
-  // Frostwing uses a code-driven slide. Imported dodge/root-motion clips are
-  // intentionally skipped because they can move the model below the floor.
-  if(state.avatarType!=='frostwing'){
-    if(player.userData.playKayClip){
-      player.userData.playKayClip('Dodge_Forward', true, true, 0.34);
-    } else {
-      player.scale.set(1.35,0.8,1.35);
-      setTimeout(()=>{ if(player) player.scale.set(1,1,1); }, 130);
-    }
+  // Frostwing uses a code-driven belly slide. Do not start/reset an
+  // imported root-motion clip here: that path was unstable on iOS and this
+  // function used to trigger it twice. Other heroes keep their normal dodge.
+  if(state.avatarType!=='frostwing' && player.userData.playKayClip){
+    player.userData.playKayClip('Dodge_Forward', true, true, 0.34);
+  } else if(state.avatarType!=='frostwing') {
+    const baseScale=player.userData.avatarScale||1;
+    player.scale.set(baseScale*1.35,baseScale*0.8,baseScale*1.35);
+    setTimeout(()=>{ if(player) player.scale.setScalar(player.userData.avatarScale||1); }, 130);
   }
   if(state.avatarType==='hooded'){spawnShadowSmoke(player.position.x,player.position.y+.55,player.position.z,24);spawnAfterimage();shadowAfterimageTimer=.04;invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.12);}
   else if(state.avatarType==='frostwing'){
     invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.10);
     player.userData.frostSlideVisual=DASH_DURATION+.06;
+    // Intentionally no imported Dodge_Forward clip. The slide is driven by
+    // safe wrapper movement plus a small visual lean below.
     spawnBurst(player.position.x,player.position.y+.12,player.position.z,22,FX_MAT_DUST,4.5); toast('BELLY SLIDE!');
   } else spawnBurst(player.position.x,0.4,player.position.z,9,FX_MAT_DUST,3.4);
   const btn = document.getElementById('dashBtn');
@@ -10197,9 +10204,6 @@ function update(dt){
   if(player && player.userData.kayMixer){
     player.userData.kayMixer.update(dt);
     player.userData.kayActionLock = Math.max(0, (player.userData.kayActionLock || 0) - dt);
-    if(state.avatarType==='frostwing' && player.userData.kayRoot && Number.isFinite(player.userData.frostRootBaseY)){
-      player.userData.kayRoot.position.y=player.userData.frostRootBaseY;
-    }
   }
 
   // camera
@@ -10270,9 +10274,24 @@ function update(dt){
     const nz = player.position.z + dashDir.z*DASH_SPEED*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
     player.position.x = resolved.x; player.position.z = resolved.z;
-    if(state.avatarType==='frostwing'&&player.userData.kayRoot){player.userData.kayRoot.rotation.x=-.48;player.userData.kayRoot.scale.y=.78;player.userData.kayRoot.scale.z=1.15;}
+    if(state.avatarType==='frostwing'&&player.userData.kayRoot){
+      const r=player.userData.kayRoot;
+      r.rotation.x=(player.userData.frostBaseRootRotX||0)-.42;
+      r.position.y=(player.userData.frostBaseRootY||.16)+.05;
+      // Never overwrite r.scale here. It contains the tiny normalization
+      // scale required by the source GLB; resetting it to 1 caused the freeze.
+    }
     dashTimer -= dt;
-    if(dashTimer<=0){dashActive=false;if(state.avatarType==='frostwing'&&player.userData.kayRoot){player.userData.kayRoot.rotation.x=0;player.userData.kayRoot.scale.set(1,1,1);}}
+    if(dashTimer<=0){
+      dashActive=false;
+      if(state.avatarType==='frostwing'&&player.userData.kayRoot){
+        const r=player.userData.kayRoot;
+        r.rotation.x=player.userData.frostBaseRootRotX||0;
+        r.position.y=player.userData.frostBaseRootY||.16;
+        const bs=player.userData.frostBaseRootScale;
+        if(bs)r.scale.copy(bs);
+      }
+    }
   } else if(moveVec.x || moveVec.y){
     const forward = -moveVec.y, strafe = moveVec.x;
     const mx = Math.sin(camYaw)*forward - Math.cos(camYaw)*strafe;
@@ -10293,7 +10312,10 @@ function update(dt){
       if(player.userData.parts.legL)player.userData.parts.legL.rotation.x = Math.sin(t)*0.5;
       if(player.userData.parts.legR)player.userData.parts.legR.rotation.x = -Math.sin(t)*0.5;
     }
-    if(state.avatarType==='frostwing'&&player.userData.kayRoot){player.userData.kayRoot.rotation.z=Math.sin(t*.55)*.055;player.userData.kayRoot.position.y=Math.abs(Math.sin(t*.55))*.035;}
+    if(state.avatarType==='frostwing'&&player.userData.kayRoot){
+      player.userData.kayRoot.rotation.z=Math.sin(t*.55)*.055;
+      player.userData.kayRoot.position.y=(player.userData.frostBaseRootY||.16)+Math.abs(Math.sin(t*.55))*.035;
+    }
 
     // Camera auto-follow: swing camYaw to catch up behind the character
     // as they turn, unless the player is actively dragging to look
@@ -10308,7 +10330,12 @@ function update(dt){
     }
   } else {
     if(player.userData.parts){if(player.userData.parts.legL)player.userData.parts.legL.rotation.x=0;if(player.userData.parts.legR)player.userData.parts.legR.rotation.x=0;}
-    if(state.avatarType==='frostwing'&&player.userData.kayRoot){player.userData.kayRoot.rotation.z*=.82;player.userData.kayRoot.position.y*=.82;}
+    if(state.avatarType==='frostwing'&&player.userData.kayRoot){
+      const r=player.userData.kayRoot;
+      r.rotation.z*=.82;
+      const baseY=player.userData.frostBaseRootY||.16;
+      r.position.y=baseY+(r.position.y-baseY)*.82;
+    }
   }
   // Drive the imported skeleton with its real baked clips.
   if(player.userData.playKayClip && player.userData.kayActionLock <= 0){
