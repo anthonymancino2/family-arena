@@ -347,7 +347,7 @@
 <div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
 background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
 padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
-KAYKIT ZOMBIES V12
+HERO COMBAT V13
 </div>
 <div id="app">
 
@@ -403,10 +403,9 @@ KAYKIT ZOMBIES V12
   <div class="screen" id="screenCustomize">
     <div class="backRow"><button class="ghostBtn" id="backHome2">← Back</button></div>
     <h1 class="title" style="font-size:22px;">Build your avatar</h1>
-    <div id="avatarPreview">
-      <div class="head"></div><div class="torso"></div>
-      <div class="armL"></div><div class="armR"></div>
-      <div class="legL"></div><div class="legR"></div>
+    <div id="avatarPreview" style="width:220px;height:245px;margin:0 auto 12px;filter:none;">
+      <canvas id="avatarPreviewCanvas" style="width:100%;height:100%;display:block;border-radius:22px;background:radial-gradient(circle at 50% 36%,#26384b,#0a111b 72%);"></canvas>
+      <div id="avatarPreviewStatus" style="position:absolute;left:0;right:0;bottom:10px;text-align:center;color:#9fdfff;font-size:13px;">Loading avatar…</div>
     </div>
     <div class="subtitle" style="margin-bottom:6px;">Avatar</div>
     <div class="swatchRow" id="typeRow"></div>
@@ -590,26 +589,18 @@ const SKINS = ['#ffe3c4','#f2c9a0','#c68a5a','#8d5a3c','#5a3826','#2b1d16'];
 const OUTFITS = ['#3fa9d6','#e0533d','#4caf50','#9b59b6','#f1c40f','#ecf0f1'];
 const HAIR_STYLES = ['short','medium','long'];
 const HAIR_STYLE_LABELS = {short:'Short', medium:'Medium', long:'Long'};
-const AVATAR_TYPES = ['rogue','hooded','knight','mage','barbarian'];
+const AVATAR_TYPES = ['rogue','hooded','mage'];
 const AVATAR_TYPE_LABELS = {
-  rogue:'🏹 Rogue',
+  rogue:'🏹 Archer',
   hooded:'🥷 Hooded Rogue',
-  knight:'🛡️ Knight',
-  mage:'🔮 Mage',
-  barbarian:'🪓 Barbarian'
+  mage:'🔮 Mage'
 };
 // Uniform scale applied on top of each avatar's own build — every value
 // here was checked numerically against the penguin's actual rendered
 // height (0.85) as the floor, and Titan Guardian's is nowhere near an
 // elephant's real ~1.76x-human shoulder-height ratio, just noticeably
 // bigger than the rest as its own "giant mech" identity calls for.
-const AVATAR_SCALE = {
-  rogue:1.0,
-  hooded:1.0,
-  knight:1.02,
-  mage:1.0,
-  barbarian:1.08
-};
+const AVATAR_SCALE = { rogue:1.0, hooded:1.0, mage:1.0 };
 // human and penguin are free by default; bunny/dog must be unlocked
 // with crystals (prices live in CATALOG, shared with the Crystal Shop).
 const FREE_AVATAR_TYPES = [...AVATAR_TYPES];
@@ -771,13 +762,7 @@ function buildCustomizeUI(){
     sw.onclick = ()=>{ state.outfit=i; saveAvatarToProfile(); buildCustomizeUI(); };
     outfitRow.appendChild(sw);
   });
-  const pv = document.getElementById('avatarPreview');
-  pv.querySelector('.head').style.background = SKINS[state.skin];
-  pv.querySelector('.torso').style.background = OUTFITS[state.outfit];
-  pv.querySelector('.armL').style.background = SKINS[state.skin];
-  pv.querySelector('.armR').style.background = SKINS[state.skin];
-  pv.querySelector('.legL').style.background = '#2b3a4a';
-  pv.querySelector('.legR').style.background = '#2b3a4a';
+  updateAvatarPreview(state.avatarType);
 }
 
 document.getElementById('btnStartGame').onclick = ()=>{
@@ -805,6 +790,53 @@ document.getElementById('btnBeginSurvival').onclick = ()=>{
   show('screenGame');
   startSurvival();
 };
+
+
+async function ensureAvatarPreview(){
+  const canvas=document.getElementById('avatarPreviewCanvas');
+  if(!canvas || previewRenderer) return;
+  const THREEP=await import('three');
+  previewRenderer=new THREEP.WebGLRenderer({canvas,alpha:true,antialias:true});
+  previewRenderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+  previewRenderer.setSize(220,245,false);
+  previewRenderer.outputColorSpace=THREEP.SRGBColorSpace;
+  previewScene=new THREEP.Scene();
+  previewCamera=new THREEP.PerspectiveCamera(30,220/245,.1,20);
+  previewCamera.position.set(0,1.0,4.2);
+  previewScene.add(new THREEP.HemisphereLight(0xffffff,0x203040,2.0));
+  const key=new THREEP.DirectionalLight(0xffedd0,2.2);key.position.set(3,5,4);previewScene.add(key);
+  const floor=new THREEP.Mesh(new THREEP.CircleGeometry(1.25,40),new THREEP.MeshStandardMaterial({color:0x263847,roughness:1}));
+  floor.rotation.x=-Math.PI/2;previewScene.add(floor);
+  const animate=()=>{
+    previewRAF=requestAnimationFrame(animate);
+    if(previewRoot) previewRoot.rotation.y+=0.006;
+    if(previewMixer) previewMixer.update(1/60);
+    previewRenderer.render(previewScene,previewCamera);
+  }; animate();
+}
+let previewRequestId=0;
+async function updateAvatarPreview(characterId){
+  await ensureAvatarPreview();
+  const requestId=++previewRequestId;
+  const status=document.getElementById('avatarPreviewStatus');
+  if(status) status.textContent='Loading '+AVATAR_TYPE_LABELS[characterId].replace(/^.\s/,'')+'…';
+  try{
+    const {gltf,THREEAsset,cloneSkinned}=await getKayKitAssetPromise(characterId);
+    if(requestId!==previewRequestId)return;
+    if(previewRoot)previewScene.remove(previewRoot);
+    const root=cloneSkinned(gltf.scene); root.rotation.y=Math.PI;
+    const box=new THREEAsset.Box3().setFromObject(root), size=box.getSize(new THREEAsset.Vector3());
+    root.scale.setScalar(1.75/Math.max(.001,size.y));
+    const box2=new THREEAsset.Box3().setFromObject(root);
+    root.position.y-=box2.min.y;
+    root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+    previewRoot=root;previewScene.add(root);
+    previewMixer=new THREEAsset.AnimationMixer(root);
+    const idle=gltf.animations.find(c=>c.name.toLowerCase()==='idle')||gltf.animations[0];
+    if(idle)previewMixer.clipAction(idle).play();
+    if(status)status.textContent=AVATAR_TYPE_LABELS[characterId].replace(/^.\s/,'');
+  }catch(e){if(status)status.textContent='Preview failed to load';}
+}
 
 // ---- SHOP (stub catalogue — purchase logic works now, character
 // swap into gameplay is the fresh-avatar-set hook for a later chunk) ----
@@ -880,6 +912,66 @@ const PLAYER_SPEED = 6.5;
 //   Sniper Rifle:        instakill, cd 1.0s, long range               → 450 (utility-priced)
 //   Rocket Launcher:     instakill + splash, cd 1.2s                  → 700 (utility-priced)
 // ---------------------------------------------------------------------
+
+const CHARACTER_COMBAT = {
+  hooded: {
+    defaultId:'hooded_blade',
+    baseMoveMult:1.35,
+    weapons:{
+      hooded_blade:{name:'Fast Blade', price:0, kind:'melee', cooldown:0.34, damage:1, radius:1.45,
+        desc:'Fast close-range slash. Speed upgrades increase attack speed.'},
+      ninja_uzi:{name:'Ninja Star Uzi', price:180, kind:'star', cooldown:0.075, damage:0.72, auto:true,
+        desc:'Hold FIRE to spray fast ninja stars.'},
+      spin:{name:'Whirlwind Spin', price:320, kind:'spin', cooldown:0.12, damage:1.5, radius:1.75, auto:true,
+        desc:'Hold FIRE to move and keep spinning. Deals 1.5× blade damage.'},
+      clone_stars:{name:'Star Shadow Clones', price:520, kind:'star', cooldown:0.075, damage:0.72, auto:true, clones:'stars',
+        desc:'Two invincible shadow clones copy your ninja-star attack.'},
+      clone_spin:{name:'Spin Shadow Clones', price:520, kind:'spin', cooldown:0.12, damage:1.5, radius:1.75, auto:true, clones:'spin',
+        desc:'Two invincible shadow clones spin beside you.'}
+    }
+  },
+  rogue: {
+    defaultId:'arrow',
+    baseMoveMult:1,
+    weapons:{
+      arrow:{name:'Arrow', price:0, kind:'arrow', cooldown:0.34, damage:1, desc:'Standard aimed arrow.'},
+      rapid_arrow:{name:'Rapid-Fire Arrows', price:190, kind:'arrow', cooldown:0.075, damage:0.72, auto:true,
+        desc:'Hold FIRE to launch arrows like an Uzi.'},
+      multi_arrow:{name:'Multi-Arrow', price:330, kind:'multi_arrow', cooldown:0.34, damage:0.85, auto:true, fireRateCap:2,
+        desc:'Fires four arrows in a wide arc. Hold FIRE to continue.'},
+      rocket_arrow:{name:'Rocket Arrows', price:500, kind:'rocket_arrow', cooldown:0.44, damage:2, splash:3.2, splashMult:2, auto:true,
+        desc:'Explodes on impact. Nearby zombies take double splash damage.'}
+    }
+  },
+  mage: {
+    defaultId:'elemental',
+    baseMoveMult:1,
+    weapons:{
+      elemental:{name:'Fire & Ice', price:0, kind:'elemental', cooldown:0.34, damage:1,
+        desc:'Alternates fireballs and ice bolts.'},
+      rapid_elemental:{name:'Rapid Fire & Ice', price:210, kind:'elemental', cooldown:0.075, damage:0.72, auto:true,
+        desc:'Hold FIRE for Uzi-speed alternating fire and ice.'},
+      chain_elemental:{name:'Chain Elements', price:390, kind:'chain', cooldown:0.48, damage:1,
+        desc:'Hits four times, bouncing among nearby zombies.'},
+      giant_fireball:{name:'Giant Fireball', price:560, kind:'giant_fireball', cooldown:0.72, damage:2, splash:3.4, auto:true,
+        desc:'Huge explosive fireball dealing 2× damage in a radius.'}
+    }
+  }
+};
+let mageElementToggle = false;
+let shadowClones = [];
+let previewRenderer=null, previewScene=null, previewCamera=null, previewRoot=null, previewMixer=null, previewRAF=0;
+function combatForAvatar(){ return CHARACTER_COMBAT[state.avatarType] || CHARACTER_COMBAT.rogue; }
+function weaponForAvatar(){
+  const c = combatForAvatar();
+  return c.weapons[currentWeaponId] || c.weapons[c.defaultId];
+}
+function resetCharacterLoadout(){
+  const c = combatForAvatar();
+  currentWeaponId = c.defaultId;
+  ownedWeapons = {[c.defaultId]:true};
+}
+
 const WEAPONS = {
   pistol: {name:'Pistol',         price:0,   cooldown:0.22, damage:1,   dual:false, splash:0,   rangeMult:1.0, color:0xff5b5b, desc:'Your starting sidearm.'},
   uzi:    {name:'Uzi',            price:150, cooldown:0.07, damage:1,   dual:false, splash:0,   rangeMult:1.0, color:0xffe066, desc:'Very fast firing rate. Hold to keep firing.', auto:true},
@@ -8292,7 +8384,7 @@ function updateRunTokensHud(){
   if(shopTokens) shopTokens.textContent = runTokens;
 }
 function updateWeaponHud(){
-  document.getElementById('weaponPill').textContent = WEAPONS[currentWeaponId].name;
+  document.getElementById('weaponPill').textContent = weaponForAvatar().name;
 }
 function updateInvincibleHud(){
   const pill = document.getElementById('invinciblePill');
@@ -8339,42 +8431,36 @@ function renderShopList(){
   updateRunTokensHud();
   const list = document.getElementById('shopList');
   list.innerHTML = '';
-  for(const id in WEAPONS){
-    const w = WEAPONS[id];
+  const weapons = combatForAvatar().weapons;
+  for(const id in weapons){
+    const w = weapons[id];
     const owned = !!ownedWeapons[id];
     const equipped = currentWeaponId === id;
     const row = document.createElement('div');
     row.className = 'weaponRow' + (equipped ? ' equipped' : '');
     const swatch = document.createElement('div');
     swatch.className = 'weaponSwatch';
-    swatch.style.background = '#'+w.color.toString(16).padStart(6,'0');
+    swatch.style.background = w.kind.includes('fire') ? '#ff7a3d'
+      : (w.kind.includes('element') || w.kind==='chain' ? '#78d8ff'
+      : (w.kind.includes('arrow') ? '#d9b36c' : '#b88cff'));
     const info = document.createElement('div');
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${w.name}</div><div class="wDesc">${w.desc}</div>`;
     const btn = document.createElement('button');
     if(equipped){
-      btn.className = 'weaponBuyBtn equippedTag';
-      btn.textContent = 'Equipped';
-      btn.disabled = true;
+      btn.className='weaponBuyBtn equippedTag'; btn.textContent='Equipped'; btn.disabled=true;
     } else if(owned){
-      btn.className = 'weaponBuyBtn';
-      btn.textContent = 'Equip';
-      btn.onclick = ()=>{ currentWeaponId = id; updateWeaponHud(); renderShopList(); toast('Equipped '+w.name); };
+      btn.className='weaponBuyBtn'; btn.textContent='Equip';
+      btn.onclick=()=>{ currentWeaponId=id; updateWeaponHud(); syncShadowClones(); renderShopList(); toast('Equipped '+w.name); };
     } else {
-      btn.className = 'weaponBuyBtn';
-      btn.textContent = w.price+'🪙';
-      btn.disabled = runTokens < w.price;
-      btn.onclick = ()=>{
-        if(runTokens < w.price) return;
-        runTokens -= w.price;
-        ownedWeapons[id] = true;
-        currentWeaponId = id;
-        updateRunTokensHud(); updateWeaponHud(); renderShopList();
-        toast('Bought '+w.name+'!');
+      btn.className='weaponBuyBtn'; btn.textContent=w.price+'🪙'; btn.disabled=runTokens<w.price;
+      btn.onclick=()=>{
+        if(runTokens<w.price) return;
+        runTokens-=w.price; ownedWeapons[id]=true; currentWeaponId=id;
+        updateRunTokensHud(); updateWeaponHud(); syncShadowClones(); renderShopList(); toast('Bought '+w.name+'!');
       };
     }
-    row.appendChild(swatch); row.appendChild(info); row.appendChild(btn);
-    list.appendChild(row);
+    row.append(swatch,info,btn); list.appendChild(row);
   }
 }
 
@@ -8474,7 +8560,7 @@ function setupControls(){
     // interval just re-attempts faster than any auto weapon's cooldown;
     // doShoot()'s own attackCooldown check throttles it to the real
     // fire rate, so this can't ever fire faster than the weapon allows.
-    if(WEAPONS[currentWeaponId].auto){
+    if(weaponForAvatar().auto){
       clearInterval(autoFireInterval);
       autoFireInterval = setInterval(doShoot, 40);
     }
@@ -8787,50 +8873,107 @@ function fireBullet(dx, dy, dz, startX, startY, startZ, weapon){
   });
 }
 
+function findClipByWords(parts, fallback='1H_Melee_Attack_Chop'){
+  if(!player || !player.userData.kayClips) return fallback;
+  const names = Object.keys(player.userData.kayClips);
+  const found = names.find(n=>parts.every(p=>n.toLowerCase().includes(p)));
+  return found || fallback;
+}
+function attackCooldownFor(w){
+  let factor = 1 + (playerStats.speed-1)*0.16;
+  if(w.fireRateCap) factor = Math.min(w.fireRateCap, factor);
+  return w.cooldown / factor;
+}
+function damageNearby(origin, radius, damage){
+  let hitCount=0;
+  for(const z of zombies){
+    if(z.userData.dead) continue;
+    if(Math.hypot(z.position.x-origin.x,z.position.z-origin.z)<=radius){
+      applyBulletDamage(z, damage*playerStats.power); hitCount++;
+    }
+  }
+  return hitCount;
+}
+function doMeleeAttack(w, origin=player.position, isClone=false){
+  const spin = w.kind==='spin';
+  if(!isClone && player.userData.playKayClip){
+    const clip = spin
+      ? findClipByWords(['melee','spin'], findClipByWords(['attack','spin']))
+      : findClipByWords(['melee','chop']);
+    player.userData.playKayClip(clip,true,true,spin?0.14:0.26);
+  }
+  const pos={x:origin.x,y:origin.y,z:origin.z};
+  damageNearby(pos,w.radius,w.damage);
+  spawnBurst(pos.x,pos.y+0.65,pos.z,spin?12:7,FX_MAT_SPARK,spin?3.2:2.2);
+}
+function shootFromPosition(w, pos, angleOffset=0){
+  let yaw=player.rotation.y+angleOffset;
+  let dx=Math.sin(yaw),dy=0,dz=Math.cos(yaw);
+  const target=findAutoAimTarget(18);
+  const startX=pos.x+dx*0.72, startY=pos.y+1.02, startZ=pos.z+dz*0.72;
+  if(target && Math.abs(angleOffset)<0.001){
+    const tx=target.position.x-startX, ty=(target.position.y+0.8)-startY, tz=target.position.z-startZ;
+    const len=Math.hypot(tx,ty,tz)||1; dx=tx/len;dy=ty/len;dz=tz/len;
+  }
+  const fake={
+    damage:w.damage, splash:w.splash||0, rangeMult:1,
+    mat:new THREE.MeshBasicMaterial({color:
+      w.kind==='rocket_arrow'||w.kind==='giant_fireball'?0xff6b32:
+      w.kind==='elemental'?(mageElementToggle?0x66d9ff:0xff723d):
+      w.kind==='star'?0xcaa7ff:0xe8c078})
+  };
+  fireBullet(dx,dy,dz,startX,startY,startZ,fake);
+  const b=bullets[bullets.length-1];
+  if(b){
+    b.kind=w.kind;
+    b.splashMult=w.splashMult||1;
+    if(w.kind==='giant_fireball') b.mesh.scale.setScalar(2.4);
+    if(w.kind==='rocket_arrow') b.mesh.scale.setScalar(1.35);
+  }
+}
+function chainElementAttack(w){
+  let live=zombies.filter(z=>!z.userData.dead);
+  if(!live.length) return;
+  let current=findAutoAimTarget(20)||live[0];
+  const struck=[];
+  for(let i=0;i<4;i++){
+    applyBulletDamage(current,w.damage*playerStats.power);
+    struck.push(current);
+    spawnBurst(current.position.x,current.position.y+0.8,current.position.z,8,i%2?FX_MAT_DUST:FX_MAT_SPARK,2.7);
+    const candidates=live.filter(z=>!z.userData.dead && z!==current)
+      .sort((a,b)=>a.position.distanceTo(current.position)-b.position.distanceTo(current.position));
+    current=candidates[0] || live[i%live.length] || current;
+  }
+}
+function cloneAttack(w){
+  shadowClones.forEach(c=>{
+    if(w.kind==='spin') doMeleeAttack(w,c.position,true);
+    else shootFromPosition(w,c.position,0);
+  });
+}
 function doShoot(){
   if(!gameRunning || player.userData.attackCooldown>0) return;
-  const weapon = WEAPONS[currentWeaponId];
-  player.userData.attackCooldown = weapon.cooldown;
-  const armR = player.userData.parts.armR;
-  if(player.userData.playKayClip){
-    player.userData.playKayClip('1H_Ranged_Shoot', true, true, 0.32);
+  const w=weaponForAvatar();
+  player.userData.attackCooldown=attackCooldownFor(w);
+
+  if(w.kind==='melee' || w.kind==='spin'){
+    doMeleeAttack(w);
+    if(w.clones==='spin') cloneAttack(w);
+  } else if(w.kind==='multi_arrow'){
+    [-0.24,-0.08,0.08,0.24].forEach(a=>shootFromPosition(w,player.position,a));
+  } else if(w.kind==='chain'){
+    if(player.userData.playKayClip) player.userData.playKayClip(findClipByWords(['magic']),true,true,0.3);
+    chainElementAttack(w);
+  } else {
+    if(player.userData.playKayClip){
+      const words=state.avatarType==='mage'?['magic']:['ranged','shoot'];
+      player.userData.playKayClip(findClipByWords(words,'1H_Ranged_Shoot'),true,true,0.25);
+    }
+    if(w.kind==='elemental') mageElementToggle=!mageElementToggle;
+    shootFromPosition(w,player.position,0);
+    if(w.clones==='stars') cloneAttack(w);
   }
-  armR.rotation.x = -0.9;
-  setTimeout(()=>{ armR.rotation.x = 0; }, Math.min(90, weapon.cooldown*400));
-
-  let dx = Math.sin(player.rotation.y), dy = 0, dz = Math.cos(player.rotation.y);
-  const target = findAutoAimTarget(16*weapon.rangeMult);
-  const avatarScale = player.userData.avatarScale || 1;
-  const sideX = Math.cos(player.rotation.y);
-  const sideZ = -Math.sin(player.rotation.y);
-  const startX = player.position.x + dx*0.72 + sideX*0.16;
-  const startY = player.position.y + 1.02*avatarScale;
-  const startZ = player.position.z + dz*0.72 + sideZ*0.16;
-  if(target){
-    // Aim at roughly the target's torso height, not just its horizontal
-    // position — this is what actually lets shots angle downward at
-    // zombies below you (e.g. clustered under a platform) instead of
-    // only ever flying dead-level.
-    const tdx = target.position.x-startX;
-    const tdy = (target.position.y+0.8) - startY;
-    const tdz = target.position.z-startZ;
-    const len = Math.hypot(tdx,tdy,tdz) || 1;
-    dx = tdx/len; dy = tdy/len; dz = tdz/len;
-  }
-
-  fireBullet(dx, dy, dz, startX, startY, startZ, weapon);
-  if(weapon.dual){
-    // The whole point of carrying two pistols: the second shot covers
-    // your exact opposite side while the first covers your front.
-    fireBullet(-dx, dy, -dz, startX, startY, startZ, weapon);
-  }
-
-  const flash = new THREE.Mesh(MUZZLE_GEO, MUZZLE_MAT);
-  flash.position.set(startX, startY, startZ);
-  scene.add(flash);
-  fx.push({mesh:flash, vx:0, vy:0, vz:0, life:0.07, maxLife:0.07});
-
-  navigator.vibrate && navigator.vibrate(12);
+  navigator.vibrate && navigator.vibrate(w.kind==='spin'?18:10);
 }
 
 // True if (x,y,z) sits inside any solid obstacle/landmark box — used to
@@ -8888,7 +9031,7 @@ function updateBullets(dt){
           for(const z2 of zombies){
             if(z2===z || z2.userData.dead) continue;
             const sdx = z2.position.x-b.mesh.position.x, sdz = z2.position.z-b.mesh.position.z;
-            if(Math.hypot(sdx,sdz) < b.splash) applyBulletDamage(z2, b.damage);
+            if(Math.hypot(sdx,sdz) < b.splash) applyBulletDamage(z2, b.damage*(b.splashMult||1));
           }
           spawnBurst(b.mesh.position.x, b.mesh.position.y+0.3, b.mesh.position.z, 14, FX_MAT_SPARK, 4.5);
         }
@@ -8963,8 +9106,56 @@ function playerTakeHit(){
   if(hearts<=0){ endSurvival(); }
 }
 
+
+function clearShadowClones(){
+  shadowClones.forEach(c=>{ scene.remove(c); disposeGroup(c); });
+  shadowClones=[];
+}
+function tintCloneBlack(root){
+  root.traverse(o=>{
+    if(o.isMesh && o.material){
+      if(Array.isArray(o.material)) o.material=o.material.map(m=>m.clone());
+      else o.material=o.material.clone();
+      (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{
+        if(m.color) m.color.setHex(0x08090d);
+        if(m.emissive) m.emissive.setHex(0x06060a);
+      });
+    }
+  });
+}
+function syncShadowClones(){
+  clearShadowClones();
+  const w=weaponForAvatar();
+  if(!w.clones || !player) return;
+  getKayKitAssetPromise('hooded').then(({gltf,THREEAsset,cloneSkinned})=>{
+    [-1,1].forEach(side=>{
+      const wrap=new THREE.Group();
+      const root=cloneSkinned(gltf.scene); root.rotation.y=0;
+      const box=new THREEAsset.Box3().setFromObject(root), size=box.getSize(new THREEAsset.Vector3());
+      root.scale.setScalar(1.48/Math.max(.001,size.y));
+      const box2=new THREEAsset.Box3().setFromObject(root); root.position.y-=box2.min.y;
+      tintCloneBlack(root); wrap.add(root);
+      wrap.userData.cloneSide=side;
+      wrap.userData.kayMixer=new THREEAsset.AnimationMixer(root);
+      wrap.userData.kayClips={}; gltf.animations.forEach(c=>wrap.userData.kayClips[c.name]=c);
+      scene.add(wrap); shadowClones.push(wrap);
+    });
+  });
+}
+function updateShadowClones(dt){
+  if(!player) return;
+  shadowClones.forEach(c=>{
+    const side=c.userData.cloneSide;
+    const sx=Math.cos(player.rotation.y)*side*1.15, sz=-Math.sin(player.rotation.y)*side*1.15;
+    c.position.set(player.position.x+sx,player.position.y,player.position.z+sz);
+    c.rotation.y=player.rotation.y;
+    if(c.userData.kayMixer)c.userData.kayMixer.update(dt);
+  });
+}
+
 // ---- Main update ----
 function update(dt){
+  updateShadowClones(dt);
   if(player && player.userData.kayMixer){
     player.userData.kayMixer.update(dt);
     player.userData.kayActionLock = Math.max(0, (player.userData.kayActionLock || 0) - dt);
@@ -9041,8 +9232,9 @@ function update(dt){
     const mx = Math.sin(camYaw)*forward - Math.cos(camYaw)*strafe;
     const mz = Math.cos(camYaw)*forward + Math.sin(camYaw)*strafe;
     const len = Math.hypot(mx,mz)||1;
-    const speedStat = playerStats.speed + (state.avatarType==='dog' ? 1 : 0);
-    const speed = PLAYER_SPEED * (1 + (speedStat-1)*0.15);
+    const speedStat = playerStats.speed;
+    const characterMoveMult = combatForAvatar().baseMoveMult || 1;
+    const speed = PLAYER_SPEED * characterMoveMult * (1 + (speedStat-1)*0.15);
     const nx = player.position.x + (mx/len)*speed*dt;
     const nz = player.position.z + (mz/len)*speed*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
@@ -9185,7 +9377,8 @@ function startSurvival(){
   runTokens = 0;
   crystalsEarned = 0;
   ownedWeapons = {pistol:true};
-  currentWeaponId = 'pistol';
+  resetCharacterLoadout();
+  clearShadowClones();
   powerUps.forEach(p=>{ scene.remove(p.mesh); disposeGroup(p.mesh); });
   powerUps = [];
   invincibleTimer = 0;
