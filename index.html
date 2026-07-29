@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V20 Undead Uprising</title>
+<title>Family Arena — V21 Frostwing Complete</title>
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -415,8 +415,13 @@ V20 · UNDEAD UPRISING
     </div>
     <div class="subtitle" style="margin-bottom:6px;">Avatar</div>
     <div class="swatchRow" id="typeRow"></div>
+    <div id="heroInfoPanel" style="max-width:560px;margin:10px auto 14px;padding:12px 14px;border:1px solid rgba(159,223,255,.28);border-radius:16px;background:rgba(8,18,29,.72);text-align:left;">
+      <div id="heroInfoTitle" style="font-weight:900;color:#dff7ff;font-size:17px;"></div>
+      <div id="heroInfoMeta" style="margin-top:3px;color:#8fdcff;font-size:12px;font-weight:800;letter-spacing:.04em;"></div>
+      <div id="heroInfoDesc" style="margin-top:7px;color:#d3e1ec;font-size:13px;line-height:1.35;"></div>
+    </div>
     <div class="subtitle" style="margin:10px 0 14px;">
-      All characters below are real CC0 KayKit assets with bone rigs and baked animations.
+      Frostwing uses a custom in-game penguin model. The other heroes use animated CC0 KayKit assets.
     </div>
     <div class="swatchRow" id="skinRow" style="display:none"></div>
     <div id="hairSection" style="display:none"><div class="swatchRow" id="hairRow"></div></div>
@@ -597,20 +602,29 @@ const SKINS = ['#ffe3c4','#f2c9a0','#c68a5a','#8d5a3c','#5a3826','#2b1d16'];
 const OUTFITS = ['#3fa9d6','#e0533d','#4caf50','#9b59b6','#f1c40f','#ecf0f1'];
 const HAIR_STYLES = ['short','medium','long'];
 const HAIR_STYLE_LABELS = {short:'Short', medium:'Medium', long:'Long'};
-const AVATAR_TYPES = ['rogue','hooded','mage','knight','barbarian'];
+const AVATAR_TYPES = ['rogue','hooded','mage','knight','barbarian','frostwing'];
 const AVATAR_TYPE_LABELS = {
   rogue:'🏹 Archer',
   hooded:'🥷 Hooded Rogue',
   mage:'🔮 Mage',
   knight:'🛡️ Knight',
-  barbarian:'🪓 Barbarian'
+  barbarian:'🪓 Barbarian',
+  frostwing:'🐧 Frostwing'
+};
+const HERO_ROSTER_INFO = {
+  rogue:{title:'Tempest Archer',role:'RANGED • EASY',desc:'Fast piercing arrows and precise crowd control. Knife removed for a clean bow-and-quiver silhouette.'},
+  hooded:{title:'Shadow Rogue',role:'MELEE • HARD',desc:'Rapid close-range slashes, shadow clones, and evasive movement. Crossbow removed for a pure assassin silhouette.'},
+  mage:{title:'Arcane Mage',role:'RANGED • MEDIUM',desc:'Alternating elemental attacks and powerful area magic.'},
+  knight:{title:'Knight of Dawn',role:'MELEE • EASY',desc:'Durable golden cleaves, shield control, and radiant power.'},
+  barbarian:{title:'Fury Barbarian',role:'MELEE • MEDIUM',desc:'Heavy axe combos, ground slams, and relentless momentum.'},
+  frostwing:{title:'Frostwing, Arctic Gunslinger',role:'RANGED • EASY',desc:'Dual frost pistols, belly-slide mobility, deployable snow turret, snowball barrage, Fish Frenzy passive, and Blizzard Protocol ultimate.'}
 };
 // Uniform scale applied on top of each avatar's own build — every value
 // here was checked numerically against the penguin's actual rendered
 // height (0.85) as the floor, and Titan Guardian's is nowhere near an
 // elephant's real ~1.76x-human shoulder-height ratio, just noticeably
 // bigger than the rest as its own "giant mech" identity calls for.
-const AVATAR_SCALE = { rogue:1.0, hooded:1.0, mage:1.0, knight:1.05, barbarian:1.08 };
+const AVATAR_SCALE = { rogue:1.0, hooded:1.0, mage:1.0, knight:1.05, barbarian:1.08, frostwing:1.12 };
 // human and penguin are free by default; bunny/dog must be unlocked
 // with crystals (prices live in CATALOG, shared with the Crystal Shop).
 const FREE_AVATAR_TYPES = [...AVATAR_TYPES];
@@ -772,6 +786,13 @@ function buildCustomizeUI(){
     sw.onclick = ()=>{ state.outfit=i; saveAvatarToProfile(); buildCustomizeUI(); };
     outfitRow.appendChild(sw);
   });
+  const heroInfo=HERO_ROSTER_INFO[state.avatarType]||HERO_ROSTER_INFO.rogue;
+  const heroTitle=document.getElementById('heroInfoTitle');
+  const heroMeta=document.getElementById('heroInfoMeta');
+  const heroDesc=document.getElementById('heroInfoDesc');
+  if(heroTitle) heroTitle.textContent=heroInfo.title;
+  if(heroMeta) heroMeta.textContent=heroInfo.role;
+  if(heroDesc) heroDesc.textContent=heroInfo.desc;
   updateAvatarPreview(state.avatarType);
 }
 
@@ -831,10 +852,23 @@ async function updateAvatarPreview(characterId){
   const status=document.getElementById('avatarPreviewStatus');
   if(status) status.textContent='Loading '+AVATAR_TYPE_LABELS[characterId].replace(/^.\s/,'')+'…';
   try{
+    if(characterId==='frostwing'){
+      if(requestId!==previewRequestId)return;
+      if(previewRoot)previewScene.remove(previewRoot);
+      const root=buildPenguin(0xffffff,0x2d86d7,0x2d86d7);
+      root.rotation.y=Math.PI;
+      root.scale.setScalar(1.48);
+      const box=new THREE.Box3().setFromObject(root);
+      root.position.y-=box.min.y;
+      previewRoot=root;previewScene.add(root);
+      previewMixer=null;
+      if(status)status.textContent='Frostwing — Arctic Gunslinger';
+      return;
+    }
     const {gltf,THREEAsset,cloneSkinned}=await getKayKitAssetPromise(characterId);
     if(requestId!==previewRequestId)return;
     if(previewRoot)previewScene.remove(previewRoot);
-    const root=cloneSkinned(gltf.scene); root.rotation.y=Math.PI;
+    const root=cloneSkinned(gltf.scene); cleanHeroEquipment(root,characterId); root.rotation.y=Math.PI;
     const box=new THREEAsset.Box3().setFromObject(root), size=box.getSize(new THREEAsset.Vector3());
     root.scale.setScalar(1.75/Math.max(.001,size.y));
     const box2=new THREEAsset.Box3().setFromObject(root);
@@ -1015,6 +1049,20 @@ const CHARACTER_COMBAT = {
         desc:'Hold FIRE to become a moving ring of axes and flame.'},
       primal_wave:{name:'Primal Axe Wave', price:570, kind:'primal_wave', cooldown:0.52, damage:2.25, splash:2.8, pierce:3, auto:true,
         desc:'Launch a huge flaming axe-shaped shockwave through a crowd.'}
+    }
+  },
+  frostwing: {
+    defaultId:'frost_pistols',
+    baseMoveMult:1.08,
+    weapons:{
+      frost_pistols:{name:'Dual Frost Pistols', price:0, kind:'frost_pistol', cooldown:0.18, damage:1.0, pierce:0, auto:true,
+        desc:'Alternating ice-blue pistol shots that build Blizzard Protocol.'},
+      snowball_barrage:{name:'Snowball Barrage', price:240, kind:'snowball_barrage', cooldown:0.52, damage:0.72, splash:1.25, auto:true,
+        desc:'Launches seven freezing snowballs in a wide fan.'},
+      snow_turret:{name:'Snow Turret', price:420, kind:'snow_turret', cooldown:1.25, damage:0.9, auto:false,
+        desc:'Deploys a snow turret that tracks and fires at nearby zombies for 12 seconds.'},
+      fish_frenzy:{name:'Fish Frenzy', price:590, kind:'fish_frenzy', cooldown:0.28, damage:1.15, pierce:1, auto:true,
+        desc:'Enhanced frost rounds. Every sixth kill triggers a six-second rapid-fire Fish Frenzy.'}
     }
   },
   mage: {
@@ -8205,6 +8253,19 @@ function getKayKitAssetPromise(characterId){
   return kayKitRemoteCache[characterId];
 }
 
+function cleanHeroEquipment(root, characterId){
+  const hidePattern = characterId==='hooded'
+    ? /(crossbow|xbow|bow_cross)/i
+    : characterId==='rogue'
+      ? /(knife|dagger|shortblade)/i
+      : null;
+  if(!hidePattern) return;
+  root.traverse(obj=>{
+    const label=[obj.name,obj.parent&&obj.parent.name].filter(Boolean).join(' ');
+    if(hidePattern.test(label)) obj.visible=false;
+  });
+}
+
 function buildKayKitPlayer(characterId, options={}){
   const wrapper = new THREE.Group();
 
@@ -8236,6 +8297,7 @@ function buildKayKitPlayer(characterId, options={}){
     loadingMesh.material.dispose();
 
     const root = cloneSkinned(gltf.scene);
+    cleanHeroEquipment(root, characterId);
     // KayKit's forward direction already matches the game's +Z facing.
     root.rotation.y = 0;
 
@@ -8338,9 +8400,28 @@ function attachPistol(armR){
   armR.add(grp);
 }
 
+function attachFrostPistol(arm, side=1){
+  if(!arm) return;
+  const grp=new THREE.Group();
+  const ice=new THREE.MeshStandardMaterial({color:0x8eeeff,emissive:0x1676b8,emissiveIntensity:.55,roughness:.28,metalness:.25,flatShading:true});
+  const dark=new THREE.MeshStandardMaterial({color:0x17334a,roughness:.58,metalness:.35,flatShading:true});
+  const body=new THREE.Mesh(new THREE.BoxGeometry(.13,.12,.34),ice); body.position.z=.11;
+  const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.045,.055,.25,8),dark); barrel.rotation.x=Math.PI/2;barrel.position.z=.34;
+  const grip=new THREE.Mesh(new THREE.BoxGeometry(.085,.18,.09),dark);grip.position.set(0,-.13,0);grip.rotation.z=-side*.12;
+  const crystal=new THREE.Mesh(new THREE.OctahedronGeometry(.07,0),ice);crystal.position.set(side*.08,.02,.02);
+  grp.add(body,barrel,grip,crystal);grp.position.set(side*.01,-.42,.08);arm.add(grp);
+}
+
 function spawnPlayer(){
   if(!AVATAR_TYPES.includes(state.avatarType)) state.avatarType = 'rogue';
-  player = buildKayKitPlayer(state.avatarType);
+  player = state.avatarType==='frostwing'
+    ? buildPenguin(0xffffff,0x2d86d7,0x2d86d7)
+    : buildKayKitPlayer(state.avatarType);
+  if(state.avatarType==='frostwing'){
+    const parts=player.userData.parts||{};
+    attachFrostPistol(parts.armL,-1);
+    attachFrostPistol(parts.armR,1);
+  }
   const avatarScale = AVATAR_SCALE[state.avatarType] || 1;
   player.scale.setScalar(avatarScale);
   player.userData.avatarScale = avatarScale;
@@ -8380,7 +8461,8 @@ function spawnPlayer(){
 
 // ---- Zombies ----
 function spawnZombie(){
-  const zombieCharacter = AVATAR_TYPES[Math.floor(Math.random()*AVATAR_TYPES.length)];
+  const zombieRoster = AVATAR_TYPES.filter(id=>id!=='frostwing');
+  const zombieCharacter = zombieRoster[Math.floor(Math.random()*zombieRoster.length)];
   const archetype = chooseZombieArchetype();
   const spec = ZOMBIE_ARCHETYPES[archetype];
   const z = buildKayKitPlayer(zombieCharacter, {zombie:true, silent:true});
@@ -8683,7 +8765,7 @@ function setupControls(){
   const ultimateBtnEl=document.getElementById('ultimateBtn');
   const activateUltimate=e=>{
     if(e){ e.preventDefault(); e.stopPropagation(); }
-    if(state.avatarType==='rogue') triggerArrowStorm(); else if(state.avatarType==='mage') triggerArcaneCataclysm(); else if(state.avatarType==='knight') triggerKingsJudgment(); else if(state.avatarType==='barbarian') triggerPrimalRage(); else triggerShadowEclipse();
+    if(state.avatarType==='rogue') triggerArrowStorm(); else if(state.avatarType==='mage') triggerArcaneCataclysm(); else if(state.avatarType==='knight') triggerKingsJudgment(); else if(state.avatarType==='barbarian') triggerPrimalRage(); else if(state.avatarType==='frostwing') triggerBlizzardProtocol(); else triggerShadowEclipse();
   };
   if(window.PointerEvent) ultimateBtnEl.addEventListener('pointerdown',activateUltimate,{passive:false});
   else ultimateBtnEl.addEventListener('touchstart',activateUltimate,{passive:false});
@@ -8814,7 +8896,11 @@ function doDash(){
     setTimeout(()=>{ if(player) player.scale.set(1,1,1); }, 130);
   }
   if(state.avatarType==='hooded'){spawnShadowSmoke(player.position.x,player.position.y+.55,player.position.z,24);spawnAfterimage();shadowAfterimageTimer=.04;invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.12);}
-  else spawnBurst(player.position.x,0.4,player.position.z,9,FX_MAT_DUST,3.4);
+  else if(state.avatarType==='frostwing'){
+    invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.10);
+    player.rotation.x=-0.72; setTimeout(()=>{if(player)player.rotation.x=0;},DASH_DURATION*1000+40);
+    spawnBurst(player.position.x,player.position.y+.12,player.position.z,22,FX_MAT_DUST,4.5); toast('BELLY SLIDE!');
+  } else spawnBurst(player.position.x,0.4,player.position.z,9,FX_MAT_DUST,3.4);
   const btn = document.getElementById('dashBtn');
   btn.classList.add('cooling');
   setTimeout(()=>btn.classList.remove('cooling'), DASH_COOLDOWN*1000);
@@ -8855,6 +8941,9 @@ let mageCastStep = 0;
 let hoodedUltimateActive = 0;
 let hoodedUltimatePulse = 0;
 let shadowAfterimageTimer = 0;
+let frostwingUltimateCharge = 0, frostwingUltimateActive = 0, frostwingUltimatePulse = 0;
+let frostwingKillChain = 0, fishFrenzyTimer = 0;
+let snowTurrets = [];
 
 // Simple shared-geometry particle burst — used for hit sparks, zombie
 // death poofs, and landing dust. Particles fade by shrinking (not by
@@ -9037,6 +9126,7 @@ function findClipByWords(parts, fallback='1H_Melee_Attack_Chop'){
 }
 function attackCooldownFor(w){
   let factor = 1 + (playerStats.speed-1)*0.16;
+  if(state.avatarType==='frostwing' && fishFrenzyTimer>0) factor *= 1.75;
   if(w.fireRateCap) factor = Math.min(w.fireRateCap, factor);
   return w.cooldown / factor;
 }
@@ -9070,15 +9160,16 @@ function spawnShadowSmoke(x,y,z,count=8){
 function updateHoodedHud(){
   const btn=document.getElementById('ultimateBtn'),meter=document.getElementById('soulMeter');
   if(!btn||!meter)return;
-  const isHooded=state.avatarType==='hooded', isArcher=state.avatarType==='rogue', isMage=state.avatarType==='mage', isKnight=state.avatarType==='knight', isBarbarian=state.avatarType==='barbarian';
-  btn.classList.toggle('hidden',!(isHooded||isArcher||isMage||isKnight||isBarbarian)); meter.classList.toggle('on',isHooded||isArcher||isMage||isKnight||isBarbarian);
-  const pct=Math.max(0,Math.min(100,isHooded?hoodedUltimateCharge:(isArcher?archerUltimateCharge:(isMage?mageUltimateCharge:(isKnight?knightUltimateCharge:barbarianUltimateCharge)))));
+  const isHooded=state.avatarType==='hooded', isArcher=state.avatarType==='rogue', isMage=state.avatarType==='mage', isKnight=state.avatarType==='knight', isBarbarian=state.avatarType==='barbarian', isFrostwing=state.avatarType==='frostwing';
+  btn.classList.toggle('hidden',!(isHooded||isArcher||isMage||isKnight||isBarbarian||isFrostwing)); meter.classList.toggle('on',isHooded||isArcher||isMage||isKnight||isBarbarian||isFrostwing);
+  const pct=Math.max(0,Math.min(100,isHooded?hoodedUltimateCharge:(isArcher?archerUltimateCharge:(isMage?mageUltimateCharge:(isKnight?knightUltimateCharge:(isBarbarian?barbarianUltimateCharge:frostwingUltimateCharge))))));
   btn.style.setProperty('--charge',pct+'%'); btn.classList.toggle('ready',pct>=100);
   if(isHooded){btn.textContent=pct>=100?'ECLIPSE!':'ECLIPSE';meter.textContent='VITALITY '+hoodedMeleeHits+'/25';}
   else if(isArcher){btn.textContent=pct>=100?'ARROW STORM!':'ARROW STORM';meter.textContent='FOCUS '+Math.round(pct)+'%';}
   else if(isMage){btn.textContent=pct>=100?'CATACLYSM!':'CATACLYSM';meter.textContent='ARCANA '+Math.round(pct)+'%';}
   else if(isKnight){btn.textContent=pct>=100?"KING'S JUDGMENT!":"JUDGMENT";meter.textContent='VALOR '+Math.round(pct)+'%';}
   else if(isBarbarian){btn.textContent=pct>=100?"PRIMAL RAGE!":"RAGE";meter.textContent='FURY '+Math.round(pct)+'%';}
+  else if(isFrostwing){btn.textContent=pct>=100?'BLIZZARD!':'BLIZZARD';meter.textContent=(fishFrenzyTimer>0?'FISH FRENZY '+fishFrenzyTimer.toFixed(1)+'s':'FROST '+Math.round(pct)+'%');}
 }
 function spawnAfterimage(){
   if(!player||!player.userData.kayRoot)return; const ghost=player.userData.kayRoot.clone(true);
@@ -9291,6 +9382,54 @@ function updateArcaneCataclysm(dt){
   }
   if(mageUltimateActive<=0){document.body.style.filter='';spawnArcaneSigil(player.position.x,player.position.y,player.position.z,6.2);damageNearby(player.position,6.2,2.5);triggerCombatShake(12,240);}
 }
+
+function deploySnowTurret(w){
+  if(!player||!scene)return;
+  const g=new THREE.Group();
+  const snow=new THREE.MeshStandardMaterial({color:0xe9fbff,roughness:.75,metalness:.05,flatShading:true});
+  const ice=new THREE.MeshStandardMaterial({color:0x55cfff,emissive:0x0b4b6f,emissiveIntensity:.8,roughness:.3,metalness:.25,flatShading:true});
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(.42,.55,.28,12),snow);base.position.y=.14;g.add(base);
+  const body=new THREE.Mesh(new THREE.SphereGeometry(.38,12,9),snow);body.position.y=.55;g.add(body);
+  const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.08,.1,.62,8),ice);barrel.rotation.x=Math.PI/2;barrel.position.set(0,.63,.42);g.add(barrel);
+  const crystal=new THREE.Mesh(new THREE.OctahedronGeometry(.16,0),ice);crystal.position.y=1.02;g.add(crystal);
+  const yaw=player.rotation.y;g.position.set(player.position.x-Math.sin(yaw)*.65,0,player.position.z-Math.cos(yaw)*.65);scene.add(g);
+  snowTurrets.push({mesh:g,life:12,shot:0,damage:w.damage||.9});
+  spawnBurst(g.position.x,.5,g.position.z,24,FX_MAT_DUST,4.5);toast('SNOW TURRET DEPLOYED');
+}
+function updateSnowTurrets(dt){
+  for(let i=snowTurrets.length-1;i>=0;i--){
+    const t=snowTurrets[i];t.life-=dt;t.shot-=dt;t.mesh.rotation.y+=dt*.8;
+    if(t.shot<=0){
+      const target=zombies.filter(z=>!z.userData.dead).sort((a,b)=>a.position.distanceTo(t.mesh.position)-b.position.distanceTo(t.mesh.position))[0];
+      if(target&&target.position.distanceTo(t.mesh.position)<15){
+        t.shot=.48;const sx=t.mesh.position.x,sy=t.mesh.position.y+.66,sz=t.mesh.position.z;
+        const tx=target.position.x-sx,ty=(target.position.y+.8)-sy,tz=target.position.z-sz,l=Math.hypot(tx,ty,tz)||1;
+        const fake={damage:t.damage,splash:0,kind:'frost_pistol',mat:new THREE.MeshBasicMaterial({color:0x86ecff})};
+        fireBullet(tx/l,ty/l,tz/l,sx,sy,sz,fake);const b=bullets[bullets.length-1];if(b){b.kind='frost_pistol';b.mesh.scale.set(.58,.58,1.1);}
+        spawnBurst(sx,sy,sz,6,FX_MAT_DUST,2.2);
+      }
+    }
+    if(t.life<=0){spawnBurst(t.mesh.position.x,.5,t.mesh.position.z,16,FX_MAT_DUST,3.6);scene.remove(t.mesh);disposeGroup(t.mesh);snowTurrets.splice(i,1);}
+  }
+}
+function triggerBlizzardProtocol(){
+  if(!gameRunning||state.avatarType!=='frostwing'||frostwingUltimateActive>0)return;
+  if(frostwingUltimateCharge<99.5){toast('Blizzard Protocol is still charging');return;}
+  frostwingUltimateCharge=0;frostwingUltimateActive=5.0;frostwingUltimatePulse=0;fishFrenzyTimer=Math.max(fishFrenzyTimer,5);updateHoodedHud();
+  document.body.style.filter='brightness(.82) saturate(1.45) contrast(1.08)';
+  spawnBurst(player.position.x,player.position.y+.8,player.position.z,60,FX_MAT_DUST,8);triggerCombatShake(16,420);navigator.vibrate&&navigator.vibrate([90,35,180]);toast('BLIZZARD PROTOCOL!');
+}
+function updateBlizzardProtocol(dt){
+  if(frostwingUltimateActive<=0)return;frostwingUltimateActive-=dt;frostwingUltimatePulse-=dt;
+  if(frostwingUltimatePulse<=0){
+    frostwingUltimatePulse=.18;
+    const live=zombies.filter(z=>!z.userData.dead).slice(0,14);
+    live.forEach((z,i)=>{applyBulletDamage(z,.72*playerStats.power);spawnBurst(z.position.x,z.position.y+.8,z.position.z,8,FX_MAT_DUST,3.5);if(i%3===0)z.userData.speed*=.82;});
+    damageNearby(player.position,7.5,.35);spawnBurst(player.position.x,player.position.y+.65,player.position.z,28,FX_MAT_DUST,7);triggerCombatShake(5,80);
+  }
+  if(frostwingUltimateActive<=0){document.body.style.filter='';damageNearby(player.position,8,2.4);spawnBurst(player.position.x,player.position.y+.8,player.position.z,70,FX_MAT_DUST,9);triggerCombatShake(13,240);}
+}
+
 function triggerShadowEclipse(){
   if(!gameRunning||state.avatarType!=='hooded'||hoodedUltimateActive>0)return;
   if(hoodedUltimateCharge<99.5){ toast('Eclipse is still charging'); return; }
@@ -9454,6 +9593,7 @@ function shootFromPosition(w, pos, angleOffset=0){
       w.kind==='primal_wave'?0xff5622:
       w.kind==='holy_wave'?0xffd04a:
       w.kind==='rocket_arrow'||w.kind==='giant_fireball'?0xff6b32:
+      w.kind==='frost_pistol'?0x86ecff:
       w.kind==='elemental'?(mageElementToggle?0x66d9ff:0xff723d):
       w.kind==='star'?0xcaa7ff:
       (state.avatarType==='rogue'?0x72e6ff:0xe8c078)})
@@ -9465,6 +9605,8 @@ function shootFromPosition(w, pos, angleOffset=0){
     b.splashMult=w.splashMult||1;
     b.pierces=w.pierce||0;
     if(w.kind==='giant_fireball'){ b.mesh.scale.setScalar(3.0); spawnArcaneSigil(startX,0,startZ,1.25); }
+    if(w.kind==='frost_pistol'||w.kind==='fish_frenzy'){ b.mesh.scale.set(.72,.72,1.35); b.pierces=w.kind==='fish_frenzy'?1:(w.pierce||0); spawnBurst(startX,startY,startZ,7,FX_MAT_DUST,2.4); }
+    if(w.kind==='snowball_barrage'){ b.mesh.scale.setScalar(1.45); b.splash=1.25; spawnBurst(startX,startY,startZ,10,FX_MAT_DUST,3.0); }
     if(w.kind==='elemental'){ b.mesh.scale.setScalar(1.45); spawnBurst(startX,startY,startZ,10,mageElementToggle?FX_MAT_DUST:FX_MAT_SPARK,3.0); }
     if(w.kind==='rocket_arrow') b.mesh.scale.setScalar(1.55);
     if(w.kind==='holy_wave'){b.mesh.scale.set(3.4,1.8,.55);b.pierces=2;spawnKnightCleave({x:startX,y:startY-.9,z:startZ},player.rotation.y,0,1.25);}
@@ -9508,6 +9650,11 @@ function doShoot(){
   } else if(w.kind==='multi_arrow'){
     [-0.34,-0.17,0,0.17,0.34].forEach(a=>shootFromPosition(w,player.position,a));
     spawnArcherMuzzleFan();
+  } else if(w.kind==='snowball_barrage'){
+    [-0.48,-0.32,-0.16,0,0.16,0.32,0.48].forEach(a=>shootFromPosition(w,player.position,a));
+    spawnBurst(player.position.x,player.position.y+.8,player.position.z,18,FX_MAT_DUST,4.0);
+  } else if(w.kind==='snow_turret'){
+    deploySnowTurret(w);
   } else if(w.kind==='chain'){
     if(player.userData.playKayClip) player.userData.playKayClip(findClipByWords(['magic']),true,true,0.3);
     chainElementAttack(w);
@@ -9610,6 +9757,12 @@ function killZombie(z){
   if(state.avatarType==='mage'){mageUltimateCharge=Math.min(100,mageUltimateCharge+9);spawnArcaneSigil(z.position.x,z.position.y,z.position.z,1.05);updateHoodedHud();}
   if(state.avatarType==='knight'){knightUltimateCharge=Math.min(100,knightUltimateCharge+10);spawnBurst(z.position.x,z.position.y+.8,z.position.z,12,FX_MAT_SPARK,3.5);updateHoodedHud();}
   if(state.avatarType==='barbarian'){barbarianUltimateCharge=Math.min(100,barbarianUltimateCharge+10);spawnBurst(z.position.x,z.position.y+.8,z.position.z,16,FX_MAT_SPARK,4.2);updateHoodedHud();}
+  if(state.avatarType==='frostwing'){
+    frostwingUltimateCharge=Math.min(100,frostwingUltimateCharge+9); frostwingKillChain++;
+    spawnBurst(z.position.x,z.position.y+.8,z.position.z,14,FX_MAT_DUST,4.0);
+    if(frostwingKillChain>=6){frostwingKillChain=0;fishFrenzyTimer=6;toast('FISH FRENZY! Rapid frost fire');navigator.vibrate&&navigator.vibrate([35,25,80]);}
+    updateHoodedHud();
+  }
   runTokens += tokensPerKill();
   updateRunTokensHud();
   // Feed the spawn queue: keeps the on-screen crowd near the cap
@@ -9720,6 +9873,9 @@ function update(dt){
   updateArcaneCataclysm(dt);
   updateKingsJudgment(dt);
   updatePrimalRage(dt);
+  updateBlizzardProtocol(dt);
+  updateSnowTurrets(dt);
+  if(fishFrenzyTimer>0){fishFrenzyTimer=Math.max(0,fishFrenzyTimer-dt);updateHoodedHud();}
   if(player && player.userData.kayMixer){
     player.userData.kayMixer.update(dt);
     player.userData.kayActionLock = Math.max(0, (player.userData.kayActionLock || 0) - dt);
@@ -9786,6 +9942,7 @@ function update(dt){
   if(dashCooldownTimer>0) dashCooldownTimer -= dt;
   if(dashActive){
     if(state.avatarType==='hooded'){shadowAfterimageTimer-=dt;if(shadowAfterimageTimer<=0){spawnAfterimage();shadowAfterimageTimer=.045;spawnShadowSmoke(player.position.x,player.position.y+.45,player.position.z,3);}}
+    if(state.avatarType==='frostwing' && (Math.abs(moveX)+Math.abs(moveY)>.18)){shadowAfterimageTimer-=dt;if(shadowAfterimageTimer<=0){shadowAfterimageTimer=.11;spawnBurst(player.position.x,player.position.y+.08,player.position.z,3,FX_MAT_DUST,1.2);}}
     const nx = player.position.x + dashDir.x*DASH_SPEED*dt;
     const nz = player.position.z + dashDir.z*DASH_SPEED*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
@@ -9969,7 +10126,7 @@ function startSurvival(){
   enemyProjectiles.forEach(p=>{scene.remove(p.mesh);disposeGroup(p.mesh);});enemyProjectiles=[];
   fx.forEach(f=>scene.remove(f.mesh));
   fx = [];
-  hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;mageUltimateCharge=0;mageUltimateActive=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;document.body.style.filter='';updateHoodedHud();
+  hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;mageUltimateCharge=0;mageUltimateActive=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;frostwingUltimateCharge=0;frostwingUltimateActive=0;frostwingUltimatePulse=0;frostwingKillChain=0;fishFrenzyTimer=0;snowTurrets.forEach(t=>{scene.remove(t.mesh);disposeGroup(t.mesh);});snowTurrets=[];document.body.style.filter='';updateHoodedHud();
   playerStats = {power:1, speed:1, hp:1};
   unspentStatPoints = 0;
   runTokens = 0;
