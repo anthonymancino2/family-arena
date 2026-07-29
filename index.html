@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V16 Archer Tempest</title>
+<title>Family Arena — V17 Arcane Cataclysm</title>
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -353,7 +353,7 @@
 <div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
 background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
 padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
-V16 · ARCHER TEMPEST
+V17 · ARCANE CATACLYSM
 </div>
 <div id="app">
 
@@ -376,7 +376,7 @@ V16 · ARCHER TEMPEST
           <button class="bigBtn" id="btnGoModes">Play</button>
           <button class="ghostBtn" id="btnGoShop">Crystal<br>Shop</button>
         </div>
-        <div class="homeVersion">FAMILY ARENA · V16 ARCHER TEMPEST</div>
+        <div class="homeVersion">FAMILY ARENA · V17 ARCANE CATACLYSM</div>
       </div>
     </div>
   </div>
@@ -8608,7 +8608,7 @@ function setupControls(){
   const ultimateBtnEl=document.getElementById('ultimateBtn');
   const activateUltimate=e=>{
     if(e){ e.preventDefault(); e.stopPropagation(); }
-    if(state.avatarType==='rogue') triggerArrowStorm(); else triggerShadowEclipse();
+    if(state.avatarType==='rogue') triggerArrowStorm(); else if(state.avatarType==='mage') triggerArcaneCataclysm(); else triggerShadowEclipse();
   };
   if(window.PointerEvent) ultimateBtnEl.addEventListener('pointerdown',activateUltimate,{passive:false});
   else ultimateBtnEl.addEventListener('touchstart',activateUltimate,{passive:false});
@@ -8771,6 +8771,10 @@ let archerUltimateCharge = 0;
 let archerUltimateActive = 0;
 let archerUltimatePulse = 0;
 let archerVolleyStep = 0;
+let mageUltimateCharge = 0;
+let mageUltimateActive = 0;
+let mageUltimatePulse = 0;
+let mageCastStep = 0;
 let hoodedUltimateActive = 0;
 let hoodedUltimatePulse = 0;
 let shadowAfterimageTimer = 0;
@@ -8807,6 +8811,17 @@ function updateFx(dt){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.scale.setScalar(1+(1-q)*.18);f.mesh.traverse(o=>{if(o.material)o.material.opacity=.28*q;});
     } else if(f.kind==='soul'){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);if(player)f.mesh.position.lerp(new THREE.Vector3(player.position.x,player.position.y+1,player.position.z),Math.min(1,dt*7));f.mesh.scale.setScalar(.7+.5*Math.sin((1-q)*Math.PI));if(f.mesh.material)f.mesh.material.opacity=q;
+    } else if(f.kind==='arcaneSigil'){
+      f.mesh.rotation.y += (f.spin||3)*dt; f.mesh.scale.multiplyScalar(1+dt*.55);
+      f.mesh.traverse(o=>{if(o.material)o.material.opacity=Math.max(0,f.life/f.maxLife)*.85;});
+    } else if(f.kind==='arcaneMeteor'){
+      f.mesh.position.y -= 18*dt; f.mesh.scale.multiplyScalar(1+dt*1.1);
+      if(f.mesh.position.y<=f.targetY){
+        spawnBurst(f.mesh.position.x,f.targetY+.25,f.mesh.position.z,18,f.element==='fire'?FX_MAT_SPARK:FX_MAT_DUST,4.4);
+        spawnArcaneSigil(f.mesh.position.x,f.targetY,f.mesh.position.z,1.55);f.life=0;
+      }
+    } else if(f.kind==='lightning'){
+      f.mesh.material.opacity=Math.max(0,f.life/f.maxLife);
     } else if(f.kind==='archerSpark'){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.scale.setScalar(1+(1-q)*2.4);if(f.mesh.material)f.mesh.material.opacity=q;
     } else if(f.kind==='archerFan'){
@@ -8972,12 +8987,13 @@ function spawnShadowSmoke(x,y,z,count=8){
 function updateHoodedHud(){
   const btn=document.getElementById('ultimateBtn'),meter=document.getElementById('soulMeter');
   if(!btn||!meter)return;
-  const isHooded=state.avatarType==='hooded', isArcher=state.avatarType==='rogue';
-  btn.classList.toggle('hidden',!(isHooded||isArcher)); meter.classList.toggle('on',isHooded||isArcher);
-  const pct=Math.max(0,Math.min(100,isHooded?hoodedUltimateCharge:archerUltimateCharge));
+  const isHooded=state.avatarType==='hooded', isArcher=state.avatarType==='rogue', isMage=state.avatarType==='mage';
+  btn.classList.toggle('hidden',!(isHooded||isArcher||isMage)); meter.classList.toggle('on',isHooded||isArcher||isMage);
+  const pct=Math.max(0,Math.min(100,isHooded?hoodedUltimateCharge:(isArcher?archerUltimateCharge:mageUltimateCharge)));
   btn.style.setProperty('--charge',pct+'%'); btn.classList.toggle('ready',pct>=100);
   if(isHooded){btn.textContent=pct>=100?'ECLIPSE!':'ECLIPSE';meter.textContent='VITALITY '+hoodedMeleeHits+'/25';}
   else if(isArcher){btn.textContent=pct>=100?'ARROW STORM!':'ARROW STORM';meter.textContent='FOCUS '+Math.round(pct)+'%';}
+  else if(isMage){btn.textContent=pct>=100?'CATACLYSM!':'CATACLYSM';meter.textContent='ARCANA '+Math.round(pct)+'%';}
 }
 function spawnAfterimage(){
   if(!player||!player.userData.kayRoot)return; const ghost=player.userData.kayRoot.clone(true);
@@ -9033,6 +9049,59 @@ function updateArrowStorm(dt){
   archerUltimateActive-=dt;archerUltimatePulse-=dt;
   if(archerUltimatePulse<=0){archerUltimatePulse=.20;spawnArrowRainVolley();}
   if(archerUltimateActive<=0){document.body.style.filter='';triggerCombatShake(6,140);}
+}
+
+function spawnArcaneSigil(x,y,z,radius=3.2){
+  const g=new THREE.Group();
+  const cyan=new THREE.MeshBasicMaterial({color:0x6fe8ff,transparent:true,opacity:.82,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const violet=new THREE.MeshBasicMaterial({color:0xb868ff,transparent:true,opacity:.68,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const white=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.92,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const outer=new THREE.Mesh(new THREE.RingGeometry(radius*.82,radius,64),cyan);outer.rotation.x=-Math.PI/2;g.add(outer);
+  const inner=new THREE.Mesh(new THREE.RingGeometry(radius*.43,radius*.5,48),violet);inner.rotation.x=-Math.PI/2;g.add(inner);
+  for(let i=0;i<6;i++){
+    const ray=new THREE.Mesh(new THREE.PlaneGeometry(.07,radius*1.5),i%2?cyan:white);
+    ray.rotation.x=-Math.PI/2;ray.rotation.z=i*Math.PI/3;ray.position.y=.015;g.add(ray);
+  }
+  g.position.set(x,y+.08,z);scene.add(g);fx.push({kind:'arcaneSigil',mesh:g,life:.7,maxLife:.7,spin:3.8});
+}
+function spawnArcaneMeteor(target,element){
+  const fire=element==='fire';
+  const mat=new THREE.MeshBasicMaterial({color:fire?0xff6a32:0x70e7ff,transparent:true,opacity:.98,depthWrite:false,blending:THREE.AdditiveBlending});
+  const core=new THREE.Mesh(new THREE.SphereGeometry(fire?.32:.26,12,10),mat);
+  core.position.set(target.x+(Math.random()-.5)*.5,8+Math.random()*2,target.z+(Math.random()-.5)*.5);scene.add(core);
+  fx.push({kind:'arcaneMeteor',mesh:core,targetY:target.y+.25,life:.48,maxLife:.48,element:element});
+}
+function spawnChainLightning(origin,maxTargets=7,damage=1.4){
+  const live=zombies.filter(z=>!z.userData.dead).sort((a,b)=>a.position.distanceTo(origin)-b.position.distanceTo(origin)).slice(0,maxTargets);
+  let from=new THREE.Vector3(origin.x,origin.y+1.05,origin.z);
+  live.forEach((z,i)=>{
+    applyBulletDamage(z,damage*playerStats.power);
+    const to=new THREE.Vector3(z.position.x,z.position.y+.8,z.position.z);
+    const mid=from.clone().add(to).multiplyScalar(.5); const len=from.distanceTo(to);
+    const beam=new THREE.Mesh(new THREE.CylinderGeometry(.035,.08,len,6),new THREE.MeshBasicMaterial({color:i%2?0xffffff:0x72ddff,transparent:true,opacity:.95,depthWrite:false,blending:THREE.AdditiveBlending}));
+    beam.position.copy(mid);beam.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),to.clone().sub(from).normalize());scene.add(beam);
+    fx.push({kind:'lightning',mesh:beam,life:.16,maxLife:.16});spawnBurst(to.x,to.y,to.z,10,FX_MAT_SPARK,3.2);from=to;
+  });
+}
+function triggerArcaneCataclysm(){
+  if(!gameRunning||state.avatarType!=='mage'||mageUltimateActive>0)return;
+  if(mageUltimateCharge<99.5){toast('Arcane Cataclysm is still charging');return;}
+  mageUltimateCharge=0;mageUltimateActive=4.2;mageUltimatePulse=0;updateHoodedHud();
+  document.body.style.filter='brightness(.62) saturate(1.65) contrast(1.12)';
+  spawnArcaneSigil(player.position.x,player.position.y,player.position.z,5.5);spawnChainLightning(player.position,10,1.8);
+  triggerCombatShake(14,360);navigator.vibrate&&navigator.vibrate([70,35,140]);toast('ARCANE CATACLYSM!');
+}
+function updateArcaneCataclysm(dt){
+  if(mageUltimateActive<=0)return;
+  mageUltimateActive-=dt;mageUltimatePulse-=dt;
+  if(mageUltimatePulse<=0){
+    mageUltimatePulse=.22;
+    const live=zombies.filter(z=>!z.userData.dead).slice(0,10);
+    live.forEach((z,i)=>{spawnArcaneMeteor(z.position,i%2?'ice':'fire');applyBulletDamage(z,1.35*playerStats.power);});
+    if((Math.floor(mageUltimateActive*10)%3)===0) spawnChainLightning(player.position,8,1.1);
+    damageNearby(player.position,6.5,.55);triggerCombatShake(6,90);
+  }
+  if(mageUltimateActive<=0){document.body.style.filter='';spawnArcaneSigil(player.position.x,player.position.y,player.position.z,6.2);damageNearby(player.position,6.2,2.5);triggerCombatShake(12,240);}
 }
 function triggerShadowEclipse(){
   if(!gameRunning||state.avatarType!=='hooded'||hoodedUltimateActive>0)return;
@@ -9205,12 +9274,14 @@ function shootFromPosition(w, pos, angleOffset=0){
     b.kind=w.kind;
     b.splashMult=w.splashMult||1;
     b.pierces=w.pierce||0;
-    if(w.kind==='giant_fireball') b.mesh.scale.setScalar(2.4);
+    if(w.kind==='giant_fireball'){ b.mesh.scale.setScalar(3.0); spawnArcaneSigil(startX,0,startZ,1.25); }
+    if(w.kind==='elemental'){ b.mesh.scale.setScalar(1.45); spawnBurst(startX,startY,startZ,10,mageElementToggle?FX_MAT_DUST:FX_MAT_SPARK,3.0); }
     if(w.kind==='rocket_arrow') b.mesh.scale.setScalar(1.55);
     if(state.avatarType==='rogue'&&w.kind!=='rocket_arrow') b.mesh.scale.set(0.82,0.82,1.45);
   }
 }
 function chainElementAttack(w){
+  spawnArcaneSigil(player.position.x,player.position.y,player.position.z,2.2);
   let live=zombies.filter(z=>!z.userData.dead);
   if(!live.length) return;
   let current=findAutoAimTarget(20)||live[0];
@@ -9249,7 +9320,7 @@ function doShoot(){
       const words=state.avatarType==='mage'?['magic']:['ranged','shoot'];
       player.userData.playKayClip(findClipByWords(words,'1H_Ranged_Shoot'),true,true,0.25);
     }
-    if(w.kind==='elemental') mageElementToggle=!mageElementToggle;
+    if(w.kind==='elemental'){ mageElementToggle=!mageElementToggle; mageCastStep=(mageCastStep+1)%4; if(mageCastStep===0) spawnArcaneSigil(player.position.x,player.position.y,player.position.z,1.7); }
     shootFromPosition(w,player.position,0);
     if(state.avatarType==='rogue'){archerVolleyStep=(archerVolleyStep+1)%3;spawnArcherMuzzleFan(archerVolleyStep===0);}
     if(state.avatarType==='hooded') cloneAttack(w);
@@ -9338,6 +9409,7 @@ function killZombie(z){
   kills++; roundKillsDone++;
   if(state.avatarType==='hooded'){spawnSoulOrb(z.position);hoodedUltimateCharge=Math.min(100,hoodedUltimateCharge+8);updateHoodedHud();}
   if(state.avatarType==='rogue'){archerUltimateCharge=Math.min(100,archerUltimateCharge+10);spawnArcherSpark(z.position.x,z.position.y+0.8,z.position.z);updateHoodedHud();}
+  if(state.avatarType==='mage'){mageUltimateCharge=Math.min(100,mageUltimateCharge+9);spawnArcaneSigil(z.position.x,z.position.y,z.position.z,1.05);updateHoodedHud();}
   runTokens += tokensPerKill();
   updateRunTokensHud();
   // Feed the spawn queue: keeps the on-screen crowd near the cap
@@ -9445,6 +9517,7 @@ function update(dt){
   updateShadowClones(dt);
   updateShadowEclipse(dt);
   updateArrowStorm(dt);
+  updateArcaneCataclysm(dt);
   if(player && player.userData.kayMixer){
     player.userData.kayMixer.update(dt);
     player.userData.kayActionLock = Math.max(0, (player.userData.kayActionLock || 0) - dt);
@@ -9676,7 +9749,7 @@ function startSurvival(){
   bullets = [];
   fx.forEach(f=>scene.remove(f.mesh));
   fx = [];
-  hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;document.body.style.filter='';updateHoodedHud();
+  hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;mageUltimateCharge=0;mageUltimateActive=0;mageCastStep=0;document.body.style.filter='';updateHoodedHud();
   playerStats = {power:1, speed:1, hp:1};
   unspentStatPoints = 0;
   runTokens = 0;
