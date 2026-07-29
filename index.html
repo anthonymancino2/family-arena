@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V15 Shadow Assassin</title>
+<title>Family Arena — V15.1 Shadow Assassin</title>
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -176,11 +176,11 @@
     pointer-events:auto;display:flex;align-items:center;justify-content:center;
     transition:opacity 0.15s;text-shadow:none;}
   .dashBtn.cooling{opacity:0.3;}
-  .ultimateBtn{position:absolute;bottom:calc(118px + env(safe-area-inset-bottom));right:72px;width:82px;height:82px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:20;font-size:13px;font-weight:1000;letter-spacing:.6px;color:#fff;border:3px solid rgba(255,255,255,.8);background:conic-gradient(#b95cff var(--charge,0%),rgba(33,11,52,.92) 0);box-shadow:0 0 20px rgba(164,72,255,.65),inset 0 0 0 5px rgba(0,0,0,.28);text-shadow:0 2px 4px #000;user-select:none;-webkit-user-select:none;touch-action:none;}
+  .ultimateBtn{position:absolute;bottom:calc(170px + env(safe-area-inset-bottom));right:126px;width:76px;height:76px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:45;font-size:12px;font-weight:1000;letter-spacing:.6px;color:#fff;border:3px solid rgba(255,255,255,.8);background:conic-gradient(#b95cff var(--charge,0%),rgba(33,11,52,.92) 0);box-shadow:0 0 20px rgba(164,72,255,.65),inset 0 0 0 5px rgba(0,0,0,.28);text-shadow:0 2px 4px #000;user-select:none;-webkit-user-select:none;touch-action:manipulation;pointer-events:auto;cursor:pointer;}
   .ultimateBtn.ready{animation:ultimatePulse .75s infinite alternate;box-shadow:0 0 34px rgba(209,108,255,1),0 0 70px rgba(126,36,255,.72),inset 0 0 0 5px rgba(255,255,255,.18);}
   .ultimateBtn.hidden{display:none;}
   @keyframes ultimatePulse{from{transform:scale(1)}to{transform:scale(1.09)}}
-  .soulMeter{position:absolute;bottom:calc(205px + env(safe-area-inset-bottom));right:64px;z-index:20;color:#e6c7ff;font-size:12px;font-weight:900;text-shadow:0 2px 4px #000;display:none;}
+  .soulMeter{position:absolute;bottom:calc(252px + env(safe-area-inset-bottom));right:118px;z-index:20;color:#e6c7ff;font-size:12px;font-weight:900;text-shadow:0 2px 4px #000;display:none;}
   .soulMeter.on{display:block;}
   .freeBtn{width:52px;height:52px;border-radius:14px;background:rgba(20,22,28,0.5);
     border:2.5px solid rgba(255,255,255,0.75);font-weight:800;font-size:11px;color:#fff;
@@ -353,7 +353,7 @@
 <div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
 background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
 padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
-V14 · SHADOW AWAKENS
+V15.1 · SHADOW ASSASSIN
 </div>
 <div id="app">
 
@@ -376,7 +376,7 @@ V14 · SHADOW AWAKENS
           <button class="bigBtn" id="btnGoModes">Play</button>
           <button class="ghostBtn" id="btnGoShop">Crystal<br>Shop</button>
         </div>
-        <div class="homeVersion">FAMILY ARENA · V14 SHADOW AWAKENS</div>
+        <div class="homeVersion">FAMILY ARENA · V15.1 SHADOW ASSASSIN</div>
       </div>
     </div>
   </div>
@@ -8606,8 +8606,13 @@ function setupControls(){
   const dashBtnEl=document.getElementById('dashBtn');
   dashBtnEl.addEventListener('touchstart',e=>{e.preventDefault();doDash();});
   const ultimateBtnEl=document.getElementById('ultimateBtn');
-  ultimateBtnEl.addEventListener('touchstart',e=>{e.preventDefault();triggerShadowEclipse();},{passive:false});
-  ultimateBtnEl.addEventListener('click',triggerShadowEclipse);
+  const activateUltimate=e=>{
+    if(e){ e.preventDefault(); e.stopPropagation(); }
+    triggerShadowEclipse();
+  };
+  if(window.PointerEvent) ultimateBtnEl.addEventListener('pointerdown',activateUltimate,{passive:false});
+  else ultimateBtnEl.addEventListener('touchstart',activateUltimate,{passive:false});
+  ultimateBtnEl.addEventListener('click',e=>e.preventDefault());
   document.getElementById('freeBtn').addEventListener('touchstart', e=>{
     e.preventDefault(); toggleFreeMode();
   });
@@ -8970,13 +8975,14 @@ function spawnSoulOrb(from){
   const orb=new THREE.Mesh(new THREE.SphereGeometry(.14,10,8),mat);orb.position.set(from.x,from.y+.8,from.z);scene.add(orb);fx.push({kind:'soul',mesh:orb,life:.72,maxLife:.72});
 }
 function triggerShadowEclipse(){
-  if(!gameRunning||state.avatarType!=='hooded'||hoodedUltimateCharge<100||hoodedUltimateActive>0)return;
+  if(!gameRunning||state.avatarType!=='hooded'||hoodedUltimateActive>0)return;
+  if(hoodedUltimateCharge<99.5){ toast('Eclipse is still charging'); return; }
   hoodedUltimateCharge=0;hoodedUltimateActive=3.2;hoodedUltimatePulse=0;updateHoodedHud();document.body.style.filter='brightness(.58) saturate(1.35)';
   spawnShadowSmoke(player.position.x,player.position.y+.7,player.position.z,48);triggerCombatShake(15,420);navigator.vibrate&&navigator.vibrate([80,40,160]);toast('SHADOW ECLIPSE!');
 }
 function updateShadowEclipse(dt){
   if(hoodedUltimateActive<=0)return;hoodedUltimateActive-=dt;hoodedUltimatePulse-=dt;
-  if(hoodedUltimatePulse<=0){hoodedUltimatePulse=.22;const a=Math.random()*Math.PI*2,o={x:player.position.x+Math.cos(a)*(1+Math.random()*2.2),y:player.position.y,z:player.position.z+Math.sin(a)*(1+Math.random()*2.2)};spawnShadowSlash(o,a+Math.PI,(Math.random()*4)|0);damageNearby(player.position,6.2,1.35);spawnWhirlwindBurst(player.position,false);}
+  if(hoodedUltimatePulse<=0){hoodedUltimatePulse=.22;const a=Math.random()*Math.PI*2,o={x:player.position.x+Math.cos(a)*(1+Math.random()*2.2),y:player.position.y,z:player.position.z+Math.sin(a)*(1+Math.random()*2.2)};spawnShadowSlash(o,a+Math.PI,(Math.random()*4)|0);damageNearby(player.position,6.2,1.35);spawnWhirlwindBurst(player.position,false,6.2);}
   if(hoodedUltimateActive<=0){document.body.style.filter='';triggerCombatShake(9,180);}
 }
 function spawnShadowSlash(origin, yaw, comboStep=0){
@@ -9007,27 +9013,40 @@ function spawnShadowSlash(origin, yaw, comboStep=0){
   fx.push({kind:'shadowSlash',mesh:group,vx:fxdirX*6.4,vz:fxdirZ*6.4,spin:(comboStep%2?2.8:-2.8),life:0.28,maxLife:0.28});
   spawnBurst(group.position.x,group.position.y,group.position.z,18,FX_MAT_SHADOW,4.2);
 }
-function spawnWhirlwindBurst(origin, isClone=false){
+function spawnWhirlwindBurst(origin, isClone=false, damageRadius=2.8){
   const group=new THREE.Group();
-  const purple=new THREE.MeshBasicMaterial({color:0x8d32ff,transparent:true,opacity:0.9,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
-  const white=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.92,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const purple=new THREE.MeshBasicMaterial({color:0x8d32ff,transparent:true,opacity:0.92,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const hot=new THREE.MeshBasicMaterial({color:0xd978ff,transparent:true,opacity:0.78,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const white=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.98,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const field=new THREE.MeshBasicMaterial({color:0x8d32ff,transparent:true,opacity:isClone?0.08:0.15,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+
+  // The filled ground circle and bright rim show the exact 360° damage zone.
+  const disk=new THREE.Mesh(new THREE.CircleGeometry(damageRadius,48),field);
+  disk.rotation.x=-Math.PI/2; disk.position.y=0.07; group.add(disk);
+  const boundary=new THREE.Mesh(new THREE.RingGeometry(damageRadius-0.10,damageRadius+0.04,64),white);
+  boundary.rotation.x=-Math.PI/2; boundary.position.y=0.085; group.add(boundary);
+  const innerRing=new THREE.Mesh(new THREE.RingGeometry(damageRadius*0.48,damageRadius*0.54,48),hot);
+  innerRing.rotation.x=-Math.PI/2; innerRing.position.y=0.10; group.add(innerRing);
+
   for(let i=0;i<3;i++){
-    const ring=new THREE.Mesh(new THREE.TorusGeometry(1.15+i*0.28,0.075,8,40),i===1?white:purple);
+    const r=damageRadius*(0.45+i*0.18);
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(r,0.07,8,48),i===1?white:purple);
     ring.rotation.x=Math.PI/2;
-    ring.position.y=0.35+i*0.38;
+    ring.position.y=0.32+i*0.34;
     group.add(ring);
   }
-  for(let i=0;i<6;i++){
-    const blade=new THREE.Mesh(new THREE.RingGeometry(0.72,1.55,30,1,-0.55,1.1),i%3===0?white:purple);
-    blade.rotation.y=i*Math.PI/3;
-    blade.rotation.z=(i%2?-0.48:0.48);
-    blade.position.y=0.9;
+  // Radial blades visibly sweep from the Rogue to the damage boundary.
+  for(let i=0;i<8;i++){
+    const blade=new THREE.Mesh(new THREE.RingGeometry(damageRadius*0.30,damageRadius*0.96,42,1,-0.20,0.40),i%4===0?white:purple);
+    blade.rotation.y=i*Math.PI/4;
+    blade.rotation.z=(i%2?-0.34:0.34);
+    blade.position.y=0.74;
     group.add(blade);
   }
   group.position.set(origin.x,origin.y,origin.z);
   scene.add(group);
-  fx.push({kind:'whirlwind',mesh:group,life:isClone?0.22:0.30,maxLife:isClone?0.22:0.30});
-  spawnBurst(origin.x,origin.y+0.75,origin.z,isClone?12:24,FX_MAT_SHADOW,isClone?3.4:5.0);
+  fx.push({kind:'whirlwind',mesh:group,life:isClone?0.34:0.52,maxLife:isClone?0.34:0.52});
+  spawnBurst(origin.x,origin.y+0.75,origin.z,isClone?12:28,FX_MAT_SHADOW,isClone?3.4:5.4);
 }
 function damageMeleeArc(origin,yaw,radius,arc,damage){
   let hitCount=0;
@@ -9083,7 +9102,7 @@ function doMeleeAttack(w, origin=player.position, isClone=false){
   } else {
     hits=damageNearby(pos,w.radius,w.damage);
     if(spin){
-      spawnWhirlwindBurst(pos,isClone);
+      spawnWhirlwindBurst(pos,isClone,w.radius);
       if(!isClone){
         player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,0.32);
         player.userData.spinVisualSpeed=26;
