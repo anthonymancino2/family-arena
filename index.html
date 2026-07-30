@@ -6,8 +6,8 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V22.2 Frostwing Ground + Dash + Mage VFX</title>
-<!-- V22.2: Frostwing standard dash, persistent imported-model ground offset, readable Mage basic VFX. -->
+<title>Family Arena — V22.3 Gameplay Hotfix</title>
+<!-- V22.3: localized Mage VFX, restored Frostwing animation playback, safe Frostwing dash. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -359,7 +359,7 @@
 <div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
 background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
 padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
-V22.2 · FROSTWING GROUND + DASH + MAGE VFX
+V22.3 · MAGE VISIBILITY + FROSTWING MOTION HOTFIX
 </div>
 <div id="app">
 
@@ -382,7 +382,7 @@ V22.2 · FROSTWING GROUND + DASH + MAGE VFX
           <button class="bigBtn" id="btnGoModes">Play</button>
           <button class="ghostBtn" id="btnGoShop">Crystal<br>Shop</button>
         </div>
-        <div class="homeVersion">FAMILY ARENA · V22.2 FROSTWING GROUND + DASH + MAGE VFX</div>
+        <div class="homeVersion">FAMILY ARENA · V22.3 MAGE VISIBILITY + FROSTWING MOTION HOTFIX</div>
       </div>
     </div>
   </div>
@@ -8382,6 +8382,7 @@ function buildImportedFrostwing(options={}){
       };
       const requested=(this.kayClips&&this.kayClips[name])||findImportedClip(gltf.animations||[],aliases[name]||[name])||findImportedClip(gltf.animations||[],['idle'])||(gltf.animations||[])[0];
       if(!requested)return;
+      if(this.kayCurrentName===requested.name&&!force&&!oneShot)return;
       const next=this.kayMixer.clipAction(requested),prev=this.kayCurrentAction;
       if(prev&&prev!==next)prev.fadeOut(.1);
       next.reset();next.enabled=true;next.clampWhenFinished=!!oneShot;next.setLoop(oneShot?THREEAsset.LoopOnce:THREEAsset.LoopRepeat,oneShot?1:Infinity);next.fadeIn(.1).play();
@@ -9099,7 +9100,11 @@ function doDash(){
   dashDir.x = Math.sin(player.rotation.y);
   dashDir.z = Math.cos(player.rotation.y);
   if(player.userData.playKayClip){
-    player.userData.playKayClip('Dodge_Forward', true, true, 0.34);
+    if(state.avatarType==='frostwing'){
+      player.userData.playKayClip('Running_A', false, false, 0);
+    } else {
+      player.userData.playKayClip('Dodge_Forward', true, true, 0.34);
+    }
   } else {
     player.scale.set(1.35,0.8,1.35);
     setTimeout(()=>{ if(player) player.scale.set(1,1,1); }, 130);
@@ -9107,7 +9112,7 @@ function doDash(){
   if(state.avatarType==='hooded'){spawnShadowSmoke(player.position.x,player.position.y+.55,player.position.z,24);spawnAfterimage();shadowAfterimageTimer=.04;invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.12);}
   else if(state.avatarType==='frostwing'){
     invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.10);
-    spawnBurst(player.position.x,player.position.y+.22,player.position.z,18,FX_MAT_DUST,4.2);
+    spawnBurst(player.position.x,player.position.y+.18,player.position.z,6,FX_MAT_DUST,1.8);
     toast('FROST DASH!');
   } else spawnBurst(player.position.x,0.4,player.position.z,9,FX_MAT_DUST,3.4);
   const btn = document.getElementById('dashBtn');
@@ -9187,7 +9192,14 @@ function updateFx(dt){
     } else if(f.kind==='soul'){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);if(player)f.mesh.position.lerp(new THREE.Vector3(player.position.x,player.position.y+1,player.position.z),Math.min(1,dt*7));f.mesh.scale.setScalar(.7+.5*Math.sin((1-q)*Math.PI));if(f.mesh.material)f.mesh.material.opacity=q;
     } else if(f.kind==='mageBasicCone'){
-      f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.scale.set(1+(1-q)*.18,1,1+(1-q)*.08);f.mesh.traverse(o=>{if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.opacity*=.86);else o.material.opacity*=.86;}});
+      f.life-=dt;
+      const q=Math.max(0,f.life/f.maxLife);
+      f.mesh.rotation.y+=(f.spin||0)*dt;
+      f.mesh.traverse(o=>{
+        if(!o.material)return;
+        const mats=Array.isArray(o.material)?o.material:[o.material];
+        mats.forEach(m=>m.opacity=Math.min(m.opacity,q*.58));
+      });
     } else if(f.kind==='arcaneSigil'){
       f.mesh.rotation.y += (f.spin||3)*dt; f.mesh.scale.multiplyScalar(1+dt*.55);
       f.mesh.traverse(o=>{if(o.material)o.material.opacity=Math.max(0,f.life/f.maxLife)*.85;});
@@ -9546,79 +9558,49 @@ function spawnMageBasicCone(elementIsIce){
   const yaw=player.rotation.y;
   const dirX=Math.sin(yaw), dirZ=Math.cos(yaw);
   const g=new THREE.Group();
-  const tint=elementIsIce?0x79eaff:0xff7a3d;
-  const accent=elementIsIce?0xd8fbff:0xffd08a;
-  const glow=new THREE.MeshBasicMaterial({
-    color:tint,transparent:true,opacity:.72,depthWrite:false,
-    side:THREE.DoubleSide,blending:THREE.AdditiveBlending
+  const tint=elementIsIce?0x35cfff:0xff5a24;
+  const accent=elementIsIce?0xa7f3ff:0xffbe55;
+
+  const matA=new THREE.MeshBasicMaterial({
+    color:tint,transparent:true,opacity:.58,depthWrite:false,
+    blending:THREE.AdditiveBlending
   });
-  const bright=new THREE.MeshBasicMaterial({
-    color:accent,transparent:true,opacity:.82,depthWrite:false,
-    side:THREE.DoubleSide,blending:THREE.AdditiveBlending
+  const matB=new THREE.MeshBasicMaterial({
+    color:accent,transparent:true,opacity:.48,depthWrite:false,
+    blending:THREE.AdditiveBlending
   });
 
-  // A sequence of open arcane rings shows range and direction without
-  // placing a bright opaque shape over the battlefield.
-  for(let i=0;i<5;i++){
-    const progress=(i+1)/5;
-    const radius=.17+progress*.50;
-    const ring=new THREE.Mesh(
-      new THREE.RingGeometry(radius*.72,radius,22),
-      i%2?bright:glow
-    );
-    ring.rotation.x=-Math.PI/2;
-    ring.position.set(0,.04+i*.025,.45+progress*4.0);
-    ring.scale.x=1+progress*.45;
-    g.add(ring);
-  }
+  // Compact muzzle halo: never larger than the character.
+  const halo=new THREE.Mesh(new THREE.RingGeometry(.12,.22,18),matA);
+  halo.rotation.x=-Math.PI/2;
+  halo.position.set(0,.12,.28);
+  g.add(halo);
 
-  // Two narrow magical ribbons frame the shot, leaving the center and
-  // enemies fully visible.
-  for(const side of [-1,1]){
-    const points=[];
-    for(let i=0;i<8;i++){
-      const p=i/7;
-      points.push(new THREE.Vector3(
-        side*(.08+p*.58)+Math.sin(p*Math.PI*3)*.055,
-        .10+Math.sin(p*Math.PI)*.16,
-        .25+p*4.35
-      ));
-    }
-    const curve=new THREE.CatmullRomCurve3(points);
-    const ribbon=new THREE.Mesh(
-      new THREE.TubeGeometry(curve,20,.025,5,false),
-      side<0?glow:bright
-    );
-    g.add(ribbon);
-  }
-
-  // Small elemental shards provide the dramatic burst around the cast,
-  // but their footprint stays localized around the projectile path.
-  for(let i=0;i<10;i++){
+  // Six tiny colored shards travel only a short distance in front.
+  for(let i=0;i<6;i++){
     const shard=new THREE.Mesh(
       elementIsIce
-        ? new THREE.OctahedronGeometry(.045+Math.random()*.035,0)
-        : new THREE.TetrahedronGeometry(.05+Math.random()*.04,0),
-      i%3===0?bright:glow
+        ? new THREE.OctahedronGeometry(.035,0)
+        : new THREE.TetrahedronGeometry(.04,0),
+      i%2?matA:matB
     );
-    const p=.15+Math.random()*.85;
     shard.position.set(
-      (Math.random()-.5)*(1.0*p+.12),
-      .08+Math.random()*.30,
-      .35+p*4.25
+      (Math.random()-.5)*.34,
+      .08+Math.random()*.22,
+      .25+Math.random()*.75
     );
     shard.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
     g.add(shard);
   }
 
   g.position.set(
-    player.position.x+dirX*.45,
-    player.position.y+.08,
-    player.position.z+dirZ*.45
+    player.position.x+dirX*.42,
+    player.position.y+.34,
+    player.position.z+dirZ*.42
   );
   g.rotation.y=yaw;
   scene.add(g);
-  fx.push({kind:'mageBasicCone',mesh:g,life:.34,maxLife:.34,spin:elementIsIce?-1.4:1.4});
+  fx.push({kind:'mageBasicCone',mesh:g,life:.20,maxLife:.20,spin:elementIsIce?-2:2});
 }
 function spawnArcaneSigil(x,y,z,radius=3.2){
   const g=new THREE.Group();
@@ -9957,7 +9939,6 @@ function doShoot(){
       mageElementToggle=!mageElementToggle;
       mageCastStep=(mageCastStep+1)%4;
       spawnMageBasicCone(mageElementToggle);
-      if(mageCastStep===0) spawnArcaneSigil(player.position.x,player.position.y,player.position.z,1.7);
     }
     shootFromPosition(w,player.position,0);
     if(state.avatarType==='rogue'){archerVolleyStep=(archerVolleyStep+1)%3;spawnArcherMuzzleFan(archerVolleyStep===0);}
@@ -10620,7 +10601,7 @@ document.getElementById('btnResultsHome').onclick = ()=>{
 
 })();
 </script>
-<div id="buildStamp" style="position:fixed;right:8px;bottom:8px;z-index:99999;font:700 11px/1.2 system-ui;color:#7dd3fc;background:#07111dcc;border:1px solid #38bdf8;border-radius:8px;padding:5px 7px;pointer-events:none">BUILD V22.2-FIX2</div>
+<div id="buildStamp" style="position:fixed;right:8px;bottom:8px;z-index:99999;font:700 11px/1.2 system-ui;color:#7dd3fc;background:#07111dcc;border:1px solid #38bdf8;border-radius:8px;padding:5px 7px;pointer-events:none">BUILD V22.3-HOTFIX</div>
 </body>
 </html>
 
