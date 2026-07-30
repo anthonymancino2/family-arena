@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.7.9: Restored Frostwing's proven shared procedural movement cadence and dash pose after the imported-only animation path caused a stiff-board regression. -->
+<!-- V22.8.0: Removed Frostwing and restored the stable five-hero roster. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -422,7 +422,6 @@
       <div id="heroInfoDesc" style="margin-top:7px;color:#d3e1ec;font-size:13px;line-height:1.35;"></div>
     </div>
     <div class="subtitle" style="margin:10px 0 14px;">
-      Frostwing V22.0 loads a real external penguin GLB directly instead of downloading and unpacking a ZIP in the browser. The procedural penguin is not used for Frostwing gameplay or preview.
     </div>
     <div class="swatchRow" id="skinRow" style="display:none"></div>
     <div id="hairSection" style="display:none"><div class="swatchRow" id="hairRow"></div></div>
@@ -560,8 +559,8 @@
 <script>
 (function(){
 
-const GAME_VERSION = '22.7.9';
-const GAME_BUILD_LABEL = `V${GAME_VERSION} · FROSTWING ANIMATION REGRESSION FIX`;
+const GAME_VERSION = '22.8.0';
+const GAME_BUILD_LABEL = `V${GAME_VERSION} · STABLE FIVE-HERO ROSTER`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
 window.addEventListener('DOMContentLoaded', ()=>{
@@ -589,9 +588,9 @@ const Store = {
   getProfile(name){
     try{
       const raw = localStorage.getItem(this._key('profile:'+name));
-      if(!raw) return { name, crystals:0, unlocked:['human','penguin'], skin:0, outfit:0, hairStyle:'short', avatarType:'rogue' };
+      if(!raw) return { name, crystals:0, unlocked:['human'], skin:0, outfit:0, hairStyle:'short', avatarType:'rogue' };
       return JSON.parse(raw);
-    }catch(e){ return { name, crystals:0, unlocked:['human','penguin'], skin:0, outfit:0, hairStyle:'short', avatarType:'rogue' }; }
+    }catch(e){ return { name, crystals:0, unlocked:['human'], skin:0, outfit:0, hairStyle:'short', avatarType:'rogue' }; }
   },
   saveProfile(p){
     localStorage.setItem(this._key('profile:'+p.name), JSON.stringify(p));
@@ -616,31 +615,23 @@ const SKINS = ['#ffe3c4','#f2c9a0','#c68a5a','#8d5a3c','#5a3826','#2b1d16'];
 const OUTFITS = ['#3fa9d6','#e0533d','#4caf50','#9b59b6','#f1c40f','#ecf0f1'];
 const HAIR_STYLES = ['short','medium','long'];
 const HAIR_STYLE_LABELS = {short:'Short', medium:'Medium', long:'Long'};
-const AVATAR_TYPES = ['rogue','hooded','mage','knight','barbarian','frostwing'];
+const AVATAR_TYPES = ['rogue','hooded','mage','knight','barbarian'];
 const AVATAR_TYPE_LABELS = {
   rogue:'🏹 Archer',
   hooded:'🥷 Hooded Rogue',
   mage:'🔮 Mage',
   knight:'🛡️ Knight',
-  barbarian:'🪓 Barbarian',
-  frostwing:'🐧 Frostwing'
+  barbarian:'🪓 Barbarian'
 };
 const HERO_ROSTER_INFO = {
   rogue:{title:'Tempest Archer',role:'RANGED • EASY',desc:'Fast piercing arrows and precise crowd control. Knife removed for a clean bow-and-quiver silhouette.'},
   hooded:{title:'Shadow Rogue',role:'MELEE • HARD',desc:'Rapid close-range slashes, shadow clones, and evasive movement. Crossbow removed for a pure assassin silhouette.'},
   mage:{title:'Arcane Mage',role:'RANGED • MEDIUM',desc:'Alternating elemental attacks and powerful area magic.'},
   knight:{title:'Knight of Dawn',role:'MELEE • EASY',desc:'Durable golden cleaves, shield control, and radiant power.'},
-  barbarian:{title:'Fury Barbarian',role:'MELEE • MEDIUM',desc:'Heavy axe combos, ground slams, and relentless momentum.'},
-  frostwing:{title:'Frostwing, Arctic Gunslinger',role:'RANGED • EASY',desc:'Dual frost pistols, belly-slide mobility, deployable snow turret, snowball barrage, Fish Frenzy passive, and Blizzard Protocol ultimate.'}
+  barbarian:{title:'Fury Barbarian',role:'MELEE • MEDIUM',desc:'Heavy axe combos, ground slams, and relentless momentum.'}
 };
 // Uniform scale applied on top of each avatar's own build — every value
-// here was checked numerically against the penguin's actual rendered
-// height (0.85) as the floor, and Titan Guardian's is nowhere near an
-// elephant's real ~1.76x-human shoulder-height ratio, just noticeably
-// bigger than the rest as its own "giant mech" identity calls for.
-const AVATAR_SCALE = { rogue:1.0, hooded:1.0, mage:1.0, knight:1.05, barbarian:1.08, frostwing:1.12 };
-// human and penguin are free by default; bunny/dog must be unlocked
-// with crystals (prices live in CATALOG, shared with the Crystal Shop).
+const AVATAR_SCALE = { rogue:1.0, hooded:1.0, mage:1.0, knight:1.05, barbarian:1.08 };
 const FREE_AVATAR_TYPES = [...AVATAR_TYPES];
 // TESTING ONLY: sET this back to false to re-lock Bunny/Dog/all 15 heroes
 // behind crystals. Everything else about the unlock system (CATALOG
@@ -870,21 +861,6 @@ async function updateAvatarPreview(characterId){
   const status=document.getElementById('avatarPreviewStatus');
   if(status) status.textContent='Loading '+AVATAR_TYPE_LABELS[characterId].replace(/^.\s/,'')+'…';
   try{
-    if(characterId==='frostwing'){
-      const {gltf,THREEAsset,cloneSkinned}=await getFrostwingAssetPromise();
-      if(requestId!==previewRequestId)return;
-      if(previewRoot)previewScene.remove(previewRoot);
-      const root=cloneSkinned(gltf.scene);
-      root.rotation.y=Math.PI;
-      normalizeImportedHero(root,THREEAsset,1.75);
-      root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
-      previewRoot=root;previewScene.add(root);
-      previewMixer=new THREEAsset.AnimationMixer(root);
-      const idle=findImportedClip(gltf.animations,['idle','stand'])||gltf.animations[0];
-      if(idle)previewMixer.clipAction(idle).play();
-      if(status)status.textContent='Frostwing — Bright Imported Penguin';
-      return;
-    }
     const {gltf,THREEAsset,cloneSkinned}=await getKayKitAssetPromise(characterId);
     if(requestId!==previewRequestId)return;
     if(previewRoot)previewScene.remove(previewRoot);
@@ -899,7 +875,7 @@ async function updateAvatarPreview(characterId){
     const idle=gltf.animations.find(c=>c.name.toLowerCase()==='idle')||gltf.animations[0];
     if(idle)previewMixer.clipAction(idle).play();
     if(status)status.textContent=AVATAR_TYPE_LABELS[characterId].replace(/^.\s/,'');
-  }catch(e){if(status)status.textContent='Frostwing model failed: '+(e?.message||'network error');}
+  }catch(e){if(status)status.textContent='Character model failed: '+(e?.message||'network error');}
 }
 
 // ---- SHOP (stub catalogue — purchase logic works now, character
@@ -1069,20 +1045,6 @@ const CHARACTER_COMBAT = {
         desc:'Hold FIRE to become a moving ring of axes and flame.'},
       primal_wave:{name:'Primal Axe Wave', price:570, kind:'primal_wave', cooldown:0.52, damage:2.25, splash:2.8, pierce:3, auto:true,
         desc:'Launch a huge flaming axe-shaped shockwave through a crowd.'}
-    }
-  },
-  frostwing: {
-    defaultId:'frost_pistols',
-    baseMoveMult:1.08,
-    weapons:{
-      frost_pistols:{name:'Dual Frost Pistols', price:0, kind:'frost_pistol', cooldown:0.18, damage:1.0, pierce:0, auto:true,
-        desc:'Alternating ice-blue pistol shots that build Blizzard Protocol.'},
-      snowball_barrage:{name:'Snowball Barrage', price:240, kind:'snowball_barrage', cooldown:0.52, damage:0.72, splash:1.25, auto:true,
-        desc:'Launches seven freezing snowballs in a wide fan.'},
-      snow_turret:{name:'Snow Turret', price:420, kind:'snow_turret', cooldown:1.25, damage:0.9, auto:false,
-        desc:'Deploys a snow turret that tracks and fires at nearby zombies for 12 seconds.'},
-      fish_frenzy:{name:'Fish Frenzy', price:590, kind:'fish_frenzy', cooldown:0.28, damage:1.15, pierce:1, auto:true,
-        desc:'Enhanced frost rounds. Every sixth kill triggers a six-second rapid-fire Fish Frenzy.'}
     }
   },
   mage: {
@@ -7407,121 +7369,6 @@ function buildDog(skinHex, outfitHex, tint){
   return g;
 }
 
-function buildPenguinLegacy(skinHex, outfitHex, tint){
-  const g = new THREE.Group();
-  // skinHex still doubles as a color pick (from the same tone swatches),
-  // but a penguin reads best in classic black/cream regardless — the
-  // chosen tone tints the belly patch instead of the whole body.
-  const bodyMat   = LMAT(tint || 0x1c1e20);
-  const bellyMat  = LMAT(tint || skinHex || 0xf2ecd8);
-  const outfitMat = LMAT(tint || outfitHex);
-  const pupilMat  = GMAT(0x141414);
-  const cheekMat  = GMAT(0xff9e9e, 0.45);
-  const beakMat   = LMAT(tint || 0xff8f2c);
-  const footMat   = LMAT(tint || 0xff8f2c);
-
-  const headR = 0.30;
-  const legR = 0.075, legH = 0.15; // short waddly legs
-  const armR = 0.06, armLen = 0.30;
-  const legGap = 0.12;
-
-  const torsoBaseY = 0.09 + legH;
-  const torsoH = 0.40; // taller nominal span — the egg-shaped body fills well past this
-  const headBaseY = torsoBaseY + torsoH;
-
-  // Big flat webbed feet — wide and forward-facing, the whole waddle
-  // silhouette lives in these.
-  function buildWebFoot(parent){
-    const foot = _a(parent, new THREE.IcosahedronGeometry(legR*2.0, 0), footMat, 0, -legH, legR*0.55);
-    foot.scale.set(1.2, 0.32, 2.0);
-  }
-  function buildLeg(x){
-    const grp = new THREE.Group();
-    _a(grp, CYLG(legR*0.9, legR, legH, 6), bodyMat, 0, -legH/2, 0);
-    grp.position.set(x, torsoBaseY, 0);
-    buildWebFoot(grp);
-    return grp;
-  }
-  const legL = buildLeg(-legGap/2);
-  const legR_ = buildLeg(legGap/2);
-  g.add(legL, legR_);
-
-  // ---- Body: ONE unified rounded egg shape (a stretched low-poly
-  // icosahedron) instead of a distinct cylinder torso + separate head —
-  // this is the single biggest fix versus the reference: a real penguin
-  // silhouette has no neck line, just one continuous rounded form.
-  const torsoCY = torsoBaseY + torsoH*0.46; // torso mesh's world-space center
-  const torso = new THREE.Mesh(new THREE.IcosahedronGeometry(0.30, 1), bodyMat);
-  torso.position.set(0, torsoCY, 0);
-  torso.scale.set(1.08, 1.24, 1.02);
-  g.add(torso);
-
-  // Big cream belly patch — the dominant front feature, running from
-  // upper chest down toward the base and tapering at the bottom, per
-  // every reference image. Parented to the top-level group (NOT to the
-  // scaled torso mesh) with explicit world-space coordinates — a child
-  // of a scaled parent has its own local offsets multiplied by that
-  // parent's scale, which is what silently sent the old outfit ribbon
-  // flying up near y=1.3 (off the top of the screen) instead of sitting
-  // at the throat. Absolute coordinates here sidestep that entirely.
-  const belly = new THREE.Mesh(new THREE.IcosahedronGeometry(0.235, 1), bellyMat);
-  belly.position.set(0, torsoCY + 0.05, 0.185);
-  belly.scale.set(0.9, 1.35, 0.6);
-  g.add(belly);
-  // A colored band at the belly's lower hem — keeps outfit-color
-  // customization visible without the positioning risk of a separate
-  // throat accessory.
-  const hem = new THREE.Mesh(new THREE.TorusGeometry(0.135, 0.032, 6, 12), outfitMat);
-  hem.position.set(0, torsoCY - 0.16, 0.135);
-  hem.rotation.set(Math.PI/2, 0, 0);
-  hem.scale.set(1, 1, 0.45); // flattened against the belly's curve, not a full free-floating ring
-  g.add(hem);
-
-  // Wing-shaped flippers that sweep back and down against the body,
-  // like real folded bird wings — tapered wide-to-narrow (not a uniform
-  // capsule) and angled backward, not just hanging straight down.
-  // Pivoted at torso-center height (well below the head) so they read
-  // as attached to the body, not as ears on the head.
-  function buildArm(x, sign){
-    const geo = new THREE.CylinderGeometry(armR*1.7, armR*0.35, armLen, 6);
-    geo.translate(0, -armLen/2, 0);
-    const mesh = new THREE.Mesh(geo, bodyMat);
-    mesh.position.set(x, torsoCY + 0.1, -0.02);
-    mesh.rotation.z = -sign*0.32;  // swept outward from the shoulder
-    mesh.rotation.x = 0.45;        // swept BACK along the body, wing-like
-    mesh.scale.set(1.9, 1, 0.4);   // wide flat wing silhouette
-    return mesh;
-  }
-  const armL = buildArm(-(0.27), -1);
-  const armR_ = buildArm(0.27, 1);
-  g.add(armL, armR_);
-
-  // `head` stays a real anchor object (kept small and folded deep into
-  // the top of the egg body, same dark color) so eyes/beak/cheeks have
-  // a stable local coordinate space, without reintroducing a neck seam.
-  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(headR*0.6, 1), bodyMat);
-  head.position.set(0, headBaseY+headR*0.15, 0.04);
-  g.add(head);
-
-  const eyeY = headR*0.28, eyeZ = headR*0.62, eyeDX = headR*0.24;
-  for(const sx of [-1,1]){
-    // Small, simple dot eyes set close together — not the big cartoon
-    // eye style used elsewhere, matching every reference here.
-    const eye = _a(head, SPHG(headR*0.1, 7, 6), pupilMat, sx*eyeDX, eyeY, eyeZ);
-  }
-  for(const sx of [-1,1]){
-    const cheek = _a(head, SPHG(headR*0.13, 7, 5), cheekMat, sx*headR*0.5, eyeY-headR*0.22, eyeZ*0.9);
-    cheek.scale.set(1, 0.7, 0.3);
-  }
-  // Bigger, blockier beak — a flattened 4-sided pyramid rather than a
-  // rounder cone, matching the chunky angular beak in the reference.
-  const beak = _a(head, CONEG(headR*0.22, headR*0.38, 4), beakMat,
-    0, eyeY-headR*0.34, headR*0.86, Math.PI/2, Math.PI/4, 0);
-  beak.scale.set(1.15, 0.62, 1);
-
-  g.userData.parts = {head, torso, armL, armR: armR_, legL, legR: legR_};
-  return g;
-}
 
 // =====================================================================
 // Shared "hero" rig — reused by all 15 pop-culture-inspired avatars
@@ -8088,95 +7935,6 @@ function buildHuman(skinHex,outfitHex,tint,hairStyle){
   g.userData.heroModel='alex-v1';
   return g;
 }
-function buildPenguin(skinHex,outfitHex,tint){
-  // Frostwing base model: clean, unmodified low-poly penguin.
-  // No scarf, backpack, facial additions, or body accessories.
-  const g = new THREE.Group();
-  const black = RC_MAT(0x24292d);
-  const blackSide = RC_MAT(0x1b2024);
-  const cream = RC_MAT(0xf5f0df);
-  const orange = RC_MAT(0xf2a13a);
-  const eye = RC_GLOSS(0x15181a);
-  const shine = RC_GLOSS(0xffffff);
-
-  const torso = new THREE.Mesh(new THREE.IcosahedronGeometry(0.38, 2), black);
-  torso.position.set(0, 0.54, 0);
-  torso.scale.set(0.92, 1.34, 0.82);
-  g.add(torso);
-
-  const belly = new THREE.Mesh(new THREE.IcosahedronGeometry(0.30, 2), cream);
-  belly.position.set(0, 0.49, 0.265);
-  belly.scale.set(0.72, 1.16, 0.25);
-  g.add(belly);
-
-  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 2), black);
-  head.position.set(0, 0.93, 0.015);
-  head.scale.set(1.03, 0.92, 0.96);
-  g.add(head);
-
-  const mask = new THREE.Mesh(new THREE.IcosahedronGeometry(0.27, 2), cream);
-  mask.position.set(0, 0.91, 0.255);
-  mask.scale.set(0.88, 0.78, 0.24);
-  g.add(mask);
-
-  for(const sx of [-1,1]){
-    const e = new THREE.Mesh(new THREE.IcosahedronGeometry(0.038, 1), eye);
-    e.position.set(sx*0.105, 0.965, 0.487);
-    e.scale.set(0.9, 1.08, 0.45);
-    g.add(e);
-    const h = new THREE.Mesh(new THREE.IcosahedronGeometry(0.010, 0), shine);
-    h.position.set(sx*0.094, 0.981, 0.515);
-    g.add(h);
-  }
-
-  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.145, 4), orange);
-  beak.position.set(0, 0.865, 0.492);
-  beak.rotation.x = Math.PI/2;
-  beak.rotation.y = Math.PI/4;
-  beak.scale.set(1.15, 1, 0.75);
-  g.add(beak);
-
-  function makeWing(side){
-    const pivot = new THREE.Group();
-    pivot.position.set(side*0.29, 0.69, -0.01);
-    const wing = new THREE.Mesh(new THREE.IcosahedronGeometry(0.19, 1), blackSide);
-    wing.position.set(side*0.07, -0.10, 0);
-    wing.scale.set(0.42, 1.15, 0.72);
-    wing.rotation.z = side*0.18;
-    pivot.add(wing);
-    g.add(pivot);
-    return pivot;
-  }
-  const armL = makeWing(-1);
-  const armR = makeWing(1);
-
-  function makeFoot(side){
-    const pivot = new THREE.Group();
-    pivot.position.set(side*0.13, 0.20, 0.02);
-    const ankle = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.055,0.09,6), orange);
-    ankle.position.y = -0.035;
-    pivot.add(ankle);
-    const foot = new THREE.Mesh(new THREE.IcosahedronGeometry(0.13,1), orange);
-    foot.position.set(0,-0.095,0.075);
-    foot.scale.set(1.05,0.28,1.55);
-    pivot.add(foot);
-    g.add(pivot);
-    return pivot;
-  }
-  const legL = makeFoot(-1);
-  const legR = makeFoot(1);
-
-  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.075,0.18,5), blackSide);
-  tail.position.set(0,0.42,-0.31);
-  tail.rotation.x = -0.65;
-  g.add(tail);
-
-  g.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
-  g.userData.parts = {head, torso, armL, armR, legL, legR};
-  g.userData.rc = {headR:0.34, headY:0.93, torsoH:0.68, torsoBase:0.20};
-  g.userData.heroModel = 'frostwing-option3-clean';
-  return g;
-}
 function buildBunny(skinHex,outfitHex,tint){const fur=tint||skinHex||0xf7e8e8,g=buildReferenceChibi({skin:fur,outfit:tint||outfitHex,headColor:fur,noEars:true});const {head}=g.userData.parts,{headR}=g.userData.rc;for(const sx of [-1,1]){const e=rcAdd(head,new THREE.CapsuleGeometry(headR*.12,headR*.65,4,7),RC_MAT(fur),sx*headR*.33,headR*1.05,-headR*.05,0,0,sx*.08);const i=rcAdd(e,new THREE.CapsuleGeometry(headR*.055,headR*.43,3,6),RC_MAT(0xffb8c8),0,0,headR*.1);};rcAnimalFace(g,0xfff3f3,0xff89a2);return g;}
 function buildDog(skinHex,outfitHex,tint){const fur=tint||0xd9aa79,g=buildReferenceChibi({skin:fur,outfit:tint||outfitHex,headColor:fur,noEars:true});const {head}=g.userData.parts,{headR}=g.userData.rc;for(const sx of [-1,1]){const e=rcAdd(head,new THREE.IcosahedronGeometry(headR*.35,1),RC_MAT(0x9d6847),sx*headR*.78,headR*.05,-headR*.08);e.scale.set(.52,1.22,.72);e.rotation.z=sx*.22;}rcAnimalFace(g,0xf0d2b4);return g;}
 
@@ -8268,142 +8026,6 @@ function getKayKitAssetPromise(characterId){
   return kayKitRemoteCache[characterId];
 }
 
-
-// ---------------------------------------------------------------------
-// FROSTWING REAL-ASSET IMPORT — V22.0
-// Source: Quaternius, Cute Animated Monsters Pack (CC0).
-// The game downloads the original asset pack, extracts the Penguin model,
-// and loads that file. No penguin body geometry is generated by the game.
-// ---------------------------------------------------------------------
-const FROSTWING_MODEL_URL = 'https://huggingface.co/datasets/dylanebert/3d-arena/resolve/main/outputs/Hunyuan3D-2/a_baby_penguin_wearing_a_blue_hat.glb?download=true';
-let frostwingAssetPromise = null;
-
-function findImportedClip(clips, words){
-  if(!clips || !clips.length) return null;
-  const lowered=words.map(w=>w.toLowerCase());
-  return clips.find(c=>lowered.some(w=>c.name.toLowerCase().includes(w)))||null;
-}
-
-function normalizeImportedHero(root, THREEAsset, targetHeight=1.48){
-  root.updateMatrixWorld(true);
-  const rawBox=new THREEAsset.Box3().setFromObject(root);
-  const size=rawBox.getSize(new THREEAsset.Vector3());
-  root.scale.setScalar(targetHeight/Math.max(.001,size.y));
-  root.updateMatrixWorld(true);
-  const placed=new THREEAsset.Box3().setFromObject(root);
-  root.position.y-=placed.min.y;
-  root.updateMatrixWorld(true);
-}
-
-function getFrostwingAssetPromise(){
-  if(frostwingAssetPromise) return frostwingAssetPromise;
-  frostwingAssetPromise=Promise.all([
-    import('three'),
-    import('three/addons/loaders/GLTFLoader.js'),
-    import('three/addons/utils/SkeletonUtils.js')
-  ]).then(async ([THREEAsset,gltfModule,skeletonModule])=>{
-    const loader=new gltfModule.GLTFLoader();
-    loader.setCrossOrigin('anonymous');
-    const gltf=await loader.loadAsync(FROSTWING_MODEL_URL);
-    if(!gltf || !gltf.scene) throw new Error('Frostwing GLB loaded without a scene');
-    return {gltf,THREEAsset,cloneSkinned:skeletonModule.clone};
-  }).catch(err=>{
-    frostwingAssetPromise=null;
-    throw err;
-  });
-  return frostwingAssetPromise;
-}
-
-function buildImportedFrostwing(options={}){
-  const wrapper=new THREE.Group();
-  wrapper.userData.kayAsset=true;
-  wrapper.userData.kayActionLock=0;
-
-  // Compatibility pivots are required by the shared movement loop. Without
-  // these, Frostwing throws during update() before renderer.render(), which
-  // made the entire arena appear empty even though the GLB loaded correctly.
-  const armR=new THREE.Group(), armL=new THREE.Group();
-  const legR=new THREE.Group(), legL=new THREE.Group();
-  armR.position.set(-.34,.92,.03); armL.position.set(.34,.92,.03);
-  legR.position.set(-.15,.22,0); legL.position.set(.15,.22,0);
-  wrapper.add(armR,armL,legR,legL);
-  wrapper.userData.parts={armR,armL,legR,legL};
-
-  // Character-local illumination keeps the dark feathers readable across
-  // every rotating environment without bleaching the rest of the arena.
-  const frostKey=new THREE.PointLight(0xffffff,2.2,7,1.5);
-  frostKey.position.set(0,2.4,2.6); wrapper.add(frostKey);
-  const frostRim=new THREE.PointLight(0x8fe7ff,1.25,6,1.7);
-  frostRim.position.set(0,2.0,-2.0); wrapper.add(frostRim);
-
-  const loadingMat=new THREE.MeshBasicMaterial({color:0x8eeeff});
-  const loadingMesh=new THREE.Mesh(new THREE.IcosahedronGeometry(.22,1),loadingMat);
-  loadingMesh.position.y=.75;
-  wrapper.add(loadingMesh);
-
-  getFrostwingAssetPromise().then(({gltf,THREEAsset,cloneSkinned})=>{
-    if(!wrapper.parent) return;
-    wrapper.remove(loadingMesh);loadingMesh.geometry.dispose();loadingMesh.material.dispose();
-    const root=cloneSkinned(gltf.scene);
-    root.rotation.y=0;
-    normalizeImportedHero(root,THREEAsset,1.48);
-    // Keep Frostwing's normalized transform as the permanent baseline.
-    // The old slide reset the imported GLB to scale 1, making it enormous
-    // and effectively freezing mobile Safari. A small local lift also keeps
-    // the feet/belly above the arena floor without changing player physics.
-    root.position.y += 0.16;
-    wrapper.userData.frostBaseScale = root.scale.clone();
-    wrapper.userData.frostBaseRotationX = root.rotation.x;
-    wrapper.userData.frostBaseY = root.position.y;
-    root.traverse(o=>{
-      if(!o.isMesh) return;
-      o.visible=true; o.frustumCulled=false; o.castShadow=true; o.receiveShadow=false;
-      const mats=Array.isArray(o.material)?o.material:[o.material];
-      mats.filter(Boolean).forEach(m=>{
-        if('color' in m && m.color){ m.color.offsetHSL(0,.08,.035); }
-        if('emissive' in m && m.emissive){
-          m.emissive.copy(m.color||new THREEAsset.Color(0xffffff)).multiplyScalar(.035);
-          m.emissiveIntensity=.22;
-        }
-        if('roughness' in m) m.roughness=Math.min(.82,m.roughness??.7);
-        m.needsUpdate=true;
-      });
-    });
-    wrapper.add(root);
-    attachFrostPistol(armR,-1);
-    attachFrostPistol(armL,1);
-    wrapper.userData.kayRoot=root;
-    const mixer=new THREEAsset.AnimationMixer(root);
-    const clips={};
-    (gltf.animations||[]).forEach(c=>clips[c.name]=c);
-    wrapper.userData.kayMixer=mixer;
-    wrapper.userData.kayClips=clips;
-    wrapper.userData.kayCurrentAction=null;
-    wrapper.userData.kayCurrentName='';
-    wrapper.userData.playKayClip=function(name,force=false,oneShot=false,lockSeconds=0){
-      if(this.kayActionLock>0&&!force)return;
-      const aliases={
-        Idle:['idle','stand','breath'],Running_A:['run','running','walk','walking','move'],Dodge_Forward:['jump','roll','run'],Jump_Start:['jump'],Jump_Full_Short:['jump'],Jump_Land:['land','idle'],
-        '1H_Ranged_Shoot':['attack','shoot','punch'], '1H_Melee_Attack_Chop':['attack','punch']
-      };
-      const requested=(this.kayClips&&this.kayClips[name])||findImportedClip(gltf.animations||[],aliases[name]||[name])||findImportedClip(gltf.animations||[],['idle'])||(gltf.animations||[])[0];
-      if(!requested)return;
-      if(this.kayCurrentName===requested.name&&!force&&!oneShot)return;
-      const next=this.kayMixer.clipAction(requested),prev=this.kayCurrentAction;
-      if(prev&&prev!==next)prev.fadeOut(.1);
-      next.reset();next.enabled=true;next.clampWhenFinished=!!oneShot;next.setLoop(oneShot?THREEAsset.LoopOnce:THREEAsset.LoopRepeat,oneShot?1:Infinity);next.fadeIn(.1).play();
-      this.kayCurrentAction=next;this.kayCurrentName=requested.name;
-      if(lockSeconds>0)this.kayActionLock=Math.max(this.kayActionLock||0,lockSeconds);
-    };
-    wrapper.userData.playKayClip('Idle',true);
-    if(!options.silent)toast('Frostwing imported CC0 penguin loaded');
-  }).catch(err=>{
-    console.error('Frostwing asset load failed:',err);
-    loadingMesh.material.color.setHex(0xff4b4b);
-    if(!options.silent)toast('Frostwing asset load error: '+String(err.message||err).slice(0,100));
-  });
-  return wrapper;
-}
 
 function cleanHeroEquipment(root, characterId){
   const hidePattern = characterId==='hooded'
@@ -8552,28 +8174,10 @@ function attachPistol(armR){
   armR.add(grp);
 }
 
-function attachFrostPistol(arm, side=1){
-  if(!arm) return;
-  const grp=new THREE.Group();
-  const ice=new THREE.MeshStandardMaterial({color:0x8eeeff,emissive:0x1676b8,emissiveIntensity:.55,roughness:.28,metalness:.25,flatShading:true});
-  const dark=new THREE.MeshStandardMaterial({color:0x17334a,roughness:.58,metalness:.35,flatShading:true});
-  const body=new THREE.Mesh(new THREE.BoxGeometry(.13,.12,.34),ice); body.position.z=.11;
-  const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.045,.055,.25,8),dark); barrel.rotation.x=Math.PI/2;barrel.position.z=.34;
-  const grip=new THREE.Mesh(new THREE.BoxGeometry(.085,.18,.09),dark);grip.position.set(0,-.13,0);grip.rotation.z=-side*.12;
-  const crystal=new THREE.Mesh(new THREE.OctahedronGeometry(.07,0),ice);crystal.position.set(side*.08,.02,.02);
-  grp.add(body,barrel,grip,crystal);grp.position.set(side*.015,-.40,.10);grp.scale.setScalar(.92);arm.add(grp);
-}
 
 function spawnPlayer(){
   if(!AVATAR_TYPES.includes(state.avatarType)) state.avatarType = 'rogue';
-  player = state.avatarType==='frostwing'
-    ? buildImportedFrostwing({silent:true})
-    : buildKayKitPlayer(state.avatarType);
-  if(state.avatarType==='frostwing' && player.userData.parts){
-    attachFrostPistol(player.userData.parts.armR,-1);
-    attachFrostPistol(player.userData.parts.armL,1);
-    player.userData.sharedAvatarMotion=true;
-  }
+  player = buildKayKitPlayer(state.avatarType);
   const avatarScale = AVATAR_SCALE[state.avatarType] || 1;
   player.scale.setScalar(avatarScale);
   player.userData.avatarScale = avatarScale;
@@ -8613,7 +8217,7 @@ function spawnPlayer(){
 
 // ---- Zombies ----
 function spawnZombie(){
-  const zombieRoster = AVATAR_TYPES.filter(id=>id!=='frostwing');
+  const zombieRoster = AVATAR_TYPES;
   const zombieCharacter = zombieRoster[Math.floor(Math.random()*zombieRoster.length)];
   const archetype = chooseZombieArchetype();
   const spec = ZOMBIE_ARCHETYPES[archetype];
@@ -8986,7 +8590,7 @@ function setupControls(){
   const ultimateBtnEl=document.getElementById('ultimateBtn');
   const activateUltimate=e=>{
     if(e){ e.preventDefault(); e.stopPropagation(); }
-    if(state.avatarType==='rogue') triggerArrowStorm(); else if(state.avatarType==='mage') triggerArcaneCataclysm(); else if(state.avatarType==='knight') triggerKingsJudgment(); else if(state.avatarType==='barbarian') triggerPrimalRage(); else if(state.avatarType==='frostwing') triggerBlizzardProtocol(); else triggerShadowEclipse();
+    if(state.avatarType==='rogue') triggerArrowStorm(); else if(state.avatarType==='mage') triggerArcaneCataclysm(); else if(state.avatarType==='knight') triggerKingsJudgment(); else if(state.avatarType==='barbarian') triggerPrimalRage(); else triggerShadowEclipse();
   };
   if(window.PointerEvent) ultimateBtnEl.addEventListener('pointerdown',activateUltimate,{passive:false});
   else ultimateBtnEl.addEventListener('touchstart',activateUltimate,{passive:false});
@@ -9115,9 +8719,7 @@ function doDash(){
     player.userData.playKayClip('Dodge_Forward', true, true, 0.34);
   }
   if(state.avatarType==='hooded'){spawnShadowSmoke(player.position.x,player.position.y+.55,player.position.z,24);spawnAfterimage();shadowAfterimageTimer=.04;invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.12);}
-  else if(state.avatarType==='frostwing'){
-    invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.10);
-  } else spawnBurst(player.position.x,0.4,player.position.z,9,FX_MAT_DUST,3.4);
+  else spawnBurst(player.position.x,0.4,player.position.z,9,FX_MAT_DUST,3.4);
   const btn = document.getElementById('dashBtn');
   btn.classList.add('cooling');
   setTimeout(()=>btn.classList.remove('cooling'), DASH_COOLDOWN*1000);
@@ -9158,9 +8760,6 @@ let mageCastStep = 0;
 let hoodedUltimateActive = 0;
 let hoodedUltimatePulse = 0;
 let shadowAfterimageTimer = 0;
-let frostwingUltimateCharge = 0, frostwingUltimateActive = 0, frostwingUltimatePulse = 0;
-let frostwingKillChain = 0, fishFrenzyTimer = 0;
-let snowTurrets = [];
 
 // Simple shared-geometry particle burst — used for hit sparks, zombie
 // death poofs, and landing dust. Particles fade by shrinking (not by
@@ -9353,7 +8952,6 @@ function findClipByWords(parts, fallback='1H_Melee_Attack_Chop'){
 }
 function attackCooldownFor(w){
   let factor = 1 + (playerStats.speed-1)*0.16;
-  if(state.avatarType==='frostwing' && fishFrenzyTimer>0) factor *= 1.75;
   if(w.fireRateCap) factor = Math.min(w.fireRateCap, factor);
   return w.cooldown / factor;
 }
@@ -9387,16 +8985,15 @@ function spawnShadowSmoke(x,y,z,count=8){
 function updateHoodedHud(){
   const btn=document.getElementById('ultimateBtn'),meter=document.getElementById('soulMeter');
   if(!btn||!meter)return;
-  const isHooded=state.avatarType==='hooded', isArcher=state.avatarType==='rogue', isMage=state.avatarType==='mage', isKnight=state.avatarType==='knight', isBarbarian=state.avatarType==='barbarian', isFrostwing=state.avatarType==='frostwing';
-  btn.classList.toggle('hidden',!(isHooded||isArcher||isMage||isKnight||isBarbarian||isFrostwing)); meter.classList.toggle('on',isHooded||isArcher||isMage||isKnight||isBarbarian||isFrostwing);
-  const pct=Math.max(0,Math.min(100,isHooded?hoodedUltimateCharge:(isArcher?archerUltimateCharge:(isMage?mageUltimateCharge:(isKnight?knightUltimateCharge:(isBarbarian?barbarianUltimateCharge:frostwingUltimateCharge))))));
+  const isHooded=state.avatarType==='hooded', isArcher=state.avatarType==='rogue', isMage=state.avatarType==='mage', isKnight=state.avatarType==='knight', isBarbarian=state.avatarType==='barbarian';
+  btn.classList.toggle('hidden',!(isHooded||isArcher||isMage||isKnight||isBarbarian)); meter.classList.toggle('on',isHooded||isArcher||isMage||isKnight||isBarbarian);
+  const pct=Math.max(0,Math.min(100,isHooded?hoodedUltimateCharge:(isArcher?archerUltimateCharge:(isMage?mageUltimateCharge:(isKnight?knightUltimateCharge:barbarianUltimateCharge)))));
   btn.style.setProperty('--charge',pct+'%'); btn.classList.toggle('ready',pct>=100);
   if(isHooded){btn.textContent=pct>=100?'ECLIPSE!':'ECLIPSE';meter.textContent='VITALITY '+hoodedMeleeHits+'/25';}
   else if(isArcher){btn.textContent=pct>=100?'ARROW STORM!':'ARROW STORM';meter.textContent='FOCUS '+Math.round(pct)+'%';}
   else if(isMage){btn.textContent=pct>=100?'CATACLYSM!':'CATACLYSM';meter.textContent='ARCANA '+Math.round(pct)+'%';}
   else if(isKnight){btn.textContent=pct>=100?"KING'S JUDGMENT!":"JUDGMENT";meter.textContent='VALOR '+Math.round(pct)+'%';}
   else if(isBarbarian){btn.textContent=pct>=100?"PRIMAL RAGE!":"RAGE";meter.textContent='FURY '+Math.round(pct)+'%';}
-  else if(isFrostwing){btn.textContent=pct>=100?'BLIZZARD!':'BLIZZARD';meter.textContent=(fishFrenzyTimer>0?'FISH FRENZY '+fishFrenzyTimer.toFixed(1)+'s':'FROST '+Math.round(pct)+'%');}
 }
 function spawnAfterimage(){
   if(!player||!player.userData.kayRoot)return; const ghost=player.userData.kayRoot.clone(true);
@@ -9659,52 +9256,6 @@ function updateArcaneCataclysm(dt){
   if(mageUltimateActive<=0){document.body.style.filter='';spawnArcaneSigil(player.position.x,player.position.y,player.position.z,6.2);damageNearby(player.position,6.2,2.5);triggerCombatShake(12,240);}
 }
 
-function deploySnowTurret(w){
-  if(!player||!scene)return;
-  const g=new THREE.Group();
-  const snow=new THREE.MeshStandardMaterial({color:0xe9fbff,roughness:.75,metalness:.05,flatShading:true});
-  const ice=new THREE.MeshStandardMaterial({color:0x55cfff,emissive:0x0b4b6f,emissiveIntensity:.8,roughness:.3,metalness:.25,flatShading:true});
-  const base=new THREE.Mesh(new THREE.CylinderGeometry(.42,.55,.28,12),snow);base.position.y=.14;g.add(base);
-  const body=new THREE.Mesh(new THREE.SphereGeometry(.38,12,9),snow);body.position.y=.55;g.add(body);
-  const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.08,.1,.62,8),ice);barrel.rotation.x=Math.PI/2;barrel.position.set(0,.63,.42);g.add(barrel);
-  const crystal=new THREE.Mesh(new THREE.OctahedronGeometry(.16,0),ice);crystal.position.y=1.02;g.add(crystal);
-  const yaw=player.rotation.y;g.position.set(player.position.x-Math.sin(yaw)*.65,0,player.position.z-Math.cos(yaw)*.65);scene.add(g);
-  snowTurrets.push({mesh:g,life:12,shot:0,damage:w.damage||.9});
-  spawnBurst(g.position.x,.5,g.position.z,24,FX_MAT_DUST,4.5);toast('SNOW TURRET DEPLOYED');
-}
-function updateSnowTurrets(dt){
-  for(let i=snowTurrets.length-1;i>=0;i--){
-    const t=snowTurrets[i];t.life-=dt;t.shot-=dt;t.mesh.rotation.y+=dt*.8;
-    if(t.shot<=0){
-      const target=zombies.filter(z=>!z.userData.dead).sort((a,b)=>a.position.distanceTo(t.mesh.position)-b.position.distanceTo(t.mesh.position))[0];
-      if(target&&target.position.distanceTo(t.mesh.position)<15){
-        t.shot=.48;const sx=t.mesh.position.x,sy=t.mesh.position.y+.66,sz=t.mesh.position.z;
-        const tx=target.position.x-sx,ty=(target.position.y+.8)-sy,tz=target.position.z-sz,l=Math.hypot(tx,ty,tz)||1;
-        const fake={damage:t.damage,splash:0,kind:'frost_pistol',mat:new THREE.MeshBasicMaterial({color:0x86ecff})};
-        fireBullet(tx/l,ty/l,tz/l,sx,sy,sz,fake);const b=bullets[bullets.length-1];if(b){b.kind='frost_pistol';b.mesh.scale.set(.58,.58,1.1);}
-        spawnBurst(sx,sy,sz,6,FX_MAT_DUST,2.2);
-      }
-    }
-    if(t.life<=0){spawnBurst(t.mesh.position.x,.5,t.mesh.position.z,16,FX_MAT_DUST,3.6);scene.remove(t.mesh);disposeGroup(t.mesh);snowTurrets.splice(i,1);}
-  }
-}
-function triggerBlizzardProtocol(){
-  if(!gameRunning||state.avatarType!=='frostwing'||frostwingUltimateActive>0)return;
-  if(frostwingUltimateCharge<99.5){toast('Blizzard Protocol is still charging');return;}
-  frostwingUltimateCharge=0;frostwingUltimateActive=3.6;frostwingUltimatePulse=0;fishFrenzyTimer=Math.max(fishFrenzyTimer,2.5);updateHoodedHud();
-  document.body.style.filter='brightness(.82) saturate(1.45) contrast(1.08)';
-  spawnArcaneSigil(player.position.x,player.position.y,player.position.z,7.0);spawnBurst(player.position.x,player.position.y+.8,player.position.z,110,FX_MAT_DUST,11);triggerCombatShake(16,420);navigator.vibrate&&navigator.vibrate([90,35,180]);toast('BLIZZARD PROTOCOL!');
-}
-function updateBlizzardProtocol(dt){
-  if(frostwingUltimateActive<=0)return;frostwingUltimateActive-=dt;frostwingUltimatePulse-=dt;
-  if(frostwingUltimatePulse<=0){
-    frostwingUltimatePulse=.26;
-    const live=zombies.filter(z=>!z.userData.dead&&!z.userData.spawnPending).slice(0,12);
-    live.forEach((z,i)=>{applyBulletDamage(z,.34*playerStats.power);spawnBurst(z.position.x,z.position.y+.8,z.position.z,16,FX_MAT_DUST,5.2);if(i%2===0)z.userData.speed=Math.max(.45,z.userData.speed*.9);});
-    damageNearby(player.position,7.5,.12);spawnBurst(player.position.x,player.position.y+.65,player.position.z,44,FX_MAT_DUST,9);triggerCombatShake(5,80);
-  }
-  if(frostwingUltimateActive<=0){document.body.style.filter='';damageNearby(player.position,8,1.25);spawnArcaneSigil(player.position.x,player.position.y,player.position.z,8.0);spawnBurst(player.position.x,player.position.y+.8,player.position.z,120,FX_MAT_DUST,12);triggerCombatShake(13,240);}
-}
 
 function triggerShadowEclipse(){
   if(!gameRunning||state.avatarType!=='hooded'||hoodedUltimateActive>0)return;
@@ -9870,7 +9421,6 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
       w.kind==='primal_wave'?0xff5622:
       w.kind==='holy_wave'?0xffd04a:
       w.kind==='rocket_arrow'||w.kind==='giant_fireball'?0xff6b32:
-      w.kind==='frost_pistol'?0x86ecff:
       w.kind==='elemental'?(mageElementToggle?0x66d9ff:0xff723d):
       w.kind==='star'?0xcaa7ff:
       (state.avatarType==='rogue'?0x72e6ff:0xe8c078)})
@@ -9882,8 +9432,6 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
     b.splashMult=w.splashMult||1;
     b.pierces=w.pierce||0;
     if(w.kind==='giant_fireball'){ b.mesh.scale.setScalar(3.0); spawnArcaneSigil(startX,0,startZ,1.25); }
-    if(w.kind==='frost_pistol'||w.kind==='fish_frenzy'){ b.mesh.scale.set(.72,.72,1.35); b.pierces=w.kind==='fish_frenzy'?1:(w.pierce||0); spawnBurst(startX,startY,startZ,7,FX_MAT_DUST,2.4); }
-    if(w.kind==='snowball_barrage'){ b.mesh.scale.setScalar(1.45); b.splash=1.25; spawnBurst(startX,startY,startZ,10,FX_MAT_DUST,3.0); }
     if(w.kind==='elemental'){ b.mesh.scale.setScalar(1.45); spawnBurst(startX,startY,startZ,10,mageElementToggle?FX_MAT_DUST:FX_MAT_SPARK,3.0); }
     if(w.kind==='rocket_arrow') b.mesh.scale.setScalar(1.55);
     if(w.kind==='holy_wave'){b.mesh.scale.set(3.4,1.8,.55);b.pierces=2;spawnKnightCleave({x:startX,y:startY-.9,z:startZ},player.rotation.y,0,1.25);}
@@ -9927,11 +9475,6 @@ function doShoot(){
   } else if(w.kind==='multi_arrow'){
     [-0.34,-0.17,0,0.17,0.34].forEach(a=>shootFromPosition(w,player.position,a));
     spawnArcherMuzzleFan();
-  } else if(w.kind==='snowball_barrage'){
-    [-0.48,-0.32,-0.16,0,0.16,0.32,0.48].forEach(a=>shootFromPosition(w,player.position,a));
-    spawnBurst(player.position.x,player.position.y+.8,player.position.z,18,FX_MAT_DUST,4.0);
-  } else if(w.kind==='snow_turret'){
-    deploySnowTurret(w);
   } else if(w.kind==='chain'){
     if(player.userData.playKayClip) player.userData.playKayClip(findClipByWords(['magic']),true,true,0.3);
     chainElementAttack(w);
@@ -9945,13 +9488,7 @@ function doShoot(){
       mageCastStep=(mageCastStep+1)%4;
       spawnMageBasicCone(mageElementToggle);
     }
-    if(state.avatarType==='frostwing' && (w.kind==='frost_pistol'||w.kind==='fish_frenzy')){
-      const dualW={...w,damage:w.damage*.56};
-      shootFromPosition(dualW,player.position,-0.018,-0.23);
-      shootFromPosition(dualW,player.position, 0.018, 0.23);
-    } else {
-      shootFromPosition(w,player.position,0);
-    }
+    shootFromPosition(w,player.position,0);
     if(state.avatarType==='rogue'){archerVolleyStep=(archerVolleyStep+1)%3;spawnArcherMuzzleFan(archerVolleyStep===0);}
     if(state.avatarType==='hooded') cloneAttack(w);
   }
@@ -10046,12 +9583,6 @@ function killZombie(z){
   if(state.avatarType==='mage'){mageUltimateCharge=Math.min(100,mageUltimateCharge+4);updateHoodedHud();}
   if(state.avatarType==='knight'){knightUltimateCharge=Math.min(100,knightUltimateCharge+4);spawnBurst(z.position.x,z.position.y+.8,z.position.z,12,FX_MAT_SPARK,3.5);updateHoodedHud();}
   if(state.avatarType==='barbarian'){barbarianUltimateCharge=Math.min(100,barbarianUltimateCharge+4);spawnBurst(z.position.x,z.position.y+.8,z.position.z,16,FX_MAT_SPARK,4.2);updateHoodedHud();}
-  if(state.avatarType==='frostwing'){
-    frostwingUltimateCharge=Math.min(100,frostwingUltimateCharge+4); frostwingKillChain++;
-    spawnBurst(z.position.x,z.position.y+.8,z.position.z,14,FX_MAT_DUST,4.0);
-    if(frostwingKillChain>=6){frostwingKillChain=0;fishFrenzyTimer=6;toast('FISH FRENZY! Rapid frost fire');navigator.vibrate&&navigator.vibrate([35,25,80]);}
-    updateHoodedHud();
-  }
   runTokens += tokensPerKill();
   updateRunTokensHud();
   // Feed the spawn queue: keeps the on-screen crowd near the cap
@@ -10221,9 +9752,6 @@ function update(dt){
   updateArcaneCataclysm(dt);
   updateKingsJudgment(dt);
   updatePrimalRage(dt);
-  updateBlizzardProtocol(dt);
-  updateSnowTurrets(dt);
-  if(fishFrenzyTimer>0){fishFrenzyTimer=Math.max(0,fishFrenzyTimer-dt);updateHoodedHud();}
   if(player && player.userData.kayMixer){
     player.userData.kayMixer.update(dt);
     player.userData.kayActionLock = Math.max(0, (player.userData.kayActionLock || 0) - dt);
@@ -10292,32 +9820,16 @@ function update(dt){
   if(dashCooldownTimer>0) dashCooldownTimer -= dt;
   if(dashActive){
     if(state.avatarType==='hooded'){shadowAfterimageTimer-=dt;if(shadowAfterimageTimer<=0){spawnAfterimage();shadowAfterimageTimer=.045;spawnShadowSmoke(player.position.x,player.position.y+.45,player.position.z,3);}}
-    if(state.avatarType==='frostwing' && (Math.abs(moveX)+Math.abs(moveY)>.18)){shadowAfterimageTimer-=dt;if(shadowAfterimageTimer<=0){shadowAfterimageTimer=.11;spawnBurst(player.position.x,player.position.y+.08,player.position.z,3,FX_MAT_DUST,1.2);}}
     const nx = player.position.x + dashDir.x*DASH_SPEED*dt;
     const nz = player.position.z + dashDir.z*DASH_SPEED*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
     player.position.x = resolved.x; player.position.z = resolved.z;
-    if(state.avatarType==='frostwing' && player.userData.parts){
-      const p=player.userData.parts;
-      const phase=performance.now()*.022;
-      if(p.legL)p.legL.rotation.x=Math.sin(phase)*.72;
-      if(p.legR)p.legR.rotation.x=-Math.sin(phase)*.72;
-      if(p.armL)p.armL.rotation.x=-Math.sin(phase)*.52;
-      if(p.armR)p.armR.rotation.x=Math.sin(phase)*.52;
-      if(p.torso)p.torso.rotation.x=-.10;
-      if(p.head)p.head.rotation.x=.05;
-    }
     dashTimer -= dt;
     // Hard release safeguard: a dropped mobile frame can never leave the
     // character trapped in dash. Free mode is no longer required to reset it.
     if(dashTimer<=0 || performance.now()-dashStartedAt>DASH_DURATION*1000+180){
       dashActive=false;
       dashTimer=0;
-      if(state.avatarType==='frostwing' && player.userData.parts){
-        const p=player.userData.parts;
-        if(p.torso)p.torso.rotation.x=0;
-        if(p.head)p.head.rotation.x=0;
-      }
     }
   } else if(moveVec.x || moveVec.y){
     const forward = -moveVec.y, strafe = moveVec.x;
@@ -10338,15 +9850,6 @@ function update(dt){
     if(player.userData.parts){
       if(player.userData.parts.legL)player.userData.parts.legL.rotation.x = Math.sin(t)*0.5;
       if(player.userData.parts.legR)player.userData.parts.legR.rotation.x = -Math.sin(t)*0.5;
-      if(state.avatarType==='frostwing'){
-        // Restore the proven opposing arm/leg cadence while the imported
-        // Frostwing asset remains visually static on devices where its GLB
-        // contains no usable baked locomotion clips.
-        if(player.userData.parts.armL)player.userData.parts.armL.rotation.x = -Math.sin(t)*0.50;
-        if(player.userData.parts.armR)player.userData.parts.armR.rotation.x = Math.sin(t)*0.50;
-        if(player.userData.parts.torso)player.userData.parts.torso.rotation.x=-.055;
-        if(player.userData.parts.head)player.userData.parts.head.rotation.x=.025;
-      }
     }
 
     // Camera auto-follow: swing camYaw to catch up behind the character
@@ -10364,13 +9867,6 @@ function update(dt){
     if(player.userData.parts){
       if(player.userData.parts.legL)player.userData.parts.legL.rotation.x=0;
       if(player.userData.parts.legR)player.userData.parts.legR.rotation.x=0;
-      if(state.avatarType==='frostwing'){
-        const idleT=performance.now()*.0032;
-        if(player.userData.parts.armL)player.userData.parts.armL.rotation.x=Math.sin(idleT)*.035;
-        if(player.userData.parts.armR)player.userData.parts.armR.rotation.x=-Math.sin(idleT)*.035;
-        if(player.userData.parts.torso)player.userData.parts.torso.rotation.x=0;
-        if(player.userData.parts.head)player.userData.parts.head.rotation.x=0;
-      }
     }
   }
   // Drive the imported skeleton with its real baked clips.
@@ -10530,7 +10026,7 @@ function startSurvival(){
   enemyProjectiles.forEach(p=>{scene.remove(p.mesh);disposeGroup(p.mesh);});enemyProjectiles=[];
   fx.forEach(f=>scene.remove(f.mesh));
   fx = [];
-  hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;mageUltimateCharge=0;mageUltimateActive=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;frostwingUltimateCharge=0;frostwingUltimateActive=0;frostwingUltimatePulse=0;frostwingKillChain=0;fishFrenzyTimer=0;snowTurrets.forEach(t=>{scene.remove(t.mesh);disposeGroup(t.mesh);});snowTurrets=[];document.body.style.filter='';updateHoodedHud();
+  hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;mageUltimateCharge=0;mageUltimateActive=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;document.body.style.filter='';updateHoodedHud();
   playerStats = {power:1, speed:1, hp:1};
   unspentStatPoints = 0;
   runTokens = 0;
