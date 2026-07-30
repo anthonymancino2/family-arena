@@ -8561,7 +8561,7 @@ function attachFrostPistol(arm, side=1){
 function spawnPlayer(){
   if(!AVATAR_TYPES.includes(state.avatarType)) state.avatarType = 'rogue';
   player = state.avatarType==='frostwing'
-    ? buildImportedFrostwing()
+    ? buildImportedFrostwing({silent:true})
     : buildKayKitPlayer(state.avatarType);
   if(state.avatarType==='frostwing' && player.userData.parts){
     attachFrostPistol(player.userData.parts.armR,-1);
