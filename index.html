@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.8.3: Enemy movement and AI polish — smoother steering, crowd separation, obstacle recovery, steadier targeting, and cleaner animation transitions. -->
+<!-- V22.8.5: Hero Passive System — data-driven passives, hero-select descriptions, and subtle in-game status feedback for all five heroes. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -420,6 +420,7 @@
       <div id="heroInfoTitle" style="font-weight:900;color:#dff7ff;font-size:17px;"></div>
       <div id="heroInfoMeta" style="margin-top:3px;color:#8fdcff;font-size:12px;font-weight:800;letter-spacing:.04em;"></div>
       <div id="heroInfoDesc" style="margin-top:7px;color:#d3e1ec;font-size:13px;line-height:1.35;"></div>
+      <div id="heroPassiveInfo" style="margin-top:10px;padding-top:9px;border-top:1px solid rgba(159,223,255,.18);color:#f5dc8a;font-size:13px;line-height:1.35;"></div>
     </div>
     <div class="subtitle" style="margin:10px 0 14px;">
     </div>
@@ -452,6 +453,7 @@
         <div class="roundTimerPill" id="roundTimerPill">⏱ 0.0s</div>
         <div class="runTokensPill"><div class="coin"></div><span id="runTokensCount">0</span></div>
         <div class="weaponPill" id="weaponPill">Pistol</div>
+        <div class="weaponPill" id="passivePill" style="top:calc(132px + env(safe-area-inset-top));max-width:230px;font-size:11px;">Passive</div>
         <div class="enemyCountPill" id="enemyCountPill">ENEMIES 0</div>
         <canvas class="enemyRadar" id="enemyRadar" width="184" height="184"></canvas>
         <div class="invinciblePill" id="invinciblePill">🛡 <span id="invincibleTime">0</span>s</div>
@@ -559,8 +561,8 @@
 <script>
 (function(){
 
-const GAME_VERSION = '22.8.3';
-const GAME_BUILD_LABEL = `V${GAME_VERSION} · FAIR ENEMY SPAWNS`;
+const GAME_VERSION = '22.8.5';
+const GAME_BUILD_LABEL = `V${GAME_VERSION} · HERO PASSIVES`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
 window.addEventListener('DOMContentLoaded', ()=>{
@@ -630,6 +632,18 @@ const HERO_ROSTER_INFO = {
   knight:{title:'Knight of Dawn',role:'MELEE • EASY',desc:'Durable golden cleaves, shield control, and radiant power.'},
   barbarian:{title:'Fury Barbarian',role:'MELEE • MEDIUM',desc:'Heavy axe combos, ground slams, and relentless momentum.'}
 };
+
+// Data-driven hero passives. New heroes only need one entry here; the
+// shared hooks below read these values without duplicating hero logic.
+const HERO_PASSIVES = {
+  rogue:{name:'Eagle Eye',icon:'🎯',desc:'Arrows fly 18% faster and remain active 15% longer.',projectileSpeedMult:1.18,projectileLifeMult:1.15},
+  hooded:{name:'Shadowstep',icon:'💨',desc:'Defeating an enemy grants 20% movement speed for 2.5 seconds.',killMoveMult:1.20,killMoveDuration:2.5},
+  knight:{name:'Iron Guard',icon:'🛡️',desc:'Every fourth incoming hit is completely blocked.',guardHits:4},
+  barbarian:{name:'Battle Fury',icon:'🔥',desc:'Attack 15% faster while at least three enemies are nearby.',nearbyCount:3,nearbyRadius:5.5,attackSpeedMult:1.15},
+  mage:{name:'Arcane Flow',icon:'✨',desc:'Ultimate charge builds 25% faster from defeated enemies.',ultimateChargeMult:1.25}
+};
+function passiveForAvatar(type=state.avatarType){ return HERO_PASSIVES[type] || HERO_PASSIVES.rogue; }
+
 // Uniform scale applied on top of each avatar's own build — every value
 const AVATAR_SCALE = { rogue:1.0, hooded:1.0, mage:1.0, knight:1.05, barbarian:1.08 };
 const FREE_AVATAR_TYPES = [...AVATAR_TYPES];
@@ -798,6 +812,9 @@ function buildCustomizeUI(){
   if(heroTitle) heroTitle.textContent=heroInfo.title;
   if(heroMeta) heroMeta.textContent=heroInfo.role;
   if(heroDesc) heroDesc.textContent=heroInfo.desc;
+  const passive=passiveForAvatar(state.avatarType);
+  const passiveInfo=document.getElementById('heroPassiveInfo');
+  if(passiveInfo) passiveInfo.innerHTML=`<strong>${passive.icon} ${passive.name}</strong><br>${passive.desc}`;
   updateAvatarPreview(state.avatarType);
 }
 
@@ -956,6 +973,7 @@ let enemySpawnRetryTimer = null;    // one shared retry timer prevents failed sp
 // ---- Player progression: 1 point in each stat by default (3 total),
 // +1 unspent point awarded every round clear for the player to place.
 let playerStats = {power:1, speed:1, hp:1};
+let passiveState = {shadowstepTimer:0, knightHitCounter:0, battleFuryActive:false};
 let unspentStatPoints = 0;
 let runTokens = 0;             // per-run currency, earned by killing zombies, spent at the shop
 let crystalsEarned = 0;        // this run's crystal total, earned per round cleared, saved to the profile at run end
@@ -8455,6 +8473,30 @@ function pickStat(stat){
   if(gameRunning) startRound();
 }
 
+function countNearbyLivingEnemies(radius){
+  if(!player) return 0;
+  let count=0;
+  for(const z of zombies){
+    if(!z.userData.dead && !z.userData.spawnPending && Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=radius) count++;
+  }
+  return count;
+}
+function refreshPassiveState(dt=0){
+  if(passiveState.shadowstepTimer>0) passiveState.shadowstepTimer=Math.max(0,passiveState.shadowstepTimer-dt);
+  const p=passiveForAvatar();
+  passiveState.battleFuryActive=state.avatarType==='barbarian' && countNearbyLivingEnemies(p.nearbyRadius||0)>=(p.nearbyCount||999);
+}
+function updatePassiveHud(){
+  const el=document.getElementById('passivePill');
+  if(!el) return;
+  const p=passiveForAvatar();
+  let suffix='';
+  if(state.avatarType==='hooded' && passiveState.shadowstepTimer>0) suffix=` · ACTIVE ${passiveState.shadowstepTimer.toFixed(1)}s`;
+  else if(state.avatarType==='knight') suffix=` · GUARD ${passiveState.knightHitCounter}/${p.guardHits}`;
+  else if(state.avatarType==='barbarian') suffix=passiveState.battleFuryActive?' · ACTIVE':'';
+  el.textContent=`${p.icon} ${p.name}${suffix}`;
+}
+
 function updateRunTokensHud(){
   document.getElementById('runTokensCount').textContent = runTokens;
   const shopTokens = document.getElementById('shopTokensCount');
@@ -9035,7 +9077,8 @@ function fireBullet(dx, dy, dz, startX, startY, startZ, weapon){
 
   const dmg = weapon.damage >= 999 ? 999 : weapon.damage * playerStats.power;
   bullets.push({
-    mesh:bullet, dx, dy, dz, life:1.15,
+    mesh:bullet, dx, dy, dz, life:1.15*(passiveForAvatar().projectileLifeMult||1),
+    speedMult:passiveForAvatar().projectileSpeedMult||1,
     damage:dmg, splash:weapon.splash||0,
     pulse:Math.random()*Math.PI*2, ricochets:weapon.kind==='star'?1:0
   });
@@ -9049,6 +9092,8 @@ function findClipByWords(parts, fallback='1H_Melee_Attack_Chop'){
 }
 function attackCooldownFor(w){
   let factor = 1 + (playerStats.speed-1)*0.16;
+  const passive=passiveForAvatar();
+  if(state.avatarType==='barbarian' && passiveState.battleFuryActive) factor*=passive.attackSpeedMult||1;
   if(w.fireRateCap) factor = Math.min(w.fireRateCap, factor);
   return w.cooldown / factor;
 }
@@ -9637,9 +9682,9 @@ function updateBullets(dt){
   const speed = 18;
   for(let i=bullets.length-1;i>=0;i--){
     const b = bullets[i];
-    b.mesh.position.x += b.dx*speed*dt;
-    b.mesh.position.y += b.dy*speed*dt;
-    b.mesh.position.z += b.dz*speed*dt;
+    b.mesh.position.x += b.dx*speed*(b.speedMult||1)*dt;
+    b.mesh.position.y += b.dy*speed*(b.speedMult||1)*dt;
+    b.mesh.position.z += b.dz*speed*(b.speedMult||1)*dt;
     b.pulse = (b.pulse || 0) + dt*18;
     if(b.mesh.children[1]){
       const pulseScale = 0.9 + Math.sin(b.pulse)*0.15;
@@ -9692,9 +9737,9 @@ function killZombie(z){
   kills++; roundKillsDone++;
   updateEnemyCountHud();
   updateEnemyRadar();
-  if(state.avatarType==='hooded'){spawnSoulOrb(z.position);hoodedUltimateCharge=Math.min(100,hoodedUltimateCharge+4);updateHoodedHud();}
+  if(state.avatarType==='hooded'){spawnSoulOrb(z.position);hoodedUltimateCharge=Math.min(100,hoodedUltimateCharge+4);passiveState.shadowstepTimer=passiveForAvatar().killMoveDuration||0;updateHoodedHud();}
   if(state.avatarType==='rogue'){archerUltimateCharge=Math.min(100,archerUltimateCharge+4);spawnArcherSpark(z.position.x,z.position.y+0.8,z.position.z);updateHoodedHud();}
-  if(state.avatarType==='mage'){mageUltimateCharge=Math.min(100,mageUltimateCharge+4);updateHoodedHud();}
+  if(state.avatarType==='mage'){mageUltimateCharge=Math.min(100,mageUltimateCharge+4*(passiveForAvatar().ultimateChargeMult||1));updateHoodedHud();}
   if(state.avatarType==='knight'){knightUltimateCharge=Math.min(100,knightUltimateCharge+4);spawnBurst(z.position.x,z.position.y+.8,z.position.z,12,FX_MAT_SPARK,3.5);updateHoodedHud();}
   if(state.avatarType==='barbarian'){barbarianUltimateCharge=Math.min(100,barbarianUltimateCharge+4);spawnBurst(z.position.x,z.position.y+.8,z.position.z,16,FX_MAT_SPARK,4.2);updateHoodedHud();}
   runTokens += tokensPerKill();
@@ -9739,6 +9784,18 @@ function killZombie(z){
 function playerTakeHit(){
   if(freeMode) return; // invincible while free-roaming
   if(invincibleTimer > 0) return; // invincible from a power-up pickup
+  if(state.avatarType==='knight'){
+    const p=passiveForAvatar();
+    passiveState.knightHitCounter++;
+    if(passiveState.knightHitCounter>=p.guardHits){
+      passiveState.knightHitCounter=0;
+      spawnKnightGuardBurst(player.position,1.7);
+      toast('Iron Guard blocked the hit!');
+      navigator.vibrate&&navigator.vibrate(24);
+      updatePassiveHud();
+      return;
+    }
+  }
   hearts--;
   heartsLostThisRound++;
   renderHearts();
@@ -9951,7 +10008,8 @@ function update(dt){
     const len = Math.hypot(mx,mz)||1;
     const speedStat = playerStats.speed;
     const characterMoveMult = combatForAvatar().baseMoveMult || 1;
-    const speed = PLAYER_SPEED * characterMoveMult * (1 + (speedStat-1)*0.15);
+    const passiveMoveMult=(state.avatarType==='hooded' && passiveState.shadowstepTimer>0)?(passiveForAvatar().killMoveMult||1):1;
+    const speed = PLAYER_SPEED * characterMoveMult * passiveMoveMult * (1 + (speedStat-1)*0.15);
     const nx = player.position.x + (mx/len)*speed*dt;
     const nz = player.position.z + (mz/len)*speed*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
@@ -10029,6 +10087,8 @@ function update(dt){
   }
 
   if(player.userData.attackCooldown>0) player.userData.attackCooldown -= dt;
+  refreshPassiveState(dt);
+  updatePassiveHud();
   // Whirlwind is a real full-body spin, independent of whichever KayKit arm clip exists.
   // Rotating only the imported visual root preserves movement direction and controls.
   if(player.userData.spinVisualTimer>0){
@@ -10188,6 +10248,8 @@ function startSurvival(){
   fx = [];
   hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;mageUltimateCharge=0;mageUltimateActive=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;document.body.style.filter='';updateHoodedHud();
   playerStats = {power:1, speed:1, hp:1};
+  passiveState = {shadowstepTimer:0, knightHitCounter:0, battleFuryActive:false};
+  updatePassiveHud();
   unspentStatPoints = 0;
   runTokens = 0;
   crystalsEarned = 0;
