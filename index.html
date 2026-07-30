@@ -6,8 +6,8 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V22.6 Frostwing Complete Fix</title>
-<!-- V22.6: consistent transparent Cataclysm, restored Frostwing animation states, smooth dash, dual-gun fire. -->
+<title>Family Arena — V22.7 Shared Animation + Dash Fix</title>
+<!-- V22.7: Frostwing uses the same articulated avatar movement cadence; dash has a hard release safeguard. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -8561,8 +8561,13 @@ function attachFrostPistol(arm, side=1){
 function spawnPlayer(){
   if(!AVATAR_TYPES.includes(state.avatarType)) state.avatarType = 'rogue';
   player = state.avatarType==='frostwing'
-    ? buildImportedFrostwing()
+    ? buildPenguin(0x24292d,0x55cfff,0x55cfff)
     : buildKayKitPlayer(state.avatarType);
+  if(state.avatarType==='frostwing' && player.userData.parts){
+    attachFrostPistol(player.userData.parts.armR,-1);
+    attachFrostPistol(player.userData.parts.armL,1);
+    player.userData.sharedAvatarMotion=true;
+  }
   const avatarScale = AVATAR_SCALE[state.avatarType] || 1;
   player.scale.setScalar(avatarScale);
   player.userData.avatarScale = avatarScale;
@@ -9064,7 +9069,7 @@ function applyCameraMode(){
 
 let vy = 0, onGround = true, wasAirborne = false, jumpsUsed = 0;
 const MAX_JUMPS = 2;
-let dashActive = false, dashTimer = 0, dashCooldownTimer = 0, dashDir = {x:0,z:1};
+let dashActive = false, dashTimer = 0, dashCooldownTimer = 0, dashDir = {x:0,z:1}, dashStartedAt = 0;
 // Free-roam: fly anywhere around the stage with no gravity and no
 // damage taken. Handy for actually looking at an environment properly
 // instead of fighting through it. Dedicated UP/DOWN buttons appear for
@@ -9084,7 +9089,7 @@ function toggleFreeMode(){
   document.getElementById('actBtn').classList.toggle('freeHide', freeMode);
   if(freeMode){
     runUsedFreeMode = true; // this run no longer counts for the leaderboard
-    vy = 0; dashActive = false;
+    vy = 0; dashActive = false; dashTimer = 0; dashStartedAt = 0;
   } else {
     freeUp = false; freeDown = false;
   }
@@ -9096,14 +9101,12 @@ function doDash(){
   if(!gameRunning || dashActive || dashCooldownTimer>0) return;
   dashActive = true;
   dashTimer = DASH_DURATION;
+  dashStartedAt = performance.now();
   dashCooldownTimer = DASH_COOLDOWN;
   dashDir.x = Math.sin(player.rotation.y);
   dashDir.z = Math.cos(player.rotation.y);
-  if(player.userData.playKayClip && state.avatarType!=='frostwing'){
+  if(player.userData.playKayClip){
     player.userData.playKayClip('Dodge_Forward', true, true, 0.34);
-  } else if(!player.userData.playKayClip) {
-    player.scale.set(1.35,0.8,1.35);
-    setTimeout(()=>{ if(player) player.scale.set(1,1,1); }, 130);
   }
   if(state.avatarType==='hooded'){spawnShadowSmoke(player.position.x,player.position.y+.55,player.position.z,24);spawnAfterimage();shadowAfterimageTimer=.04;invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.12);}
   else if(state.avatarType==='frostwing'){
@@ -9632,7 +9635,7 @@ function triggerArcaneCataclysm(){
   if(!gameRunning||state.avatarType!=='mage'||mageUltimateActive>0)return;
   if(mageUltimateCharge<99.5){toast('Arcane Cataclysm is still charging');return;}
   mageUltimateCharge=0;mageUltimateActive=4.2;mageUltimatePulse=0;updateHoodedHud();
-  document.body.style.filter='brightness(.88) saturate(1.12)';
+  document.body.style.filter='brightness(.96) saturate(1.04)';
   spawnArcaneSigil(player.position.x,player.position.y,player.position.z,5.5);spawnChainLightning(player.position,10,1.8);
   triggerCombatShake(14,360);navigator.vibrate&&navigator.vibrate([70,35,140]);toast('ARCANE CATACLYSM!');
 }
@@ -10287,18 +10290,27 @@ function update(dt){
     const nz = player.position.z + dashDir.z*DASH_SPEED*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
     player.position.x = resolved.x; player.position.z = resolved.z;
-    if(state.avatarType==='frostwing'&&player.userData.kayRoot){
-      const root=player.userData.kayRoot;
-      const baseY=Number.isFinite(player.userData.frostBaseY)?player.userData.frostBaseY:root.position.y;
-      const phase=performance.now()*.018;
-      root.rotation.z=Math.sin(phase)*.08;
-      root.position.y=baseY+Math.abs(Math.sin(phase))*.04;
+    if(state.avatarType==='frostwing' && player.userData.parts){
       const p=player.userData.parts;
-      if(p){ if(p.armL)p.armL.rotation.x=Math.sin(phase)*.32; if(p.armR)p.armR.rotation.x=-Math.sin(phase)*.32; }
+      const phase=performance.now()*.022;
+      if(p.legL)p.legL.rotation.x=Math.sin(phase)*.72;
+      if(p.legR)p.legR.rotation.x=-Math.sin(phase)*.72;
+      if(p.armL)p.armL.rotation.x=-Math.sin(phase)*.52;
+      if(p.armR)p.armR.rotation.x=Math.sin(phase)*.52;
+      if(p.torso)p.torso.rotation.x=-.10;
+      if(p.head)p.head.rotation.x=.05;
     }
     dashTimer -= dt;
-    if(dashTimer<=0){
+    // Hard release safeguard: a dropped mobile frame can never leave the
+    // character trapped in dash. Free mode is no longer required to reset it.
+    if(dashTimer<=0 || performance.now()-dashStartedAt>DASH_DURATION*1000+180){
       dashActive=false;
+      dashTimer=0;
+      if(state.avatarType==='frostwing' && player.userData.parts){
+        const p=player.userData.parts;
+        if(p.torso)p.torso.rotation.x=0;
+        if(p.head)p.head.rotation.x=0;
+      }
     }
   } else if(moveVec.x || moveVec.y){
     const forward = -moveVec.y, strafe = moveVec.x;
@@ -10320,16 +10332,12 @@ function update(dt){
       if(player.userData.parts.legL)player.userData.parts.legL.rotation.x = Math.sin(t)*0.5;
       if(player.userData.parts.legR)player.userData.parts.legR.rotation.x = -Math.sin(t)*0.5;
       if(state.avatarType==='frostwing'){
-        if(player.userData.parts.armL)player.userData.parts.armL.rotation.x = -Math.sin(t)*0.38;
-        if(player.userData.parts.armR)player.userData.parts.armR.rotation.x = Math.sin(t)*0.38;
+        // Same opposing arm/leg cadence used by a humanoid run cycle.
+        if(player.userData.parts.armL)player.userData.parts.armL.rotation.x = -Math.sin(t)*0.50;
+        if(player.userData.parts.armR)player.userData.parts.armR.rotation.x = Math.sin(t)*0.50;
+        if(player.userData.parts.torso)player.userData.parts.torso.rotation.x=-.055;
+        if(player.userData.parts.head)player.userData.parts.head.rotation.x=.025;
       }
-    }
-    if(state.avatarType==='frostwing'&&player.userData.kayRoot){
-      const root=player.userData.kayRoot;
-      const baseY=Number.isFinite(player.userData.frostBaseY)?player.userData.frostBaseY:root.position.y;
-      root.rotation.z=Math.sin(t*.72)*.075;
-      root.rotation.x=(player.userData.frostBaseRotationX||0)+Math.sin(t*1.44)*.025;
-      root.position.y=baseY+Math.abs(Math.sin(t*.72))*.055;
     }
 
     // Camera auto-follow: swing camYaw to catch up behind the character
@@ -10348,17 +10356,12 @@ function update(dt){
       if(player.userData.parts.legL)player.userData.parts.legL.rotation.x=0;
       if(player.userData.parts.legR)player.userData.parts.legR.rotation.x=0;
       if(state.avatarType==='frostwing'){
-        const idleT=performance.now()*.0035;
-        if(player.userData.parts.armL)player.userData.parts.armL.rotation.x=Math.sin(idleT)*.08;
-        if(player.userData.parts.armR)player.userData.parts.armR.rotation.x=-Math.sin(idleT)*.08;
+        const idleT=performance.now()*.0032;
+        if(player.userData.parts.armL)player.userData.parts.armL.rotation.x=Math.sin(idleT)*.035;
+        if(player.userData.parts.armR)player.userData.parts.armR.rotation.x=-Math.sin(idleT)*.035;
+        if(player.userData.parts.torso)player.userData.parts.torso.rotation.x=0;
+        if(player.userData.parts.head)player.userData.parts.head.rotation.x=0;
       }
-    }
-    if(state.avatarType==='frostwing'&&player.userData.kayRoot){
-      const root=player.userData.kayRoot;
-      const baseY=Number.isFinite(player.userData.frostBaseY)?player.userData.frostBaseY:0;
-      root.rotation.z*=.78;
-      root.rotation.x += ((player.userData.frostBaseRotationX||0)-root.rotation.x)*Math.min(1,dt*12);
-      root.position.y += (baseY-root.position.y)*Math.min(1,dt*14);
     }
   }
   // Drive the imported skeleton with its real baked clips.
@@ -10535,7 +10538,7 @@ function startSurvival(){
   vy = 0; onGround = true; wasAirborne = false; jumpsUsed = 0;
   runUsedFreeMode = false;
   if(freeMode) toggleFreeMode(); // always start a fresh run in normal play
-  dashActive = false; dashTimer = 0; dashCooldownTimer = 0;
+  dashActive = false; dashTimer = 0; dashCooldownTimer = 0; dashStartedAt = 0;
   if(player){ scene.remove(player); disposeGroup(player); }
   spawnPlayer();
   renderHearts();
@@ -10625,7 +10628,7 @@ document.getElementById('btnResultsHome').onclick = ()=>{
 
 })();
 </script>
-<div id="buildStamp" style="position:fixed;right:8px;bottom:8px;z-index:99999;font:700 11px/1.2 system-ui;color:#7dd3fc;background:#07111dcc;border:1px solid #38bdf8;border-radius:8px;padding:5px 7px;pointer-events:none">BUILD V22.6-FIX</div>
+<div id="buildStamp" style="position:fixed;right:8px;bottom:8px;z-index:99999;font:700 11px/1.2 system-ui;color:#7dd3fc;background:#07111dcc;border:1px solid #38bdf8;border-radius:8px;padding:5px 7px;pointer-events:none">BUILD V22.7-FIX</div>
 </body>
 </html>
 
