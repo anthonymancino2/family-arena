@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.8.8: Arcane Visual Balance — vivid colored Mage effects with fast cleanup and no blinding screen coverage. -->
+<!-- V22.8.9: Mage Spectacle — the Mage now has the game's flashiest readable effects with strict fade and cleanup safeguards. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -562,7 +562,7 @@
 <script>
 (function(){
 
-const GAME_VERSION = '22.8.8';
+const GAME_VERSION = '22.8.9';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · STABLE SKILL FX`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -9014,9 +9014,13 @@ function updateFx(dt){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);const p=1-q;f.mesh.scale.setScalar(.55+p*1.45);f.mesh.rotation.y+=(f.spin||3)*dt;f.mesh.traverse(o=>{if(o.material)o.material.opacity=q*(o.userData.baseOpacity||.58);});
     } else if(f.kind==='arcaneAura'){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.rotation.y+=(f.spin||4.5)*dt;f.mesh.scale.setScalar(.9+(1-q)*.32);f.mesh.traverse(o=>{if(o.material)o.material.opacity=q*(o.userData.baseOpacity||.45);});
+    } else if(f.kind==='arcanePillars'){
+      f.life-=dt;const q=Math.max(0,f.life/f.maxLife);const p=1-q;f.mesh.rotation.y+=(f.spin||1.5)*dt;f.mesh.scale.set(1, .72+p*.45, 1);f.mesh.traverse(o=>{if(o.material)o.material.opacity=q*(o.userData.baseOpacity||.38);});
+    } else if(f.kind==='arcaneRuneBurst'){
+      f.life-=dt;const q=Math.max(0,f.life/f.maxLife);const p=1-q;f.mesh.rotation.y+=(f.spin||6)*dt;f.mesh.scale.setScalar(.55+p*1.15);f.mesh.traverse(o=>{if(o.material)o.material.opacity=q*(o.userData.baseOpacity||.62);});
     } else if(f.kind==='lightning'){
       f.life-=dt;
-      f.mesh.material.opacity=Math.max(0,f.life/f.maxLife)*.42;
+      f.mesh.material.opacity=Math.max(0,f.life/f.maxLife)*.68;
     } else if(f.kind==='spawnWarning'){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.rotation.z+=(f.spin||6)*dt;f.mesh.scale.setScalar(.88+(1-q)*.18);if(f.mesh.material)f.mesh.material.opacity=q*.72;
     } else if(f.kind==='barbarianArc'){
@@ -9455,6 +9459,35 @@ function spawnArcaneAura(origin){
   }
   g.position.set(origin.x,origin.y,origin.z);scene.add(g);fx.push({kind:'arcaneAura',mesh:g,life:.72,maxLife:.72,spin:4.8,dispose:true});
 }
+function spawnArcanePillars(origin){
+  const g=new THREE.Group();
+  const colors=[0x35cfff,0xb85cff,0xff5a24,0xffc14d];
+  for(let i=0;i<8;i++){
+    const a=i*Math.PI/4;
+    const mat=new THREE.MeshBasicMaterial({color:colors[i%colors.length],transparent:true,opacity:.38,depthWrite:false,blending:THREE.AdditiveBlending});
+    const pillar=new THREE.Mesh(new THREE.CylinderGeometry(.055,.18,2.4+(i%2)*.7,8,1,true),mat);
+    pillar.position.set(Math.sin(a)*(2.05+(i%2)*.42),1.15,Math.cos(a)*(2.05+(i%2)*.42));
+    pillar.rotation.z=(i%2?-.10:.10);pillar.userData.baseOpacity=.38;g.add(pillar);
+    const cap=new THREE.Mesh(new THREE.OctahedronGeometry(.13,0),mat);
+    cap.position.set(pillar.position.x,2.45+(i%2)*.35,pillar.position.z);cap.userData.baseOpacity=.48;g.add(cap);
+  }
+  g.position.set(origin.x,origin.y,origin.z);scene.add(g);fx.push({kind:'arcanePillars',mesh:g,life:.62,maxLife:.62,spin:1.8,dispose:true});
+}
+function spawnArcaneRuneBurst(origin,radius=3.4){
+  const g=new THREE.Group();
+  const colors=[0x35cfff,0xb85cff,0xff5a24,0xffc14d];
+  for(let i=0;i<12;i++){
+    const a=i*Math.PI/6;
+    const mat=new THREE.MeshBasicMaterial({color:colors[i%4],transparent:true,opacity:.62,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+    const rune=new THREE.Mesh(new THREE.RingGeometry(.09,.20,6),mat);
+    rune.rotation.x=-Math.PI/2;rune.rotation.z=a;
+    rune.position.set(Math.sin(a)*radius,.12+(i%3)*.06,Math.cos(a)*radius);
+    rune.userData.baseOpacity=.62;g.add(rune);
+  }
+  const centerMat=new THREE.MeshBasicMaterial({color:0xb85cff,transparent:true,opacity:.34,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const center=new THREE.Mesh(new THREE.RingGeometry(radius*.18,radius*.32,32),centerMat);center.rotation.x=-Math.PI/2;center.position.y=.04;center.userData.baseOpacity=.34;g.add(center);
+  g.position.set(origin.x,origin.y,origin.z);scene.add(g);fx.push({kind:'arcaneRuneBurst',mesh:g,life:.46,maxLife:.46,spin:7.5,dispose:true});
+}
 function spawnArcaneMeteor(target,element){
   const fire=element==='fire';
   const g=new THREE.Group();
@@ -9478,7 +9511,7 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
     applyBulletDamage(z,damage*playerStats.power);
     const to=new THREE.Vector3(z.position.x,z.position.y+.8,z.position.z);
     const mid=from.clone().add(to).multiplyScalar(.5); const len=from.distanceTo(to);
-    const beam=new THREE.Mesh(new THREE.CylinderGeometry(.035,.08,len,6),new THREE.MeshBasicMaterial({color:i%2?0xffffff:0x72ddff,transparent:true,opacity:.20,depthWrite:false,blending:THREE.NormalBlending}));
+    const beam=new THREE.Mesh(new THREE.CylinderGeometry(.045,.11,len,7),new THREE.MeshBasicMaterial({color:i%2?0xb85cff:0x35cfff,transparent:true,opacity:.62,depthWrite:false,blending:THREE.NormalBlending}));
     beam.position.copy(mid);beam.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),to.clone().sub(from).normalize());scene.add(beam);
     fx.push({kind:'lightning',mesh:beam,life:.12,maxLife:.12,dispose:true});spawnBurst(to.x,to.y,to.z,4,FX_MAT_SPARK,2.0);from=to;
   });
@@ -9486,23 +9519,23 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
 function triggerArcaneCataclysm(){
   if(!gameRunning||state.avatarType!=='mage'||mageUltimateActive>0)return;
   if(mageUltimateCharge<99.5){toast('Arcane Cataclysm is still charging');return;}
-  mageUltimateCharge=0;mageUltimateActive=2.6;mageUltimatePulse=0;updateHoodedHud();
+  mageUltimateCharge=0;mageUltimateActive=3.0;mageUltimatePulse=0;updateHoodedHud();
   document.body.style.filter='saturate(1.08) contrast(1.02)';
-  spawnArcaneAura(player.position);spawnArcaneSigil(player.position.x,player.position.y,player.position.z,4.4);spawnChainLightning(player.position,6,1.8);
+  spawnArcaneAura(player.position);spawnArcanePillars(player.position);spawnArcaneRuneBurst(player.position,3.7);spawnArcaneSigil(player.position.x,player.position.y,player.position.z,4.4);spawnChainLightning(player.position,8,1.8);
   triggerCombatShake(10,260);navigator.vibrate&&navigator.vibrate([55,30,100]);toast('ARCANE CATACLYSM!');
 }
 function updateArcaneCataclysm(dt){
   if(mageUltimateActive<=0)return;
   mageUltimateActive-=dt;mageUltimatePulse-=dt;
   if(mageUltimatePulse<=0){
-    mageUltimatePulse=.42;
-    const live=zombies.filter(z=>!z.userData.dead).slice(0,7);
+    mageUltimatePulse=.38;
+    const live=zombies.filter(z=>!z.userData.dead).slice(0,9);
     live.forEach((z,i)=>{spawnArcaneMeteor(z.position,i%2?'ice':'fire');applyBulletDamage(z,1.35*playerStats.power);});
     // One short lightning chain per pulse is readable and has a guaranteed cleanup.
-    spawnArcaneAura(player.position);spawnChainLightning(player.position,Math.min(5,live.length),1.05);
+    spawnArcaneAura(player.position);spawnArcaneRuneBurst(player.position,2.6+Math.random()*1.0);spawnChainLightning(player.position,Math.min(7,live.length),1.05);
     damageNearby(player.position,6.5,.75);triggerCombatShake(4,70);
   }
-  if(mageUltimateActive<=0){document.body.style.filter='';spawnArcaneSigil(player.position.x,player.position.y,player.position.z,4.8);damageNearby(player.position,6.2,2.5);triggerCombatShake(9,180);}
+  if(mageUltimateActive<=0){document.body.style.filter='';spawnArcanePillars(player.position);spawnArcaneRuneBurst(player.position,4.4);spawnArcaneSigil(player.position.x,player.position.y,player.position.z,4.8);spawnChainLightning(player.position,9,1.4);damageNearby(player.position,6.2,2.5);triggerCombatShake(11,220);}
 }
 
 
