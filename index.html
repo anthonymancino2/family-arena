@@ -6,8 +6,8 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V22.5 Animation, Dash & Transparency Repair</title>
-<!-- V22.5: transparent Mage Cataclysm, real Frostwing idle/run animation, stateless Frostwing dash. -->
+<title>Family Arena — V22.6 Frostwing Complete Fix</title>
+<!-- V22.6: consistent transparent Cataclysm, restored Frostwing animation states, smooth dash, dual-gun fire. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -359,7 +359,7 @@
 <div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
 background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
 padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
-V22.5 · ANIMATION + DASH + TRANSPARENCY
+V22.6 · FROSTWING COMPLETE FIX
 </div>
 <div id="app">
 
@@ -382,7 +382,7 @@ V22.5 · ANIMATION + DASH + TRANSPARENCY
           <button class="bigBtn" id="btnGoModes">Play</button>
           <button class="ghostBtn" id="btnGoShop">Crystal<br>Shop</button>
         </div>
-        <div class="homeVersion">FAMILY ARENA · V22.4 THREE-ISSUE REPAIR</div>
+        <div class="homeVersion">FAMILY ARENA · V22.6 FROSTWING COMPLETE FIX</div>
       </div>
     </div>
   </div>
@@ -8377,7 +8377,7 @@ function buildImportedFrostwing(options={}){
     wrapper.userData.playKayClip=function(name,force=false,oneShot=false,lockSeconds=0){
       if(this.kayActionLock>0&&!force)return;
       const aliases={
-        Idle:['idle','stand'],Running_A:['run','walk'],Dodge_Forward:['jump','roll','run'],Jump_Start:['jump'],Jump_Full_Short:['jump'],Jump_Land:['land','idle'],
+        Idle:['idle','stand','breath'],Running_A:['run','running','walk','walking','move'],Dodge_Forward:['jump','roll','run'],Jump_Start:['jump'],Jump_Full_Short:['jump'],Jump_Land:['land','idle'],
         '1H_Ranged_Shoot':['attack','shoot','punch'], '1H_Melee_Attack_Chop':['attack','punch']
       };
       const requested=(this.kayClips&&this.kayClips[name])||findImportedClip(gltf.animations||[],aliases[name]||[name])||findImportedClip(gltf.animations||[],['idle'])||(gltf.animations||[])[0];
@@ -9090,56 +9090,29 @@ function toggleFreeMode(){
   }
   toast(freeMode ? 'Free roam on — invincible' : 'Free roam off');
 }
-const DASH_SPEED = 24, DASH_DURATION = 0.16, DASH_COOLDOWN = 0.55;
+const DASH_SPEED = 12.8, DASH_DURATION = 0.30, DASH_COOLDOWN = 0.55;
 
 function doDash(){
-  if(!gameRunning || dashActive || dashCooldownTimer>0 || !player) return;
+  if(!gameRunning || dashActive || dashCooldownTimer>0) return;
+  dashActive = true;
+  dashTimer = DASH_DURATION;
   dashCooldownTimer = DASH_COOLDOWN;
   dashDir.x = Math.sin(player.rotation.y);
   dashDir.z = Math.cos(player.rotation.y);
-
+  if(player.userData.playKayClip && state.avatarType!=='frostwing'){
+    player.userData.playKayClip('Dodge_Forward', true, true, 0.34);
+  } else if(!player.userData.playKayClip) {
+    player.scale.set(1.35,0.8,1.35);
+    setTimeout(()=>{ if(player) player.scale.set(1,1,1); }, 130);
+  }
+  if(state.avatarType==='hooded'){spawnShadowSmoke(player.position.x,player.position.y+.55,player.position.z,24);spawnAfterimage();shadowAfterimageTimer=.04;invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.12);}
+  else if(state.avatarType==='frostwing'){
+    invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.10);
+  } else spawnBurst(player.position.x,0.4,player.position.z,9,FX_MAT_DUST,3.4);
   const btn = document.getElementById('dashBtn');
-  if(btn){
-    btn.classList.add('cooling');
-    setTimeout(()=>btn.classList.remove('cooling'), DASH_COOLDOWN*1000);
-  }
-
-  // Frostwing uses a stateless burst. It never enters the persistent
-  // dashActive state, so the character cannot become trapped waiting for
-  // a dash animation or timer to release it.
-  if(state.avatarType==='frostwing'){
-    const totalDistance=DASH_SPEED*DASH_DURATION;
-    const steps=8;
-    for(let i=0;i<steps;i++){
-      const nx=player.position.x+dashDir.x*(totalDistance/steps);
-      const nz=player.position.z+dashDir.z*(totalDistance/steps);
-      const resolved=freeMode?{x:nx,z:nz}:resolveCollision(nx,nz,player.position.y);
-      player.position.x=resolved.x;
-      player.position.z=resolved.z;
-    }
-    dashActive=false;
-    dashTimer=0;
-    invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.14);
-    if(player.userData.playKayClip) player.userData.playKayClip('Running_A');
-    spawnBurst(player.position.x,player.position.y+.12,player.position.z,5,FX_MAT_DUST,1.5);
-    navigator.vibrate&&navigator.vibrate(18);
-    return;
-  }
-
-  dashActive=true;
-  dashTimer=DASH_DURATION;
-  if(player.userData.playKayClip){
-    player.userData.playKayClip('Dodge_Forward',true,true,.34);
-  }else{
-    player.scale.set(1.35,.8,1.35);
-    setTimeout(()=>{if(player)player.scale.set(1,1,1);},130);
-  }
-  if(state.avatarType==='hooded'){
-    spawnShadowSmoke(player.position.x,player.position.y+.55,player.position.z,24);
-    spawnAfterimage();shadowAfterimageTimer=.04;
-    invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.12);
-  }else spawnBurst(player.position.x,.4,player.position.z,9,FX_MAT_DUST,3.4);
-  navigator.vibrate&&navigator.vibrate(18);
+  btn.classList.add('cooling');
+  setTimeout(()=>btn.classList.remove('cooling'), DASH_COOLDOWN*1000);
+  navigator.vibrate && navigator.vibrate(18);
 }
 
 function doJump(){
@@ -9223,7 +9196,7 @@ function updateFx(dt){
       });
     } else if(f.kind==='arcaneSigil'){
       f.mesh.rotation.y += (f.spin||3)*dt; f.mesh.scale.multiplyScalar(1+dt*.55);
-      f.mesh.traverse(o=>{if(o.material){const base=o.material.userData.baseFxOpacity??(o.material.userData.baseFxOpacity=o.material.opacity);o.material.opacity=Math.max(0,f.life/f.maxLife)*base;}});
+      f.mesh.traverse(o=>{if(o.material)o.material.opacity=Math.max(0,f.life/f.maxLife)*.85;});
     } else if(f.kind==='arcaneMeteor'){
       f.mesh.position.y -= 18*dt; f.mesh.scale.multiplyScalar(1+dt*1.1);
       if(f.mesh.position.y<=f.targetY){
@@ -9231,7 +9204,7 @@ function updateFx(dt){
         spawnArcaneSigil(f.mesh.position.x,f.targetY,f.mesh.position.z,1.55);f.life=0;
       }
     } else if(f.kind==='lightning'){
-      {const m=f.mesh.material,base=m.userData.baseFxOpacity??(m.userData.baseFxOpacity=m.opacity);m.opacity=Math.max(0,f.life/f.maxLife)*base;}
+      f.mesh.material.opacity=Math.max(0,f.life/f.maxLife);
     } else if(f.kind==='archerSpark'){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.scale.setScalar(1+(1-q)*2.4);if(f.mesh.material)f.mesh.material.opacity=q;
     } else if(f.kind==='archerFan'){
@@ -9487,7 +9460,7 @@ function spawnKnightCleave(origin,yaw,step=0,scale=1){
 function spawnKnightGuardBurst(origin,radius=2.2){
   const g=new THREE.Group();
   const gold=new THREE.MeshBasicMaterial({color:0xffd35a,transparent:true,opacity:.82,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
-  const white=new THREE.MeshBasicMaterial({color:0xc9f5ff,transparent:true,opacity:.08,depthWrite:false,side:THREE.DoubleSide,blending:THREE.NormalBlending});
+  const white=new THREE.MeshBasicMaterial({color:0xd9f7ff,transparent:true,opacity:.10,depthWrite:false,side:THREE.DoubleSide,blending:THREE.NormalBlending});
   const disk=new THREE.Mesh(new THREE.CircleGeometry(radius,48),new THREE.MeshBasicMaterial({color:0xffc13b,transparent:true,opacity:.13,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));disk.rotation.x=-Math.PI/2;disk.position.y=.06;g.add(disk);
   const rim=new THREE.Mesh(new THREE.RingGeometry(radius-.1,radius+.04,64),white);rim.rotation.x=-Math.PI/2;rim.position.y=.08;g.add(rim);
   for(let i=0;i<8;i++){const ray=new THREE.Mesh(new THREE.PlaneGeometry(.08,radius*1.7),i%2?gold:white);ray.rotation.x=-Math.PI/2;ray.rotation.z=i*Math.PI/4;ray.position.y=.09;g.add(ray);}
@@ -9515,7 +9488,7 @@ function doKnightAttack(w){
   navigator.vibrate&&navigator.vibrate(hits?[18,18,30]:12);
 }
 function spawnJudgmentSword(target,i=0){
-  const mat=new THREE.MeshBasicMaterial({color:i%3===0?0xffffff:0xffc83d,transparent:true,opacity:.98,depthWrite:false,blending:THREE.AdditiveBlending});
+  const mat=new THREE.MeshBasicMaterial({color:i%3===0?0xffffff:0xffc83d,transparent:true,opacity:.24,depthWrite:false,blending:THREE.NormalBlending});
   const g=new THREE.Group();const blade=new THREE.Mesh(new THREE.BoxGeometry(.14,3.5,.32),mat);blade.position.y=1.7;g.add(blade);const cross=new THREE.Mesh(new THREE.BoxGeometry(1.25,.16,.25),mat.clone());cross.position.y=.45;g.add(cross);
   g.position.set(target.x+(Math.random()-.5)*.5,8+Math.random()*2,target.z+(Math.random()-.5)*.5);scene.add(g);fx.push({kind:'judgmentSword',mesh:g,targetY:target.y,life:.50,maxLife:.50});
 }
@@ -9527,7 +9500,7 @@ function triggerKingsJudgment(){
 }
 function updateKingsJudgment(dt){
   if(knightUltimateActive<=0)return;knightUltimateActive-=dt;knightUltimatePulse-=dt;
-  if(knightUltimatePulse<=0){knightUltimatePulse=.22;const live=zombies.filter(z=>!z.userData.dead).slice(0,6);live.forEach((z,i)=>{spawnJudgmentSword(z.position,i);applyBulletDamage(z,1.55*playerStats.power);});damageNearby(player.position,6.0,.45);triggerCombatShake(6,90);}
+  if(knightUltimatePulse<=0){knightUltimatePulse=.22;const live=zombies.filter(z=>!z.userData.dead).slice(0,10);live.forEach((z,i)=>{spawnJudgmentSword(z.position,i);applyBulletDamage(z,1.55*playerStats.power);});damageNearby(player.position,6.0,.45);triggerCombatShake(6,90);}
   if(knightUltimateActive<=0){document.body.style.filter='';spawnKnightGuardBurst(player.position,6.4);damageNearby(player.position,6.4,2.6);triggerCombatShake(13,240);}
 }
 
@@ -9627,7 +9600,7 @@ function spawnArcaneSigil(x,y,z,radius=3.2){
   const g=new THREE.Group();
   const cyan=new THREE.MeshBasicMaterial({color:0x6fe8ff,transparent:true,opacity:.16,depthWrite:false,side:THREE.DoubleSide,blending:THREE.NormalBlending});
   const violet=new THREE.MeshBasicMaterial({color:0xb868ff,transparent:true,opacity:.14,depthWrite:false,side:THREE.DoubleSide,blending:THREE.NormalBlending});
-  const white=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.92,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const white=new THREE.MeshBasicMaterial({color:0xd9f7ff,transparent:true,opacity:.10,depthWrite:false,side:THREE.DoubleSide,blending:THREE.NormalBlending});
   const outer=new THREE.Mesh(new THREE.RingGeometry(radius*.82,radius,64),cyan);outer.rotation.x=-Math.PI/2;g.add(outer);
   const inner=new THREE.Mesh(new THREE.RingGeometry(radius*.43,radius*.5,48),violet);inner.rotation.x=-Math.PI/2;g.add(inner);
   for(let i=0;i<6;i++){
@@ -9638,7 +9611,7 @@ function spawnArcaneSigil(x,y,z,radius=3.2){
 }
 function spawnArcaneMeteor(target,element){
   const fire=element==='fire';
-  const mat=new THREE.MeshBasicMaterial({color:fire?0xff6a32:0x70e7ff,transparent:true,opacity:.24,depthWrite:false,blending:THREE.NormalBlending});
+  const mat=new THREE.MeshBasicMaterial({color:fire?0xff6a32:0x70e7ff,transparent:true,opacity:.98,depthWrite:false,blending:THREE.AdditiveBlending});
   const core=new THREE.Mesh(new THREE.SphereGeometry(fire?.32:.26,12,10),mat);
   core.position.set(target.x+(Math.random()-.5)*.5,8+Math.random()*2,target.z+(Math.random()-.5)*.5);scene.add(core);
   fx.push({kind:'arcaneMeteor',mesh:core,targetY:target.y+.25,life:.48,maxLife:.48,element:element});
@@ -9650,7 +9623,7 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
     applyBulletDamage(z,damage*playerStats.power);
     const to=new THREE.Vector3(z.position.x,z.position.y+.8,z.position.z);
     const mid=from.clone().add(to).multiplyScalar(.5); const len=from.distanceTo(to);
-    const beam=new THREE.Mesh(new THREE.CylinderGeometry(.035,.08,len,6),new THREE.MeshBasicMaterial({color:i%2?0xc9f5ff:0x72ddff,transparent:true,opacity:.20,depthWrite:false,blending:THREE.NormalBlending}));
+    const beam=new THREE.Mesh(new THREE.CylinderGeometry(.035,.08,len,6),new THREE.MeshBasicMaterial({color:i%2?0xffffff:0x72ddff,transparent:true,opacity:.20,depthWrite:false,blending:THREE.NormalBlending}));
     beam.position.copy(mid);beam.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),to.clone().sub(from).normalize());scene.add(beam);
     fx.push({kind:'lightning',mesh:beam,life:.16,maxLife:.16});spawnBurst(to.x,to.y,to.z,10,FX_MAT_SPARK,3.2);from=to;
   });
@@ -9659,8 +9632,8 @@ function triggerArcaneCataclysm(){
   if(!gameRunning||state.avatarType!=='mage'||mageUltimateActive>0)return;
   if(mageUltimateCharge<99.5){toast('Arcane Cataclysm is still charging');return;}
   mageUltimateCharge=0;mageUltimateActive=4.2;mageUltimatePulse=0;updateHoodedHud();
-  document.body.style.filter='brightness(.90) saturate(1.12) contrast(1.02)';
-  spawnArcaneSigil(player.position.x,player.position.y,player.position.z,5.5);spawnChainLightning(player.position,6,1.8);
+  document.body.style.filter='brightness(.88) saturate(1.12)';
+  spawnArcaneSigil(player.position.x,player.position.y,player.position.z,5.5);spawnChainLightning(player.position,10,1.8);
   triggerCombatShake(14,360);navigator.vibrate&&navigator.vibrate([70,35,140]);toast('ARCANE CATACLYSM!');
 }
 function updateArcaneCataclysm(dt){
@@ -9670,7 +9643,7 @@ function updateArcaneCataclysm(dt){
     mageUltimatePulse=.22;
     const live=zombies.filter(z=>!z.userData.dead).slice(0,10);
     live.forEach((z,i)=>{spawnArcaneMeteor(z.position,i%2?'ice':'fire');applyBulletDamage(z,1.35*playerStats.power);});
-    if((Math.floor(mageUltimateActive*10)%3)===0) spawnChainLightning(player.position,5,1.1);
+    if((Math.floor(mageUltimateActive*10)%3)===0) spawnChainLightning(player.position,8,1.1);
     damageNearby(player.position,6.5,.55);triggerCombatShake(6,90);
   }
   if(mageUltimateActive<=0){document.body.style.filter='';spawnArcaneSigil(player.position.x,player.position.y,player.position.z,6.2);damageNearby(player.position,6.2,2.5);triggerCombatShake(12,240);}
@@ -9871,11 +9844,12 @@ function doMeleeAttack(w, origin=player.position, isClone=false){
   if(!isClone) navigator.vibrate && navigator.vibrate(hits>0?[18,22,30]:12);
 }
 
-function shootFromPosition(w, pos, angleOffset=0){
+function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
   let yaw=player.rotation.y+angleOffset;
   let dx=Math.sin(yaw),dy=0,dz=Math.cos(yaw);
   const target=findAutoAimTarget(18);
-  const startX=pos.x+dx*0.72, startY=pos.y+1.02, startZ=pos.z+dz*0.72;
+  const rightX=Math.cos(yaw), rightZ=-Math.sin(yaw);
+  const startX=pos.x+dx*0.72+rightX*lateralOffset, startY=pos.y+1.02, startZ=pos.z+dz*0.72+rightZ*lateralOffset;
   if(target && Math.abs(angleOffset)<0.001){
     const tx=target.position.x-startX, ty=(target.position.y+0.8)-startY, tz=target.position.z-startZ;
     const len=Math.hypot(tx,ty,tz)||1; dx=tx/len;dy=ty/len;dz=tz/len;
@@ -9961,7 +9935,13 @@ function doShoot(){
       mageCastStep=(mageCastStep+1)%4;
       spawnMageBasicCone(mageElementToggle);
     }
-    shootFromPosition(w,player.position,0);
+    if(state.avatarType==='frostwing' && (w.kind==='frost_pistol'||w.kind==='fish_frenzy')){
+      const dualW={...w,damage:w.damage*.56};
+      shootFromPosition(dualW,player.position,-0.018,-0.23);
+      shootFromPosition(dualW,player.position, 0.018, 0.23);
+    } else {
+      shootFromPosition(w,player.position,0);
+    }
     if(state.avatarType==='rogue'){archerVolleyStep=(archerVolleyStep+1)%3;spawnArcherMuzzleFan(archerVolleyStep===0);}
     if(state.avatarType==='hooded') cloneAttack(w);
   }
@@ -10310,9 +10290,11 @@ function update(dt){
     if(state.avatarType==='frostwing'&&player.userData.kayRoot){
       const root=player.userData.kayRoot;
       const baseY=Number.isFinite(player.userData.frostBaseY)?player.userData.frostBaseY:root.position.y;
-      const phase=performance.now()*.025;
-      root.rotation.z=Math.sin(phase)*.11;
-      root.position.y=baseY+Math.abs(Math.sin(phase))*.045;
+      const phase=performance.now()*.018;
+      root.rotation.z=Math.sin(phase)*.08;
+      root.position.y=baseY+Math.abs(Math.sin(phase))*.04;
+      const p=player.userData.parts;
+      if(p){ if(p.armL)p.armL.rotation.x=Math.sin(phase)*.32; if(p.armR)p.armR.rotation.x=-Math.sin(phase)*.32; }
     }
     dashTimer -= dt;
     if(dashTimer<=0){
@@ -10337,14 +10319,17 @@ function update(dt){
     if(player.userData.parts){
       if(player.userData.parts.legL)player.userData.parts.legL.rotation.x = Math.sin(t)*0.5;
       if(player.userData.parts.legR)player.userData.parts.legR.rotation.x = -Math.sin(t)*0.5;
+      if(state.avatarType==='frostwing'){
+        if(player.userData.parts.armL)player.userData.parts.armL.rotation.x = -Math.sin(t)*0.38;
+        if(player.userData.parts.armR)player.userData.parts.armR.rotation.x = Math.sin(t)*0.38;
+      }
     }
     if(state.avatarType==='frostwing'&&player.userData.kayRoot){
-      // A very small body waddle complements the GLB's real leg/wing animation
-      // without replacing it or restarting it.
       const root=player.userData.kayRoot;
       const baseY=Number.isFinite(player.userData.frostBaseY)?player.userData.frostBaseY:root.position.y;
-      root.rotation.z=Math.sin(t*.62)*.035;
-      root.position.y=baseY+Math.abs(Math.sin(t*.62))*.018;
+      root.rotation.z=Math.sin(t*.72)*.075;
+      root.rotation.x=(player.userData.frostBaseRotationX||0)+Math.sin(t*1.44)*.025;
+      root.position.y=baseY+Math.abs(Math.sin(t*.72))*.055;
     }
 
     // Camera auto-follow: swing camYaw to catch up behind the character
@@ -10359,7 +10344,15 @@ function update(dt){
       camYaw += step;
     }
   } else {
-    if(player.userData.parts){if(player.userData.parts.legL)player.userData.parts.legL.rotation.x=0;if(player.userData.parts.legR)player.userData.parts.legR.rotation.x=0;}
+    if(player.userData.parts){
+      if(player.userData.parts.legL)player.userData.parts.legL.rotation.x=0;
+      if(player.userData.parts.legR)player.userData.parts.legR.rotation.x=0;
+      if(state.avatarType==='frostwing'){
+        const idleT=performance.now()*.0035;
+        if(player.userData.parts.armL)player.userData.parts.armL.rotation.x=Math.sin(idleT)*.08;
+        if(player.userData.parts.armR)player.userData.parts.armR.rotation.x=-Math.sin(idleT)*.08;
+      }
+    }
     if(state.avatarType==='frostwing'&&player.userData.kayRoot){
       const root=player.userData.kayRoot;
       const baseY=Number.isFinite(player.userData.frostBaseY)?player.userData.frostBaseY:0;
@@ -10632,7 +10625,7 @@ document.getElementById('btnResultsHome').onclick = ()=>{
 
 })();
 </script>
-<div id="buildStamp" style="position:fixed;right:8px;bottom:8px;z-index:99999;font:700 11px/1.2 system-ui;color:#7dd3fc;background:#07111dcc;border:1px solid #38bdf8;border-radius:8px;padding:5px 7px;pointer-events:none">BUILD V22.5-FIX</div>
+<div id="buildStamp" style="position:fixed;right:8px;bottom:8px;z-index:99999;font:700 11px/1.2 system-ui;color:#7dd3fc;background:#07111dcc;border:1px solid #38bdf8;border-radius:8px;padding:5px 7px;pointer-events:none">BUILD V22.6-FIX</div>
 </body>
 </html>
 
