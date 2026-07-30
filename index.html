@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.8.2: Fair spawn system — enemies now require a valid, obstacle-free position outside the player safety radius or the spawn is delayed. -->
+<!-- V22.8.3: Enemy movement and AI polish — smoother steering, crowd separation, obstacle recovery, steadier targeting, and cleaner animation transitions. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -559,7 +559,7 @@
 <script>
 (function(){
 
-const GAME_VERSION = '22.8.2';
+const GAME_VERSION = '22.8.3';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · FAIR ENEMY SPAWNS`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -8372,6 +8372,63 @@ function recoverRoundIfNeeded(dt){
   fillEnemySlotsFromQueue();
 }
 
+// Shared enemy steering helpers. These keep movement behavior centralized so
+// every enemy archetype benefits without changing its damage, HP, or speed.
+function chooseEnemyTarget(z,dt){
+  const candidates=livingPlayers();
+  if(!candidates.length) return null;
+  z.userData.targetRefresh=Math.max(0,(z.userData.targetRefresh||0)-dt);
+  const current=z.userData.targetPlayer;
+  if(current && candidates.includes(current) && z.userData.targetRefresh>0) return current;
+  let best=candidates[0],bestDist=Infinity;
+  for(const p of candidates){
+    const d=(p.position.x-z.position.x)**2+(p.position.z-z.position.z)**2;
+    if(d<bestDist){bestDist=d;best=p;}
+  }
+  z.userData.targetPlayer=best;
+  z.userData.targetRefresh=.35+Math.random()*.25;
+  return best;
+}
+function enemySeparation(z){
+  let sx=0,sz=0,count=0;
+  const ownRadius=(z.userData.archetype==='brute'?1.05:.68)*(z.userData.baseScale||1);
+  for(const other of zombies){
+    if(other===z || other.userData.dead || other.userData.spawnPending) continue;
+    const dx=z.position.x-other.position.x,dz=z.position.z-other.position.z;
+    const d2=dx*dx+dz*dz;
+    const otherRadius=(other.userData.archetype==='brute'?1.0:.62)*(other.userData.baseScale||1);
+    const desired=ownRadius+otherRadius;
+    if(d2>0.0001 && d2<desired*desired){
+      const d=Math.sqrt(d2),strength=(desired-d)/desired;
+      sx+=(dx/d)*strength; sz+=(dz/d)*strength; count++;
+    }
+  }
+  if(count){sx/=count;sz/=count;}
+  return {x:sx,z:sz};
+}
+function recoverStuckEnemy(z,target){
+  const baseAngle=Math.atan2(z.position.z-target.position.z,z.position.x-target.position.x);
+  for(let i=0;i<18;i++){
+    const a=baseAngle+(i%2?1:-1)*Math.ceil(i/2)*.34;
+    const rr=7+Math.random()*3;
+    const x=target.position.x+Math.cos(a)*rr,zp=target.position.z+Math.sin(a)*rr;
+    if(spawnPointBlocked(x,zp,z.userData.archetype==='brute'?1.05:.75)) continue;
+    if(livingPlayers().some(p=>Math.hypot(x-p.position.x,zp-p.position.z)<5.5)) continue;
+    z.position.set(x,0,zp);
+    z.userData.stuckTimer=0;
+    z.userData.lastSafePosition=z.position.clone();
+    spawnBurst(z.position.x,z.position.y+.5,z.position.z,8,FX_MAT_ZOMBIE,2.2);
+    return true;
+  }
+  if(z.userData.lastSafePosition) z.position.copy(z.userData.lastSafePosition);
+  z.userData.stuckTimer=0;
+  return false;
+}
+function setEnemyMoveClip(z,name){
+  if(!z.userData.playKayClip || (z.userData.kayActionLock||0)>0) return;
+  z.userData.playKayClip(name);
+}
+
 // ---------------------------------------------------------------------
 // Level-up picker: shown once per round clear. Blocks the next round
 // from starting until the player taps one of the three stats — the
@@ -10005,70 +10062,103 @@ function update(dt){
     updateInvincibleHud();
   }
 
-  // Zombies chase + contact damage — frozen in place while free roaming,
-  // so the player can fly around and actually look at a moment in the
-  // fight rather than the horde continuing to close in off-camera.
+  // Zombies chase + contact damage — frozen in place while free roaming.
   if(!freeMode){
     zombies.forEach(z=>{
       if(z.userData.kayMixer) z.userData.kayMixer.update(dt);
-      let dx = player.position.x-z.position.x, dz = player.position.z-z.position.z;
-      let dist = Math.hypot(dx,dz);
-      const type=z.userData.archetype||'walker';
-      z.userData.attackCooldown = Math.max(0,(z.userData.attackCooldown||0)-dt);
-      z.userData.specialTimer = Math.max(0,(z.userData.specialTimer||0)-dt);
+      z.userData.kayActionLock=Math.max(0,(z.userData.kayActionLock||0)-dt);
+      if(z.userData.dead || z.userData.spawnPending) return;
 
-      // Let impact recoil win over chase movement for a split second. This
-      // prevents enemies from visually sliding straight through an attack.
+      const target=chooseEnemyTarget(z,dt);
+      if(!target) return;
+      let dx=target.position.x-z.position.x,dz=target.position.z-z.position.z;
+      let dist=Math.hypot(dx,dz);
+      const type=z.userData.archetype||'walker';
+      z.userData.attackCooldown=Math.max(0,(z.userData.attackCooldown||0)-dt);
+      z.userData.specialTimer=Math.max(0,(z.userData.specialTimer||0)-dt);
+
+      // Let impact recoil win over chase movement for a split second.
       if((z.userData.hitStun||0)>0){
         z.userData.hitStun=Math.max(0,z.userData.hitStun-dt);
         const nx=z.position.x+(z.userData.knockbackX||0)*dt;
         const nz=z.position.z+(z.userData.knockbackZ||0)*dt;
         const pushed=resolveCollision(nx,nz,z.position.y);
-        z.position.x=pushed.x; z.position.z=pushed.z;
+        z.position.x=pushed.x;z.position.z=pushed.z;
         z.userData.knockbackX=(z.userData.knockbackX||0)*Math.max(0,1-dt*9);
         z.userData.knockbackZ=(z.userData.knockbackZ||0)*Math.max(0,1-dt*9);
         if(z.userData.playKayClip) z.userData.playKayClip('Hit_A',true,true,.12);
         return;
       }
+
       if(type==='shadow' && z.userData.specialTimer<=0 && dist>2.4){
         spawnBurst(z.position.x,z.position.y+.5,z.position.z,10,FX_MAT_SHADOW,3);
         const a=Math.atan2(dx,dz)+(Math.random()-.5)*1.0;
         const targetDist=1.8+Math.random()*1.2;
-        const rr=resolveCollision(player.position.x-Math.sin(a)*targetDist,player.position.z-Math.cos(a)*targetDist,z.position.y);
+        const rr=resolveCollision(target.position.x-Math.sin(a)*targetDist,target.position.z-Math.cos(a)*targetDist,z.position.y);
         z.position.x=rr.x;z.position.z=rr.z;z.userData.specialTimer=3.4+Math.random()*1.8;
         spawnBurst(z.position.x,z.position.y+.5,z.position.z,12,FX_MAT_SHADOW,3.2);
-        dx=player.position.x-z.position.x;dz=player.position.z-z.position.z;dist=Math.hypot(dx,dz);
+        dx=target.position.x-z.position.x;dz=target.position.z-z.position.z;dist=Math.hypot(dx,dz);
       }
+
       let moveDir=1;
       if(type==='spitter'){
         if(dist<3.4) moveDir=-1; else if(dist<6.2) moveDir=0;
-        if(dist<8.5 && z.userData.attackCooldown<=0){spawnEnemyShot(z);z.userData.attackCooldown=2.0+Math.random()*.7;if(z.userData.playKayClip)z.userData.playKayClip('1H_Melee_Attack_Chop',true,true,.45);}
+        if(dist<8.5 && z.userData.attackCooldown<=0){
+          spawnEnemyShot(z);
+          z.userData.attackCooldown=2.0+Math.random()*.7;
+          if(z.userData.playKayClip) z.userData.playKayClip('1H_Melee_Attack_Chop',true,true,.45);
+        }
       }
+
       if(dist>0.01 && moveDir!==0){
         let mx=dx/dist,mz=dz/dist;
-        if(type==='runner'){const sway=Math.sin(performance.now()*.008+z.id)*.45;const ox=-mz*sway,oz=mx*sway;mx+=ox;mz+=oz;const ml=Math.hypot(mx,mz)||1;mx/=ml;mz/=ml;}
-        const nx = z.position.x + mx*z.userData.speed*dt*moveDir;
-        const nz = z.position.z + mz*z.userData.speed*dt*moveDir;
-        const resolved = resolveCollision(nx, nz, z.position.y);
-        const moved=Math.hypot(resolved.x-z.position.x,resolved.z-z.position.z);
-        z.position.x = resolved.x; z.position.z = resolved.z;
-        if(moved < 0.008 && dist > 1.5) z.userData.stuckTimer=(z.userData.stuckTimer||0)+dt;
-        else { z.userData.stuckTimer=0; z.userData.lastSafePosition=z.position.clone(); }
-        if(z.userData.stuckTimer > 4.0){
-          // Reposition stuck enemies near the player on a clear ring so the round can continue.
-          const a=Math.random()*Math.PI*2, rr=5+Math.random()*2;
-          const pos=resolveCollision(player.position.x+Math.cos(a)*rr,player.position.z+Math.sin(a)*rr,0);
-          z.position.set(pos.x,0,pos.z);
-          z.userData.stuckTimer=0;
-          spawnBurst(z.position.x,z.position.y+.5,z.position.z,8,FX_MAT_ZOMBIE,2.2);
+        // Stable per-enemy strafe/wander keeps the horde from moving in identical lines.
+        const now=performance.now()*.001;
+        const swayBase=type==='runner'?.45:.16;
+        const sway=Math.sin(now*(type==='runner'?8:2.2)+z.id*.73)*swayBase;
+        const sideX=-mz*sway,sideZ=mx*sway;
+        const sep=enemySeparation(z);
+        const sepWeight=type==='brute'?.55:1.05;
+        mx+=sideX+sep.x*sepWeight;mz+=sideZ+sep.z*sepWeight;
+        let ml=Math.hypot(mx,mz)||1;mx/=ml;mz/=ml;
+
+        let nx=z.position.x+mx*z.userData.speed*dt*moveDir;
+        let nz=z.position.z+mz*z.userData.speed*dt*moveDir;
+        let resolved=resolveCollision(nx,nz,z.position.y);
+        let moved=Math.hypot(resolved.x-z.position.x,resolved.z-z.position.z);
+
+        // If the direct path is blocked, probe left/right before declaring the enemy stuck.
+        if(moved<.006 && dist>1.5){
+          const base=Math.atan2(mx,mz);
+          const turn=(z.id%2?1:-1)*(.7+Math.min(1.0,(z.userData.stuckTimer||0)*.35));
+          const ax=Math.sin(base+turn),az=Math.cos(base+turn);
+          const alt=resolveCollision(z.position.x+ax*z.userData.speed*dt,z.position.z+az*z.userData.speed*dt,z.position.y);
+          const altMoved=Math.hypot(alt.x-z.position.x,alt.z-z.position.z);
+          if(altMoved>moved){resolved=alt;moved=altMoved;}
         }
-        z.rotation.y = Math.atan2(dx,dz);
-        if(z.userData.playKayClip) z.userData.playKayClip('Running_A');
-      } else if(z.userData.playKayClip && type!=='spitter') z.userData.playKayClip('Idle');
-      const verticalGap = Math.abs(player.position.y - z.position.y);
+
+        z.position.x=resolved.x;z.position.z=resolved.z;
+        if(moved<.008 && dist>1.5) z.userData.stuckTimer=(z.userData.stuckTimer||0)+dt;
+        else{z.userData.stuckTimer=Math.max(0,(z.userData.stuckTimer||0)-dt*2);z.userData.lastSafePosition=z.position.clone();}
+        if(z.userData.stuckTimer>2.5) recoverStuckEnemy(z,target);
+
+        const desiredYaw=Math.atan2(dx,dz);
+        let yawDelta=((desiredYaw-z.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI;
+        z.rotation.y+=yawDelta*Math.min(1,dt*9);
+        setEnemyMoveClip(z,'Running_A');
+      }else{
+        const desiredYaw=Math.atan2(dx,dz);
+        let yawDelta=((desiredYaw-z.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI;
+        z.rotation.y+=yawDelta*Math.min(1,dt*9);
+        if(type!=='spitter') setEnemyMoveClip(z,'Idle');
+      }
+
+      const verticalGap=Math.abs(target.position.y-z.position.y);
       const hitRange=type==='brute'?1.28:.9;
-      if(dist < hitRange && verticalGap < 1.0 && z.userData.attackCooldown<=0){
-        z.userData.attackCooldown = type==='brute'?1.65:1.0;
+      if(dist<hitRange && verticalGap<1.0 && z.userData.attackCooldown<=0){
+        z.userData.attackCooldown=type==='brute'?1.65:1.0;
+        const attackClip=type==='brute'?'2H_Melee_Attack_Spin':'1H_Melee_Attack_Chop';
+        if(z.userData.playKayClip) z.userData.playKayClip(attackClip,true,true,type==='brute'?.55:.36);
         if(type==='brute'){spawnBurst(z.position.x,z.position.y+.2,z.position.z,16,FX_MAT_SPARK,4.5);triggerCombatShake(10,150);}
         playerTakeHit();
       }
