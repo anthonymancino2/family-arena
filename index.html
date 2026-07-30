@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.9.4: Outside Enemy Entry — every enemy now begins beyond the arena boundary and visibly advances into the map. -->
+<!-- V22.9.3_TEST: Shadow Teleport Safety — every enemy now begins beyond the arena boundary and visibly advances into the map. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -562,7 +562,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.4a';
+const GAME_VERSION = '22.9.2';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · OUTSIDE ENEMY ENTRY`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -8259,81 +8259,20 @@ function enemyEntryPointBlocked(x,z,clearance=0.7){
   }
   return false;
 }
-
-const MIN_PLAYER_SPAWN_DISTANCE = 18;
-function __spawnTooCloseToPlayers(pos){
-  try{
-    const heroes=(window.heroes||window.players||[]);
-    for(const h of heroes){
-      if(!h) continue;
-      const dx=(pos.x||0)-(h.x||0);
-      const dz=(pos.z||0)-(h.z||0);
-      if(Math.hypot(dx,dz)<MIN_PLAYER_SPAWN_DISTANCE) return true;
-    }
-  }catch(e){}
-  return false;
-}
-
-function __validateEnemySpawn(pos){
-  const heroes=(window.heroes||window.players||[]);
-  const SAFE=22;
-  let tries=0;
-  while(tries++<32){
-    let ok=true;
-    for(const h of heroes){
-      if(!h) continue;
-      const dx=pos.x-h.x, dz=pos.z-h.z;
-      if(Math.hypot(dx,dz)<SAFE){ ok=false; break; }
-    }
-    if(ok) return pos;
-    const side=Math.floor(Math.random()*4);
-    const edge=70;
-    if(side===0) pos={x:-edge,z:(Math.random()*2-1)*edge};
-    if(side===1) pos={x: edge,z:(Math.random()*2-1)*edge};
-    if(side===2) pos={x:(Math.random()*2-1)*edge,z:-edge};
-    if(side===3) pos={x:(Math.random()*2-1)*edge,z: edge};
-  }
-  return pos;
-}
-
-function __validateEnemySpawn(pos){
-  const heroes=(window.heroes||window.players||[]);
-  const SAFE=22;
-  let tries=0;
-  while(tries++<32){
-    let ok=true;
-    for(const h of heroes){
-      if(!h) continue;
-      const dx=(pos.x||0)-(h.x||0);
-      const dz=(pos.z||0)-(h.z||0);
-      if(Math.hypot(dx,dz)<SAFE){ ok=false; break; }
-    }
-    if(ok) return pos;
-    const side=Math.floor(Math.random()*4);
-    const edge=70;
-    if(side===0) pos={x:-edge,z:(Math.random()*2-1)*edge};
-    else if(side===1) pos={x:edge,z:(Math.random()*2-1)*edge};
-    else if(side===2) pos={x:(Math.random()*2-1)*edge,z:-edge};
-    else pos={x:(Math.random()*2-1)*edge,z:edge};
-  }
-  return pos;
-}
+function findEnemySpawnPosition(archetype){
   const safeRadius = archetype==='brute' ? 18 : 14;
   const clearance = archetype==='brute' ? 1.05 : 0.75;
   const players = livingPlayers();
   const facing = player ? player.rotation.y : 0;
 
   for(let attempt=0;attempt<64;attempt++){
-    const margin=3+Math.random()*2;
-    const half=arenaSize+margin;
-    const side=Math.floor(Math.random()*4);
-    let x,z;
-    switch(side){
-      case 0: x=-half; z=(Math.random()*2-1)*arenaSize; break; // left
-      case 1: x= half; z=(Math.random()*2-1)*arenaSize; break; // right
-      case 2: x=(Math.random()*2-1)*arenaSize; z=-half; break; // top
-      default:x=(Math.random()*2-1)*arenaSize; z= half; break; // bottom
-    }
+    const bias=facing+Math.PI+(Math.random()-.5)*Math.PI*1.5;
+    const ang=attempt<36 ? bias : Math.random()*Math.PI*2;
+    // Always begin clearly beyond the arena edge, then let normal chase AI
+    // carry the enemy across the boundary and into the fight.
+    const radius=arenaSize+2.4+Math.random()*1.8;
+    const x=Math.cos(ang)*radius;
+    const z=Math.sin(ang)*radius;
 
     if(enemyEntryPointBlocked(x,z,clearance)) continue;
     if(players.some(p=>Math.hypot(x-p.position.x,z-p.position.z)<safeRadius)) continue;
@@ -8364,7 +8303,7 @@ function spawnZombie(){
   const zombieCharacter = zombieRoster[Math.floor(Math.random()*zombieRoster.length)];
   const archetype = chooseZombieArchetype();
   const spec = ZOMBIE_ARCHETYPES[archetype];
-  const spawnPos=__validateEnemySpawn(findEnemySpawnPosition(archetype));
+  const spawnPos=findEnemySpawnPosition(archetype);
 
   // Never force a bad position. Leave the zombie in the queue and retry shortly.
   if(!spawnPos) return false;
@@ -8400,7 +8339,7 @@ function spawnZombie(){
     const revealSafeRadius=archetype==='brute'?18:14;
     const tooClose=livingPlayers().some(p=>Math.hypot(z.position.x-p.position.x,z.position.z-p.position.z)<revealSafeRadius);
     if(tooClose||enemyEntryPointBlocked(z.position.x,z.position.z,archetype==='brute'?1.05:.75)){
-      const replacement=__validateEnemySpawn(findEnemySpawnPosition(archetype));
+      const replacement=findEnemySpawnPosition(archetype);
       if(replacement){
         z.position.set(replacement.x,0,replacement.z);
         if(z.userData.lastSafePosition) z.userData.lastSafePosition.copy(z.position);
@@ -10376,6 +10315,15 @@ function update(dt){
         const a=Math.atan2(dx,dz)+(Math.random()-.5)*1.0;
         const targetDist=1.8+Math.random()*1.2;
         const rr=resolveCollision(target.position.x-Math.sin(a)*targetDist,target.position.z-Math.cos(a)*targetDist,z.position.y);
+        const minTeleport=6.0;
+        let tdx=rr.x-target.position.x;
+        let tdz=rr.z-target.position.z;
+        const d=Math.hypot(tdx,tdz);
+        if(d<minTeleport){
+          const s=(minTeleport+(Math.random()*1.5))/Math.max(d,0.001);
+          rr.x=target.position.x+tdx*s;
+          rr.z=target.position.z+tdz*s;
+        }
         z.position.x=rr.x;z.position.z=rr.z;z.userData.specialTimer=3.4+Math.random()*1.8;
         spawnBurst(z.position.x,z.position.y+.5,z.position.z,12,FX_MAT_SHADOW,3.2);
         dx=target.position.x-z.position.x;dz=target.position.z-z.position.z;dist=Math.hypot(dx,dz);
