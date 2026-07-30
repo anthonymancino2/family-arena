@@ -6,8 +6,8 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V22.3 Gameplay Hotfix</title>
-<!-- V22.3: localized Mage VFX, restored Frostwing animation playback, safe Frostwing dash. -->
+<title>Family Arena — V22.4 Three-Issue Repair</title>
+<!-- V22.4: remove Mage hit-screen washout, procedural Frostwing motion, no-animation Frostwing dash. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -359,7 +359,7 @@
 <div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:99999;
 background:#111827;color:#7dd3fc;border:1px solid #7dd3fc;border-radius:8px;
 padding:5px 8px;font:700 11px/1.1 system-ui;pointer-events:none;opacity:.88">
-V22.3 · MAGE VISIBILITY + FROSTWING MOTION HOTFIX
+V22.4 · THREE-ISSUE REPAIR
 </div>
 <div id="app">
 
@@ -382,7 +382,7 @@ V22.3 · MAGE VISIBILITY + FROSTWING MOTION HOTFIX
           <button class="bigBtn" id="btnGoModes">Play</button>
           <button class="ghostBtn" id="btnGoShop">Crystal<br>Shop</button>
         </div>
-        <div class="homeVersion">FAMILY ARENA · V22.3 MAGE VISIBILITY + FROSTWING MOTION HOTFIX</div>
+        <div class="homeVersion">FAMILY ARENA · V22.4 THREE-ISSUE REPAIR</div>
       </div>
     </div>
   </div>
@@ -9099,21 +9099,15 @@ function doDash(){
   dashCooldownTimer = DASH_COOLDOWN;
   dashDir.x = Math.sin(player.rotation.y);
   dashDir.z = Math.cos(player.rotation.y);
-  if(player.userData.playKayClip){
-    if(state.avatarType==='frostwing'){
-      player.userData.playKayClip('Running_A', false, false, 0);
-    } else {
-      player.userData.playKayClip('Dodge_Forward', true, true, 0.34);
-    }
-  } else {
+  if(player.userData.playKayClip && state.avatarType!=='frostwing'){
+    player.userData.playKayClip('Dodge_Forward', true, true, 0.34);
+  } else if(!player.userData.playKayClip) {
     player.scale.set(1.35,0.8,1.35);
     setTimeout(()=>{ if(player) player.scale.set(1,1,1); }, 130);
   }
   if(state.avatarType==='hooded'){spawnShadowSmoke(player.position.x,player.position.y+.55,player.position.z,24);spawnAfterimage();shadowAfterimageTimer=.04;invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.12);}
   else if(state.avatarType==='frostwing'){
     invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.10);
-    spawnBurst(player.position.x,player.position.y+.18,player.position.z,6,FX_MAT_DUST,1.8);
-    toast('FROST DASH!');
   } else spawnBurst(player.position.x,0.4,player.position.z,9,FX_MAT_DUST,3.4);
   const btn = document.getElementById('dashBtn');
   btn.classList.add('cooling');
@@ -9563,11 +9557,11 @@ function spawnMageBasicCone(elementIsIce){
 
   const matA=new THREE.MeshBasicMaterial({
     color:tint,transparent:true,opacity:.58,depthWrite:false,
-    blending:THREE.AdditiveBlending
+    blending:THREE.NormalBlending
   });
   const matB=new THREE.MeshBasicMaterial({
     color:accent,transparent:true,opacity:.48,depthWrite:false,
-    blending:THREE.AdditiveBlending
+    blending:THREE.NormalBlending
   });
 
   // Compact muzzle halo: never larger than the character.
@@ -9600,7 +9594,7 @@ function spawnMageBasicCone(elementIsIce){
   );
   g.rotation.y=yaw;
   scene.add(g);
-  fx.push({kind:'mageBasicCone',mesh:g,life:.20,maxLife:.20,spin:elementIsIce?-2:2});
+  fx.push({kind:'mageBasicCone',mesh:g,life:.12,maxLife:.12,spin:elementIsIce?-1.2:1.2});
 }
 function spawnArcaneSigil(x,y,z,radius=3.2){
   const g=new THREE.Group();
@@ -10032,7 +10026,7 @@ function killZombie(z){
   updateEnemyRadar();
   if(state.avatarType==='hooded'){spawnSoulOrb(z.position);hoodedUltimateCharge=Math.min(100,hoodedUltimateCharge+4);updateHoodedHud();}
   if(state.avatarType==='rogue'){archerUltimateCharge=Math.min(100,archerUltimateCharge+4);spawnArcherSpark(z.position.x,z.position.y+0.8,z.position.z);updateHoodedHud();}
-  if(state.avatarType==='mage'){mageUltimateCharge=Math.min(100,mageUltimateCharge+4);spawnArcaneSigil(z.position.x,z.position.y,z.position.z,1.05);updateHoodedHud();}
+  if(state.avatarType==='mage'){mageUltimateCharge=Math.min(100,mageUltimateCharge+4);updateHoodedHud();}
   if(state.avatarType==='knight'){knightUltimateCharge=Math.min(100,knightUltimateCharge+4);spawnBurst(z.position.x,z.position.y+.8,z.position.z,12,FX_MAT_SPARK,3.5);updateHoodedHud();}
   if(state.avatarType==='barbarian'){barbarianUltimateCharge=Math.min(100,barbarianUltimateCharge+4);spawnBurst(z.position.x,z.position.y+.8,z.position.z,16,FX_MAT_SPARK,4.2);updateHoodedHud();}
   if(state.avatarType==='frostwing'){
@@ -10286,6 +10280,13 @@ function update(dt){
     const nz = player.position.z + dashDir.z*DASH_SPEED*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
     player.position.x = resolved.x; player.position.z = resolved.z;
+    if(state.avatarType==='frostwing'&&player.userData.kayRoot){
+      const root=player.userData.kayRoot;
+      const baseY=Number.isFinite(player.userData.frostBaseY)?player.userData.frostBaseY:root.position.y;
+      const phase=performance.now()*.025;
+      root.rotation.z=Math.sin(phase)*.11;
+      root.position.y=baseY+Math.abs(Math.sin(phase))*.045;
+    }
     dashTimer -= dt;
     if(dashTimer<=0){
       dashActive=false;
@@ -10312,6 +10313,13 @@ function update(dt){
     }
     if(state.avatarType==='frostwing'&&player.userData.kayRoot){
       const root=player.userData.kayRoot;
+      const baseY=Number.isFinite(player.userData.frostBaseY)?player.userData.frostBaseY:root.position.y;
+      root.rotation.z=Math.sin(t*.72)*.075;
+      root.rotation.x=(player.userData.frostBaseRotationX||0)+Math.sin(t*1.44)*.025;
+      root.position.y=baseY+Math.abs(Math.sin(t*.72))*.055;
+    }
+    if(state.avatarType==='frostwing'&&player.userData.kayRoot){
+      const root=player.userData.kayRoot;
       const baseY=Number.isFinite(player.userData.frostBaseY)?player.userData.frostBaseY:0;
       root.rotation.z=Math.sin(t*.55)*.055;
       root.position.y=baseY+Math.abs(Math.sin(t*.55))*.035;
@@ -10333,12 +10341,13 @@ function update(dt){
     if(state.avatarType==='frostwing'&&player.userData.kayRoot){
       const root=player.userData.kayRoot;
       const baseY=Number.isFinite(player.userData.frostBaseY)?player.userData.frostBaseY:0;
-      root.rotation.z*=.82;
+      root.rotation.z*=.78;
+      root.rotation.x += ((player.userData.frostBaseRotationX||0)-root.rotation.x)*Math.min(1,dt*12);
       root.position.y += (baseY-root.position.y)*Math.min(1,dt*14);
     }
   }
   // Drive the imported skeleton with its real baked clips.
-  if(player.userData.playKayClip && player.userData.kayActionLock <= 0){
+  if(state.avatarType!=='frostwing' && player.userData.playKayClip && player.userData.kayActionLock <= 0){
     const isMoving = !!(moveVec.x || moveVec.y);
     const desired = !onGround
       ? 'Jump_Idle'
@@ -10601,7 +10610,7 @@ document.getElementById('btnResultsHome').onclick = ()=>{
 
 })();
 </script>
-<div id="buildStamp" style="position:fixed;right:8px;bottom:8px;z-index:99999;font:700 11px/1.2 system-ui;color:#7dd3fc;background:#07111dcc;border:1px solid #38bdf8;border-radius:8px;padding:5px 7px;pointer-events:none">BUILD V22.3-HOTFIX</div>
+<div id="buildStamp" style="position:fixed;right:8px;bottom:8px;z-index:99999;font:700 11px/1.2 system-ui;color:#7dd3fc;background:#07111dcc;border:1px solid #38bdf8;border-radius:8px;padding:5px 7px;pointer-events:none">BUILD V22.4-REPAIR</div>
 </body>
 </html>
 
