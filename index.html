@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.8.6: Spawn Safety + HUD Fix — revalidates delayed enemy spawns and separates stacked mobile HUD displays. -->
+<!-- V22.8.7: Stable Skill Effects — lightweight Mage ultimate visuals, guaranteed FX cleanup, and safety handling for every hero effect. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -562,8 +562,8 @@
 <script>
 (function(){
 
-const GAME_VERSION = '22.8.6';
-const GAME_BUILD_LABEL = `V${GAME_VERSION} · SPAWN + HUD FIX`;
+const GAME_VERSION = '22.8.7';
+const GAME_BUILD_LABEL = `V${GAME_VERSION} · STABLE SKILL FX`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
 window.addEventListener('DOMContentLoaded', ()=>{
@@ -8943,9 +8943,30 @@ function spawnBurst(x,y,z,count,mat,spread){
     fx.push({mesh:m, vx:Math.cos(ang)*spd, vz:Math.sin(ang)*spd, vy:2+Math.random()*1.8, life:0.45, maxLife:0.45});
   }
 }
+function removeFxAt(index){
+  const f=fx[index];
+  if(!f) return;
+  if(f.mesh && f.mesh.parent) f.mesh.parent.remove(f.mesh);
+  // Effect materials/geometries are mostly short-lived and unique. Dispose only
+  // those explicitly marked as disposable so shared game materials stay intact.
+  if(f.dispose && f.mesh){
+    f.mesh.traverse(o=>{
+      if(o.geometry) o.geometry.dispose();
+      if(o.material){
+        const mats=Array.isArray(o.material)?o.material:[o.material];
+        mats.forEach(m=>m.dispose&&m.dispose());
+      }
+    });
+  }
+  fx.splice(index,1);
+}
 function updateFx(dt){
+  // Hard ceiling prevents any skill from filling the scene if a browser pauses,
+  // resumes late, or an effect unexpectedly misses its normal cleanup path.
+  while(fx.length>180) removeFxAt(0);
   for(let i=fx.length-1;i>=0;i--){
     const f = fx[i];
+    if(!f || !f.mesh){ fx.splice(i,1); continue; }
     if(f.kind==='shadowSlash'){
       f.life -= dt;
       const p = 1-Math.max(f.life,0)/f.maxLife;
@@ -8972,16 +8993,29 @@ function updateFx(dt){
       });
     } else if(f.kind==='arcaneSigil'){
       f.life -= dt;
-      f.mesh.rotation.y += (f.spin||3)*dt; f.mesh.scale.multiplyScalar(1+dt*.55);
-      f.mesh.traverse(o=>{if(o.material)o.material.opacity=Math.max(0,f.life/f.maxLife)*.85;});
+      const q=Math.max(0,f.life/f.maxLife);
+      f.mesh.rotation.y += (f.spin||2.4)*dt;
+      f.mesh.scale.setScalar(.92+(1-q)*.18);
+      f.mesh.traverse(o=>{if(o.material)o.material.opacity=q*(o.userData.baseOpacity||.22);});
     } else if(f.kind==='arcaneMeteor'){
-      f.mesh.position.y -= 18*dt; f.mesh.scale.multiplyScalar(1+dt*1.1);
-      if(f.mesh.position.y<=f.targetY){
-        spawnBurst(f.mesh.position.x,f.targetY+.25,f.mesh.position.z,18,f.element==='fire'?FX_MAT_SPARK:FX_MAT_DUST,4.4);
-        spawnArcaneSigil(f.mesh.position.x,f.targetY,f.mesh.position.z,1.55);f.life=0;
+      f.life -= dt;
+      f.mesh.position.y -= (f.fallSpeed||20)*dt;
+      const q=Math.max(0,f.life/f.maxLife);
+      f.mesh.scale.setScalar(.72+(1-q)*.38);
+      if(f.mesh.material) f.mesh.material.opacity=Math.min(.82,q*1.6);
+      if(f.mesh.position.y<=f.targetY || f.life<=0){
+        spawnBurst(f.mesh.position.x,f.targetY+.25,f.mesh.position.z,7,f.element==='fire'?FX_MAT_SPARK:FX_MAT_DUST,2.6);
+        spawnArcaneSigil(f.mesh.position.x,f.targetY,f.mesh.position.z,.9);f.life=0;
       }
     } else if(f.kind==='lightning'){
-      f.mesh.material.opacity=Math.max(0,f.life/f.maxLife);
+      f.life-=dt;
+      f.mesh.material.opacity=Math.max(0,f.life/f.maxLife)*.42;
+    } else if(f.kind==='spawnWarning'){
+      f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.rotation.z+=(f.spin||6)*dt;f.mesh.scale.setScalar(.88+(1-q)*.18);if(f.mesh.material)f.mesh.material.opacity=q*.72;
+    } else if(f.kind==='barbarianArc'){
+      f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.rotation.y+=(f.spin||2)*dt;f.mesh.scale.setScalar(.92+(1-q)*.42);f.mesh.traverse(o=>{if(o.material)o.material.opacity=q*.72;});
+    } else if(f.kind==='earthbreakerFx'){
+      f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.rotation.y+=(f.spin||1.4)*dt;f.mesh.scale.setScalar(.9+(1-q)*.32);f.mesh.traverse(o=>{if(o.material)o.material.opacity=q*.62;});
     } else if(f.kind==='archerSpark'){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.scale.setScalar(1+(1-q)*2.4);if(f.mesh.material)f.mesh.material.opacity=q;
     } else if(f.kind==='archerFan'){
@@ -9002,11 +9036,9 @@ function updateFx(dt){
       f.life -= dt;
       f.mesh.scale.setScalar(Math.max(f.life/f.maxLife,0));
     }
-    if(f.life<=0){
-      scene.remove(f.mesh);
-      f.mesh.traverse(o=>{ if(o.geometry && f.kind==='shadowSlash') o.geometry.dispose(); if(o.material && f.kind==='shadowSlash') o.material.dispose(); });
-      fx.splice(i,1);
-    }
+    // Universal failsafe: every visual must have a finite lifetime and position.
+    if(!Number.isFinite(f.life) || !Number.isFinite(f.mesh.position.x) || !Number.isFinite(f.mesh.position.y) || !Number.isFinite(f.mesh.position.z)) f.life=0;
+    if(f.life<=0) removeFxAt(i);
   }
 }
 
@@ -9376,23 +9408,23 @@ function spawnMageBasicCone(elementIsIce){
 }
 function spawnArcaneSigil(x,y,z,radius=3.2){
   const g=new THREE.Group();
-  const cyan=new THREE.MeshBasicMaterial({color:0x6fe8ff,transparent:true,opacity:.16,depthWrite:false,side:THREE.DoubleSide,blending:THREE.NormalBlending});
-  const violet=new THREE.MeshBasicMaterial({color:0xb868ff,transparent:true,opacity:.14,depthWrite:false,side:THREE.DoubleSide,blending:THREE.NormalBlending});
-  const white=new THREE.MeshBasicMaterial({color:0xd9f7ff,transparent:true,opacity:.10,depthWrite:false,side:THREE.DoubleSide,blending:THREE.NormalBlending});
-  const outer=new THREE.Mesh(new THREE.RingGeometry(radius*.82,radius,64),cyan);outer.rotation.x=-Math.PI/2;g.add(outer);
-  const inner=new THREE.Mesh(new THREE.RingGeometry(radius*.43,radius*.5,48),violet);inner.rotation.x=-Math.PI/2;g.add(inner);
-  for(let i=0;i<6;i++){
-    const ray=new THREE.Mesh(new THREE.PlaneGeometry(.07,radius*1.5),i%2?cyan:white);
-    ray.rotation.x=-Math.PI/2;ray.rotation.z=i*Math.PI/3;ray.position.y=.015;g.add(ray);
+  const makeMat=(color,opacity)=>new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide,blending:THREE.NormalBlending});
+  const cyan=makeMat(0x6fe8ff,.18), violet=makeMat(0xb868ff,.14), white=makeMat(0xd9f7ff,.10);
+  const outer=new THREE.Mesh(new THREE.RingGeometry(radius*.82,radius,40),cyan);outer.rotation.x=-Math.PI/2;outer.userData.baseOpacity=.18;g.add(outer);
+  const inner=new THREE.Mesh(new THREE.RingGeometry(radius*.44,radius*.51,32),violet);inner.rotation.x=-Math.PI/2;inner.userData.baseOpacity=.14;g.add(inner);
+  // Three slim spokes keep the spell recognizable without covering the arena.
+  for(let i=0;i<3;i++){
+    const ray=new THREE.Mesh(new THREE.PlaneGeometry(.045,radius*1.25),white);
+    ray.rotation.x=-Math.PI/2;ray.rotation.z=i*Math.PI/3;ray.position.y=.012;ray.userData.baseOpacity=.10;g.add(ray);
   }
-  g.position.set(x,y+.08,z);scene.add(g);fx.push({kind:'arcaneSigil',mesh:g,life:.7,maxLife:.7,spin:3.8});
+  g.position.set(x,y+.07,z);scene.add(g);fx.push({kind:'arcaneSigil',mesh:g,life:.42,maxLife:.42,spin:2.5,dispose:true});
 }
 function spawnArcaneMeteor(target,element){
   const fire=element==='fire';
-  const mat=new THREE.MeshBasicMaterial({color:fire?0xff6a32:0x70e7ff,transparent:true,opacity:.98,depthWrite:false,blending:THREE.AdditiveBlending});
-  const core=new THREE.Mesh(new THREE.SphereGeometry(fire?.32:.26,12,10),mat);
-  core.position.set(target.x+(Math.random()-.5)*.5,8+Math.random()*2,target.z+(Math.random()-.5)*.5);scene.add(core);
-  fx.push({kind:'arcaneMeteor',mesh:core,targetY:target.y+.25,life:.48,maxLife:.48,element:element});
+  const mat=new THREE.MeshBasicMaterial({color:fire?0xff7440:0x78e9ff,transparent:true,opacity:.78,depthWrite:false,blending:THREE.NormalBlending});
+  const core=new THREE.Mesh(new THREE.OctahedronGeometry(fire?.20:.18,0),mat);
+  core.position.set(target.x+(Math.random()-.5)*.35,6.4+Math.random()*.8,target.z+(Math.random()-.5)*.35);scene.add(core);
+  fx.push({kind:'arcaneMeteor',mesh:core,targetY:target.y+.25,life:.34,maxLife:.34,fallSpeed:21,element,dispose:true});
 }
 function spawnChainLightning(origin,maxTargets=7,damage=1.4){
   const live=zombies.filter(z=>!z.userData.dead).sort((a,b)=>a.position.distanceTo(origin)-b.position.distanceTo(origin)).slice(0,maxTargets);
@@ -9403,28 +9435,29 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
     const mid=from.clone().add(to).multiplyScalar(.5); const len=from.distanceTo(to);
     const beam=new THREE.Mesh(new THREE.CylinderGeometry(.035,.08,len,6),new THREE.MeshBasicMaterial({color:i%2?0xffffff:0x72ddff,transparent:true,opacity:.20,depthWrite:false,blending:THREE.NormalBlending}));
     beam.position.copy(mid);beam.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),to.clone().sub(from).normalize());scene.add(beam);
-    fx.push({kind:'lightning',mesh:beam,life:.16,maxLife:.16});spawnBurst(to.x,to.y,to.z,10,FX_MAT_SPARK,3.2);from=to;
+    fx.push({kind:'lightning',mesh:beam,life:.12,maxLife:.12,dispose:true});spawnBurst(to.x,to.y,to.z,4,FX_MAT_SPARK,2.0);from=to;
   });
 }
 function triggerArcaneCataclysm(){
   if(!gameRunning||state.avatarType!=='mage'||mageUltimateActive>0)return;
   if(mageUltimateCharge<99.5){toast('Arcane Cataclysm is still charging');return;}
-  mageUltimateCharge=0;mageUltimateActive=4.2;mageUltimatePulse=0;updateHoodedHud();
-  document.body.style.filter='brightness(.96) saturate(1.04)';
-  spawnArcaneSigil(player.position.x,player.position.y,player.position.z,5.5);spawnChainLightning(player.position,10,1.8);
-  triggerCombatShake(14,360);navigator.vibrate&&navigator.vibrate([70,35,140]);toast('ARCANE CATACLYSM!');
+  mageUltimateCharge=0;mageUltimateActive=2.6;mageUltimatePulse=0;updateHoodedHud();
+  document.body.style.filter='brightness(.98) saturate(1.02)';
+  spawnArcaneSigil(player.position.x,player.position.y,player.position.z,4.4);spawnChainLightning(player.position,6,1.8);
+  triggerCombatShake(10,260);navigator.vibrate&&navigator.vibrate([55,30,100]);toast('ARCANE CATACLYSM!');
 }
 function updateArcaneCataclysm(dt){
   if(mageUltimateActive<=0)return;
   mageUltimateActive-=dt;mageUltimatePulse-=dt;
   if(mageUltimatePulse<=0){
-    mageUltimatePulse=.22;
-    const live=zombies.filter(z=>!z.userData.dead).slice(0,10);
+    mageUltimatePulse=.48;
+    const live=zombies.filter(z=>!z.userData.dead).slice(0,6);
     live.forEach((z,i)=>{spawnArcaneMeteor(z.position,i%2?'ice':'fire');applyBulletDamage(z,1.35*playerStats.power);});
-    if((Math.floor(mageUltimateActive*10)%3)===0) spawnChainLightning(player.position,8,1.1);
-    damageNearby(player.position,6.5,.55);triggerCombatShake(6,90);
+    // One short lightning chain per pulse is readable and has a guaranteed cleanup.
+    spawnChainLightning(player.position,Math.min(4,live.length),1.05);
+    damageNearby(player.position,6.5,.75);triggerCombatShake(4,70);
   }
-  if(mageUltimateActive<=0){document.body.style.filter='';spawnArcaneSigil(player.position.x,player.position.y,player.position.z,6.2);damageNearby(player.position,6.2,2.5);triggerCombatShake(12,240);}
+  if(mageUltimateActive<=0){document.body.style.filter='';spawnArcaneSigil(player.position.x,player.position.y,player.position.z,4.8);damageNearby(player.position,6.2,2.5);triggerCombatShake(9,180);}
 }
 
 
