@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.9.4 TEST: Shadow Removed Cleanly — every enemy now begins beyond the arena boundary and visibly advances into the map. -->
+<!-- V22.9.6 TEST: Cataclysm Rebalance — hidden Mage Ultimate capacity increased to 200 while the HUD still displays 0–100%. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -562,7 +562,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.4 TEST - No Shadow';
+const GAME_VERSION='22.9.6 TEST - Cataclysm Rebalance';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · OUTSIDE ENEMY ENTRY`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -9250,7 +9250,8 @@ function updateHoodedHud(){
   if(!btn||!meter)return;
   const isHooded=state.avatarType==='hooded', isArcher=state.avatarType==='rogue', isMage=state.avatarType==='mage', isKnight=state.avatarType==='knight', isBarbarian=state.avatarType==='barbarian';
   btn.classList.toggle('hidden',!(isHooded||isArcher||isMage||isKnight||isBarbarian)); meter.classList.toggle('on',isHooded||isArcher||isMage||isKnight||isBarbarian);
-  const pct=Math.max(0,Math.min(100,isHooded?hoodedUltimateCharge:(isArcher?archerUltimateCharge:(isMage?mageUltimateCharge:(isKnight?knightUltimateCharge:barbarianUltimateCharge)))));
+  const displayedCharge=isMage?(mageUltimateCharge/2):(isHooded?hoodedUltimateCharge:(isArcher?archerUltimateCharge:(isKnight?knightUltimateCharge:barbarianUltimateCharge)));
+  const pct=Math.max(0,Math.min(100,displayedCharge));
   btn.style.setProperty('--charge',pct+'%'); btn.classList.toggle('ready',pct>=100);
   if(isHooded){btn.textContent=pct>=100?'ECLIPSE!':'ECLIPSE';meter.textContent='VITALITY '+hoodedMeleeHits+'/25';}
   else if(isArcher){btn.textContent=pct>=100?'ARROW STORM!':'ARROW STORM';meter.textContent='FOCUS '+Math.round(pct)+'%';}
@@ -9536,7 +9537,7 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
 }
 function triggerArcaneCataclysm(){
   if(!gameRunning||state.avatarType!=='mage'||mageUltimateActive>0)return;
-  if(mageUltimateCharge<99.5){toast('Arcane Cataclysm is still charging');return;}
+  if(mageUltimateCharge<199.5){toast('Arcane Cataclysm is still charging');return;}
   mageUltimateCharge=0;mageUltimateActive=3.6;mageUltimatePulse=0;updateHoodedHud();
   document.body.style.filter='saturate(1.22) contrast(1.08) brightness(.88)';
   spawnArcaneAura(player.position);spawnArcaneAura(player.position);spawnArcanePillars(player.position);spawnArcaneRuneBurst(player.position,3.7);spawnArcaneRuneBurst(player.position,5.1);spawnArcaneSigil(player.position.x,player.position.y,player.position.z,5.2);spawnChainLightning(player.position,10,1.8);
@@ -9898,7 +9899,13 @@ function killZombie(z){
   updateEnemyRadar();
   if(state.avatarType==='hooded'){spawnSoulOrb(z.position);hoodedUltimateCharge=Math.min(100,hoodedUltimateCharge+4);passiveState.shadowstepTimer=passiveForAvatar().killMoveDuration||0;updateHoodedHud();}
   if(state.avatarType==='rogue'){archerUltimateCharge=Math.min(100,archerUltimateCharge+4);spawnArcherSpark(z.position.x,z.position.y+0.8,z.position.z);updateHoodedHud();}
-  if(state.avatarType==='mage'){mageUltimateCharge=Math.min(100,mageUltimateCharge+4*(passiveForAvatar().ultimateChargeMult||1));updateHoodedHud();}
+  if(state.avatarType==='mage'){
+    const archetype=z.userData.archetype||'walker';
+    const baseCharge=archetype==='boss'?15:(archetype==='brute'?3:(archetype==='spitter'?2:1));
+    const gainedCharge=archetype==='boss'?15:baseCharge*(passiveForAvatar().ultimateChargeMult||1);
+    mageUltimateCharge=Math.min(200,mageUltimateCharge+gainedCharge);
+    updateHoodedHud();
+  }
   if(state.avatarType==='knight'){knightUltimateCharge=Math.min(100,knightUltimateCharge+4);spawnBurst(z.position.x,z.position.y+.8,z.position.z,12,FX_MAT_SPARK,3.5);updateHoodedHud();}
   if(state.avatarType==='barbarian'){barbarianUltimateCharge=Math.min(100,barbarianUltimateCharge+4);spawnBurst(z.position.x,z.position.y+.8,z.position.z,16,FX_MAT_SPARK,4.2);updateHoodedHud();}
   runTokens += tokensPerKill();
