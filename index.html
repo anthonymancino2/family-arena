@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.8.5: Hero Passive System — data-driven passives, hero-select descriptions, and subtle in-game status feedback for all five heroes. -->
+<!-- V22.8.6: Spawn Safety + HUD Fix — revalidates delayed enemy spawns and separates stacked mobile HUD displays. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -229,11 +229,12 @@
   .weaponPill{position:absolute;top:calc(96px + env(safe-area-inset-top));left:14px;
     background:rgba(20,22,28,0.55);border:1.5px solid rgba(255,255,255,0.35);
     border-radius:12px;padding:5px 11px;font-weight:700;font-size:12px;color:#fff;}
-  .enemyCountPill{position:absolute;top:calc(130px + env(safe-area-inset-top));left:14px;
+  .passivePill{position:absolute;top:calc(130px + env(safe-area-inset-top));left:14px;max-width:230px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .enemyCountPill{position:absolute;top:calc(166px + env(safe-area-inset-top));left:14px;
     background:rgba(44,18,64,0.78);border:1.5px solid rgba(205,126,255,0.78);
     border-radius:12px;padding:6px 11px;font-weight:900;font-size:12px;color:#f0d5ff;
     letter-spacing:.035em;box-shadow:0 0 10px rgba(172,74,255,0.22);}
-  .enemyRadar{position:absolute;top:calc(168px + env(safe-area-inset-top));left:14px;width:92px;height:92px;border-radius:50%;background:rgba(5,12,22,.62);border:2px solid rgba(255,255,255,.38);box-shadow:0 0 14px rgba(0,0,0,.4);pointer-events:none;}
+  .enemyRadar{position:absolute;top:calc(204px + env(safe-area-inset-top));left:14px;width:92px;height:92px;border-radius:50%;background:rgba(5,12,22,.62);border:2px solid rgba(255,255,255,.38);box-shadow:0 0 14px rgba(0,0,0,.4);pointer-events:none;}
   .invinciblePill{position:absolute;top:calc(112px + env(safe-area-inset-top));left:50%;
     transform:translateX(-50%);background:rgba(74,255,234,0.18);
     border:2px solid #4affea;border-radius:16px;padding:8px 16px;display:none;
@@ -453,7 +454,7 @@
         <div class="roundTimerPill" id="roundTimerPill">⏱ 0.0s</div>
         <div class="runTokensPill"><div class="coin"></div><span id="runTokensCount">0</span></div>
         <div class="weaponPill" id="weaponPill">Pistol</div>
-        <div class="weaponPill" id="passivePill" style="top:calc(132px + env(safe-area-inset-top));max-width:230px;font-size:11px;">Passive</div>
+        <div class="weaponPill passivePill" id="passivePill">Passive</div>
         <div class="enemyCountPill" id="enemyCountPill">ENEMIES 0</div>
         <canvas class="enemyRadar" id="enemyRadar" width="184" height="184"></canvas>
         <div class="invinciblePill" id="invinciblePill">🛡 <span id="invincibleTime">0</span>s</div>
@@ -8249,7 +8250,7 @@ function spawnPointBlocked(x,z,clearance=0.7){
   return false;
 }
 function findEnemySpawnPosition(archetype){
-  const safeRadius = archetype==='brute' ? 17 : 13;
+  const safeRadius = archetype==='brute' ? 18 : 14;
   const clearance = archetype==='brute' ? 1.05 : 0.75;
   const edgeRadius = arenaSize-2;
   const players = livingPlayers();
@@ -8319,7 +8320,35 @@ function spawnZombie(){
   zombies.push(z);
   const warnMat=new THREE.MeshBasicMaterial({color:archetype==='brute'?0xff7a35:0xffd84a,transparent:true,opacity:.9,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
   const warn=new THREE.Mesh(new THREE.RingGeometry(.45,.85,28),warnMat);warn.rotation.x=-Math.PI/2;warn.position.set(z.position.x,.07,z.position.z);scene.add(warn);fx.push({kind:'spawnWarning',mesh:warn,life:.72,maxLife:.72,spin:7});
-  setTimeout(()=>{if(!z.userData.dead&&z.parent){z.visible=true;z.userData.spawnPending=false;spawnBurst(z.position.x,z.position.y+.45,z.position.z,14,FX_MAT_ZOMBIE,3.2);}},650);
+  setTimeout(()=>{
+    if(z.userData.dead||!z.parent) return;
+    // The player can move into a warning ring during its delay. Revalidate at
+    // the exact reveal moment so a valid warning position never turns into an
+    // enemy spawning on top of the player.
+    const revealSafeRadius=archetype==='brute'?18:14;
+    const tooClose=livingPlayers().some(p=>Math.hypot(z.position.x-p.position.x,z.position.z-p.position.z)<revealSafeRadius);
+    if(tooClose||spawnPointBlocked(z.position.x,z.position.z,archetype==='brute'?1.05:.75)){
+      const replacement=findEnemySpawnPosition(archetype);
+      if(replacement){
+        z.position.set(replacement.x,0,replacement.z);
+        if(z.userData.lastSafePosition) z.userData.lastSafePosition.copy(z.position);
+        const delayedWarn=new THREE.Mesh(new THREE.RingGeometry(.45,.85,28),warnMat.clone());
+        delayedWarn.rotation.x=-Math.PI/2;delayedWarn.position.set(z.position.x,.07,z.position.z);scene.add(delayedWarn);
+        fx.push({kind:'spawnWarning',mesh:delayedWarn,life:.38,maxLife:.38,spin:7});
+        setTimeout(()=>{
+          if(z.userData.dead||!z.parent) return;
+          const stillTooClose=livingPlayers().some(p=>Math.hypot(z.position.x-p.position.x,z.position.z-p.position.z)<revealSafeRadius);
+          if(stillTooClose){scene.remove(z);disposeGroup(z);zombies=zombies.filter(o=>o!==z);zombiesRemainingToSpawn++;scheduleEnemySpawnRetry();return;}
+          z.visible=true;z.userData.spawnPending=false;spawnBurst(z.position.x,z.position.y+.45,z.position.z,14,FX_MAT_ZOMBIE,3.2);
+        },340);
+        return;
+      }
+      // No safe position exists right now. Return this enemy to the queue
+      // rather than forcing an unsafe spawn.
+      scene.remove(z);disposeGroup(z);zombies=zombies.filter(o=>o!==z);zombiesRemainingToSpawn++;scheduleEnemySpawnRetry();return;
+    }
+    z.visible=true;z.userData.spawnPending=false;spawnBurst(z.position.x,z.position.y+.45,z.position.z,14,FX_MAT_ZOMBIE,3.2);
+  },650);
   addXray(z, spec.color);
   setTimeout(()=>{if(!z.userData.dead)styleZombieArchetype(z);},180);
   if(archetype!=='walker') spawnBurst(z.position.x,z.position.y+.5,z.position.z,8,FX_MAT_ZOMBIE,2.5);
