@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.8.9: Mage Spectacle — the Mage now has the game's flashiest readable effects with strict fade and cleanup safeguards. -->
+<!-- V22.9.1: Hero Identity Pass — distinct readable aura, attack, and ultimate visuals for all five heroes with strict cleanup safeguards. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -8928,6 +8928,42 @@ let mageCastStep = 0;
 let hoodedUltimateActive = 0;
 let hoodedUltimatePulse = 0;
 let shadowAfterimageTimer = 0;
+let heroIdentityAuraTimer = 0;
+
+
+// Lightweight hero identity aura. One short-lived pulse at a time keeps each
+// hero recognizable while preserving combat readability and mobile performance.
+function spawnHeroIdentityAura(){
+  if(!player || !scene || fx.length>150) return;
+  const type=state.avatarType;
+  const palette={
+    mage:[0x35cfff,0xb85cff], knight:[0xffd35a,0xffffff],
+    barbarian:[0xff6a22,0x8b4a24], hooded:[0x7b2cff,0x180626], rogue:[0x71e7ff,0x79d66b]
+  }[type];
+  if(!palette) return;
+  const g=new THREE.Group();
+  const mat=(color,opacity)=>new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.52,.68,28),mat(palette[0],.22));
+  ring.rotation.x=-Math.PI/2;ring.position.y=.055;ring.userData.baseOpacity=.22;g.add(ring);
+  if(type==='mage'){
+    for(let i=0;i<3;i++){const orb=new THREE.Mesh(new THREE.OctahedronGeometry(.055,0),mat(i%2?palette[1]:palette[0],.34));const a=i*Math.PI*2/3;orb.position.set(Math.sin(a)*.62,.55+i*.18,Math.cos(a)*.62);orb.userData.baseOpacity=.34;g.add(orb);}
+  }else if(type==='knight'){
+    for(let i=0;i<4;i++){const ray=new THREE.Mesh(new THREE.PlaneGeometry(.025,.75),mat(i%2?palette[1]:palette[0],.18));ray.rotation.x=-Math.PI/2;ray.rotation.z=i*Math.PI/2;ray.position.y=.07;ray.userData.baseOpacity=.18;g.add(ray);}
+  }else if(type==='barbarian'){
+    for(let i=0;i<4;i++){const ember=new THREE.Mesh(new THREE.TetrahedronGeometry(.045,0),mat(palette[0],.30));const a=i*Math.PI/2;ember.position.set(Math.sin(a)*.55,.12+(i%2)*.12,Math.cos(a)*.55);ember.userData.baseOpacity=.30;g.add(ember);}
+  }else if(type==='hooded'){
+    const mist=new THREE.Mesh(new THREE.TorusGeometry(.58,.045,6,30),mat(palette[0],.20));mist.rotation.x=Math.PI/2;mist.position.y=.38;mist.userData.baseOpacity=.20;g.add(mist);
+  }else if(type==='rogue'){
+    for(let i=0;i<3;i++){const leaf=new THREE.Mesh(new THREE.PlaneGeometry(.055,.16),mat(i%2?palette[1]:palette[0],.28));const a=i*Math.PI*2/3;leaf.position.set(Math.sin(a)*.62,.18+i*.12,Math.cos(a)*.62);leaf.rotation.z=a;leaf.userData.baseOpacity=.28;g.add(leaf);}
+  }
+  g.position.copy(player.position);scene.add(g);
+  fx.push({kind:'heroAura',mesh:g,life:.62,maxLife:.62,spin:type==='hooded'?-2.4:2.4,dispose:true});
+}
+function updateHeroIdentityAura(dt){
+  if(!gameRunning || !player) return;
+  heroIdentityAuraTimer-=dt;
+  if(heroIdentityAuraTimer<=0){heroIdentityAuraTimer=state.avatarType==='mage'?.42:.72;spawnHeroIdentityAura();}
+}
 
 // Simple shared-geometry particle burst — used for hit sparks, zombie
 // death poofs, and landing dust. Particles fade by shrinking (not by
@@ -8982,6 +9018,8 @@ function updateFx(dt){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.scale.setScalar(1+(1-q)*.18);f.mesh.traverse(o=>{if(o.material)o.material.opacity=.28*q;});
     } else if(f.kind==='soul'){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);if(player)f.mesh.position.lerp(new THREE.Vector3(player.position.x,player.position.y+1,player.position.z),Math.min(1,dt*7));f.mesh.scale.setScalar(.7+.5*Math.sin((1-q)*Math.PI));if(f.mesh.material)f.mesh.material.opacity=q;
+    } else if(f.kind==='heroAura'){
+      f.life-=dt;const q=Math.max(0,f.life/f.maxLife),p=1-q;f.mesh.rotation.y+=(f.spin||2)*dt;f.mesh.scale.setScalar(.88+p*.34);f.mesh.traverse(o=>{if(o.material)o.material.opacity=q*(o.userData.baseOpacity||.22);});
     } else if(f.kind==='mageBasicCone'){
       f.life-=dt;
       const q=Math.max(0,f.life/f.maxLife);
@@ -9301,7 +9339,7 @@ function doKnightAttack(w){
     const dx=Math.sin(yaw),dz=Math.cos(yaw);zombies.forEach(z=>{if(z.userData.dead)return;const ox=z.position.x-pos.x,oz=z.position.z-pos.z,d=Math.hypot(ox,oz);if(d<w.radius+0.3){const r=resolveCollision(z.position.x+dx*1.25,z.position.z+dz*1.25,z.position.y);z.position.x=r.x;z.position.z=r.z;}});
     triggerCombatShake(hits?12:5,170);navigator.vibrate&&navigator.vibrate(hits?[35,20,55]:18);return;
   }
-  const step=knightComboStep++%3;spawnKnightCleave(pos,yaw,step,step===2?1.22:1);
+  spawnHeroIdentityAura();const step=knightComboStep++%3;spawnKnightCleave(pos,yaw,step,step===2?1.22:1);
   let hits=damageMeleeArc(pos,yaw,w.radius,w.arc,w.damage*(step===2?1.35:1));
   if(step===2){spawnKnightCleave(pos,yaw+Math.PI/2,3,1.2);damageNearby(pos,w.radius*1.12,w.damage*.75);spawnKnightGuardBurst(player.position,2.8);triggerCombatShake(13,190);}
   else triggerCombatShake(hits?7:3,110);
@@ -9344,6 +9382,7 @@ function spawnEarthbreaker(origin,radius=3.25){
   g.position.set(origin.x,origin.y+.06,origin.z);scene.add(g);fx.push({kind:'earthbreakerFx',mesh:g,life:.62,maxLife:.62,spin:1.4});
 }
 function doBarbarianAttack(w){
+  spawnHeroIdentityAura();
   const pos={x:player.position.x,y:player.position.y,z:player.position.z},yaw=player.rotation.y;
   if(player.userData.playKayClip){const clip=findClipByWords(w.kind==='earthbreaker'?['melee','smash']:['melee','chop'],findClipByWords(['melee','slash']));player.userData.playKayClip(clip,true,true,w.kind==='earthbreaker'?.46:.27);}
   if(w.kind==='barbarian_spin'){
@@ -9369,54 +9408,22 @@ function updatePrimalRage(dt){
 }
 
 function spawnMageBasicCone(elementIsIce){
-  if(!player || !scene) return;
-  const yaw=player.rotation.y;
-  const dirX=Math.sin(yaw), dirZ=Math.cos(yaw);
+  if(!player || !scene || fx.length>160) return;
+  const yaw=player.rotation.y,dirX=Math.sin(yaw),dirZ=Math.cos(yaw);
   const g=new THREE.Group();
-  const tint=elementIsIce?0x35cfff:0xff5a24;
-  const accent=elementIsIce?0xa7f3ff:0xffbe55;
-
-  const matA=new THREE.MeshBasicMaterial({
-    color:tint,transparent:true,opacity:.58,depthWrite:false,
-    blending:THREE.NormalBlending
-  });
-  const matB=new THREE.MeshBasicMaterial({
-    color:accent,transparent:true,opacity:.48,depthWrite:false,
-    blending:THREE.NormalBlending
-  });
-
-  // Compact muzzle halo: never larger than the character.
-  const halo=new THREE.Mesh(new THREE.RingGeometry(.12,.22,18),matA);
-  halo.rotation.x=-Math.PI/2;
-  halo.position.set(0,.12,.28);
-  g.add(halo);
-
-  // Six tiny colored shards travel only a short distance in front.
-  for(let i=0;i<6;i++){
-    const shard=new THREE.Mesh(
-      elementIsIce
-        ? new THREE.OctahedronGeometry(.035,0)
-        : new THREE.TetrahedronGeometry(.04,0),
-      i%2?matA:matB
-    );
-    shard.position.set(
-      (Math.random()-.5)*.34,
-      .08+Math.random()*.22,
-      .25+Math.random()*.75
-    );
-    shard.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
-    g.add(shard);
+  const tint=elementIsIce?0x35cfff:0xff5a24, accent=elementIsIce?0xb85cff:0xffc14d;
+  const make=(color,opacity,blend=THREE.AdditiveBlending)=>new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide,blending:blend});
+  const halo=new THREE.Mesh(new THREE.RingGeometry(.11,.34,26),make(tint,.72));halo.position.set(0,.12,.24);halo.userData.baseOpacity=.72;g.add(halo);
+  const rune=new THREE.Mesh(new THREE.RingGeometry(.19,.25,6),make(accent,.62));rune.position.set(0,.12,.27);rune.rotation.z=Math.PI/6;rune.userData.baseOpacity=.62;g.add(rune);
+  for(let i=0;i<9;i++){
+    const shard=new THREE.Mesh(elementIsIce?new THREE.OctahedronGeometry(.045+(i%3)*.008,0):new THREE.TetrahedronGeometry(.05+(i%3)*.008,0),make(i%2?tint:accent,.56));
+    shard.position.set((Math.random()-.5)*.42,.03+Math.random()*.30,.28+Math.random()*1.05);shard.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);shard.userData.baseOpacity=.56;g.add(shard);
   }
-
-  g.position.set(
-    player.position.x+dirX*.42,
-    player.position.y+.34,
-    player.position.z+dirZ*.42
-  );
-  g.rotation.y=yaw;
-  scene.add(g);
-  fx.push({kind:'mageBasicCone',mesh:g,life:.12,maxLife:.12,spin:elementIsIce?-1.2:1.2});
+  const streak=new THREE.Mesh(new THREE.ConeGeometry(.18,1.35,10,1,true),make(tint,.20));streak.rotation.x=Math.PI/2;streak.position.z=.82;streak.userData.baseOpacity=.20;g.add(streak);
+  g.position.set(player.position.x+dirX*.42,player.position.y+.34,player.position.z+dirZ*.42);g.rotation.y=yaw;scene.add(g);
+  fx.push({kind:'mageBasicCone',mesh:g,life:.20,maxLife:.20,spin:elementIsIce?-3.2:3.2,dispose:true});
 }
+
 function spawnArcaneSigil(x,y,z,radius=3.2){
   const g=new THREE.Group();
   const makeMat=(color,opacity)=>new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide,blending:THREE.NormalBlending});
@@ -9519,23 +9526,23 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
 function triggerArcaneCataclysm(){
   if(!gameRunning||state.avatarType!=='mage'||mageUltimateActive>0)return;
   if(mageUltimateCharge<99.5){toast('Arcane Cataclysm is still charging');return;}
-  mageUltimateCharge=0;mageUltimateActive=3.0;mageUltimatePulse=0;updateHoodedHud();
-  document.body.style.filter='saturate(1.08) contrast(1.02)';
-  spawnArcaneAura(player.position);spawnArcanePillars(player.position);spawnArcaneRuneBurst(player.position,3.7);spawnArcaneSigil(player.position.x,player.position.y,player.position.z,4.4);spawnChainLightning(player.position,8,1.8);
-  triggerCombatShake(10,260);navigator.vibrate&&navigator.vibrate([55,30,100]);toast('ARCANE CATACLYSM!');
+  mageUltimateCharge=0;mageUltimateActive=3.6;mageUltimatePulse=0;updateHoodedHud();
+  document.body.style.filter='saturate(1.22) contrast(1.08) brightness(.88)';
+  spawnArcaneAura(player.position);spawnArcaneAura(player.position);spawnArcanePillars(player.position);spawnArcaneRuneBurst(player.position,3.7);spawnArcaneRuneBurst(player.position,5.1);spawnArcaneSigil(player.position.x,player.position.y,player.position.z,5.2);spawnChainLightning(player.position,10,1.8);
+  triggerCombatShake(14,360);navigator.vibrate&&navigator.vibrate([55,30,100]);toast('ARCANE CATACLYSM!');
 }
 function updateArcaneCataclysm(dt){
   if(mageUltimateActive<=0)return;
   mageUltimateActive-=dt;mageUltimatePulse-=dt;
   if(mageUltimatePulse<=0){
-    mageUltimatePulse=.38;
-    const live=zombies.filter(z=>!z.userData.dead).slice(0,9);
+    mageUltimatePulse=.28;
+    const live=zombies.filter(z=>!z.userData.dead).slice(0,12);
     live.forEach((z,i)=>{spawnArcaneMeteor(z.position,i%2?'ice':'fire');applyBulletDamage(z,1.35*playerStats.power);});
     // One short lightning chain per pulse is readable and has a guaranteed cleanup.
-    spawnArcaneAura(player.position);spawnArcaneRuneBurst(player.position,2.6+Math.random()*1.0);spawnChainLightning(player.position,Math.min(7,live.length),1.05);
+    spawnArcaneAura(player.position);spawnArcanePillars(player.position);spawnArcaneRuneBurst(player.position,2.8+Math.random()*1.8);spawnChainLightning(player.position,Math.min(9,live.length),1.05);
     damageNearby(player.position,6.5,.75);triggerCombatShake(4,70);
   }
-  if(mageUltimateActive<=0){document.body.style.filter='';spawnArcanePillars(player.position);spawnArcaneRuneBurst(player.position,4.4);spawnArcaneSigil(player.position.x,player.position.y,player.position.z,4.8);spawnChainLightning(player.position,9,1.4);damageNearby(player.position,6.2,2.5);triggerCombatShake(11,220);}
+  if(mageUltimateActive<=0){document.body.style.filter='';spawnArcaneAura(player.position);spawnArcanePillars(player.position);spawnArcanePillars(player.position);spawnArcaneRuneBurst(player.position,4.4);spawnArcaneRuneBurst(player.position,6.0);spawnArcaneSigil(player.position.x,player.position.y,player.position.z,6.2);spawnChainLightning(player.position,12,1.4);damageNearby(player.position,6.2,2.5);triggerCombatShake(11,220);}
 }
 
 
@@ -9652,6 +9659,7 @@ function doMeleeAttack(w, origin=player.position, isClone=false){
   const pos={x:origin.x,y:origin.y,z:origin.z};
   let hits=0;
   if(!spin && state.avatarType==='hooded'){
+    spawnHeroIdentityAura();
     const yaw=player.rotation.y;
     const step=hoodedComboStep++%4;
     spawnShadowSlash(pos,yaw,step);
@@ -9756,7 +9764,7 @@ function doShoot(){
     if(state.avatarType==='hooded') cloneAttack(w);
   } else if(w.kind==='multi_arrow'){
     [-0.34,-0.17,0,0.17,0.34].forEach(a=>shootFromPosition(w,player.position,a));
-    spawnArcherMuzzleFan();
+    spawnArcherMuzzleFan();spawnHeroIdentityAura();
   } else if(w.kind==='chain'){
     if(player.userData.playKayClip) player.userData.playKayClip(findClipByWords(['magic']),true,true,0.3);
     chainElementAttack(w);
@@ -9771,7 +9779,7 @@ function doShoot(){
       spawnMageBasicCone(mageElementToggle);
     }
     shootFromPosition(w,player.position,0);
-    if(state.avatarType==='rogue'){archerVolleyStep=(archerVolleyStep+1)%3;spawnArcherMuzzleFan(archerVolleyStep===0);}
+    if(state.avatarType==='rogue'){archerVolleyStep=(archerVolleyStep+1)%3;spawnArcherMuzzleFan(archerVolleyStep===0);spawnHeroIdentityAura();}
     if(state.avatarType==='hooded') cloneAttack(w);
   }
   if(w.kind!=='melee' && w.kind!=='spin') navigator.vibrate && navigator.vibrate(10);
@@ -10056,6 +10064,7 @@ function updateSceneryOcclusion(dt){
 
 // ---- Main update ----
 function update(dt){
+  updateHeroIdentityAura(dt);
   updateShadowClones(dt);
   updateShadowEclipse(dt);
   updateArrowStorm(dt);
