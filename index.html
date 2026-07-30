@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.7.8: Removed the remaining Frostwing-specific procedural animation hooks; imported clips now determine Frostwing movement animation. -->
+<!-- V22.7.9: Restored Frostwing's proven shared procedural movement cadence and dash pose after the imported-only animation path caused a stiff-board regression. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -560,8 +560,8 @@
 <script>
 (function(){
 
-const GAME_VERSION = '22.7.8';
-const GAME_BUILD_LABEL = `V${GAME_VERSION} · PROCEDURAL ANIMATION CLEANUP`;
+const GAME_VERSION = '22.7.9';
+const GAME_BUILD_LABEL = `V${GAME_VERSION} · FROSTWING ANIMATION REGRESSION FIX`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
 window.addEventListener('DOMContentLoaded', ()=>{
@@ -8572,6 +8572,7 @@ function spawnPlayer(){
   if(state.avatarType==='frostwing' && player.userData.parts){
     attachFrostPistol(player.userData.parts.armR,-1);
     attachFrostPistol(player.userData.parts.armL,1);
+    player.userData.sharedAvatarMotion=true;
   }
   const avatarScale = AVATAR_SCALE[state.avatarType] || 1;
   player.scale.setScalar(avatarScale);
@@ -10295,12 +10296,27 @@ function update(dt){
     const nz = player.position.z + dashDir.z*DASH_SPEED*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
     player.position.x = resolved.x; player.position.z = resolved.z;
+    if(state.avatarType==='frostwing' && player.userData.parts){
+      const p=player.userData.parts;
+      const phase=performance.now()*.022;
+      if(p.legL)p.legL.rotation.x=Math.sin(phase)*.72;
+      if(p.legR)p.legR.rotation.x=-Math.sin(phase)*.72;
+      if(p.armL)p.armL.rotation.x=-Math.sin(phase)*.52;
+      if(p.armR)p.armR.rotation.x=Math.sin(phase)*.52;
+      if(p.torso)p.torso.rotation.x=-.10;
+      if(p.head)p.head.rotation.x=.05;
+    }
     dashTimer -= dt;
     // Hard release safeguard: a dropped mobile frame can never leave the
     // character trapped in dash. Free mode is no longer required to reset it.
     if(dashTimer<=0 || performance.now()-dashStartedAt>DASH_DURATION*1000+180){
       dashActive=false;
       dashTimer=0;
+      if(state.avatarType==='frostwing' && player.userData.parts){
+        const p=player.userData.parts;
+        if(p.torso)p.torso.rotation.x=0;
+        if(p.head)p.head.rotation.x=0;
+      }
     }
   } else if(moveVec.x || moveVec.y){
     const forward = -moveVec.y, strafe = moveVec.x;
@@ -10318,9 +10334,18 @@ function update(dt){
     player.rotation.y = player.userData.facing;
     // walk bob
     const t = performance.now()*0.01;
-    if(player.userData.parts && !player.userData.playKayClip){
+    if(player.userData.parts){
       if(player.userData.parts.legL)player.userData.parts.legL.rotation.x = Math.sin(t)*0.5;
       if(player.userData.parts.legR)player.userData.parts.legR.rotation.x = -Math.sin(t)*0.5;
+      if(state.avatarType==='frostwing'){
+        // Restore the proven opposing arm/leg cadence while the imported
+        // Frostwing asset remains visually static on devices where its GLB
+        // contains no usable baked locomotion clips.
+        if(player.userData.parts.armL)player.userData.parts.armL.rotation.x = -Math.sin(t)*0.50;
+        if(player.userData.parts.armR)player.userData.parts.armR.rotation.x = Math.sin(t)*0.50;
+        if(player.userData.parts.torso)player.userData.parts.torso.rotation.x=-.055;
+        if(player.userData.parts.head)player.userData.parts.head.rotation.x=.025;
+      }
     }
 
     // Camera auto-follow: swing camYaw to catch up behind the character
@@ -10335,9 +10360,16 @@ function update(dt){
       camYaw += step;
     }
   } else {
-    if(player.userData.parts && !player.userData.playKayClip){
+    if(player.userData.parts){
       if(player.userData.parts.legL)player.userData.parts.legL.rotation.x=0;
       if(player.userData.parts.legR)player.userData.parts.legR.rotation.x=0;
+      if(state.avatarType==='frostwing'){
+        const idleT=performance.now()*.0032;
+        if(player.userData.parts.armL)player.userData.parts.armL.rotation.x=Math.sin(idleT)*.035;
+        if(player.userData.parts.armR)player.userData.parts.armR.rotation.x=-Math.sin(idleT)*.035;
+        if(player.userData.parts.torso)player.userData.parts.torso.rotation.x=0;
+        if(player.userData.parts.head)player.userData.parts.head.rotation.x=0;
+      }
     }
   }
   // Drive the imported skeleton with its real baked clips.
