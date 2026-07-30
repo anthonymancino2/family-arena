@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.8.0: Removed Frostwing and restored the stable five-hero roster. -->
+<!-- V22.8.2: Fair spawn system — enemies now require a valid, obstacle-free position outside the player safety radius or the spawn is delayed. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -559,8 +559,8 @@
 <script>
 (function(){
 
-const GAME_VERSION = '22.8.0';
-const GAME_BUILD_LABEL = `V${GAME_VERSION} · STABLE FIVE-HERO ROSTER`;
+const GAME_VERSION = '22.8.2';
+const GAME_BUILD_LABEL = `V${GAME_VERSION} · FAIR ENEMY SPAWNS`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
 window.addEventListener('DOMContentLoaded', ()=>{
@@ -952,6 +952,7 @@ function updateEnemyProjectiles(dt){
 let hearts = 3, maxHearts = 3, round = 1, kills = 0, roundKillTarget = 0, roundKillsDone = 0;
 const MAX_CONCURRENT_ZOMBIES = 30; // hard cap on simultaneous zombies, regardless of round target
 let zombiesRemainingToSpawn = 0;   // queued zombies still owed this round, fed in as others die
+let enemySpawnRetryTimer = null;    // one shared retry timer prevents failed spawn attempts from piling up
 // ---- Player progression: 1 point in each stat by default (3 total),
 // +1 unspent point awarded every round clear for the player to place.
 let playerStats = {power:1, speed:1, hp:1};
@@ -8216,27 +8217,69 @@ function spawnPlayer(){
 }
 
 // ---- Zombies ----
+function livingPlayers(){
+  // Centralized for future co-op support. The current game has one player.
+  return player && player.parent && player.userData.hp>0 ? [player] : [];
+}
+function spawnPointBlocked(x,z,clearance=0.7){
+  if(Math.hypot(x,z) > arenaSize-clearance) return true;
+  for(const b of obstacleBoxes){
+    const base=b.base||0;
+    if(base>0.1) continue; // floating platforms do not block a ground spawn beneath them
+    if(x>b.minX-clearance && x<b.maxX+clearance && z>b.minZ-clearance && z<b.maxZ+clearance) return true;
+  }
+  return false;
+}
+function findEnemySpawnPosition(archetype){
+  const safeRadius = archetype==='brute' ? 17 : 13;
+  const clearance = archetype==='brute' ? 1.05 : 0.75;
+  const edgeRadius = arenaSize-2;
+  const players = livingPlayers();
+  const facing = player ? player.rotation.y : 0;
+
+  for(let attempt=0;attempt<48;attempt++){
+    const bias=facing+Math.PI+(Math.random()-.5)*Math.PI*1.5;
+    const ang=attempt<28 ? bias : Math.random()*Math.PI*2;
+    const radius=edgeRadius*(0.78+Math.random()*0.22);
+    const x=Math.cos(ang)*radius;
+    const z=Math.sin(ang)*radius;
+
+    if(spawnPointBlocked(x,z,clearance)) continue;
+    if(players.some(p=>Math.hypot(x-p.position.x,z-p.position.z)<safeRadius)) continue;
+    if(zombies.some(enemy=>!enemy.userData.dead && Math.hypot(x-enemy.position.x,z-enemy.position.z)<clearance*2.2)) continue;
+    return {x,z};
+  }
+  return null;
+}
+function scheduleEnemySpawnRetry(){
+  if(enemySpawnRetryTimer || !gameRunning || zombiesRemainingToSpawn<=0) return;
+  enemySpawnRetryTimer=setTimeout(()=>{
+    enemySpawnRetryTimer=null;
+    fillEnemySlotsFromQueue();
+  },350);
+}
+function fillEnemySlotsFromQueue(){
+  if(!gameRunning || roundKillsDone>=roundKillTarget) return;
+  while(zombies.length<MAX_CONCURRENT_ZOMBIES && zombiesRemainingToSpawn>0){
+    if(!spawnZombie()){
+      scheduleEnemySpawnRetry();
+      break;
+    }
+    zombiesRemainingToSpawn--;
+  }
+}
 function spawnZombie(){
   const zombieRoster = AVATAR_TYPES;
   const zombieCharacter = zombieRoster[Math.floor(Math.random()*zombieRoster.length)];
   const archetype = chooseZombieArchetype();
   const spec = ZOMBIE_ARCHETYPES[archetype];
+  const spawnPos=findEnemySpawnPosition(archetype);
+
+  // Never force a bad position. Leave the zombie in the queue and retry shortly.
+  if(!spawnPos) return false;
+
   const z = buildKayKitPlayer(zombieCharacter, {zombie:true, silent:true});
-  // V22.0 safe spawning: never appear on top of or immediately beside the player.
-  // Prefer the far side of the arena and retry several angles when the player is near an edge.
-  const minSpawnDistance = archetype==='brute' ? 17 : 13;
-  const rad = arenaSize - 2;
-  let spawnX=rad, spawnZ=0, bestDist=-1;
-  const playerFacing = player ? player.rotation.y : 0;
-  for(let attempt=0;attempt<20;attempt++){
-    const bias = playerFacing + Math.PI + (Math.random()-.5)*Math.PI*1.5;
-    const ang = attempt<12 ? bias : Math.random()*Math.PI*2;
-    const x=Math.cos(ang)*rad, zz=Math.sin(ang)*rad;
-    const d=player?Math.hypot(x-player.position.x,zz-player.position.z):999;
-    if(d>bestDist){bestDist=d;spawnX=x;spawnZ=zz;}
-    if(d>=minSpawnDistance){spawnX=x;spawnZ=zz;break;}
-  }
-  z.position.set(spawnX, 0, spawnZ);
+  z.position.set(spawnPos.x, 0, spawnPos.z);
   z.userData.spawnPending=true;
   z.visible=false;
   const roundHp = 2 + Math.floor(round/3);
@@ -8262,8 +8305,10 @@ function spawnZombie(){
   addXray(z, spec.color);
   setTimeout(()=>{if(!z.userData.dead)styleZombieArchetype(z);},180);
   if(archetype!=='walker') spawnBurst(z.position.x,z.position.y+.5,z.position.z,8,FX_MAT_ZOMBIE,2.5);
+  return true;
 }
 function clearZombies(){
+  if(enemySpawnRetryTimer){clearTimeout(enemySpawnRetryTimer);enemySpawnRetryTimer=null;}
   zombies.forEach(z=>{ scene.remove(z); disposeGroup(z); });
   zombies = [];
   enemyProjectiles.forEach(p=>{scene.remove(p.mesh);disposeGroup(p.mesh);});
@@ -8286,9 +8331,7 @@ function startRound(){
   // tops up the rest as slots free up, so the total-kills goal for the
   // round stays the same but the concurrent crowd stays render-friendly.
   zombiesRemainingToSpawn = roundKillTarget;
-  const initialSpawn = Math.min(zombiesRemainingToSpawn, MAX_CONCURRENT_ZOMBIES);
-  for(let i=0;i<initialSpawn;i++) spawnZombie();
-  zombiesRemainingToSpawn -= initialSpawn;
+  fillEnemySlotsFromQueue();
   spawnPowerUps();
   roundStartTime = performance.now();
   heartsLostThisRound = 0;
@@ -8326,10 +8369,7 @@ function recoverRoundIfNeeded(dt){
   if(zombiesRemainingToSpawn < needed) zombiesRemainingToSpawn=needed;
 
   // Never allow an active round to sit empty. Refill immediately up to the cap.
-  while(zombies.length < MAX_CONCURRENT_ZOMBIES && zombiesRemainingToSpawn>0){
-    spawnZombie();
-    zombiesRemainingToSpawn--;
-  }
+  fillEnemySlotsFromQueue();
 }
 
 // ---------------------------------------------------------------------
@@ -9511,11 +9551,28 @@ function bulletBlockedAt(x,y,z){
 // its HP to zero — shared by direct hits and splash damage so both
 // paths behave identically.
 function applyBulletDamage(z, dmg){
+  if(!z || z.userData.dead) return;
   z.userData.hp -= dmg;
+
+  // Shared impact response for every hero and weapon. The enemy is pushed
+  // away from the player, briefly staggered, and visibly compressed so a
+  // successful hit reads immediately even during crowded mobile combat.
+  if(player){
+    let kx=z.position.x-player.position.x, kz=z.position.z-player.position.z;
+    const kl=Math.hypot(kx,kz)||1;
+    const force=Math.min(5.2,2.25+Math.max(0,dmg)*0.42);
+    z.userData.knockbackX=(kx/kl)*force;
+    z.userData.knockbackZ=(kz/kl)*force;
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,Math.min(.16,.065+dmg*.012));
+  }
+
   const bs=z.userData.baseScale||1;
-  z.scale.set(bs*1.15,bs*0.85,bs*1.15);
-  setTimeout(()=>{ if(!z.userData.dead) z.scale.setScalar(bs); },120);
+  z.scale.set(bs*1.18,bs*0.80,bs*1.18);
+  setTimeout(()=>{ if(!z.userData.dead) z.scale.setScalar(bs); },105);
   flashZombie(z);
+  spawnBurst(z.position.x,z.position.y+.72,z.position.z,dmg>=3?9:5,FX_MAT_SPARK,dmg>=3?3.5:2.4);
+  triggerCombatShake(dmg>=3?4.5:2.2,dmg>=3?85:55);
+  if(navigator.vibrate) navigator.vibrate(dmg>=3?14:7);
   if(z.userData.hp<=0) killZombie(z);
 }
 
@@ -9588,8 +9645,7 @@ function killZombie(z){
   // Feed the spawn queue: keeps the on-screen crowd near the cap
   // without ever exceeding it, however large the round's real target is.
   if(zombiesRemainingToSpawn > 0 && roundKillsDone < roundKillTarget){
-    spawnZombie();
-    zombiesRemainingToSpawn--;
+    fillEnemySlotsFromQueue();
   }
   if(roundKillsDone >= roundKillTarget){
     const clearTime = (performance.now() - roundStartTime) / 1000;
@@ -9960,6 +10016,20 @@ function update(dt){
       const type=z.userData.archetype||'walker';
       z.userData.attackCooldown = Math.max(0,(z.userData.attackCooldown||0)-dt);
       z.userData.specialTimer = Math.max(0,(z.userData.specialTimer||0)-dt);
+
+      // Let impact recoil win over chase movement for a split second. This
+      // prevents enemies from visually sliding straight through an attack.
+      if((z.userData.hitStun||0)>0){
+        z.userData.hitStun=Math.max(0,z.userData.hitStun-dt);
+        const nx=z.position.x+(z.userData.knockbackX||0)*dt;
+        const nz=z.position.z+(z.userData.knockbackZ||0)*dt;
+        const pushed=resolveCollision(nx,nz,z.position.y);
+        z.position.x=pushed.x; z.position.z=pushed.z;
+        z.userData.knockbackX=(z.userData.knockbackX||0)*Math.max(0,1-dt*9);
+        z.userData.knockbackZ=(z.userData.knockbackZ||0)*Math.max(0,1-dt*9);
+        if(z.userData.playKayClip) z.userData.playKayClip('Hit_A',true,true,.12);
+        return;
+      }
       if(type==='shadow' && z.userData.specialTimer<=0 && dist>2.4){
         spawnBurst(z.position.x,z.position.y+.5,z.position.z,10,FX_MAT_SHADOW,3);
         const a=Math.atan2(dx,dz)+(Math.random()-.5)*1.0;
