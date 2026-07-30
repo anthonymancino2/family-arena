@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.9.1: Hero Identity Pass — distinct readable aura, attack, and ultimate visuals for all five heroes with strict cleanup safeguards. -->
+<!-- V22.9.2: Outside Enemy Entry — every enemy now begins beyond the arena boundary and visibly advances into the map. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -562,8 +562,8 @@
 <script>
 (function(){
 
-const GAME_VERSION = '22.8.9';
-const GAME_BUILD_LABEL = `V${GAME_VERSION} · STABLE SKILL FX`;
+const GAME_VERSION = '22.9.2';
+const GAME_BUILD_LABEL = `V${GAME_VERSION} · OUTSIDE ENEMY ENTRY`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
 window.addEventListener('DOMContentLoaded', ()=>{
@@ -8249,23 +8249,37 @@ function spawnPointBlocked(x,z,clearance=0.7){
   }
   return false;
 }
+function enemyEntryPointBlocked(x,z,clearance=0.7){
+  // Entry points deliberately sit beyond the playable arena. Only reject a
+  // point if level geometry physically reaches outside and overlaps it.
+  for(const b of obstacleBoxes){
+    const base=b.base||0;
+    if(base>0.1) continue;
+    if(x>b.minX-clearance && x<b.maxX+clearance && z>b.minZ-clearance && z<b.maxZ+clearance) return true;
+  }
+  return false;
+}
 function findEnemySpawnPosition(archetype){
   const safeRadius = archetype==='brute' ? 18 : 14;
   const clearance = archetype==='brute' ? 1.05 : 0.75;
-  const edgeRadius = arenaSize-2;
   const players = livingPlayers();
   const facing = player ? player.rotation.y : 0;
 
-  for(let attempt=0;attempt<48;attempt++){
-    const bias=facing+Math.PI+(Math.random()-.5)*Math.PI*1.5;
-    const ang=attempt<28 ? bias : Math.random()*Math.PI*2;
-    const radius=edgeRadius*(0.78+Math.random()*0.22);
-    const x=Math.cos(ang)*radius;
-    const z=Math.sin(ang)*radius;
+  for(let attempt=0;attempt<64;attempt++){
+    const margin=3+Math.random()*2;
+    const half=arenaSize+margin;
+    const side=Math.floor(Math.random()*4);
+    let x,z;
+    switch(side){
+      case 0: x=-half; z=(Math.random()*2-1)*arenaSize; break; // left
+      case 1: x= half; z=(Math.random()*2-1)*arenaSize; break; // right
+      case 2: x=(Math.random()*2-1)*arenaSize; z=-half; break; // top
+      default:x=(Math.random()*2-1)*arenaSize; z= half; break; // bottom
+    }
 
-    if(spawnPointBlocked(x,z,clearance)) continue;
+    if(enemyEntryPointBlocked(x,z,clearance)) continue;
     if(players.some(p=>Math.hypot(x-p.position.x,z-p.position.z)<safeRadius)) continue;
-    if(zombies.some(enemy=>!enemy.userData.dead && Math.hypot(x-enemy.position.x,z-enemy.position.z)<clearance*2.2)) continue;
+    if(zombies.some(enemy=>!enemy.userData.dead && Math.hypot(x-enemy.position.x,z-enemy.position.z)<clearance*2.6)) continue;
     return {x,z};
   }
   return null;
@@ -8327,7 +8341,7 @@ function spawnZombie(){
     // enemy spawning on top of the player.
     const revealSafeRadius=archetype==='brute'?18:14;
     const tooClose=livingPlayers().some(p=>Math.hypot(z.position.x-p.position.x,z.position.z-p.position.z)<revealSafeRadius);
-    if(tooClose||spawnPointBlocked(z.position.x,z.position.z,archetype==='brute'?1.05:.75)){
+    if(tooClose||enemyEntryPointBlocked(z.position.x,z.position.z,archetype==='brute'?1.05:.75)){
       const replacement=findEnemySpawnPosition(archetype);
       if(replacement){
         z.position.set(replacement.x,0,replacement.z);
@@ -8405,7 +8419,7 @@ function recoverRoundIfNeeded(dt){
     const z=zombies[i];
     const p=z && z.position;
     const invalid=!z || z.userData.dead || !p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z);
-    const escaped=!invalid && Math.hypot(p.x,p.z) > arenaSize+5;
+    const escaped=!invalid && Math.hypot(p.x,p.z) > arenaSize+8;
     if(invalid || escaped){
       if(z){ scene.remove(z); disposeGroup(z); }
       zombies.splice(i,1);
