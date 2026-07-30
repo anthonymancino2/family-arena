@@ -6,8 +6,8 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena — V22.7 Shared Animation + Dash Fix</title>
-<!-- V22.7: Frostwing uses the same articulated avatar movement cadence; dash has a hard release safeguard. -->
+<title>Family Arena — V22.7.5 Shared Animation + Dash Fix</title>
+<!-- V22.7.5: Frostwing uses the same articulated avatar movement cadence; dash has a hard release safeguard. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -7401,7 +7401,7 @@ function buildDog(skinHex, outfitHex, tint){
   return g;
 }
 
-function buildPenguin(skinHex, outfitHex, tint){
+function buildPenguinLegacy(skinHex, outfitHex, tint){
   const g = new THREE.Group();
   // skinHex still doubles as a color pick (from the same tone swatches),
   // but a penguin reads best in classic black/cream regardless — the
@@ -10628,7 +10628,7 @@ document.getElementById('btnResultsHome').onclick = ()=>{
 
 })();
 </script>
-<div id="buildStamp" style="position:fixed;right:8px;bottom:8px;z-index:99999;font:700 11px/1.2 system-ui;color:#7dd3fc;background:#07111dcc;border:1px solid #38bdf8;border-radius:8px;padding:5px 7px;pointer-events:none">BUILD V22.7-FIX</div>
+<div id="buildStamp" style="position:fixed;right:8px;bottom:8px;z-index:99999;font:700 11px/1.2 system-ui;color:#7dd3fc;background:#07111dcc;border:1px solid #38bdf8;border-radius:8px;padding:5px 7px;pointer-events:none">BUILD V22.7.3-FIX</div>
 </body>
 </html>
 
