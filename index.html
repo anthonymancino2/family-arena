@@ -9204,6 +9204,7 @@ function updateFx(dt){
         mats.forEach(m=>m.opacity=Math.min(m.opacity,q*.58));
       });
     } else if(f.kind==='arcaneSigil'){
+      f.life -= dt;
       f.mesh.rotation.y += (f.spin||3)*dt; f.mesh.scale.multiplyScalar(1+dt*.55);
       f.mesh.traverse(o=>{if(o.material)o.material.opacity=Math.max(0,f.life/f.maxLife)*.85;});
     } else if(f.kind==='arcaneMeteor'){
