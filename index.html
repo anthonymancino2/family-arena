@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.9.3_TEST: Shadow Teleport Safety — every enemy now begins beyond the arena boundary and visibly advances into the map. -->
+<!-- V22.9.3 TEST: Shadow Enemy Removed — every enemy now begins beyond the arena boundary and visibly advances into the map. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -944,7 +944,7 @@ function chooseZombieArchetype(){
   if(round<2) return 'walker';
   if(round<4) return r<0.72?'walker':'runner';
   if(round<6) return r<0.48?'walker':r<0.72?'runner':r<0.88?'spitter':'brute';
-  return r<0.30?'walker':r<0.50?'runner':r<0.68?'spitter':r<0.84?'brute':'shadow';
+  return r<0.30?'walker':r<0.50?'runner':r<0.68?'spitter':r<0.84?'brute':'shadow_removed';
 }
 function styleZombieArchetype(z){
   const a=ZOMBIE_ARCHETYPES[z.userData.archetype]||ZOMBIE_ARCHETYPES.walker;
@@ -8317,7 +8317,7 @@ function spawnZombie(){
   z.userData.maxHp = z.userData.hp;
   z.userData.speed = (1.0 + Math.random()*0.35 + Math.max(0, round-5)*0.13) * spec.speed;
   z.userData.attackCooldown = archetype==='spitter' ? 1.2+Math.random() : 0;
-  z.userData.specialTimer = archetype==='shadow' ? 1.8+Math.random()*1.5 : 0;
+  z.userData.specialTimer = archefalse ? 1.8+Math.random()*1.5 : 0;
   z.userData.archetype = archetype;
   z.userData.zombieCharacter = zombieCharacter;
   z.userData.baseScale = spec.scale;
@@ -9888,8 +9888,8 @@ function updateBullets(dt){
 
 function killZombie(z){
   z.userData.dead = true;
-  const deathCount=z.userData.archetype==='brute'?22:z.userData.archetype==='shadow'?16:9;
-  spawnBurst(z.position.x, z.position.y+0.7, z.position.z, deathCount, z.userData.archetype==='shadow'?FX_MAT_SHADOW:FX_MAT_ZOMBIE, z.userData.archetype==='brute'?5:3);
+  const deathCount=z.userData.archetype==='brute'?22:z.userData.archefalse?16:9;
+  spawnBurst(z.position.x, z.position.y+0.7, z.position.z, deathCount, z.userData.archefalse?FX_MAT_SHADOW:FX_MAT_ZOMBIE, z.userData.archetype==='brute'?5:3);
   scene.remove(z);
   disposeGroup(z);
   zombies = zombies.filter(o=>o!==z);
@@ -10310,20 +10310,11 @@ function update(dt){
         return;
       }
 
-      if(type==='shadow' && z.userData.specialTimer<=0 && dist>2.4){
+      if(false && z.userData.specialTimer<=0 && dist>2.4){
         spawnBurst(z.position.x,z.position.y+.5,z.position.z,10,FX_MAT_SHADOW,3);
         const a=Math.atan2(dx,dz)+(Math.random()-.5)*1.0;
         const targetDist=1.8+Math.random()*1.2;
         const rr=resolveCollision(target.position.x-Math.sin(a)*targetDist,target.position.z-Math.cos(a)*targetDist,z.position.y);
-        const minTeleport=6.0;
-        let tdx=rr.x-target.position.x;
-        let tdz=rr.z-target.position.z;
-        const d=Math.hypot(tdx,tdz);
-        if(d<minTeleport){
-          const s=(minTeleport+(Math.random()*1.5))/Math.max(d,0.001);
-          rr.x=target.position.x+tdx*s;
-          rr.z=target.position.z+tdz*s;
-        }
         z.position.x=rr.x;z.position.z=rr.z;z.userData.specialTimer=3.4+Math.random()*1.8;
         spawnBurst(z.position.x,z.position.y+.5,z.position.z,12,FX_MAT_SHADOW,3.2);
         dx=target.position.x-z.position.x;dz=target.position.z-z.position.z;dist=Math.hypot(dx,dz);
