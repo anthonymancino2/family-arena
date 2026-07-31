@@ -7,8 +7,9 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.9.17 Knight Phase 3 FINAL: final Knight cleanup. Whirlwind tuning is fully data-driven, armor/Whirlwind state is confirmed to reset per run, passive announcements remain disabled, and Knight HUD/effect behavior is finalized before Rogue development. -->
-<!-- V22.9.17 Knight Phase 2: adds the Knight's every-fifth-kill 3-second Whirlwind passive with repeating radial damage, stun, knockback, spinning hero feedback, and HUD progress. Passive activation uses effects only and never displays an announcement box. -->
+<!-- V22.9.18 Orientation & Radar Fix: avatar preview starts front-facing, and enemy radar X/Y coordinates are corrected so left/right and top/bottom match enemy positions. -->
+<!-- V22.9.18 Knight Phase 3 FINAL: final Knight cleanup. Whirlwind tuning is fully data-driven, armor/Whirlwind state is confirmed to reset per run, passive announcements remain disabled, and Knight HUD/effect behavior is finalized before Rogue development. -->
+<!-- V22.9.18 Knight Phase 2: adds the Knight's every-fifth-kill 3-second Whirlwind passive with repeating radial damage, stun, knockback, spinning hero feedback, and HUD progress. Passive activation uses effects only and never displays an announcement box. -->
 <!-- V22.9.15 Knight Phase 1: adds Knight-specific +2 starting HP and +2 HP upgrades, replaces the old every-fourth-hit guard with a two-charge regenerating Magical Armor system, adds a dedicated armor HUD meter, and standardizes nearest-enemy melee auto-facing. Passive activations remain free of repetitive announcement boxes. -->
 <!-- V22.9.14 Passive Announcement Fix: removes repetitive toast/text-box announcements from automatic hero passive triggers across current avatars. Passive gameplay effects, sounds, vibration, particles, HUD counters, and timers remain intact. Manual signature/ultimate announcements and important game-event notices remain unchanged. -->
 <!-- V22.9.14 Passive Announcement Fix: adds independent kill counters. Every third Barbarian defeat releases a damaging ground Shockwave with brief stun and knockback; every fifth defeat grants 3 seconds of Invincibility. The passive HUD shows both progress counters and active invincibility. -->
@@ -1018,7 +1019,7 @@ async function updateAvatarPreview(characterId){
     const {gltf,THREEAsset,cloneSkinned}=await getKayKitAssetPromise(characterId);
     if(requestId!==previewRequestId)return;
     if(previewRoot)previewScene.remove(previewRoot);
-    const root=cloneSkinned(gltf.scene); cleanHeroEquipment(root,characterId); root.rotation.y=Math.PI;
+    const root=cloneSkinned(gltf.scene); cleanHeroEquipment(root,characterId); root.rotation.y=0; // Start front-facing toward the player
     const box=new THREEAsset.Box3().setFromObject(root), size=box.getSize(new THREEAsset.Vector3());
     root.scale.setScalar(1.75/Math.max(.001,size.y));
     const box2=new THREEAsset.Box3().setFromObject(root);
@@ -9036,7 +9037,7 @@ function updateEnemyRadar(){
   const c=document.getElementById('enemyRadar');if(!c||!player)return;const ctx=c.getContext('2d'),w=c.width,h=c.height,cx=w/2,cy=h/2;
   ctx.clearRect(0,0,w,h);ctx.save();ctx.translate(cx,cy);ctx.strokeStyle='rgba(255,255,255,.22)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,w*.46,0,Math.PI*2);ctx.stroke();
   ctx.fillStyle='#7ff4ff';ctx.beginPath();ctx.moveTo(0,-9);ctx.lineTo(6,7);ctx.lineTo(0,4);ctx.lineTo(-6,7);ctx.closePath();ctx.fill();
-  const scale=(w*.42)/Math.max(18,arenaSize);for(const z of zombies){if(z.userData.dead)continue;const dx=z.position.x-player.position.x,dz=z.position.z-player.position.z;const a=-player.rotation.y;const rx=dx*Math.cos(a)-dz*Math.sin(a),rz=dx*Math.sin(a)+dz*Math.cos(a);const px=Math.max(-w*.42,Math.min(w*.42,rx*scale)),py=Math.max(-h*.42,Math.min(h*.42,-rz*scale));ctx.fillStyle=z.userData.spawnPending?'#ffd84a':(z.userData.archetype==='brute'?'#ff7a35':'#ff4b68');ctx.beginPath();ctx.arc(px,py,z.userData.archetype==='brute'?5:3.5,0,Math.PI*2);ctx.fill();}ctx.restore();
+  const scale=(w*.42)/Math.max(18,arenaSize);for(const z of zombies){if(z.userData.dead)continue;const dx=z.position.x-player.position.x,dz=z.position.z-player.position.z;const a=-player.rotation.y;const rx=dx*Math.cos(a)-dz*Math.sin(a),rz=dx*Math.sin(a)+dz*Math.cos(a);const px=Math.max(-w*.42,Math.min(w*.42,-rx*scale)),py=Math.max(-h*.42,Math.min(h*.42,rz*scale));ctx.fillStyle=z.userData.spawnPending?'#ffd84a':(z.userData.archetype==='brute'?'#ff7a35':'#ff4b68');ctx.beginPath();ctx.arc(px,py,z.userData.archetype==='brute'?5:3.5,0,Math.PI*2);ctx.fill();}ctx.restore();
 }
 
 // ---------------------------------------------------------------------
