@@ -7,6 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
+<!-- V22.9.26 HUD & Round Completion Fixes: fixes the rare Round 10/zero-enemy progression stall with a centralized idempotent round-completion guard; removes the FREE control; moves Pause into the camera stack; makes FIRE match SECONDARY size; stacks NOVA above ECHOES above FIRE in portrait; and provides dedicated compact landscape browser/app HUD positions. -->
 <!-- V22.9.25 Arcane Echoes Base Ability: implements the Mage signature summon unlocked at Level 10. Five 1-HP avatar copies prioritize enemy aggro, stay near the Mage, fire 10%-damage knockback bolts, use an initial 25-second charge, and then scale cooldown from 15 seconds at Level 1 to 5 seconds at Level 20 with a 1.5-second floor. -->
 <!-- V22.9.24 Avatar Signature Slot Cleanup: removes the Mage's Arcane Cataclysm move and its charge system. The shared ultimate control remains reserved for future avatar-specific signature moves such as Arcane Echoes, while the pause overlay now stays above all combat controls. -->
 <!-- V22.9.23 Between-Round Stat Shop: converts the mandatory free stat pick into a coin-funded between-round shop. Players may buy multiple affordable HP, Power, or Speed upgrades, see live prices and balances, or continue without purchasing. -->
@@ -169,10 +170,10 @@
     box-shadow:0 3px 12px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(0,0,0,0.3);
     text-shadow:0 1px 3px rgba(0,0,0,0.85);}
   .actBtn{position:absolute;bottom:calc(34px + env(safe-area-inset-bottom));right:22px;
-    width:98px;height:98px;border-radius:50%;background:rgba(255,80,80,0.62);
-    border:2.5px solid rgba(255,255,255,0.75);font-weight:800;font-size:15px;color:#fff;
+    width:72px;height:72px;border-radius:50%;background:rgba(255,80,80,0.62);
+    border:2.5px solid rgba(255,255,255,0.75);font-weight:800;font-size:13px;color:#fff;
     pointer-events:auto;display:flex;align-items:center;justify-content:center;}
-  .secondaryBtn{position:absolute;bottom:calc(42px + env(safe-area-inset-bottom));right:128px;
+  .secondaryBtn{position:absolute;bottom:calc(34px + env(safe-area-inset-bottom));right:102px;
     width:72px;height:72px;border-radius:50%;background:rgba(74,47,112,.78);
     border:2.5px solid rgba(255,255,255,.82);font-weight:900;font-size:10px;line-height:1.05;
     color:#fff;pointer-events:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -199,13 +200,13 @@
     box-shadow:0 3px 12px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(0,0,0,0.3);
     text-shadow:0 1px 3px rgba(0,0,0,0.85);}
   .camLabelBox span{font-size:15px;}
-  .dashBtn{position:absolute;bottom:calc(128px + env(safe-area-inset-bottom));right:126px;
+  .dashBtn{position:absolute;bottom:calc(114px + env(safe-area-inset-bottom));right:102px;
     width:62px;height:62px;border-radius:50%;background:rgba(255,199,54,0.82);
     border:2.5px solid rgba(255,255,255,0.85);font-weight:800;font-size:11px;color:#1a1400;
     pointer-events:auto;display:flex;align-items:center;justify-content:center;
     transition:opacity 0.15s;text-shadow:none;}
   .dashBtn.cooling{opacity:0.3;}
-  .novaBtn{position:absolute;bottom:calc(48px + env(safe-area-inset-bottom));right:206px;
+  .novaBtn{position:absolute;bottom:calc(194px + env(safe-area-inset-bottom));right:27px;
     width:62px;height:62px;border-radius:50%;background:rgba(53,207,255,0.82);
     border:2.5px solid rgba(255,255,255,0.85);font-weight:800;font-size:11px;color:#04222c;
     pointer-events:auto;display:flex;align-items:center;justify-content:center;
@@ -220,16 +221,12 @@
   .laserBtn.empty{opacity:0.35;}
   .laserBtn.active{box-shadow:0 0 18px rgba(209,108,255,.9);}
   .laserBtn.hidden{display:none;}
-  .ultimateBtn{position:absolute;bottom:calc(170px + env(safe-area-inset-bottom));right:126px;width:76px;height:76px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:45;font-size:12px;font-weight:1000;letter-spacing:.6px;color:#fff;border:3px solid rgba(255,255,255,.8);background:conic-gradient(#b95cff var(--charge,0%),rgba(33,11,52,.92) 0);box-shadow:0 0 20px rgba(164,72,255,.65),inset 0 0 0 5px rgba(0,0,0,.28);text-shadow:0 2px 4px #000;user-select:none;-webkit-user-select:none;touch-action:manipulation;pointer-events:auto;cursor:pointer;}
+  .ultimateBtn{position:absolute;bottom:calc(114px + env(safe-area-inset-bottom));right:22px;width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:45;font-size:12px;font-weight:1000;letter-spacing:.6px;color:#fff;border:3px solid rgba(255,255,255,.8);background:conic-gradient(#b95cff var(--charge,0%),rgba(33,11,52,.92) 0);box-shadow:0 0 20px rgba(164,72,255,.65),inset 0 0 0 5px rgba(0,0,0,.28);text-shadow:0 2px 4px #000;user-select:none;-webkit-user-select:none;touch-action:manipulation;pointer-events:auto;cursor:pointer;}
   .ultimateBtn.ready{animation:ultimatePulse .75s infinite alternate;box-shadow:0 0 34px rgba(209,108,255,1),0 0 70px rgba(126,36,255,.72),inset 0 0 0 5px rgba(255,255,255,.18);}
   .ultimateBtn.hidden{display:none;}
   @keyframes ultimatePulse{from{transform:scale(1)}to{transform:scale(1.09)}}
   .soulMeter{position:absolute;bottom:calc(252px + env(safe-area-inset-bottom));right:118px;z-index:20;color:#e6c7ff;font-size:12px;font-weight:900;text-shadow:0 2px 4px #000;display:none;}
   .soulMeter.on{display:block;}
-  .freeBtn{width:52px;height:52px;border-radius:14px;background:rgba(20,22,28,0.5);
-    border:2.5px solid rgba(255,255,255,0.75);font-weight:800;font-size:11px;color:#fff;
-    pointer-events:auto;display:flex;align-items:center;justify-content:center;}
-  .freeBtn.on{background:rgba(127,216,240,0.92);color:#052233;border-color:#fff;text-shadow:none;}
   .vertBtn{position:absolute;right:40px;width:56px;height:56px;border-radius:50%;
     background:rgba(20,50,58,0.55);border:2.5px solid rgba(127,224,240,0.9);
     font-weight:800;color:#fff;pointer-events:auto;display:none;
@@ -253,7 +250,7 @@
     border:2.5px solid rgba(255,255,255,0.75);font-weight:800;font-size:8px;color:#fff;
     line-height:1.15;pointer-events:auto;display:flex;flex-direction:column;
     align-items:center;justify-content:center;text-align:center;}
-  .pauseBtn{width:52px;height:52px;border-radius:50%;background:rgba(20,22,28,0.5);
+  .pauseBtn{width:52px;height:46px;border-radius:12px;background:rgba(20,22,28,0.5);
     border:2.5px solid rgba(255,255,255,0.75);pointer-events:auto;display:flex;
     align-items:center;justify-content:center;font-size:16px;color:#fff;letter-spacing:2px;}
   .pauseOverlay{position:absolute;inset:0;background:rgba(5,10,18,0.85);z-index:120;
@@ -301,6 +298,15 @@
      layout instead of an unnecessary rearrangement. */
   @media (orientation:landscape) and (max-height:500px){
     .enemyRadar{left:calc(300px + env(safe-area-inset-left));top:calc(58px + env(safe-area-inset-top));}
+    /* Browser and installed-app landscape share one stable bottom action row. */
+    .actBtn{right:calc(94px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));}
+    .secondaryBtn{right:calc(174px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));}
+    .ultimateBtn{right:calc(14px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));width:72px;height:72px;}
+    .novaBtn{right:calc(14px + env(safe-area-inset-right));bottom:calc(96px + env(safe-area-inset-bottom));}
+    .dashBtn{right:calc(254px + env(safe-area-inset-right));bottom:calc(21px + env(safe-area-inset-bottom));}
+    .camCluster{top:calc(10px + env(safe-area-inset-top));right:calc(10px + env(safe-area-inset-right));gap:4px;}
+    .roundPill{top:calc(10px + env(safe-area-inset-top));}
+    .roundTimerPill{top:calc(48px + env(safe-area-inset-top));}
   }
   .invinciblePill{position:absolute;top:calc(112px + env(safe-area-inset-top));left:50%;
     transform:translateX(-50%);background:rgba(74,255,234,0.18);
@@ -565,6 +571,7 @@
           <div class="camZoomBtn" id="camOutBtn">&minus;</div>
           <div class="camLabelBox">VIEW<br><span id="camLabel">3</span></div>
           <div class="camZoomBtn" id="camInBtn">&plus;</div>
+          <div class="pauseBtn" id="pauseBtn">❚❚</div>
           <div class="jumpBtn" id="jumpBtn">JUMP</div>
           <div class="lookFwdBtn" id="lookFwdBtn">LOOK<br>FWD</div>
         </div>
@@ -573,10 +580,6 @@
         <div class="laserBtn hidden" id="laserBtn" style="--charge:100%">LASER</div>
         <div class="ultimateBtn hidden" id="ultimateBtn" style="--charge:0%">ECLIPSE</div>
         <div class="soulMeter" id="soulMeter">SOULS 0/25</div>
-        <div class="leftCluster">
-          <div class="freeBtn" id="freeBtn">FREE</div>
-          <div class="pauseBtn" id="pauseBtn">❚❚</div>
-        </div>
         <div class="pauseOverlay" id="pauseOverlay">
           <div class="pausePanel">
             <h2 style="margin:0 0 18px;">Paused</h2>
@@ -664,7 +667,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.25 - Arcane Echoes';
+const GAME_VERSION='22.9.26 - HUD & Round Fixes';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -8720,6 +8723,7 @@ function clearZombies(){
 }
 
 function startRound(){
+  roundCompletionPending = false;
   clearZombies();
   applyTheme(round);
   // Rounds 1-3 add one zombie at a time (4, 5, 6). From round 4 on, the
@@ -9441,9 +9445,6 @@ function setupControls(){
   if(window.PointerEvent) ultimateBtnEl.addEventListener('pointerdown',activateUltimate,{passive:false});
   else ultimateBtnEl.addEventListener('touchstart',activateUltimate,{passive:false});
   ultimateBtnEl.addEventListener('click',e=>e.preventDefault());
-  document.getElementById('freeBtn').addEventListener('touchstart', e=>{
-    e.preventDefault(); toggleFreeMode();
-  });
   const upBtnEl = document.getElementById('upBtn');
   const downBtnEl = document.getElementById('downBtn');
   upBtnEl.addEventListener('touchstart', e=>{ e.preventDefault(); freeUp = true; });
@@ -9535,7 +9536,7 @@ let freeMode = false, freeUp = false, freeDown = false, runUsedFreeMode = false;
 const FREE_VERTICAL_SPEED = 7;
 function toggleFreeMode(){
   freeMode = !freeMode;
-  document.getElementById('freeBtn').classList.toggle('on', freeMode);
+  const freeBtnEl=document.getElementById('freeBtn'); if(freeBtnEl) freeBtnEl.classList.toggle('on', freeMode);
   document.getElementById('freeBanner').classList.toggle('on', freeMode);
   // Dedicated UP/DOWN buttons take over vertical movement in free roam;
   // JUMP/DASH step aside rather than double as ascend/descend.
@@ -10854,6 +10855,31 @@ function updateBullets(dt){
   }
 }
 
+let roundCompletionPending = false;
+function completeCurrentRound(){
+  if(roundCompletionPending || !gameRunning || roundKillsDone < roundKillTarget) return;
+  roundCompletionPending = true;
+  const clearTime = (performance.now() - roundStartTime) / 1000;
+  let bonusMsg = 'Round '+round+' cleared in '+clearTime.toFixed(1)+'s!';
+  const paceBudget = roundKillTarget * 3;
+  if(clearTime < paceBudget){
+    const speedBonus = Math.floor(paceBudget - clearTime);
+    if(speedBonus > 0){
+      runTokens += speedBonus;
+      updateRunTokensHud();
+      bonusMsg += ' +'+speedBonus+'🪙 speed bonus!';
+    }
+  }
+  if(heartsLostThisRound === 0){
+    crystalsEarned += 10;
+    bonusMsg += ' Flawless! +10💎';
+  }
+  toast(bonusMsg);
+  round++;
+  crystalsEarned += crystalsPerRound();
+  setTimeout(()=>{ if(gameRunning) showLevelUp(); }, 900);
+}
+
 function killZombie(z){
   z.userData.dead = true;
   const deathCount=z.userData.archetype==='brute'?22:z.userData.archetype==='shadow'?16:9;
@@ -10879,35 +10905,7 @@ function killZombie(z){
   if(zombiesRemainingToSpawn > 0 && roundKillsDone < roundKillTarget){
     fillEnemySlotsFromQueue();
   }
-  if(roundKillsDone >= roundKillTarget){
-    const clearTime = (performance.now() - roundStartTime) / 1000;
-    let bonusMsg = 'Round '+round+' cleared in '+clearTime.toFixed(1)+'s!';
-    // Speed bonus: a pace budget of 3s/zombie — anything faster earns
-    // bonus tokens proportional to how much time was saved.
-    const paceBudget = roundKillTarget * 3;
-    if(clearTime < paceBudget){
-      const speedBonus = Math.floor(paceBudget - clearTime);
-      if(speedBonus > 0){
-        runTokens += speedBonus;
-        updateRunTokensHud();
-        bonusMsg += ' +'+speedBonus+'🪙 speed bonus!';
-      }
-    }
-    // Flawless bonus: took zero damage the whole round — the "stay
-    // alive" half of this mode's goal, rewarded the same way as speed.
-    if(heartsLostThisRound === 0){
-      crystalsEarned += 10;
-      bonusMsg += ' Flawless! +10💎';
-    }
-    toast(bonusMsg);
-    round++;
-    // Crystals are the persistent, cross-run currency (spent in the
-    // main-menu Crystal Shop) — earned once per round cleared, not per
-    // kill, so a long careful run earns steadily even if it's not a
-    // speed-kill run.
-    crystalsEarned += crystalsPerRound();
-    setTimeout(()=>{ if(gameRunning) showLevelUp(); }, 900);
-  }
+  completeCurrentRound();
 }
 
 function playerTakeHit(){
@@ -11252,6 +11250,8 @@ function update(dt){
   updateEnemyCountHud();
   updateEnemyRadar();
   recoverRoundIfNeeded(dt);
+  // Final safety net: if the HUD reaches ENEMIES 0 through any damage path, finish exactly once.
+  if(roundKillsDone >= roundKillTarget) completeCurrentRound();
   if(invincibleTimer > 0){
     invincibleTimer -= dt;
     if(invincibleTimer < 0) invincibleTimer = 0;
