@@ -7,6 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
+<!-- V22.9.27 High-Contrast Timer Fix: makes the in-game timer readable against both light and dark environments with an opaque dark pill, bright border, white text, stronger shadow, and explicit HUD stacking. -->
 <!-- V22.9.26 HUD & Round Completion Fixes: fixes the rare Round 10/zero-enemy progression stall with a centralized idempotent round-completion guard; removes the FREE control; moves Pause into the camera stack; makes FIRE match SECONDARY size; stacks NOVA above ECHOES above FIRE in portrait; and provides dedicated compact landscape browser/app HUD positions. -->
 <!-- V22.9.25 Arcane Echoes Base Ability: implements the Mage signature summon unlocked at Level 10. Five 1-HP avatar copies prioritize enemy aggro, stay near the Mage, fire 10%-damage knockback bolts, use an initial 25-second charge, and then scale cooldown from 15 seconds at Level 1 to 5 seconds at Level 20 with a 1.5-second floor. -->
 <!-- V22.9.24 Avatar Signature Slot Cleanup: removes the Mage's Arcane Cataclysm move and its charge system. The shared ultimate control remains reserved for future avatar-specific signature moves such as Arcane Echoes, while the pause overlay now stays above all combat controls. -->
@@ -150,8 +151,11 @@
     transform:translateX(-50%);background:var(--panel);padding:8px 18px;border-radius:999px;
     font-weight:800;font-size:14px;}
   .roundTimerPill{position:absolute;top:calc(58px + env(safe-area-inset-top));left:50%;
-    transform:translateX(-50%);background:rgba(255,214,74,0.15);border:1.5px solid rgba(255,214,74,0.6);
-    padding:5px 14px;border-radius:999px;font-weight:800;font-size:13px;color:#ffd64a;}
+    transform:translateX(-50%);z-index:24;min-width:78px;text-align:center;
+    background:rgba(5,12,22,0.94);border:2px solid #ffd64a;
+    padding:6px 14px;border-radius:999px;font-weight:900;font-size:13px;color:#fff;
+    box-shadow:0 3px 12px rgba(0,0,0,0.78),0 0 0 1px rgba(255,255,255,0.45) inset,0 0 8px rgba(255,214,74,0.35);
+    text-shadow:0 2px 3px #000,0 0 2px #000;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);}
   .toast{position:absolute;top:80px;left:50%;transform:translateX(-50%);
     background:var(--panel);padding:10px 20px;border-radius:12px;font-weight:700;
     opacity:0;transition:opacity 0.25s;}
@@ -667,7 +671,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.26 - HUD & Round Fixes';
+const GAME_VERSION='22.9.27 - High-Contrast Timer';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
