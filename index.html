@@ -7,6 +7,12 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
+<!-- V22.9.17 Knight Phase 3 FINAL: final Knight cleanup. Whirlwind tuning is fully data-driven, armor/Whirlwind state is confirmed to reset per run, passive announcements remain disabled, and Knight HUD/effect behavior is finalized before Rogue development. -->
+<!-- V22.9.17 Knight Phase 2: adds the Knight's every-fifth-kill 3-second Whirlwind passive with repeating radial damage, stun, knockback, spinning hero feedback, and HUD progress. Passive activation uses effects only and never displays an announcement box. -->
+<!-- V22.9.15 Knight Phase 1: adds Knight-specific +2 starting HP and +2 HP upgrades, replaces the old every-fourth-hit guard with a two-charge regenerating Magical Armor system, adds a dedicated armor HUD meter, and standardizes nearest-enemy melee auto-facing. Passive activations remain free of repetitive announcement boxes. -->
+<!-- V22.9.14 Passive Announcement Fix: removes repetitive toast/text-box announcements from automatic hero passive triggers across current avatars. Passive gameplay effects, sounds, vibration, particles, HUD counters, and timers remain intact. Manual signature/ultimate announcements and important game-event notices remain unchanged. -->
+<!-- V22.9.14 Passive Announcement Fix: adds independent kill counters. Every third Barbarian defeat releases a damaging ground Shockwave with brief stun and knockback; every fifth defeat grants 3 seconds of Invincibility. The passive HUD shows both progress counters and active invincibility. -->
+<!-- V22.9.12 Barbarian Phase 1: adds Barbarian-specific +2 starting HP, +2 starting Power, +2 HP per between-round HP choice, roughly 25% longer default axe reach, and 360-degree nearest-enemy melee auto-aim. -->
 <!-- V22.9.11 Effect Visibility Fix: toast() now has a hard 2.2s max-lifetime cap so a rapidly re-triggered notification (e.g. Mage's Arcane Shockwave firing every 3rd cast on a fast weapon) can never stay stuck on screen — this protects every hero that calls toast(), not just Mage. Also throttles the Arcane Shockwave banner specifically to at most once per 1.8s; the underlying stun/knockback effect still procs every 3rd cast as designed, only the notification spam is limited. Standing rule going forward: no visual effect, for any hero, may reduce visibility enough to make the game hard to play. -->
 <!-- V22.9.10 Landing Hub: adds selected-player high score, featured hero display, and cache-clearing Refresh / Sync button prepared for future cloud synchronization. -->
 <!-- V22.9.9 Mage Phase 6 FINAL: completes the Mage pass with data-driven passive tuning, centralized passive-state resets, Arcane Haste expiration cleanup, and regression validation. -->
@@ -250,6 +256,13 @@
     background:rgba(20,22,28,0.55);border:1.5px solid rgba(255,255,255,0.35);
     border-radius:12px;padding:5px 11px;font-weight:700;font-size:12px;color:#fff;}
   .passivePill{position:absolute;top:calc(130px + env(safe-area-inset-top));left:14px;max-width:230px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .knightArmorHud{position:absolute;top:calc(45px + env(safe-area-inset-top));left:14px;width:142px;display:none;pointer-events:none;}
+  .knightArmorHud.show{display:block;}
+  .knightArmorLabel{font-size:10px;font-weight:900;letter-spacing:.08em;color:#dff7ff;text-shadow:0 1px 3px #000;margin-bottom:3px;}
+  .knightArmorTrack{height:8px;border-radius:7px;background:rgba(7,22,35,.72);border:1px solid rgba(205,244,255,.72);overflow:hidden;box-shadow:0 0 8px rgba(117,218,255,.3);}
+  .knightArmorFill{height:100%;width:100%;border-radius:6px;background:linear-gradient(90deg,#68cfff,#fff2a3);transition:width .16s linear;box-shadow:0 0 10px rgba(151,226,255,.8);}
+  .knightArmorHud.regenerating .knightArmorFill{animation:knightArmorPulse .7s ease-in-out infinite alternate;}
+  @keyframes knightArmorPulse{from{filter:brightness(1)}to{filter:brightness(1.5)}}
   .passivePill.mageReady{box-shadow:0 0 0 1px rgba(111,232,255,.75),0 0 14px rgba(111,232,255,.7);animation:magePassivePulse .72s ease-in-out infinite alternate;}
   .passivePill.mageHaste{color:#effcff;background:linear-gradient(90deg,rgba(39,87,151,.94),rgba(116,53,176,.94));box-shadow:0 0 18px rgba(184,104,255,.85);}
   @keyframes magePassivePulse{from{transform:scale(1);filter:brightness(1)}to{transform:scale(1.025);filter:brightness(1.3)}}
@@ -511,6 +524,7 @@
       <div id="hudChrome">
         <div class="hitFlash" id="hitFlash"></div>
         <div class="heartsWrap"><div class="heartsRow" id="heartsRow"></div></div>
+        <div class="knightArmorHud" id="knightArmorHud"><div class="knightArmorLabel" id="knightArmorLabel">MAGICAL ARMOR 2/2</div><div class="knightArmorTrack"><div class="knightArmorFill" id="knightArmorFill"></div></div></div>
         <div class="roundPill" id="roundPill">Round 1</div>
         <div class="roundTimerPill" id="roundTimerPill">⏱ 0.0s</div>
         <div class="runTokensPill"><div class="coin"></div><span id="runTokensCount">0</span></div>
@@ -625,8 +639,8 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.11 - Effect Visibility Fix';
-const GAME_BUILD_LABEL = `V${GAME_VERSION} · MAGE COMPLETE`;
+const GAME_VERSION='22.9.13 - Barbarian Phase 2';
+const GAME_BUILD_LABEL = `V${GAME_VERSION} · BARBARIAN STARTED`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
 window.addEventListener('DOMContentLoaded', ()=>{
@@ -700,8 +714,8 @@ const HERO_ROSTER_INFO = {
   rogue:{title:'Tempest Archer',role:'RANGED • EASY',desc:'Fast piercing arrows and precise crowd control. Knife removed for a clean bow-and-quiver silhouette.'},
   hooded:{title:'Shadow Rogue',role:'MELEE • HARD',desc:'Rapid close-range slashes, shadow clones, and evasive movement. Crossbow removed for a pure assassin silhouette.'},
   mage:{title:'Arcane Mage',role:'RANGED • MEDIUM',desc:'Alternating elemental attacks and powerful area magic.'},
-  knight:{title:'Knight of Dawn',role:'MELEE • EASY',desc:'Durable golden cleaves, shield control, and radiant power.'},
-  barbarian:{title:'Fury Barbarian',role:'MELEE • MEDIUM',desc:'Heavy axe combos, ground slams, and relentless momentum.'}
+  knight:{title:'Knight of Dawn',role:'MELEE • EASY',desc:'A durable melee guardian with regenerating Magical Armor. Every fifth defeat triggers a 3-second radiant Whirlwind.'},
+  barbarian:{title:'Fury Barbarian',role:'MELEE • MEDIUM',desc:'A durable heavy hitter with extended axe reach. Every third defeat erupts into a Shockwave; every fifth grants 3 seconds of Invincibility.'}
 };
 
 // Data-driven hero passives. New heroes only need one entry here; the
@@ -709,8 +723,8 @@ const HERO_ROSTER_INFO = {
 const HERO_PASSIVES = {
   rogue:{name:'Eagle Eye',icon:'🎯',desc:'Arrows fly 18% faster and remain active 15% longer.',projectileSpeedMult:1.18,projectileLifeMult:1.15},
   hooded:{name:'Shadowstep',icon:'💨',desc:'Defeating an enemy grants 20% movement speed for 2.5 seconds.',killMoveMult:1.20,killMoveDuration:2.5},
-  knight:{name:'Iron Guard',icon:'🛡️',desc:'Every fourth incoming hit is completely blocked.',guardHits:4},
-  barbarian:{name:'Battle Fury',icon:'🔥',desc:'Attack 15% faster while at least three enemies are nearby.',nearbyCount:3,nearbyRadius:5.5,attackSpeedMult:1.15},
+  knight:{name:'Radiant Guardian',icon:'🛡️',desc:'Two regenerating armor charges absorb hits. Every fifth defeat triggers a 3-second Whirlwind.',armorMax:2,armorRegenDelay:5,armorRegenInterval:3,whirlwindKills:5,whirlwindDuration:3,whirlwindRadius:3.15,whirlwindDamage:.72,whirlwindStun:.18,whirlwindPulse:.22,whirlwindKnockback:3.8,whirlwindSpinSpeed:24},
+  barbarian:{name:'Relentless Fury',icon:'🔥',desc:'Every third defeat releases a ground Shockwave. Every fifth defeat grants 3 seconds of Invincibility.',shockwaveKills:3,shockwaveRadius:5.2,shockwaveDamage:1.25,shockwaveStun:.65,invincibleKills:5,invincibleDuration:3.0},
   mage:{
     name:'Arcane Flow',icon:'✨',
     desc:'Every third normal cast releases a stunning shockwave. Every third defeat grants Arcane Haste for 3 seconds.',
@@ -1150,6 +1164,14 @@ const HERO_STAT_CONFIG = {
   mage: {
     startingBonus: {power:2, speed:2, hp:0},
     upgradeAmount: {power:2, speed:2, hp:1}
+  },
+  barbarian: {
+    startingBonus: {power:2, speed:0, hp:2},
+    upgradeAmount: {power:1, speed:1, hp:2}
+  },
+  knight: {
+    startingBonus: {power:0, speed:0, hp:2},
+    upgradeAmount: {power:1, speed:1, hp:2}
   }
 };
 const DEFAULT_HERO_STAT_CONFIG = {
@@ -1170,7 +1192,8 @@ function upgradeAmountForActiveHero(stat){
 let playerStats = {power:1, speed:1, hp:1};
 function createFreshPassiveState(){
   return {
-    shadowstepTimer:0, knightHitCounter:0, battleFuryActive:false,
+    shadowstepTimer:0, knightArmor:0, knightArmorRegenDelay:0, knightArmorRegenTimer:0, knightWhirlwindCounter:0, knightWhirlwindTimer:0, knightWhirlwindPulse:0, battleFuryActive:false,
+    barbarianShockwaveCounter:0, barbarianInvincibleCounter:0,
     mageAttackCounter:0, mageKillCounter:0, mageSpeedBoostTimer:0,
     mageHasteFxCooldown:0, mageHastePulseStage:0
   };
@@ -8779,17 +8802,8 @@ function triggerMageAttackShockwave(){
   }
   triggerCombatShake(6,150);
   navigator.vibrate&&navigator.vibrate([20,18,35]);
-  // The stun/knockback above still fires every 3rd cast as designed —
-  // that's the actual gameplay effect. But at a rapid-fire weapon's
-  // cooldown (as low as 0.075s), "every 3rd cast" can mean a proc every
-  // ~0.2s while FIRE is held, which is far faster than a banner should
-  // ever re-announce itself. Only the notification is throttled here,
-  // to a floor of 1.8s between appearances, so it can't camp on screen.
-  const nowMs=performance.now();
-  if(nowMs-(passiveState.lastShockwaveToastAt||0)>1800){
-    passiveState.lastShockwaveToastAt=nowMs;
-    toast('ARCANE SHOCKWAVE!');
-  }
+  // Automatic passive: communicate through the effect, vibration, and HUD only.
+  // Repetitive center-screen/toast announcements are intentionally disabled.
 }
 function registerMageNormalAttack(){
   if(state.avatarType!=='mage') return;
@@ -8799,6 +8813,43 @@ function registerMageNormalAttack(){
     triggerMageAttackShockwave();
   }
 }
+function triggerBarbarianKillShockwave(){
+  if(state.avatarType!=='barbarian' || !player) return;
+  const p=HERO_PASSIVES.barbarian;
+  spawnEarthbreaker(player.position,p.shockwaveRadius||5.2);
+  for(const z of [...zombies]){
+    if(z.userData.dead || z.userData.spawnPending) continue;
+    const dx=z.position.x-player.position.x,dz=z.position.z-player.position.z;
+    const dist=Math.hypot(dx,dz);
+    if(dist>(p.shockwaveRadius||5.2)) continue;
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,p.shockwaveStun||.65);
+    const len=dist||1;
+    z.userData.knockbackX=(dx/len)*5.2;
+    z.userData.knockbackZ=(dz/len)*5.2;
+    applyBulletDamage(z,(p.shockwaveDamage||1.25)*playerStats.power);
+  }
+  triggerCombatShake(10,220);
+  navigator.vibrate&&navigator.vibrate([35,22,65]);
+}
+function registerBarbarianKill(){
+  if(state.avatarType!=='barbarian') return;
+  const p=HERO_PASSIVES.barbarian;
+  passiveState.barbarianShockwaveCounter=(passiveState.barbarianShockwaveCounter||0)+1;
+  passiveState.barbarianInvincibleCounter=(passiveState.barbarianInvincibleCounter||0)+1;
+  if(passiveState.barbarianShockwaveCounter>=(p.shockwaveKills||3)){
+    passiveState.barbarianShockwaveCounter=0;
+    triggerBarbarianKillShockwave();
+  }
+  if(passiveState.barbarianInvincibleCounter>=(p.invincibleKills||5)){
+    passiveState.barbarianInvincibleCounter=0;
+    invincibleTimer=Math.max(invincibleTimer,p.invincibleDuration||3);
+    if(player){spawnEarthbreaker(player.position,3.5);spawnBurst(player.position.x,player.position.y+.7,player.position.z,22,FX_MAT_SPARK,5.2);}
+    updateInvincibleHud();
+    triggerCombatShake(7,160);
+    navigator.vibrate&&navigator.vibrate([45,25,90]);
+  }
+}
+
 function registerMageKill(){
   if(state.avatarType!=='mage') return;
   // The buff cannot stack, and kills earned while it is active do not count.
@@ -8811,11 +8862,107 @@ function registerMageKill(){
     passiveState.mageHastePulseStage=0;
     spawnArcaneAura(player.position);
     spawnArcaneRuneBurst(player.position,2.8);
-    toast('ARCANE HASTE — 3 seconds!');
   }
+}
+function triggerKnightWhirlwind(){
+  if(state.avatarType!=='knight' || !player) return;
+  const p=HERO_PASSIVES.knight;
+  passiveState.knightWhirlwindTimer=Math.max(passiveState.knightWhirlwindTimer||0,p.whirlwindDuration||3);
+  passiveState.knightWhirlwindPulse=0;
+  spawnKnightGuardBurst(player.position,p.whirlwindRadius||3.15);
+  player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,p.whirlwindDuration||3);
+  player.userData.spinVisualSpeed=p.whirlwindSpinSpeed||24;
+  triggerCombatShake(8,150);
+  navigator.vibrate&&navigator.vibrate([30,18,45]);
+  // Automatic passive: effects and HUD only. No center-screen announcement.
+}
+function registerKnightKill(){
+  if(state.avatarType!=='knight') return;
+  const p=HERO_PASSIVES.knight;
+  passiveState.knightWhirlwindCounter=(passiveState.knightWhirlwindCounter||0)+1;
+  if(passiveState.knightWhirlwindCounter>=(p.whirlwindKills||5)){
+    passiveState.knightWhirlwindCounter=0;
+    triggerKnightWhirlwind();
+  }
+}
+function pulseKnightWhirlwind(){
+  if(state.avatarType!=='knight' || !player || (passiveState.knightWhirlwindTimer||0)<=0) return;
+  const p=HERO_PASSIVES.knight;
+  const radius=p.whirlwindRadius||3.15;
+  spawnKnightGuardBurst(player.position,radius);
+  let hits=0;
+  for(const z of [...zombies]){
+    if(z.userData.dead || z.userData.spawnPending) continue;
+    const dx=z.position.x-player.position.x,dz=z.position.z-player.position.z;
+    const dist=Math.hypot(dx,dz);
+    if(dist>radius) continue;
+    const len=dist||1;
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,p.whirlwindStun||.18);
+    const kb=p.whirlwindKnockback||3.8;
+    z.userData.knockbackX=(dx/len)*kb;
+    z.userData.knockbackZ=(dz/len)*kb;
+    applyBulletDamage(z,(p.whirlwindDamage||.72)*playerStats.power);
+    hits++;
+  }
+  if(hits) triggerCombatShake(5.5,85);
+}
+function updateKnightArmorHud(){
+  const hud=document.getElementById('knightArmorHud');
+  if(!hud) return;
+  const isKnight=state.avatarType==='knight';
+  hud.classList.toggle('show',isKnight);
+  if(!isKnight) return;
+  const p=HERO_PASSIVES.knight;
+  const max=p.armorMax||2;
+  const armor=Math.max(0,Math.min(max,passiveState.knightArmor||0));
+  const pct=(armor/max)*100;
+  document.getElementById('knightArmorFill').style.width=pct+'%';
+  const waiting=(passiveState.knightArmorRegenDelay||0)>0;
+  const regenerating=armor<max && !waiting;
+  hud.classList.toggle('regenerating',regenerating);
+  const label=document.getElementById('knightArmorLabel');
+  if(armor>=max) label.textContent=`MAGICAL ARMOR ${armor}/${max}`;
+  else if(waiting) label.textContent=`ARMOR ${armor}/${max} · RECHARGE ${(passiveState.knightArmorRegenDelay||0).toFixed(1)}s`;
+  else label.textContent=`ARMOR ${armor}/${max} · REGENERATING`;
 }
 function refreshPassiveState(dt=0){
   if(passiveState.shadowstepTimer>0) passiveState.shadowstepTimer=Math.max(0,passiveState.shadowstepTimer-dt);
+  if(state.avatarType==='knight'){
+    const p=HERO_PASSIVES.knight;
+    if((passiveState.knightWhirlwindTimer||0)>0){
+      passiveState.knightWhirlwindTimer=Math.max(0,passiveState.knightWhirlwindTimer-dt);
+      passiveState.knightWhirlwindPulse=(passiveState.knightWhirlwindPulse||0)-dt;
+      if(passiveState.knightWhirlwindPulse<=0){
+        passiveState.knightWhirlwindPulse=p.whirlwindPulse||.22;
+        pulseKnightWhirlwind();
+      }
+      if(player){
+        player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,.12);
+        player.userData.spinVisualSpeed=p.whirlwindSpinSpeed||24;
+      }
+    }else{
+      passiveState.knightWhirlwindPulse=0;
+    }
+    const max=p.armorMax||2;
+    if((passiveState.knightArmor||0)<max){
+      if((passiveState.knightArmorRegenDelay||0)>0){
+        passiveState.knightArmorRegenDelay=Math.max(0,passiveState.knightArmorRegenDelay-dt);
+      }else{
+        passiveState.knightArmorRegenTimer=(passiveState.knightArmorRegenTimer||0)+dt;
+        if(passiveState.knightArmorRegenTimer>=(p.armorRegenInterval||3)){
+          passiveState.knightArmor=Math.min(max,(passiveState.knightArmor||0)+1);
+          passiveState.knightArmorRegenTimer=0;
+          if(player){spawnKnightGuardBurst(player.position,1.35);navigator.vibrate&&navigator.vibrate(12);}
+        }
+      }
+    }else{
+      passiveState.knightArmorRegenDelay=0;
+      passiveState.knightArmorRegenTimer=0;
+    }
+    updateKnightArmorHud();
+  }else{
+    updateKnightArmorHud();
+  }
   if(passiveState.mageSpeedBoostTimer>0){
     const hasteWasActive=passiveState.mageSpeedBoostTimer>0;
     passiveState.mageSpeedBoostTimer=Math.max(0,passiveState.mageSpeedBoostTimer-dt);
@@ -8836,7 +8983,7 @@ function refreshPassiveState(dt=0){
     }
   }
   const p=passiveForAvatar();
-  passiveState.battleFuryActive=state.avatarType==='barbarian' && countNearbyLivingEnemies(p.nearbyRadius||0)>=(p.nearbyCount||999);
+  passiveState.battleFuryActive=false; // legacy field retained for save/runtime compatibility
 }
 function updatePassiveHud(){
   const el=document.getElementById('passivePill');
@@ -8844,8 +8991,10 @@ function updatePassiveHud(){
   const p=passiveForAvatar();
   let suffix='';
   if(state.avatarType==='hooded' && passiveState.shadowstepTimer>0) suffix=` · ACTIVE ${passiveState.shadowstepTimer.toFixed(1)}s`;
-  else if(state.avatarType==='knight') suffix=` · GUARD ${passiveState.knightHitCounter}/${p.guardHits}`;
-  else if(state.avatarType==='barbarian') suffix=passiveState.battleFuryActive?' · ACTIVE':'';
+  else if(state.avatarType==='knight') suffix=(passiveState.knightWhirlwindTimer||0)>0 ? ` · 🌀 WHIRLWIND ${passiveState.knightWhirlwindTimer.toFixed(1)}s · KILLS ${passiveState.knightWhirlwindCounter||0}/${p.whirlwindKills||5} · ARMOR ${passiveState.knightArmor||0}/${p.armorMax||2}` : ` · KILLS ${passiveState.knightWhirlwindCounter||0}/${p.whirlwindKills||5} · ARMOR ${passiveState.knightArmor||0}/${p.armorMax||2}`;
+  else if(state.avatarType==='barbarian') suffix=invincibleTimer>0
+    ? ` · 🛡 INVINCIBLE ${invincibleTimer.toFixed(1)}s · WAVE ${passiveState.barbarianShockwaveCounter||0}/3 · FURY ${passiveState.barbarianInvincibleCounter||0}/5`
+    : ` · WAVE ${passiveState.barbarianShockwaveCounter||0}/3 · FURY ${passiveState.barbarianInvincibleCounter||0}/5`;
   else if(state.avatarType==='mage') suffix=(passiveState.mageSpeedBoostTimer||0)>0
     ? ` · ⚡ HASTE ${passiveState.mageSpeedBoostTimer.toFixed(1)}s`
     : ` · CAST ${passiveState.mageAttackCounter||0}/3 · KILLS ${passiveState.mageKillCounter||0}/3`;
@@ -9525,7 +9674,7 @@ function findAutoAimTarget(maxRange){
   maxRange = maxRange || 16;
   // Mage uses true 360-degree nearest-enemy targeting. Other heroes keep
   // the previous forward-cone behavior until their individual phases.
-  if(state.avatarType==='mage') return findNearestEnemy(maxRange);
+  if(state.avatarType==='mage' || state.avatarType==='barbarian') return findNearestEnemy(maxRange);
   const fx = Math.sin(player.rotation.y), fz = Math.cos(player.rotation.y);
   let best = null, bestScore = -Infinity;
   zombies.forEach(z=>{
@@ -9613,7 +9762,7 @@ function findClipByWords(parts, fallback='1H_Melee_Attack_Chop'){
 function attackCooldownFor(w){
   let factor = 1 + (playerStats.speed-1)*0.16;
   const passive=passiveForAvatar();
-  if(state.avatarType==='barbarian' && passiveState.battleFuryActive) factor*=passive.attackSpeedMult||1;
+  // Barbarian Phase 2 replaces the old nearby-enemy attack-speed passive with kill-triggered Fury.
   if(w.fireRateCap) factor = Math.min(w.fireRateCap, factor);
   return w.cooldown / factor;
 }
@@ -9739,6 +9888,8 @@ function spawnKnightGuardBurst(origin,radius=2.2){
   g.position.copy(origin);scene.add(g);fx.push({kind:'knightGuard',mesh:g,life:.45,maxLife:.45,spin:5.2});
 }
 function doKnightAttack(w){
+  const nearest=livingEnemiesByDistance()[0];
+  if(nearest) faceEnemyTarget(nearest);
   const yaw=player.rotation.y,pos={x:player.position.x,y:player.position.y,z:player.position.z};
   if(player.userData.playKayClip){
     const clip=w.kind==='shield_bash'?findClipByWords(['shield'],findClipByWords(['melee','attack'])):findClipByWords(['melee','slash'],findClipByWords(['melee','chop']));
@@ -9796,7 +9947,12 @@ function spawnEarthbreaker(origin,radius=3.25){
 }
 function doBarbarianAttack(w){
   spawnHeroIdentityAura();
+  // Universal auto-aim rule: the Barbarian turns toward the nearest living
+  // enemy before each normal or special melee attack. With no enemy alive,
+  // the current movement/facing direction remains the fallback.
+  faceEnemyTarget(findNearestEnemy(Math.max(8,(w.radius||3)*3)));
   const pos={x:player.position.x,y:player.position.y,z:player.position.z},yaw=player.rotation.y;
+  const reachMult=1.25;
   if(player.userData.playKayClip){const clip=findClipByWords(w.kind==='earthbreaker'?['melee','smash']:['melee','chop'],findClipByWords(['melee','slash']));player.userData.playKayClip(clip,true,true,w.kind==='earthbreaker'?.46:.27);}
   if(w.kind==='barbarian_spin'){
     const hits=damageNearby(pos,w.radius,w.damage);spawnEarthbreaker(player.position,w.radius);player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,.38);player.userData.spinVisualSpeed=28;triggerCombatShake(hits?9:4,115);return;
@@ -9804,7 +9960,7 @@ function doBarbarianAttack(w){
   if(w.kind==='earthbreaker'){
     spawnEarthbreaker(player.position,w.radius);const hits=damageNearby(pos,w.radius,w.damage);zombies.forEach(z=>{if(z.userData.dead)return;const dx=z.position.x-pos.x,dz=z.position.z-pos.z,d=Math.hypot(dx,dz)||1;if(d<w.radius+.25){const r=resolveCollision(z.position.x+dx/d*1.45,z.position.z+dz/d*1.45,z.position.y);z.position.x=r.x;z.position.z=r.z;}});triggerCombatShake(hits?16:8,240);navigator.vibrate&&navigator.vibrate([45,25,90]);return;
   }
-  const step=barbarianComboStep++%3;spawnBarbarianArc(pos,yaw,step,step===2?1.2:1);let hits=damageMeleeArc(pos,yaw,w.radius,w.arc,w.damage*(step===2?1.5:1));
+  const step=barbarianComboStep++%3;spawnBarbarianArc(pos,yaw,step,step===2?1.2:1);let hits=damageMeleeArc(pos,yaw,w.radius*reachMult,w.arc,w.damage*(step===2?1.5:1));
   if(step===2){spawnEarthbreaker(player.position,2.7);damageNearby(pos,2.7,w.damage*.85);triggerCombatShake(15,210);}else triggerCombatShake(hits?8:4,115);
   const lunge=resolveCollision(player.position.x+Math.sin(yaw)*.38,player.position.z+Math.cos(yaw)*.38,player.position.y);player.position.x=lunge.x;player.position.z=lunge.z;navigator.vibrate&&navigator.vibrate(hits?[22,18,38]:12);
 }
@@ -10281,10 +10437,10 @@ function doMeleeAttack(w, origin=player.position, isClone=false){
   }
   if(!isClone && state.avatarType==='hooded' && hits>0){
     hoodedMeleeHits += hits;
-    if(hoodedMeleeHits%5 < hits) toast(`Shadow vitality ${hoodedMeleeHits}/25`); updateHoodedHud();
+    updateHoodedHud();
     while(hoodedMeleeHits>=25){
       hoodedMeleeHits-=25;
-      if(hearts<maxHearts){hearts++;renderHearts();toast('Shadow vitality restored 1 heart!');spawnShadowSmoke(player.position.x,player.position.y+1,player.position.z,18);}
+      if(hearts<maxHearts){hearts++;renderHearts();spawnShadowSmoke(player.position.x,player.position.y+1,player.position.z,18);}
     }
   }
   spawnBurst(pos.x,pos.y+0.65,pos.z,spin?14:10,FX_MAT_SPARK,spin?3.5:3.0);
@@ -10499,8 +10655,8 @@ function killZombie(z){
     mageUltimateCharge=Math.min(200,mageUltimateCharge+gainedCharge);
     updateHoodedHud();
   }
-  if(state.avatarType==='knight'){knightUltimateCharge=Math.min(100,knightUltimateCharge+4);spawnBurst(z.position.x,z.position.y+.8,z.position.z,12,FX_MAT_SPARK,3.5);updateHoodedHud();}
-  if(state.avatarType==='barbarian'){barbarianUltimateCharge=Math.min(100,barbarianUltimateCharge+4);spawnBurst(z.position.x,z.position.y+.8,z.position.z,16,FX_MAT_SPARK,4.2);updateHoodedHud();}
+  if(state.avatarType==='knight'){registerKnightKill();knightUltimateCharge=Math.min(100,knightUltimateCharge+4);spawnBurst(z.position.x,z.position.y+.8,z.position.z,12,FX_MAT_SPARK,3.5);updateHoodedHud();}
+  if(state.avatarType==='barbarian'){registerBarbarianKill();barbarianUltimateCharge=Math.min(100,barbarianUltimateCharge+4);spawnBurst(z.position.x,z.position.y+.8,z.position.z,16,FX_MAT_SPARK,4.2);updateHoodedHud();}
   runTokens += tokensPerKill();
   updateRunTokensHud();
   // Feed the spawn queue: keeps the on-screen crowd near the cap
@@ -10544,13 +10700,14 @@ function playerTakeHit(){
   if(freeMode) return; // invincible while free-roaming
   if(invincibleTimer > 0) return; // invincible from a power-up pickup
   if(state.avatarType==='knight'){
-    const p=passiveForAvatar();
-    passiveState.knightHitCounter++;
-    if(passiveState.knightHitCounter>=p.guardHits){
-      passiveState.knightHitCounter=0;
+    const p=HERO_PASSIVES.knight;
+    passiveState.knightArmorRegenDelay=p.armorRegenDelay||5;
+    passiveState.knightArmorRegenTimer=0;
+    if((passiveState.knightArmor||0)>0){
+      passiveState.knightArmor=Math.max(0,passiveState.knightArmor-1);
       spawnKnightGuardBurst(player.position,1.7);
-      toast('Iron Guard blocked the hit!');
       navigator.vibrate&&navigator.vibrate(24);
+      updateKnightArmorHud();
       updatePassiveHud();
       return;
     }
@@ -11011,8 +11168,15 @@ function startSurvival(){
   fx = [];
   hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;mageUltimateCharge=0;mageUltimateActive=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;document.body.style.filter='';updateHoodedHud();
   playerStats = startingStatsForActiveHero();
+  // Base survival health is three hearts. Hero HP bonuses are represented by
+  // HP levels above 1, so +2 starting HP produces five full hearts.
+  maxHearts = 3 + Math.max(0, playerStats.hp - 1);
+  hearts = maxHearts;
+  renderHearts();
   passiveState = createFreshPassiveState();
+  if(state.avatarType==='knight') passiveState.knightArmor=HERO_PASSIVES.knight.armorMax||2;
   updatePassiveHud();
+  updateKnightArmorHud();
   unspentStatPoints = 0;
   runTokens = 0;
   crystalsEarned = 0;
