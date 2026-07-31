@@ -7,6 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
+<!-- V22.9.25 Arcane Echoes Base Ability: implements the Mage signature summon unlocked at Level 10. Five 1-HP avatar copies prioritize enemy aggro, stay near the Mage, fire 10%-damage knockback bolts, use an initial 25-second charge, and then scale cooldown from 15 seconds at Level 1 to 5 seconds at Level 20 with a 1.5-second floor. -->
 <!-- V22.9.24 Avatar Signature Slot Cleanup: removes the Mage's Arcane Cataclysm move and its charge system. The shared ultimate control remains reserved for future avatar-specific signature moves such as Arcane Echoes, while the pause overlay now stays above all combat controls. -->
 <!-- V22.9.23 Between-Round Stat Shop: converts the mandatory free stat pick into a coin-funded between-round shop. Players may buy multiple affordable HP, Power, or Speed upgrades, see live prices and balances, or continue without purchasing. -->
 <!-- V22.9.22 Level Unlock Foundation: adds a centralized level milestone table, run-level unlock tracking, and visible unlock/next-unlock messaging on the between-round screen. Arcane Echoes is registered for Level 10 for the upcoming ability implementation. -->
@@ -663,7 +664,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.24 - Signature Slot Cleanup';
+const GAME_VERSION='22.9.25 - Arcane Echoes';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -1171,8 +1172,10 @@ function updateEnemyProjectiles(dt){
     // cheap extra texture, not the thing doing the "growing streak" job.
     p.trailTimer-=dt;
     if(p.trailTimer<=0){ p.trailTimer=0.035; spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,1,FX_MAT_ENEMY_SHOT,0.35); }
-    const d=Math.hypot(player.position.x-p.mesh.position.x,(player.position.y+.55)-p.mesh.position.y,player.position.z-p.mesh.position.z);
-    if(d<.55){spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,12,FX_MAT_ENEMY_SHOT,3.4);playerTakeHit();scene.remove(p.mesh);disposeGroup(p.mesh);if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}enemyProjectiles.splice(i,1);continue;}
+    const targets=livingPlayers();
+    let hitTarget=null,hitDist=Infinity;
+    for(const t of targets){const d=Math.hypot(t.position.x-p.mesh.position.x,(t.position.y+.55)-p.mesh.position.y,t.position.z-p.mesh.position.z);if(d<hitDist){hitDist=d;hitTarget=t;}}
+    if(hitTarget&&hitDist<.55){spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,12,FX_MAT_ENEMY_SHOT,3.4);if(hitTarget.userData&&hitTarget.userData.isArcaneEcho)destroyArcaneEcho(hitTarget);else playerTakeHit();scene.remove(p.mesh);disposeGroup(p.mesh);if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}enemyProjectiles.splice(i,1);continue;}
     if(p.life<=0||bulletBlockedAt(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z)){scene.remove(p.mesh);disposeGroup(p.mesh);if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}enemyProjectiles.splice(i,1);}
   }
 }
@@ -1185,7 +1188,7 @@ function avatarLevel(){ return round; }
 const LEVEL_UNLOCKS = [
   {level:2, id:'between_round_growth', name:'Between-Round Growth', desc:'Stat growth is available after every cleared round.'},
   {level:7, id:'arcane_lance_milestone', name:'Arcane Lance Milestone', desc:'Mage progression has reached the Arcane Lance tier.'},
-  {level:10, id:'arcane_echoes', name:'Arcane Echoes', desc:'Signature summon milestone reached. Ability implementation follows in the next production increment.', avatar:'mage'},
+  {level:10, id:'arcane_echoes', name:'Arcane Echoes', desc:'Summon five fragile copies of your current Mage avatar to distract and knock back enemies.', avatar:'mage'},
   {level:15, id:'arcane_mastery', name:'Arcane Mastery Tier', desc:'Advanced Mage upgrades can begin unlocking from this level.', avatar:'mage'}
 ];
 let reachedLevelUnlocks = new Set();
@@ -1378,6 +1381,16 @@ const CHARACTER_COMBAT = {
 };
 let mageElementToggle = false;
 let shadowClones = [];
+let arcaneEchoes = [];
+let arcaneEchoesCooldownTimer = 0;
+let arcaneEchoesCycleDuration = 15;
+let arcaneEchoesInitialChargePending = true;
+const ARCANE_ECHO_COUNT = 5;
+const ARCANE_ECHO_INITIAL_CHARGE = 25;
+function arcaneEchoesCooldownForLevel(level=avatarLevel()){
+  return Math.max(1.5, 15 - (Math.max(1,level)-1)*(10/19));
+}
+function arcaneEchoesUnlocked(){ return state.avatarType==='mage' && avatarLevel()>=10; }
 let previewRenderer=null, previewScene=null, previewCamera=null, previewRoot=null, previewMixer=null, previewRAF=0;
 function combatForAvatar(){ return CHARACTER_COMBAT[state.avatarType] || CHARACTER_COMBAT.rogue; }
 function weaponForAvatar(){
@@ -8568,7 +8581,9 @@ function spawnPlayer(){
 
 // ---- Zombies ----
 function livingPlayers(){
-  // Centralized for future co-op support. The current game has one player.
+  // Arcane Echoes deliberately take enemy aggro before the real Mage.
+  const echoes=arcaneEchoes.filter(e=>e && e.parent && !e.userData.dead && e.userData.hp>0);
+  if(echoes.length) return echoes;
   return player && player.parent && player.userData.hp>0 ? [player] : [];
 }
 function spawnPointBlocked(x,z,clearance=0.7){
@@ -8728,6 +8743,7 @@ function startRound(){
   updateEnemyCountHud();
   updateEnemyRadar();
   const theme = themeForRound(round, state.themeIndex||0);
+  updateHoodedHud();
   toast('Round '+round+' · Level '+avatarLevel()+' · '+theme.name+' — '+roundKillTarget+' incoming · Mixed undead!');
 }
 
@@ -9420,7 +9436,7 @@ function setupControls(){
   const ultimateBtnEl=document.getElementById('ultimateBtn');
   const activateUltimate=e=>{
     if(e){ e.preventDefault(); e.stopPropagation(); }
-    if(state.avatarType==='rogue') triggerArrowStorm(); else if(state.avatarType==='knight') triggerKingsJudgment(); else if(state.avatarType==='barbarian') triggerPrimalRage(); else if(state.avatarType==='hooded') triggerShadowEclipse();
+    if(state.avatarType==='mage') triggerArcaneEchoes(); else if(state.avatarType==='rogue') triggerArrowStorm(); else if(state.avatarType==='knight') triggerKingsJudgment(); else if(state.avatarType==='barbarian') triggerPrimalRage(); else if(state.avatarType==='hooded') triggerShadowEclipse();
   };
   if(window.PointerEvent) ultimateBtnEl.addEventListener('pointerdown',activateUltimate,{passive:false});
   else ultimateBtnEl.addEventListener('touchstart',activateUltimate,{passive:false});
@@ -9926,16 +9942,21 @@ function updateHoodedHud(){
   const btn=document.getElementById('ultimateBtn'),meter=document.getElementById('soulMeter');
   if(!btn||!meter)return;
   const isHooded=state.avatarType==='hooded', isArcher=state.avatarType==='rogue', isMage=state.avatarType==='mage', isKnight=state.avatarType==='knight', isBarbarian=state.avatarType==='barbarian';
-  // The Mage's shared signature slot is intentionally reserved for Arcane Echoes.
-  // Until that move is implemented, the obsolete Arcane Cataclysm control and
-  // charge meter stay hidden rather than exposing a nonfunctional placeholder.
-  const hasSignature=isHooded||isArcher||isKnight||isBarbarian;
+  const mageEchoReady=isMage&&arcaneEchoesUnlocked();
+  const hasSignature=isHooded||isArcher||isKnight||isBarbarian||mageEchoReady;
   btn.classList.toggle('hidden',!hasSignature); meter.classList.toggle('on',hasSignature);
   if(hasSignature){
-    const displayedCharge=isHooded?hoodedUltimateCharge:(isArcher?archerUltimateCharge:(isKnight?knightUltimateCharge:barbarianUltimateCharge));
-    const pct=Math.max(0,Math.min(100,displayedCharge));
+    let pct=0;
+    if(mageEchoReady){
+      const total=Math.max(.001,arcaneEchoesCycleDuration||arcaneEchoesCooldownForLevel());
+      pct=arcaneEchoesCooldownTimer<=0?100:Math.max(0,Math.min(100,(1-arcaneEchoesCooldownTimer/total)*100));
+    }else{
+      const displayedCharge=isHooded?hoodedUltimateCharge:(isArcher?archerUltimateCharge:(isKnight?knightUltimateCharge:barbarianUltimateCharge));
+      pct=Math.max(0,Math.min(100,displayedCharge));
+    }
     btn.style.setProperty('--charge',pct+'%'); btn.classList.toggle('ready',pct>=100);
-    if(isHooded){btn.textContent=pct>=100?'ECLIPSE!':'ECLIPSE';meter.textContent='VITALITY '+hoodedMeleeHits+'/25';}
+    if(mageEchoReady){btn.textContent=pct>=100?'ECHOES!':'ECHOES';meter.textContent=pct>=100?'ARCANE ECHOES READY':'ECHOES '+arcaneEchoesCooldownTimer.toFixed(1)+'s';}
+    else if(isHooded){btn.textContent=pct>=100?'ECLIPSE!':'ECLIPSE';meter.textContent='VITALITY '+hoodedMeleeHits+'/25';}
     else if(isArcher){btn.textContent=pct>=100?'ARROW STORM!':'ARROW STORM';meter.textContent='FOCUS '+Math.round(pct)+'%';}
     else if(isKnight){btn.textContent=pct>=100?"KING'S JUDGMENT!":"JUDGMENT";meter.textContent='VALOR '+Math.round(pct)+'%';}
     else if(isBarbarian){btn.textContent=pct>=100?"PRIMAL RAGE!":"RAGE";meter.textContent='FURY '+Math.round(pct)+'%';}
@@ -9947,6 +9968,90 @@ function updateHoodedHud(){
   const novaBtn=document.getElementById('novaBtn');
   if(novaBtn) novaBtn.classList.toggle('hidden', !(isMage && ownedAbilities.arcane_nova));
 }
+
+function clearArcaneEchoes(){
+  arcaneEchoes.forEach(e=>{ if(e&&e.parent){scene.remove(e);disposeGroup(e);} });
+  arcaneEchoes=[];
+  zombies.forEach(z=>{ if(z.userData.targetPlayer&&z.userData.targetPlayer.userData&&z.userData.targetPlayer.userData.isArcaneEcho){z.userData.targetPlayer=null;z.userData.targetRefresh=0;} });
+}
+function tintArcaneEcho(root){
+  root.traverse(o=>{
+    if(o.isMesh&&o.material){
+      if(Array.isArray(o.material))o.material=o.material.map(m=>m.clone());else o.material=o.material.clone();
+      (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{
+        if(m.color)m.color.lerp(new THREE.Color(0x55d9ff),.62);
+        if(m.emissive)m.emissive.setHex(0x713cff);
+        m.transparent=true;m.opacity=.48;m.depthWrite=false;
+      });
+    }
+  });
+}
+function destroyArcaneEcho(e){
+  if(!e||e.userData.dead)return;
+  e.userData.dead=true;e.userData.hp=0;
+  spawnBurst(e.position.x,e.position.y+.75,e.position.z,18,FX_MAT_SPARK,3.8);
+  setTimeout(()=>{if(e.parent){scene.remove(e);disposeGroup(e);}arcaneEchoes=arcaneEchoes.filter(x=>x!==e);updateHoodedHud();},0);
+}
+function triggerArcaneEchoes(){
+  if(!gameRunning||!arcaneEchoesUnlocked())return;
+  if(arcaneEchoesCooldownTimer>0){toast('Arcane Echoes ready in '+arcaneEchoesCooldownTimer.toFixed(1)+'s');return;}
+  clearArcaneEchoes();
+  arcaneEchoesCycleDuration=arcaneEchoesCooldownForLevel();
+  arcaneEchoesCooldownTimer=arcaneEchoesCycleDuration;
+  updateHoodedHud();
+  toast('ARCANE ECHOES!');
+  navigator.vibrate&&navigator.vibrate([30,25,55]);
+  getKayKitAssetPromise('mage').then(({gltf,THREEAsset,cloneSkinned})=>{
+    for(let i=0;i<ARCANE_ECHO_COUNT;i++){
+      setTimeout(()=>{
+        if(!player||state.avatarType!=='mage')return;
+        const wrap=new THREE.Group();
+        const root=cloneSkinned(gltf.scene);root.rotation.y=0;
+        const box=new THREEAsset.Box3().setFromObject(root),size=box.getSize(new THREEAsset.Vector3());
+        root.scale.setScalar(1.48/Math.max(.001,size.y));
+        const box2=new THREEAsset.Box3().setFromObject(root);root.position.y-=box2.min.y;
+        tintArcaneEcho(root);wrap.add(root);
+        const a=(i/ARCANE_ECHO_COUNT)*Math.PI*2;
+        wrap.position.set(player.position.x+Math.cos(a)*1.8,player.position.y,player.position.z+Math.sin(a)*1.8);
+        wrap.userData.isArcaneEcho=true;wrap.userData.hp=1;wrap.userData.dead=false;wrap.userData.echoIndex=i;wrap.userData.attackCooldown=.15+i*.08;
+        wrap.userData.kayMixer=new THREEAsset.AnimationMixer(root);wrap.userData.kayClips={};gltf.animations.forEach(c=>wrap.userData.kayClips[c.name]=c);
+        scene.add(wrap);arcaneEchoes.push(wrap);spawnBurst(wrap.position.x,wrap.position.y+.7,wrap.position.z,14,FX_MAT_SPARK,3.0);updateHoodedHud();
+      },i*120);
+    }
+  });
+}
+function updateArcaneEchoes(dt){
+  if(arcaneEchoesUnlocked()&&arcaneEchoesInitialChargePending){
+    arcaneEchoesInitialChargePending=false;arcaneEchoesCycleDuration=ARCANE_ECHO_INITIAL_CHARGE;arcaneEchoesCooldownTimer=ARCANE_ECHO_INITIAL_CHARGE;updateHoodedHud();
+  }
+  if(arcaneEchoesCooldownTimer>0){arcaneEchoesCooldownTimer=Math.max(0,arcaneEchoesCooldownTimer-dt);updateHoodedHud();}
+  if(!player)return;
+  const now=performance.now()*.001;
+  for(const e of [...arcaneEchoes]){
+    if(!e||e.userData.dead||e.userData.hp<=0){destroyArcaneEcho(e);continue;}
+    if(e.userData.kayMixer)e.userData.kayMixer.update(dt);
+    const i=e.userData.echoIndex||0;
+    const a=now*.35+(i/ARCANE_ECHO_COUNT)*Math.PI*2;
+    const desired=new THREE.Vector3(player.position.x+Math.cos(a)*2.25,player.position.y,player.position.z+Math.sin(a)*2.25);
+    const dist=e.position.distanceTo(desired);
+    if(dist>8)e.position.copy(desired);else e.position.lerp(desired,Math.min(1,dt*(dist>4?8:4.5)));
+    let target=null,best=8*8;
+    for(const z of zombies){if(z.userData.dead||z.userData.spawnPending)continue;const d=e.position.distanceToSquared(z.position);if(d<best){best=d;target=z;}}
+    e.userData.attackCooldown=Math.max(0,(e.userData.attackCooldown||0)-dt);
+    if(target){
+      e.rotation.y=Math.atan2(target.position.x-e.position.x,target.position.z-e.position.z);
+      if(e.userData.attackCooldown<=0){
+        e.userData.attackCooldown=.82;
+        const dx=target.position.x-e.position.x,dz=target.position.z-e.position.z,dl=Math.hypot(dx,dz)||1;
+        const damage=Math.max(.08,(weaponForAvatar().damage||1)*playerStats.power*.10);
+        spawnBurst(e.position.x,e.position.y+1.0,e.position.z,5,FX_MAT_SPARK,2.0);
+        applyBulletDamage(target,damage);
+        if(!target.userData.dead){target.userData.knockbackX=(dx/dl)*3.2;target.userData.knockbackZ=(dz/dl)*3.2;target.userData.hitStun=Math.max(target.userData.hitStun||0,.12);}
+      }
+    }else e.rotation.y=player.rotation.y;
+  }
+}
+
 function spawnAfterimage(){
   if(!player||!player.userData.kayRoot)return; const ghost=player.userData.kayRoot.clone(true);
   ghost.traverse(o=>{if(o.isMesh&&o.material){const mats=(Array.isArray(o.material)?o.material:[o.material]).map(m=>{const c=m.clone();c.transparent=true;c.opacity=.28;c.depthWrite=false;if(c.color)c.color.setHex(0x7b2cff);if(c.emissive)c.emissive.setHex(0x3c0878);return c;});o.material=Array.isArray(o.material)?mats:mats[0];}});
@@ -10851,6 +10956,7 @@ function tintCloneBlack(root){
 }
 function syncShadowClones(){
   clearShadowClones();
+  clearArcaneEchoes(); arcaneEchoesCooldownTimer=0; arcaneEchoesCycleDuration=15; arcaneEchoesInitialChargePending=true;
   updateHoodedHud();
   const w=weaponForAvatar();
   if(state.avatarType!=='hooded' || !player) return;
@@ -10943,6 +11049,7 @@ function updateSceneryOcclusion(dt){
 function update(dt){
   updateHeroIdentityAura(dt);
   updateShadowClones(dt);
+  updateArcaneEchoes(dt);
   updateShadowEclipse(dt);
   updateArrowStorm(dt);
   updateArcaneNova(dt);
@@ -11249,7 +11356,7 @@ function update(dt){
         const attackClip=type==='brute'?'2H_Melee_Attack_Spin':'1H_Melee_Attack_Chop';
         if(z.userData.playKayClip) z.userData.playKayClip(attackClip,true,true,type==='brute'?.55:.36);
         if(type==='brute'){spawnBurst(z.position.x,z.position.y+.2,z.position.z,16,FX_MAT_SPARK,4.5);triggerCombatShake(10,150);}
-        playerTakeHit();
+        if(target.userData&&target.userData.isArcaneEcho) destroyArcaneEcho(target); else playerTakeHit();
       }
     });
   }
