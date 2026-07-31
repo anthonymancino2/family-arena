@@ -7,6 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
+<!-- V22.9.23 Between-Round Stat Shop: converts the mandatory free stat pick into a coin-funded between-round shop. Players may buy multiple affordable HP, Power, or Speed upgrades, see live prices and balances, or continue without purchasing. -->
 <!-- V22.9.22 Level Unlock Foundation: adds a centralized level milestone table, run-level unlock tracking, and visible unlock/next-unlock messaging on the between-round screen. Arcane Echoes is registered for Level 10 for the upcoming ability implementation. -->
 <!-- V22.9.21 Round-Level Sync: avatar level now always equals the active round, the HUD displays both values, and round-clear messaging announces the newly reached level. -->
 <!-- V22.9.20 HUD Layout Update: moves JUMP and LOOK FWD into the camera-control stack directly below the zoom + button, keeping camera/navigation controls grouped and leaving the combat cluster clearer. -->
@@ -586,23 +587,25 @@
         <div class="levelUpOverlay" id="levelUpOverlay">
           <div class="levelUpPanel">
             <h2 style="margin:0 0 6px;">Round Clear!</h2>
-            <p class="subtitle" id="levelUpSubtitle" style="margin:0 0 16px;">Level 2 reached · Choose one stat upgrade</p>
+            <p class="subtitle" id="levelUpSubtitle" style="margin:0 0 10px;">Level 2 reached · Spend coins or continue</p>
+            <div class="shopTokensRow" style="justify-content:center;margin:0 0 12px;"><div class="coin"></div><span id="roundShopTokensCount">0</span></div>
             <div class="levelUnlockNotice" id="levelUnlockNotice"><div class="levelUnlockTitle" id="levelUnlockTitle"></div><div class="levelUnlockDesc" id="levelUnlockDesc"></div></div>
             <button class="statChoiceBtn" id="statBtnPower">
-              <span class="scLevel" id="scLevelPower">Lv 1</span>
+              <span class="scLevel" id="scLevelPower">Lv 1 · 20🪙</span>
               <div class="scLabel">💪 Power</div>
               <div class="scDesc">More damage per shot</div>
             </button>
             <button class="statChoiceBtn" id="statBtnSpeed">
-              <span class="scLevel" id="scLevelSpeed">Lv 1</span>
+              <span class="scLevel" id="scLevelSpeed">Lv 1 · 20🪙</span>
               <div class="scLabel">⚡ Speed</div>
               <div class="scDesc">Move faster</div>
             </button>
             <button class="statChoiceBtn" id="statBtnHp">
-              <span class="scLevel" id="scLevelHp">Lv 1</span>
+              <span class="scLevel" id="scLevelHp">Lv 1 · 25🪙</span>
               <div class="scLabel">❤️ HP</div>
               <div class="scDesc">+1 max heart, healed now</div>
             </button>
+            <button class="bigBtn" id="btnContinueRound" style="width:100%;margin-top:10px;">Continue to Next Round</button>
           </div>
         </div>
         <div class="shopOverlay" id="shopOverlay">
@@ -659,7 +662,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.22 - Level Unlock Foundation';
+const GAME_VERSION='22.9.23 - Between-Round Stat Shop';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -8815,32 +8818,54 @@ function setEnemyMoveClip(z,name){
 }
 
 // ---------------------------------------------------------------------
-// Level-up picker: shown once per round clear. Blocks the next round
-// from starting until the player taps one of the three stats — the
-// point value is always exactly 1 (no re-spending, no undo), which
-// keeps the choice quick and the run moving.
+// Between-round stat shop. The player may buy any affordable combination
+// of the three foundational stats, including repeated purchases, then
+// explicitly continue. Prices rise gradually per purchase during the run.
 // ---------------------------------------------------------------------
+let roundStatPurchases = {power:0,speed:0,hp:0};
+const ROUND_STAT_BASE_PRICE = {power:20,speed:20,hp:25};
+function roundStatPrice(stat){
+  return ROUND_STAT_BASE_PRICE[stat] + roundStatPurchases[stat]*10;
+}
+function refreshRoundStatShop(){
+  const tokenEl=document.getElementById('roundShopTokensCount');
+  if(tokenEl) tokenEl.textContent=runTokens;
+  for(const stat of ['power','speed','hp']){
+    const price=roundStatPrice(stat);
+    const label=document.getElementById('scLevel'+(stat==='hp'?'Hp':stat[0].toUpperCase()+stat.slice(1)));
+    const btn=document.getElementById('statBtn'+(stat==='hp'?'Hp':stat[0].toUpperCase()+stat.slice(1)));
+    if(label) label.textContent='Lv '+playerStats[stat]+' · '+price+'🪙';
+    if(btn){
+      btn.disabled=runTokens<price;
+      btn.style.opacity=btn.disabled?'.48':'1';
+    }
+  }
+}
 function showLevelUp(){
   const subtitle=document.getElementById('levelUpSubtitle');
-  if(subtitle) subtitle.textContent='Level '+avatarLevel()+' reached · Choose one stat upgrade';
+  if(subtitle) subtitle.textContent='Level '+avatarLevel()+' reached · Spend coins or continue';
   renderLevelUnlockNotice(avatarLevel());
-  document.getElementById('scLevelPower').textContent = 'Lv '+playerStats.power;
-  document.getElementById('scLevelSpeed').textContent = 'Lv '+playerStats.speed;
-  document.getElementById('scLevelHp').textContent = 'Lv '+playerStats.hp;
+  refreshRoundStatShop();
   document.getElementById('levelUpOverlay').classList.add('show');
 }
 function pickStat(stat){
-  if(unspentStatPoints <= 0) return;
-  unspentStatPoints--;
+  const price=roundStatPrice(stat);
+  if(runTokens<price) return;
+  runTokens-=price;
+  roundStatPurchases[stat]++;
   const amount=upgradeAmountForActiveHero(stat);
   playerStats[stat]+=amount;
   if(stat === 'hp'){
     maxHearts+=amount;
-    hearts = Math.min(maxHearts, hearts+amount); // every newly earned heart arrives full
+    hearts=Math.min(maxHearts,hearts+amount);
     renderHearts();
   }
+  updateRunTokensHud();
+  refreshRoundStatShop();
+  toast((stat==='power'?'💪 Power':stat==='speed'?'⚡ Speed':'❤️ HP')+' +'+amount+' · '+price+'🪙');
+}
+function continueAfterRoundShop(){
   document.getElementById('levelUpOverlay').classList.remove('show');
-  toast((stat==='power'?'💪 Power':stat==='speed'?'⚡ Speed':'❤️ HP')+' +'+amount+' → Lv '+playerStats[stat]);
   if(gameRunning) startRound();
 }
 
@@ -9439,6 +9464,7 @@ function setupControls(){
   document.getElementById('statBtnPower').addEventListener('touchstart', e=>{ e.preventDefault(); pickStat('power'); });
   document.getElementById('statBtnSpeed').addEventListener('touchstart', e=>{ e.preventDefault(); pickStat('speed'); });
   document.getElementById('statBtnHp').addEventListener('touchstart', e=>{ e.preventDefault(); pickStat('hp'); });
+  document.getElementById('btnContinueRound').addEventListener('touchstart', e=>{ e.preventDefault(); continueAfterRoundShop(); });
 
   document.getElementById('shopPromptBtn').addEventListener('touchstart', e=>{ e.preventDefault(); openShop(); });
   document.getElementById('btnCloseShop').addEventListener('touchstart', e=>{ e.preventDefault(); closeShop(); });
@@ -10793,7 +10819,6 @@ function killZombie(z){
     }
     toast(bonusMsg);
     round++;
-    unspentStatPoints++;
     // Crystals are the persistent, cross-run currency (spent in the
     // main-menu Crystal Shop) — earned once per round cleared, not per
     // kill, so a long careful run earns steadily even if it's not a
@@ -11287,6 +11312,7 @@ function startSurvival(){
   updatePassiveHud();
   updateKnightArmorHud();
   unspentStatPoints = 0;
+  roundStatPurchases = {power:0,speed:0,hp:0};
   runTokens = 0;
   crystalsEarned = 0;
   ownedWeapons = {pistol:true};
