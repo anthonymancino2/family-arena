@@ -7,6 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
+<!-- V22.9.22 Level Unlock Foundation: adds a centralized level milestone table, run-level unlock tracking, and visible unlock/next-unlock messaging on the between-round screen. Arcane Echoes is registered for Level 10 for the upcoming ability implementation. -->
 <!-- V22.9.21 Round-Level Sync: avatar level now always equals the active round, the HUD displays both values, and round-clear messaging announces the newly reached level. -->
 <!-- V22.9.20 HUD Layout Update: moves JUMP and LOOK FWD into the camera-control stack directly below the zoom + button, keeping camera/navigation controls grouped and leaving the combat cluster clearer. -->
 <!-- V22.9.19 Mage Secondary Combat Overhaul: avatar preview starts front-facing, and enemy radar X/Y coordinates are corrected so left/right and top/bottom match enemy positions. -->
@@ -319,6 +320,10 @@
   .statChoiceBtn{width:100%;background:rgba(255,255,255,0.08);border:2px solid rgba(255,255,255,0.2);
     border-radius:14px;padding:14px;margin:7px 0;text-align:left;color:#fff;font-weight:700;}
   .statChoiceBtn:active{background:rgba(127,216,240,0.25);border-color:var(--ice);}
+  .levelUnlockNotice{display:none;margin:0 0 14px;padding:12px 14px;border-radius:14px;text-align:left;background:linear-gradient(135deg,rgba(128,82,255,.22),rgba(59,211,255,.14));border:1.5px solid rgba(174,145,255,.72);box-shadow:0 0 16px rgba(125,82,255,.22);}
+  .levelUnlockNotice.show{display:block;}
+  .levelUnlockTitle{font-weight:1000;color:#e8dcff;letter-spacing:.5px;margin-bottom:3px;}
+  .levelUnlockDesc{font-size:13px;color:rgba(255,255,255,.82);line-height:1.35;}
   .statChoiceBtn .scLabel{font-size:16px;}
   .statChoiceBtn .scDesc{font-size:12px;opacity:0.7;font-weight:500;margin-top:2px;}
   .statChoiceBtn .scLevel{font-size:12px;opacity:0.85;font-weight:700;float:right;}
@@ -582,6 +587,7 @@
           <div class="levelUpPanel">
             <h2 style="margin:0 0 6px;">Round Clear!</h2>
             <p class="subtitle" id="levelUpSubtitle" style="margin:0 0 16px;">Level 2 reached · Choose one stat upgrade</p>
+            <div class="levelUnlockNotice" id="levelUnlockNotice"><div class="levelUnlockTitle" id="levelUnlockTitle"></div><div class="levelUnlockDesc" id="levelUnlockDesc"></div></div>
             <button class="statChoiceBtn" id="statBtnPower">
               <span class="scLevel" id="scLevelPower">Lv 1</span>
               <div class="scLabel">💪 Power</div>
@@ -653,7 +659,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.21 - Round-Level Sync';
+const GAME_VERSION='22.9.22 - Level Unlock Foundation';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -1168,6 +1174,51 @@ function updateEnemyProjectiles(dt){
 }
 let hearts = 3, maxHearts = 3, round = 1, kills = 0, roundKillTarget = 0, roundKillsDone = 0;
 function avatarLevel(){ return round; }
+// Centralized round/level milestone registry. Gameplay systems can query this
+// table instead of scattering hard-coded level checks throughout the file.
+// Arcane Echoes is registered now so the next production increment can attach
+// its actual ability behavior without changing progression rules again.
+const LEVEL_UNLOCKS = [
+  {level:2, id:'between_round_growth', name:'Between-Round Growth', desc:'Stat growth is available after every cleared round.'},
+  {level:7, id:'arcane_lance_milestone', name:'Arcane Lance Milestone', desc:'Mage progression has reached the Arcane Lance tier.'},
+  {level:10, id:'arcane_echoes', name:'Arcane Echoes', desc:'Signature summon milestone reached. Ability implementation follows in the next production increment.', avatar:'mage'},
+  {level:15, id:'arcane_mastery', name:'Arcane Mastery Tier', desc:'Advanced Mage upgrades can begin unlocking from this level.', avatar:'mage'}
+];
+let reachedLevelUnlocks = new Set();
+function levelUnlockApplies(entry){ return !entry.avatar || entry.avatar===state.avatarType; }
+function unlocksAtLevel(level){ return LEVEL_UNLOCKS.filter(u=>u.level===level && levelUnlockApplies(u)); }
+function nextLevelUnlock(level){ return LEVEL_UNLOCKS.filter(u=>u.level>level && levelUnlockApplies(u)).sort((a,b)=>a.level-b.level)[0] || null; }
+function registerReachedLevelUnlocks(level){
+  const newly=[];
+  for(const u of LEVEL_UNLOCKS){
+    if(u.level<=level && levelUnlockApplies(u) && !reachedLevelUnlocks.has(u.id)){
+      reachedLevelUnlocks.add(u.id); newly.push(u);
+    }
+  }
+  return newly;
+}
+function hasLevelUnlock(id){ return reachedLevelUnlocks.has(id); }
+function renderLevelUnlockNotice(level){
+  const box=document.getElementById('levelUnlockNotice');
+  const title=document.getElementById('levelUnlockTitle');
+  const desc=document.getElementById('levelUnlockDesc');
+  if(!box||!title||!desc) return;
+  const newly=registerReachedLevelUnlocks(level).filter(u=>u.level===level);
+  if(newly.length){
+    title.textContent='✨ NEW UNLOCK · '+newly.map(u=>u.name).join(' + ');
+    desc.textContent=newly.map(u=>u.desc).join(' ');
+    box.classList.add('show');
+    return;
+  }
+  const next=nextLevelUnlock(level);
+  if(next){
+    title.textContent='NEXT UNLOCK · LEVEL '+next.level;
+    desc.textContent=next.name+' — '+next.desc;
+    box.classList.add('show');
+  }else{
+    box.classList.remove('show'); title.textContent=''; desc.textContent='';
+  }
+}
 const MAX_CONCURRENT_ZOMBIES = 30; // hard cap on simultaneous zombies, regardless of round target
 let zombiesRemainingToSpawn = 0;   // queued zombies still owed this round, fed in as others die
 let enemySpawnRetryTimer = null;    // one shared retry timer prevents failed spawn attempts from piling up
@@ -8772,6 +8823,7 @@ function setEnemyMoveClip(z,name){
 function showLevelUp(){
   const subtitle=document.getElementById('levelUpSubtitle');
   if(subtitle) subtitle.textContent='Level '+avatarLevel()+' reached · Choose one stat upgrade';
+  renderLevelUnlockNotice(avatarLevel());
   document.getElementById('scLevelPower').textContent = 'Lv '+playerStats.power;
   document.getElementById('scLevelSpeed').textContent = 'Lv '+playerStats.speed;
   document.getElementById('scLevelHp').textContent = 'Lv '+playerStats.hp;
@@ -11222,6 +11274,7 @@ function startSurvival(){
   enemyProjectiles.forEach(p=>{scene.remove(p.mesh);disposeGroup(p.mesh);if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}});enemyProjectiles=[];
   fx.forEach(f=>scene.remove(f.mesh));
   fx = [];
+  reachedLevelUnlocks = new Set(); registerReachedLevelUnlocks(1);
   hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;mageUltimateCharge=0;mageUltimateActive=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;document.body.style.filter='';updateHoodedHud();
   playerStats = startingStatsForActiveHero();
   // Base survival health is three hearts. Hero HP bonuses are represented by
