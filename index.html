@@ -7,6 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
+<!-- V22.9.10 Landing Hub: adds selected-player high score, featured hero display, and cache-clearing Refresh / Sync button prepared for future cloud synchronization. -->
 <!-- V22.9.9 Mage Phase 6 FINAL: completes the Mage pass with data-driven passive tuning, centralized passive-state resets, Arcane Haste expiration cleanup, and regression validation. -->
 <!-- V22.9.9 Mage Phase 5: adds readable Mage passive polish: persistent Arcane Haste aura/trails, pulse feedback as Haste expires, highlighted passive HUD states, and clearer Arcane Flow descriptions. -->
 <!-- V22.9.9 Mage Phase 4: completes Mage targeting consistency. Normal attacks and Arcane Laser use 360-degree nearest-enemy auto-targeting; Arcane Cataclysm prioritizes the nearest living enemies and turns the Mage toward its primary target; Arcane Nova remains a centered 360-degree survival special. Includes Mage stat scaling, hold-to-cast, and Mage passive framework from earlier phases. -->
@@ -375,7 +376,19 @@
 .homePrompt{font-size:12px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;color:#dff7ff;margin:0 0 8px 3px;}
 #screenHome .nameRow{margin:0 0 10px;max-height:82px;overflow-y:auto;}
 #screenHome #newName{margin:0 0 12px;background:rgba(255,255,255,.94);color:#18283a;border:none;box-shadow:inset 0 0 0 2px rgba(17,64,94,.12);}
+.homePlayerShowcase{display:grid;grid-template-columns:72px 1fr;gap:12px;align-items:center;margin:0 0 12px;padding:10px 12px;border-radius:18px;background:linear-gradient(135deg,rgba(70,176,229,.20),rgba(132,81,201,.18));border:1px solid rgba(198,235,255,.38);box-shadow:inset 0 1px 0 rgba(255,255,255,.12);}
+.homeHeroPortrait{width:72px;height:72px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:42px;background:radial-gradient(circle at 45% 30%,rgba(255,255,255,.30),rgba(33,57,82,.82) 70%);border:2px solid rgba(255,255,255,.42);filter:drop-shadow(0 5px 8px rgba(0,0,0,.28));}
+.homeHeroDetails{min-width:0;text-align:left;}
+.homeHeroLabel{font-size:9px;font-weight:900;letter-spacing:1.35px;color:#9fddff;text-transform:uppercase;}
+.homeHeroName{font-size:18px;font-weight:950;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+.homeBestScore{display:flex;align-items:baseline;gap:7px;margin-top:5px;}
+.homeBestScore span:first-child{font-size:10px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;color:#f5dc8a;}
+.homeBestScore strong{font-size:21px;color:#ffe36e;text-shadow:0 2px 6px rgba(0,0,0,.35);}
 .homeActions{display:grid;grid-template-columns:1fr .42fr;gap:10px;}
+.homeUtilityRow{display:grid;grid-template-columns:1fr;gap:7px;margin-top:10px;}
+#screenHome #btnRefreshSync{width:100%;min-height:39px;margin:0;padding:8px 12px;border-radius:13px;background:rgba(8,22,36,.62);border:1px solid rgba(159,223,255,.42);color:#dff7ff;font-size:12px;font-weight:850;letter-spacing:.25px;}
+#screenHome #btnRefreshSync:active{transform:scale(.985);background:rgba(18,52,76,.74);}
+.homeSyncStatus{min-height:13px;text-align:center;font-size:9px;color:#a9c8da;letter-spacing:.25px;opacity:.82;}
 #screenHome #btnGoModes{width:100%;margin:0;min-height:58px;border-radius:18px;font-size:20px;background:linear-gradient(#ffe46f,#f6b63e);color:#3d270a;border:3px solid rgba(255,255,255,.9);box-shadow:0 5px 0 #b76b22,0 10px 18px rgba(0,0,0,.3);text-transform:uppercase;letter-spacing:1px;}
 #screenHome #btnGoModes:active{transform:translateY(4px);box-shadow:0 1px 0 #b76b22;}
 #screenHome #btnGoShop{width:100%;margin:0;min-height:58px;border-radius:18px;padding:10px 8px;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.6);font-size:12px;line-height:1.15;}
@@ -409,9 +422,21 @@
         <div class="homePrompt">Choose your family profile</div>
         <div class="nameRow" id="nameRow"></div>
         <input id="newName" placeholder="Add a player name" maxlength="14" autocomplete="off">
+        <div class="homePlayerShowcase" id="homePlayerShowcase">
+          <div class="homeHeroPortrait" id="homeHeroPortrait" aria-hidden="true">⚔️</div>
+          <div class="homeHeroDetails">
+            <div class="homeHeroLabel" id="homeHeroLabel">Select a player</div>
+            <div class="homeHeroName" id="homeHeroName">Your Hero</div>
+            <div class="homeBestScore"><span>Highest Score</span><strong id="homeHighestScore">—</strong></div>
+          </div>
+        </div>
         <div class="homeActions">
           <button class="bigBtn" id="btnGoModes">Play</button>
           <button class="ghostBtn" id="btnGoShop">Crystal<br>Shop</button>
+        </div>
+        <div class="homeUtilityRow">
+          <button class="ghostBtn" id="btnRefreshSync" type="button">↻ Refresh / Sync Game</button>
+          <div class="homeSyncStatus" id="homeSyncStatus">Local save active · cloud sync coming later</div>
         </div>
         <div class="homeVersion" id="homeVersion"></div>
       </div>
@@ -599,8 +624,8 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.8 - Arcane Laser + Landscape/Projectile Visibility Fixes v2';
-const GAME_BUILD_LABEL = `V${GAME_VERSION} · OUTSIDE ENEMY ENTRY`;
+const GAME_VERSION='22.9.10 - Landing Hub';
+const GAME_BUILD_LABEL = `V${GAME_VERSION} · MAGE COMPLETE`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
 window.addEventListener('DOMContentLoaded', ()=>{
@@ -638,6 +663,13 @@ const Store = {
   getLeaderboard(mode){
     try{ return JSON.parse(localStorage.getItem(this._key('lb:'+mode))||'[]'); }
     catch(e){ return []; }
+  },
+  getHighestScore(mode, name){
+    if(!name) return null;
+    const scores = this.getLeaderboard(mode)
+      .filter(row=>row && row.name===name && Number.isFinite(Number(row.score)))
+      .map(row=>Number(row.score));
+    return scores.length ? Math.max(...scores) : 0;
   },
   submitScore(mode, name, score){
     const lb = this.getLeaderboard(mode);
@@ -710,6 +742,7 @@ let state = {
 function show(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  if(id==='screenHome') updateHomePlayerShowcase();
 }
 
 function refreshCrystalPills(){
@@ -718,6 +751,46 @@ function refreshCrystalPills(){
     const el = document.getElementById(id);
     if(el) el.textContent = p.crystals;
   });
+}
+
+// ---- HOME: selected hero + local high score ----
+const HOME_HERO_ICONS = {rogue:'🏹',hooded:'🥷',mage:'🔮',knight:'🛡️',barbarian:'🪓'};
+function updateHomePlayerShowcase(){
+  const label=document.getElementById('homeHeroLabel');
+  const heroName=document.getElementById('homeHeroName');
+  const portrait=document.getElementById('homeHeroPortrait');
+  const scoreEl=document.getElementById('homeHighestScore');
+  if(!label || !heroName || !portrait || !scoreEl) return;
+  if(!state.currentName){
+    label.textContent='Select a player';
+    heroName.textContent='Your Hero';
+    portrait.textContent='⚔️';
+    scoreEl.textContent='—';
+    return;
+  }
+  const profile=Store.getProfile(state.currentName);
+  const heroType=profile.avatarType || state.avatarType || 'rogue';
+  const info=HERO_ROSTER_INFO[heroType];
+  label.textContent=state.currentName;
+  heroName.textContent=info ? info.title : (AVATAR_TYPE_LABELS[heroType] || 'Hero');
+  portrait.textContent=HOME_HERO_ICONS[heroType] || '⚔️';
+  const best=Store.getHighestScore('survival',state.currentName);
+  scoreEl.textContent=Number(best||0).toLocaleString();
+}
+
+// Future cloud phase will replace this stub with Store.pull/push sync.
+async function refreshAndSyncGame(){
+  const btn=document.getElementById('btnRefreshSync');
+  const status=document.getElementById('homeSyncStatus');
+  if(btn){ btn.disabled=true; btn.textContent='↻ Refreshing…'; }
+  if(status) status.textContent='Clearing cached game files · local save preserved';
+  try{
+    if('caches' in window){
+      const keys=await caches.keys();
+      await Promise.all(keys.map(key=>caches.delete(key)));
+    }
+  }catch(err){ console.warn('Cache cleanup skipped:',err); }
+  window.location.reload();
 }
 
 // ---- HOME: name chips ----
@@ -729,9 +802,10 @@ function renderNameRow(){
     const chip = document.createElement('div');
     chip.className = 'nameChip' + (state.currentName===n ? ' sel':'');
     chip.textContent = n;
-    chip.onclick = ()=>{ state.currentName = n; loadAvatarFromProfile(); renderNameRow(); refreshCrystalPills(); };
+    chip.onclick = ()=>{ state.currentName = n; loadAvatarFromProfile(); renderNameRow(); refreshCrystalPills(); updateHomePlayerShowcase(); };
     row.appendChild(chip);
   });
+  updateHomePlayerShowcase();
 }
 
 // The avatar picker (skin, outfit color, hair style, avatar type) sticks
@@ -753,9 +827,12 @@ function saveAvatarToProfile(){
   p.skin = state.skin; p.outfit = state.outfit;
   p.hairStyle = state.hairStyle; p.avatarType = state.avatarType;
   Store.saveProfile(p);
+  updateHomePlayerShowcase();
 }
 renderNameRow();
 refreshCrystalPills();
+updateHomePlayerShowcase();
+document.getElementById('btnRefreshSync').addEventListener('click',refreshAndSyncGame);
 
 document.getElementById('newName').addEventListener('keydown', e=>{
   if(e.key === 'Enter') addName();
@@ -775,6 +852,7 @@ function addName(){
   input.value = '';
   renderNameRow();
   refreshCrystalPills();
+  updateHomePlayerShowcase();
 }
 document.getElementById('newName').addEventListener('blur', addName);
 
@@ -10979,6 +11057,7 @@ function endSurvival(){
   }
   const lb = practice ? Store.getLeaderboard('survival')
                       : Store.submitScore('survival', state.currentName, score);
+  updateHomePlayerShowcase();
 
   document.getElementById('rankBadge').className = 'rankBadge '+rank;
   document.getElementById('rankBadge').textContent = rank[0].toUpperCase();
