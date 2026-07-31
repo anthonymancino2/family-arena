@@ -7,6 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
+<!-- V22.9.21 Round-Level Sync: avatar level now always equals the active round, the HUD displays both values, and round-clear messaging announces the newly reached level. -->
 <!-- V22.9.20 HUD Layout Update: moves JUMP and LOOK FWD into the camera-control stack directly below the zoom + button, keeping camera/navigation controls grouped and leaving the combat cluster clearer. -->
 <!-- V22.9.19 Mage Secondary Combat Overhaul: avatar preview starts front-facing, and enemy radar X/Y coordinates are corrected so left/right and top/bottom match enemy positions. -->
 <!-- V22.9.19 Knight Phase 3 FINAL: final Knight cleanup. Whirlwind tuning is fully data-driven, armor/Whirlwind state is confirmed to reset per run, passive announcements remain disabled, and Knight HUD/effect behavior is finalized before Rogue development. -->
@@ -537,7 +538,7 @@
         <div class="hitFlash" id="hitFlash"></div>
         <div class="heartsWrap"><div class="heartsRow" id="heartsRow"></div></div>
         <div class="knightArmorHud" id="knightArmorHud"><div class="knightArmorLabel" id="knightArmorLabel">MAGICAL ARMOR 2/2</div><div class="knightArmorTrack"><div class="knightArmorFill" id="knightArmorFill"></div></div></div>
-        <div class="roundPill" id="roundPill">Round 1</div>
+        <div class="roundPill" id="roundPill">Round 1 · Lv 1</div>
         <div class="roundTimerPill" id="roundTimerPill">⏱ 0.0s</div>
         <div class="runTokensPill"><div class="coin"></div><span id="runTokensCount">0</span></div>
         <div class="weaponPill" id="weaponPill">Pistol</div>
@@ -580,7 +581,7 @@
         <div class="levelUpOverlay" id="levelUpOverlay">
           <div class="levelUpPanel">
             <h2 style="margin:0 0 6px;">Round Clear!</h2>
-            <p class="subtitle" style="margin:0 0 16px;">Choose one stat to level up</p>
+            <p class="subtitle" id="levelUpSubtitle" style="margin:0 0 16px;">Level 2 reached · Choose one stat upgrade</p>
             <button class="statChoiceBtn" id="statBtnPower">
               <span class="scLevel" id="scLevelPower">Lv 1</span>
               <div class="scLabel">💪 Power</div>
@@ -652,8 +653,8 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.20 - HUD Layout Update';
-const GAME_BUILD_LABEL = `V${GAME_VERSION} · CAMERA CONTROLS REPOSITIONED`;
+const GAME_VERSION='22.9.21 - Round-Level Sync';
+const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
 window.addEventListener('DOMContentLoaded', ()=>{
@@ -1166,6 +1167,7 @@ function updateEnemyProjectiles(dt){
   }
 }
 let hearts = 3, maxHearts = 3, round = 1, kills = 0, roundKillTarget = 0, roundKillsDone = 0;
+function avatarLevel(){ return round; }
 const MAX_CONCURRENT_ZOMBIES = 30; // hard cap on simultaneous zombies, regardless of round target
 let zombiesRemainingToSpawn = 0;   // queued zombies still owed this round, fed in as others die
 let enemySpawnRetryTimer = null;    // one shared retry timer prevents failed spawn attempts from piling up
@@ -1912,7 +1914,7 @@ function applyTheme(round){
   buildDecorations(theme);
   spawnCritters(theme);
 
-  document.getElementById('roundPill').textContent = 'Round '+round+' · '+theme.name;
+  document.getElementById('roundPill').textContent = 'Round '+round+' · Lv '+avatarLevel()+' · '+theme.name;
   applyCameraMode();
 }
 
@@ -8671,7 +8673,7 @@ function startRound(){
   updateEnemyCountHud();
   updateEnemyRadar();
   const theme = themeForRound(round, state.themeIndex||0);
-  toast('Round '+round+' · '+theme.name+' — '+roundKillTarget+' incoming · Mixed undead!');
+  toast('Round '+round+' · Level '+avatarLevel()+' · '+theme.name+' — '+roundKillTarget+' incoming · Mixed undead!');
 }
 
 // Round recovery watchdog. Long matches can expose rare cases where an
@@ -8768,6 +8770,8 @@ function setEnemyMoveClip(z,name){
 // keeps the choice quick and the run moving.
 // ---------------------------------------------------------------------
 function showLevelUp(){
+  const subtitle=document.getElementById('levelUpSubtitle');
+  if(subtitle) subtitle.textContent='Level '+avatarLevel()+' reached · Choose one stat upgrade';
   document.getElementById('scLevelPower').textContent = 'Lv '+playerStats.power;
   document.getElementById('scLevelSpeed').textContent = 'Lv '+playerStats.speed;
   document.getElementById('scLevelHp').textContent = 'Lv '+playerStats.hp;
