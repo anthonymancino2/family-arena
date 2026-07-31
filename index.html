@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.9.7: Arcane Nova — new Mage Survival ability, purchasable in the shop, own HUD button/cooldown. -->
+<!-- V22.9.8: Arcane Laser — new Mage Boss Killer ability, hold-to-channel piercing beam on its own charge meter, purchasable in the shop. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -184,6 +184,14 @@
     transition:opacity 0.15s;text-shadow:none;}
   .novaBtn.cooling{opacity:0.3;}
   .novaBtn.hidden{display:none;}
+  .laserBtn{position:absolute;bottom:calc(122px + env(safe-area-inset-bottom));right:206px;
+    width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:10px;color:#fff;border:2.5px solid rgba(255,255,255,0.85);
+    background:conic-gradient(#d16cff var(--charge,100%),rgba(40,10,52,.85) 0);
+    pointer-events:auto;transition:opacity 0.15s;text-shadow:0 1px 3px rgba(0,0,0,0.85);}
+  .laserBtn.empty{opacity:0.35;}
+  .laserBtn.active{box-shadow:0 0 18px rgba(209,108,255,.9);}
+  .laserBtn.hidden{display:none;}
   .ultimateBtn{position:absolute;bottom:calc(170px + env(safe-area-inset-bottom));right:126px;width:76px;height:76px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:45;font-size:12px;font-weight:1000;letter-spacing:.6px;color:#fff;border:3px solid rgba(255,255,255,.8);background:conic-gradient(#b95cff var(--charge,0%),rgba(33,11,52,.92) 0);box-shadow:0 0 20px rgba(164,72,255,.65),inset 0 0 0 5px rgba(0,0,0,.28);text-shadow:0 2px 4px #000;user-select:none;-webkit-user-select:none;touch-action:manipulation;pointer-events:auto;cursor:pointer;}
   .ultimateBtn.ready{animation:ultimatePulse .75s infinite alternate;box-shadow:0 0 34px rgba(209,108,255,1),0 0 70px rgba(126,36,255,.72),inset 0 0 0 5px rgba(255,255,255,.18);}
   .ultimateBtn.hidden{display:none;}
@@ -205,7 +213,7 @@
   .vertBtn .vbLabel{font-size:10px;line-height:1;}
   .upBtn{bottom:calc(150px + env(safe-area-inset-bottom));}
   .downBtn{bottom:calc(84px + env(safe-area-inset-bottom));}
-  .jumpBtn.freeHide, .dashBtn.freeHide, .actBtn.freeHide, .novaBtn.freeHide{display:none;}
+  .jumpBtn.freeHide, .dashBtn.freeHide, .actBtn.freeHide, .novaBtn.freeHide, .laserBtn.freeHide{display:none;}
   .freeBanner{position:absolute;top:calc(60px + env(safe-area-inset-top));left:50%;
     transform:translateX(-50%);background:rgba(127,216,240,0.92);color:#052233;
     font-weight:800;font-size:12px;padding:6px 14px;border-radius:999px;display:none;}
@@ -479,6 +487,7 @@
         </div>
         <div class="dashBtn" id="dashBtn">DASH</div>
         <div class="novaBtn hidden" id="novaBtn">NOVA</div>
+        <div class="laserBtn hidden" id="laserBtn" style="--charge:100%">LASER</div>
         <div class="ultimateBtn hidden" id="ultimateBtn" style="--charge:0%">ECLIPSE</div>
         <div class="soulMeter" id="soulMeter">SOULS 0/25</div>
         <div class="lookFwdBtn" id="lookFwdBtn">LOOK<br>FWD</div>
@@ -570,7 +579,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.7 - Arcane Nova';
+const GAME_VERSION='22.9.8 - Arcane Laser';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · OUTSIDE ENEMY ENTRY`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -1118,6 +1127,12 @@ const WEAPONS = {
 // novaBtn. See triggerArcaneNova() for what it actually does.
 const ARCANE_NOVA = {id:'arcane_nova', name:'Arcane Nova', price:640,
   desc:'Survival panic button. A giant blast around you instantly kills weak zombies, badly hurts Brutes, and deals real damage to Bosses. Stragglers outside the blast get yanked in, anything that survives is knocked back and stunned, and you get a burst of speed to reposition.'};
+// Boss Killer: hold to channel a piercing beam of massive sustained
+// damage at the nearest well-aligned target (falling back to wherever
+// you're facing). Drains a charge meter while firing and regenerates
+// when idle — weak against crowds, built to melt one tough target.
+const ARCANE_LASER = {id:'arcane_laser', name:'Arcane Laser', price:760,
+  desc:'Hold to channel a piercing beam of massive sustained damage into whatever you\'re aimed at — the dedicated way to burn down a Brute or Boss. Pierces the crowd behind your target for lighter damage. Drains a charge meter that refills when you let go.'};
 // Coins earned per kill — a flat rate that inches up in later rounds so
 // the pricier weapons stay reachable in a long run.
 function tokensPerKill(){ return 5 + Math.floor(round/5); }
@@ -8656,7 +8671,7 @@ function renderShopList(){
 // Abilities are a standing unlock (not equipped/swapped like weapons) —
 // once bought they stay active for the rest of the run and are used from
 // their own HUD button on its own cooldown.
-const HERO_ABILITIES = { mage:[ARCANE_NOVA] };
+const HERO_ABILITIES = { mage:[ARCANE_NOVA, ARCANE_LASER] };
 function renderAbilityShopList(list){
   const abilities = HERO_ABILITIES[state.avatarType];
   if(!abilities || !abilities.length) return;
@@ -8671,7 +8686,7 @@ function renderAbilityShopList(list){
     row.className = 'weaponRow' + (owned ? ' equipped' : '');
     const swatch = document.createElement('div');
     swatch.className = 'weaponSwatch';
-    swatch.style.background = '#35cfff';
+    swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : '#35cfff';
     const info = document.createElement('div');
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${a.name}</div><div class="wDesc">${a.desc}</div>`;
@@ -8821,6 +8836,10 @@ function setupControls(){
   dashBtnEl.addEventListener('touchstart',e=>{e.preventDefault();doDash();});
   const novaBtnEl=document.getElementById('novaBtn');
   novaBtnEl.addEventListener('touchstart',e=>{e.preventDefault();triggerArcaneNova();});
+  const laserBtnEl=document.getElementById('laserBtn');
+  laserBtnEl.addEventListener('touchstart',e=>{e.preventDefault();startArcaneLaser();});
+  laserBtnEl.addEventListener('touchend',e=>{e.preventDefault();stopArcaneLaser();});
+  laserBtnEl.addEventListener('touchcancel',()=>{stopArcaneLaser();});
   const ultimateBtnEl=document.getElementById('ultimateBtn');
   const activateUltimate=e=>{
     if(e){ e.preventDefault(); e.stopPropagation(); }
@@ -8931,6 +8950,8 @@ function toggleFreeMode(){
   document.getElementById('jumpBtn').classList.toggle('freeHide', freeMode);
   document.getElementById('dashBtn').classList.toggle('freeHide', freeMode);
   document.getElementById('novaBtn').classList.toggle('freeHide', freeMode);
+  document.getElementById('laserBtn').classList.toggle('freeHide', freeMode);
+  if(freeMode) stopArcaneLaser();
   document.getElementById('actBtn').classList.toggle('freeHide', freeMode);
   if(freeMode){
     runUsedFreeMode = true; // this run no longer counts for the leaderboard
@@ -9677,10 +9698,109 @@ function updateArcaneNova(dt){
   if(novaSpeedBoostTimer>0) novaSpeedBoostTimer=Math.max(0,novaSpeedBoostTimer-dt);
 }
 
+// ---------------------------------------------------------------------
+// Arcane Laser — Mage Boss Killer ability (purchasable, see ARCANE_LASER).
+// Hold laserBtn to channel: a thin beam locks onto the best auto-aim
+// target (falling back to player facing) and pours massive damage into
+// it, with lighter piercing damage to whatever's stacked up behind it.
+// Runs on a charge meter (not a flat cooldown like Nova) so it rewards
+// short precise bursts on a tough target over spamming it.
+// ---------------------------------------------------------------------
+const LASER_RANGE = 22, LASER_WIDTH = 1.15, LASER_DPS_PRIMARY = 15, LASER_DPS_PIERCE = 5,
+  LASER_MAX_CHARGE = 100, LASER_DRAIN_RATE = 26, LASER_REGEN_RATE = 13, LASER_REGEN_DELAY = 0.6;
+let laserActive = false, laserCharge = LASER_MAX_CHARGE, laserRegenDelayTimer = 0, laserBeamMesh = null, laserHum = 0;
+function laserAvailable(){
+  return state.avatarType==='mage' && !!ownedAbilities.arcane_laser;
+}
+function startArcaneLaser(){
+  if(!gameRunning || !laserAvailable() || laserActive || laserCharge<=1) return;
+  laserActive = true;
+  laserRegenDelayTimer = LASER_REGEN_DELAY;
+  spawnArcaneRuneBurst(player.position, 1.6); // brief charge-up flourish before the beam ticks damage
+  const btn = document.getElementById('laserBtn');
+  if(btn) btn.classList.add('active');
+  const mat = new THREE.MeshBasicMaterial({color:0xd16cff, transparent:true, opacity:0.75, depthWrite:false, blending:THREE.AdditiveBlending});
+  laserBeamMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.16, 1, 8), mat);
+  scene.add(laserBeamMesh);
+}
+function stopArcaneLaser(){
+  laserActive = false;
+  const btn = document.getElementById('laserBtn');
+  if(btn) btn.classList.remove('active');
+  if(laserBeamMesh){ scene.remove(laserBeamMesh); laserBeamMesh.geometry.dispose(); laserBeamMesh.material.dispose(); laserBeamMesh = null; }
+}
+function updateArcaneLaser(dt){
+  const btn = document.getElementById('laserBtn');
+  if(btn){
+    btn.classList.toggle('hidden', !laserAvailable());
+    btn.style.setProperty('--charge', Math.max(0,Math.min(100,laserCharge))+'%');
+    btn.classList.toggle('empty', laserCharge<=1);
+  }
+  if(laserActive && (!gameRunning || !laserAvailable() || laserCharge<=0)){ stopArcaneLaser(); }
+  if(!laserActive){
+    if(laserRegenDelayTimer>0) laserRegenDelayTimer-=dt;
+    else laserCharge = Math.min(LASER_MAX_CHARGE, laserCharge + LASER_REGEN_RATE*dt);
+    return;
+  }
+  laserCharge = Math.max(0, laserCharge - LASER_DRAIN_RATE*dt);
+
+  // Aim: prefer the same soft auto-aim target other weapons use so the
+  // beam tracks the nearest well-aligned enemy; otherwise fire straight
+  // ahead so it's never a dead button with nothing in the forward cone.
+  const aimTarget = findAutoAimTarget(LASER_RANGE);
+  let dx, dz;
+  if(aimTarget){
+    dx = aimTarget.position.x-player.position.x; dz = aimTarget.position.z-player.position.z;
+    const dl = Math.hypot(dx,dz)||1; dx/=dl; dz/=dl;
+  } else {
+    dx = Math.sin(player.rotation.y); dz = Math.cos(player.rotation.y);
+  }
+  const originX = player.position.x, originY = player.position.y+0.95, originZ = player.position.z;
+
+  // Find every zombie inside the narrow beam corridor, ordered by how
+  // far along the beam they sit — the first is the "primary" target,
+  // everything else is a pierced target taking reduced damage.
+  const hits = [];
+  for(const z of zombies){
+    if(z.userData.dead) continue;
+    const zx=z.position.x-originX, zz=z.position.z-originZ;
+    const forward = zx*dx + zz*dz;
+    if(forward<=0 || forward>LASER_RANGE) continue;
+    const perp = Math.abs(zx*dz - zz*dx);
+    if(perp>LASER_WIDTH) continue;
+    hits.push({z,forward});
+  }
+  hits.sort((a,b)=>a.forward-b.forward);
+  laserHum -= dt;
+  const doVisualTick = laserHum<=0;
+  if(doVisualTick) laserHum = 0.09;
+  hits.forEach((h,i)=>{
+    const dps = i===0 ? LASER_DPS_PRIMARY : LASER_DPS_PIERCE;
+    h.z.userData.hp -= dps*dt*playerStats.power;
+    if(doVisualTick){
+      spawnBurst(h.z.position.x, h.z.position.y+0.8, h.z.position.z, i===0?4:2, FX_MAT_SPARK, i===0?2.2:1.3);
+      flashZombie(h.z);
+      if(i===0) h.z.userData.hitStun = Math.max(h.z.userData.hitStun||0, 0.14); // light pin, not a full stop
+    }
+    if(h.z.userData.hp<=0) killZombie(h.z);
+  });
+  if(doVisualTick && navigator.vibrate) navigator.vibrate(4);
+
+  // Beam visual: a thin cylinder stretched from the player to either the
+  // first thing it hits or its max range, so it visibly stops at impact
+  // instead of drawing through a zombie.
+  const endDist = hits.length ? hits[0].forward : LASER_RANGE;
+  const midX = originX+dx*endDist/2, midZ = originZ+dz*endDist/2;
+  laserBeamMesh.position.set(midX, originY, midZ);
+  laserBeamMesh.scale.set(1, endDist, 1);
+  laserBeamMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), new THREE.Vector3(dx,0,dz));
+}
+
 
 function triggerShadowEclipse(){
   if(!gameRunning||state.avatarType!=='hooded'||hoodedUltimateActive>0)return;
   if(hoodedUltimateCharge<99.5){ toast('Eclipse is still charging'); return; }
+
   hoodedUltimateCharge=0;hoodedUltimateActive=3.2;hoodedUltimatePulse=0;updateHoodedHud();document.body.style.filter='brightness(.58) saturate(1.35)';
   spawnShadowSmoke(player.position.x,player.position.y+.7,player.position.z,48);triggerCombatShake(15,420);navigator.vibrate&&navigator.vibrate([80,40,160]);toast('SHADOW ECLIPSE!');
 }
@@ -10208,6 +10328,7 @@ function update(dt){
   updateArrowStorm(dt);
   updateArcaneCataclysm(dt);
   updateArcaneNova(dt);
+  updateArcaneLaser(dt);
   updateKingsJudgment(dt);
   updatePrimalRage(dt);
   if(player && player.userData.kayMixer){
@@ -10545,6 +10666,7 @@ function startSurvival(){
   ownedWeapons = {pistol:true};
   ownedAbilities = {};
   novaCooldownTimer = 0; novaSpeedBoostTimer = 0;
+  stopArcaneLaser(); laserCharge = LASER_MAX_CHARGE; laserRegenDelayTimer = 0;
   resetCharacterLoadout();
   clearShadowClones();
   powerUps.forEach(p=>{ scene.remove(p.mesh); disposeGroup(p.mesh); });
