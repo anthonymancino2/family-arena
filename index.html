@@ -7,7 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.9.8: Arcane Laser — new Mage Boss Killer ability, hold-to-channel piercing beam on its own charge meter, purchasable in the shop. Also fixes landscape play: the HUD no longer scales down to a portrait-shaped target box, so buttons stay full-size and pinned to the real screen edges instead of shrinking and drifting toward the center. -->
+<!-- V22.9.9 Mage Phase 6 FINAL: completes the Mage pass with data-driven passive tuning, centralized passive-state resets, Arcane Haste expiration cleanup, and regression validation. -->
+<!-- V22.9.9 Mage Phase 5: adds readable Mage passive polish: persistent Arcane Haste aura/trails, pulse feedback as Haste expires, highlighted passive HUD states, and clearer Arcane Flow descriptions. -->
+<!-- V22.9.9 Mage Phase 4: completes Mage targeting consistency. Normal attacks and Arcane Laser use 360-degree nearest-enemy auto-targeting; Arcane Cataclysm prioritizes the nearest living enemies and turns the Mage toward its primary target; Arcane Nova remains a centered 360-degree survival special. Includes Mage stat scaling, hold-to-cast, and Mage passive framework from earlier phases. -->
+<!-- V22.9.9: Mage Phase 3 — adds reusable attack/kill passive counters. Every third Mage normal cast releases a 360-degree Arcane Shockwave that stuns nearby enemies for 1.5 seconds. Every third Mage kill grants a non-stacking 3-second speed surge; kills during the surge do not advance its counter. Arcane Nova, Arcane Laser, and Ultimate damage do not advance the normal-attack counter. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -245,11 +248,28 @@
     background:rgba(20,22,28,0.55);border:1.5px solid rgba(255,255,255,0.35);
     border-radius:12px;padding:5px 11px;font-weight:700;font-size:12px;color:#fff;}
   .passivePill{position:absolute;top:calc(130px + env(safe-area-inset-top));left:14px;max-width:230px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .passivePill.mageReady{box-shadow:0 0 0 1px rgba(111,232,255,.75),0 0 14px rgba(111,232,255,.7);animation:magePassivePulse .72s ease-in-out infinite alternate;}
+  .passivePill.mageHaste{color:#effcff;background:linear-gradient(90deg,rgba(39,87,151,.94),rgba(116,53,176,.94));box-shadow:0 0 18px rgba(184,104,255,.85);}
+  @keyframes magePassivePulse{from{transform:scale(1);filter:brightness(1)}to{transform:scale(1.025);filter:brightness(1.3)}}
   .enemyCountPill{position:absolute;top:calc(166px + env(safe-area-inset-top));left:14px;
     background:rgba(44,18,64,0.78);border:1.5px solid rgba(205,126,255,0.78);
     border-radius:12px;padding:6px 11px;font-weight:900;font-size:12px;color:#f0d5ff;
     letter-spacing:.035em;box-shadow:0 0 10px rgba(172,74,255,0.22);}
   .enemyRadar{position:absolute;top:calc(204px + env(safe-area-inset-top));left:14px;width:92px;height:92px;border-radius:50%;background:rgba(5,12,22,.62);border:2px solid rgba(255,255,255,.38);box-shadow:0 0 14px rgba(0,0,0,.4);pointer-events:none;}
+  /* Landscape phones: the left info stack (hearts/tokens/weapon/passive/
+     enemy count) is text-width, not a fixed column, so it can't safely
+     become a rigid grid without risking overlap on a long weapon or
+     passive name. The radar is a fixed 92px circle though, so pulling
+     it out of the vertical stack and into the unused width to the
+     right is always overlap-safe — this alone shortens the stack from
+     ~296px tall down to ~204px, which is the difference between fitting
+     comfortably and feeling cramped on a ~375-430px-tall landscape
+     screen. Gated to short/wide viewports so landscape tablets (which
+     already have plenty of vertical room) keep the normal stacked
+     layout instead of an unnecessary rearrangement. */
+  @media (orientation:landscape) and (max-height:500px){
+    .enemyRadar{left:calc(300px + env(safe-area-inset-left));top:calc(58px + env(safe-area-inset-top));}
+  }
   .invinciblePill{position:absolute;top:calc(112px + env(safe-area-inset-top));left:50%;
     transform:translateX(-50%);background:rgba(74,255,234,0.18);
     border:2px solid #4affea;border-radius:16px;padding:8px 16px;display:none;
@@ -579,7 +599,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.8 - Arcane Laser + Landscape HUD Fix';
+const GAME_VERSION='22.9.8 - Arcane Laser + Landscape/Projectile Visibility Fixes v2';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · OUTSIDE ENEMY ENTRY`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -658,7 +678,13 @@ const HERO_PASSIVES = {
   hooded:{name:'Shadowstep',icon:'💨',desc:'Defeating an enemy grants 20% movement speed for 2.5 seconds.',killMoveMult:1.20,killMoveDuration:2.5},
   knight:{name:'Iron Guard',icon:'🛡️',desc:'Every fourth incoming hit is completely blocked.',guardHits:4},
   barbarian:{name:'Battle Fury',icon:'🔥',desc:'Attack 15% faster while at least three enemies are nearby.',nearbyCount:3,nearbyRadius:5.5,attackSpeedMult:1.15},
-  mage:{name:'Arcane Flow',icon:'✨',desc:'Ultimate charge builds 25% faster from defeated enemies.',ultimateChargeMult:1.25}
+  mage:{
+    name:'Arcane Flow',icon:'✨',
+    desc:'Every third normal cast releases a stunning shockwave. Every third defeat grants Arcane Haste for 3 seconds.',
+    ultimateChargeMult:1.25,
+    attackTrigger:3,shockwaveRadius:5.4,shockwaveStun:1.5,
+    killTrigger:3,hasteDuration:3.0,hasteMoveMult:1.75
+  }
 };
 function passiveForAvatar(type=state.avatarType){ return HERO_PASSIVES[type] || HERO_PASSIVES.rogue; }
 
@@ -970,28 +996,107 @@ function styleZombieArchetype(z){
 function spawnEnemyShot(z){
   if(!player||z.userData.dead)return;
   const g=new THREE.Group();
-  const core=new THREE.Mesh(new THREE.SphereGeometry(.16,10,8),new THREE.MeshBasicMaterial({color:0x74ffd8}));
-  const halo=new THREE.Mesh(new THREE.SphereGeometry(.30,10,8),new THREE.MeshBasicMaterial({color:0x5affca,transparent:true,opacity:.25,depthWrite:false}));
-  g.add(core,halo);g.position.set(z.position.x,z.position.y+1.0,z.position.z);scene.add(g);
+  // Bigger, brighter, and a color (hot magenta) that almost nothing in
+  // any environment theme sits near, so it can't blend into scenery the
+  // way the old small teal orb could. White-hot core + magenta glow +
+  // a wide halo that visibly breathes (see the pulse in the update
+  // loop below) — motion draws the eye far more reliably than a static
+  // shape sitting in a busy fight. Each shot gets its own fresh
+  // materials (not the shared FX_MAT_ENEMY_SHOT) because disposeGroup()
+  // below unconditionally disposes whatever material it finds, and a
+  // shared material can't survive that.
+  const core=new THREE.Mesh(new THREE.SphereGeometry(.22,12,10),new THREE.MeshBasicMaterial({color:0xffffff}));
+  const midGlow=new THREE.Mesh(new THREE.SphereGeometry(.38,12,10),new THREE.MeshBasicMaterial({color:0xff2fd6,transparent:true,opacity:.9,depthWrite:false,blending:THREE.AdditiveBlending}));
+  const outerHalo=new THREE.Mesh(new THREE.SphereGeometry(.66,12,10),new THREE.MeshBasicMaterial({color:0xff2fd6,transparent:true,opacity:.32,depthWrite:false,blending:THREE.AdditiveBlending}));
+  g.add(outerHalo,midGlow,core);
+  g.userData.outerHalo=outerHalo;
+  g.position.set(z.position.x,z.position.y+1.0,z.position.z);scene.add(g);
   const dx=player.position.x-g.position.x,dy=(player.position.y+.65)-g.position.y,dz=player.position.z-g.position.z,l=Math.hypot(dx,dy,dz)||1;
-  enemyProjectiles.push({mesh:g,dx:dx/l,dy:dy/l,dz:dz/l,life:3.2,speed:7.2});
-  spawnBurst(g.position.x,g.position.y,g.position.z,7,FX_MAT_ZOMBIE,2.2);
+
+  // Comet tail: a real streak anchored to the shot that GROWS behind it
+  // as it travels (from a point at the instant it's fired, up to a
+  // fixed max length once it's covered enough ground), instead of a
+  // string of separate fading dots that never visually connect into a
+  // trail. It's a tapered cone — wide/bright where it meets the shot,
+  // narrowing to a point at the tail end. Kept as its own object (not a
+  // child of g) so it isn't dragged around by g's own spin animation
+  // below; direction is fixed for the shot's whole flight so its
+  // orientation only needs to be set once, here.
+  const backDir=new THREE.Vector3(-dx/l,-dy/l,-dz/l);
+  const tailQuat=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),backDir);
+  const innerGeo=new THREE.ConeGeometry(.11,1,8,1,true); innerGeo.translate(0,.5,0);
+  const outerGeo=new THREE.ConeGeometry(.30,1,8,1,true); outerGeo.translate(0,.5,0);
+  const innerTail=new THREE.Mesh(innerGeo,new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.75,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}));
+  const outerTail=new THREE.Mesh(outerGeo,new THREE.MeshBasicMaterial({color:0xff2fd6,transparent:true,opacity:.42,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}));
+  const tail=new THREE.Group(); tail.add(outerTail,innerTail);
+  tail.position.copy(g.position); tail.quaternion.copy(tailQuat); tail.scale.y=0.0001;
+  scene.add(tail);
+
+  enemyProjectiles.push({mesh:g,tail,dx:dx/l,dy:dy/l,dz:dz/l,life:3.2,speed:7.2,age:0,trailTimer:0});
+  spawnBurst(g.position.x,g.position.y,g.position.z,9,FX_MAT_ENEMY_SHOT,2.6);
 }
+const ENEMY_SHOT_TAIL_MAX_LEN = 1.7;
 function updateEnemyProjectiles(dt){
-  for(let i=enemyProjectiles.length-1;i>=0;i--){const p=enemyProjectiles[i];p.life-=dt;p.mesh.position.x+=p.dx*p.speed*dt;p.mesh.position.y+=p.dy*p.speed*dt;p.mesh.position.z+=p.dz*p.speed*dt;p.mesh.rotation.y+=dt*8;
+  for(let i=enemyProjectiles.length-1;i>=0;i--){
+    const p=enemyProjectiles[i];
+    p.life-=dt; p.age+=dt;
+    p.mesh.position.x+=p.dx*p.speed*dt;p.mesh.position.y+=p.dy*p.speed*dt;p.mesh.position.z+=p.dz*p.speed*dt;
+    p.mesh.rotation.y+=dt*10;
+    if(p.mesh.userData.outerHalo) p.mesh.userData.outerHalo.scale.setScalar(1+Math.sin(p.age*14)*0.28);
+    if(p.tail){
+      p.tail.position.copy(p.mesh.position);
+      // Length tracks actual distance traveled (capped), so the tail
+      // genuinely grows out of the shot rather than popping in at full
+      // size — it can never be "longer than where this shot has been."
+      p.tail.scale.y=Math.max(0.0001, Math.min(ENEMY_SHOT_TAIL_MAX_LEN, p.age*p.speed));
+    }
+    // A few loose sparks along the path on top of the solid tail —
+    // cheap extra texture, not the thing doing the "growing streak" job.
+    p.trailTimer-=dt;
+    if(p.trailTimer<=0){ p.trailTimer=0.035; spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,1,FX_MAT_ENEMY_SHOT,0.35); }
     const d=Math.hypot(player.position.x-p.mesh.position.x,(player.position.y+.55)-p.mesh.position.y,player.position.z-p.mesh.position.z);
-    if(d<.55){spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,10,FX_MAT_ZOMBIE,3);playerTakeHit();scene.remove(p.mesh);disposeGroup(p.mesh);enemyProjectiles.splice(i,1);continue;}
-    if(p.life<=0||bulletBlockedAt(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z)){scene.remove(p.mesh);disposeGroup(p.mesh);enemyProjectiles.splice(i,1);}
+    if(d<.55){spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,12,FX_MAT_ENEMY_SHOT,3.4);playerTakeHit();scene.remove(p.mesh);disposeGroup(p.mesh);if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}enemyProjectiles.splice(i,1);continue;}
+    if(p.life<=0||bulletBlockedAt(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z)){scene.remove(p.mesh);disposeGroup(p.mesh);if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}enemyProjectiles.splice(i,1);}
   }
 }
 let hearts = 3, maxHearts = 3, round = 1, kills = 0, roundKillTarget = 0, roundKillsDone = 0;
 const MAX_CONCURRENT_ZOMBIES = 30; // hard cap on simultaneous zombies, regardless of round target
 let zombiesRemainingToSpawn = 0;   // queued zombies still owed this round, fed in as others die
 let enemySpawnRetryTimer = null;    // one shared retry timer prevents failed spawn attempts from piling up
-// ---- Player progression: 1 point in each stat by default (3 total),
-// +1 unspent point awarded every round clear for the player to place.
+// ---- Reusable hero progression definitions. Each hero can independently
+// control its starting bonuses and how much each between-round choice grants.
+// Phase 1 enables the Mage values; heroes without an entry retain the original
+// 1/1/1 starting stats and +1 upgrade behavior.
+const HERO_STAT_CONFIG = {
+  mage: {
+    startingBonus: {power:2, speed:2, hp:0},
+    upgradeAmount: {power:2, speed:2, hp:1}
+  }
+};
+const DEFAULT_HERO_STAT_CONFIG = {
+  startingBonus: {power:0, speed:0, hp:0},
+  upgradeAmount: {power:1, speed:1, hp:1}
+};
+function activeHeroStatConfig(){
+  return HERO_STAT_CONFIG[state.avatarType] || DEFAULT_HERO_STAT_CONFIG;
+}
+function startingStatsForActiveHero(){
+  const bonus=activeHeroStatConfig().startingBonus;
+  return {power:1+(bonus.power||0), speed:1+(bonus.speed||0), hp:1+(bonus.hp||0)};
+}
+function upgradeAmountForActiveHero(stat){
+  const amount=activeHeroStatConfig().upgradeAmount[stat];
+  return Number.isFinite(amount) && amount>0 ? amount : 1;
+}
 let playerStats = {power:1, speed:1, hp:1};
-let passiveState = {shadowstepTimer:0, knightHitCounter:0, battleFuryActive:false};
+function createFreshPassiveState(){
+  return {
+    shadowstepTimer:0, knightHitCounter:0, battleFuryActive:false,
+    mageAttackCounter:0, mageKillCounter:0, mageSpeedBoostTimer:0,
+    mageHasteFxCooldown:0, mageHastePulseStage:0
+  };
+}
+let passiveState = createFreshPassiveState();
 let unspentStatPoints = 0;
 let runTokens = 0;             // per-run currency, earned by killing zombies, spent at the shop
 let crystalsEarned = 0;        // this run's crystal total, earned per round cleared, saved to the profile at run end
@@ -1141,7 +1246,7 @@ function tokensPerKill(){ return 5 + Math.floor(round/5); }
 function crystalsPerRound(){ return 15 + Math.floor(round/10)*5; }
 const CAM_LABELS = {1:'POV', 2:'Close', 3:'Far', 4:'Wide', 5:'Wider',
   6:'Distant', 7:'Panorama', 8:'Far out', 9:"Bird's eye"};
-let BULLET_GEO, BULLET_MAT, MUZZLE_GEO, MUZZLE_MAT, FX_GEO, FX_MAT_ZOMBIE, FX_MAT_DUST, FX_MAT_SPARK, FX_MAT_SHADOW;
+let BULLET_GEO, BULLET_MAT, MUZZLE_GEO, MUZZLE_MAT, FX_GEO, FX_MAT_ZOMBIE, FX_MAT_DUST, FX_MAT_SPARK, FX_MAT_SHADOW, FX_MAT_ENEMY_SHOT;
 let fx = [];
 let groundMat = null;
 let hemiLight = null, sunLight = null;
@@ -7060,6 +7165,11 @@ function initEngine(){
   FX_MAT_DUST = new THREE.MeshBasicMaterial({color:0xe8f6fb, transparent:true, opacity:0.85});
   FX_MAT_SPARK = new THREE.MeshBasicMaterial({color:0xffd23f});
   FX_MAT_SHADOW = new THREE.MeshBasicMaterial({color:0x9a4dff, transparent:true, opacity:0.9});
+  // Hot magenta, additive — deliberately a color that almost nothing else
+  // in any environment theme sits near (grass/sand/snow/rock/foliage all
+  // avoid it), used only for the Spitter's projectile so it reads as an
+  // unmistakable "incoming" signal rather than blending into scenery.
+  FX_MAT_ENEMY_SHOT = new THREE.MeshBasicMaterial({color:0xff2fd6, transparent:true, opacity:0.95, depthWrite:false, blending:THREE.AdditiveBlending});
 
   // Shared decoration geometries — scaled per-instance rather than
   // rebuilt, since scenery now regenerates every single round.
@@ -8412,7 +8522,7 @@ function clearZombies(){
   if(enemySpawnRetryTimer){clearTimeout(enemySpawnRetryTimer);enemySpawnRetryTimer=null;}
   zombies.forEach(z=>{ scene.remove(z); disposeGroup(z); });
   zombies = [];
-  enemyProjectiles.forEach(p=>{scene.remove(p.mesh);disposeGroup(p.mesh);});
+  enemyProjectiles.forEach(p=>{scene.remove(p.mesh);disposeGroup(p.mesh);if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}});
   enemyProjectiles=[];
 }
 
@@ -8545,14 +8655,15 @@ function showLevelUp(){
 function pickStat(stat){
   if(unspentStatPoints <= 0) return;
   unspentStatPoints--;
-  playerStats[stat]++;
+  const amount=upgradeAmountForActiveHero(stat);
+  playerStats[stat]+=amount;
   if(stat === 'hp'){
-    maxHearts++;
-    hearts = Math.min(maxHearts, hearts+1); // the new heart arrives full
+    maxHearts+=amount;
+    hearts = Math.min(maxHearts, hearts+amount); // every newly earned heart arrives full
     renderHearts();
   }
   document.getElementById('levelUpOverlay').classList.remove('show');
-  toast((stat==='power'?'💪 Power':stat==='speed'?'⚡ Speed':'❤️ HP')+' → Lv '+playerStats[stat]);
+  toast((stat==='power'?'💪 Power':stat==='speed'?'⚡ Speed':'❤️ HP')+' +'+amount+' → Lv '+playerStats[stat]);
   if(gameRunning) startRound();
 }
 
@@ -8564,8 +8675,77 @@ function countNearbyLivingEnemies(radius){
   }
   return count;
 }
+// Mage tuning is stored with the hero definition so later balance changes
+// do not require hunting through combat code.
+const MAGE_SHOCKWAVE_ATTACKS = HERO_PASSIVES.mage.attackTrigger;
+const MAGE_SHOCKWAVE_RADIUS = HERO_PASSIVES.mage.shockwaveRadius;
+const MAGE_SHOCKWAVE_STUN = HERO_PASSIVES.mage.shockwaveStun;
+const MAGE_SPEED_KILLS = HERO_PASSIVES.mage.killTrigger;
+const MAGE_SPEED_BOOST_DURATION = HERO_PASSIVES.mage.hasteDuration;
+const MAGE_SPEED_BOOST_MULT = HERO_PASSIVES.mage.hasteMoveMult;
+function triggerMageAttackShockwave(){
+  if(state.avatarType!=='mage' || !player) return;
+  spawnArcaneAura(player.position);
+  spawnArcaneRuneBurst(player.position,MAGE_SHOCKWAVE_RADIUS*.58);
+  spawnArcaneSigil(player.position.x,player.position.y,player.position.z,MAGE_SHOCKWAVE_RADIUS);
+  for(const z of zombies){
+    if(z.userData.dead) continue;
+    const dist=Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z);
+    if(dist<=MAGE_SHOCKWAVE_RADIUS){
+      z.userData.hitStun=Math.max(z.userData.hitStun||0,MAGE_SHOCKWAVE_STUN);
+      const dx=z.position.x-player.position.x,dz=z.position.z-player.position.z,len=Math.hypot(dx,dz)||1;
+      z.userData.knockbackX=(dx/len)*3.0;
+      z.userData.knockbackZ=(dz/len)*3.0;
+    }
+  }
+  triggerCombatShake(6,150);
+  navigator.vibrate&&navigator.vibrate([20,18,35]);
+  toast('ARCANE SHOCKWAVE!');
+}
+function registerMageNormalAttack(){
+  if(state.avatarType!=='mage') return;
+  passiveState.mageAttackCounter=(passiveState.mageAttackCounter||0)+1;
+  if(passiveState.mageAttackCounter>=MAGE_SHOCKWAVE_ATTACKS){
+    passiveState.mageAttackCounter=0;
+    triggerMageAttackShockwave();
+  }
+}
+function registerMageKill(){
+  if(state.avatarType!=='mage') return;
+  // The buff cannot stack, and kills earned while it is active do not count.
+  if((passiveState.mageSpeedBoostTimer||0)>0) return;
+  passiveState.mageKillCounter=(passiveState.mageKillCounter||0)+1;
+  if(passiveState.mageKillCounter>=MAGE_SPEED_KILLS){
+    passiveState.mageKillCounter=0;
+    passiveState.mageSpeedBoostTimer=MAGE_SPEED_BOOST_DURATION;
+    passiveState.mageHasteFxCooldown=0;
+    passiveState.mageHastePulseStage=0;
+    spawnArcaneAura(player.position);
+    spawnArcaneRuneBurst(player.position,2.8);
+    toast('ARCANE HASTE — 3 seconds!');
+  }
+}
 function refreshPassiveState(dt=0){
   if(passiveState.shadowstepTimer>0) passiveState.shadowstepTimer=Math.max(0,passiveState.shadowstepTimer-dt);
+  if(passiveState.mageSpeedBoostTimer>0){
+    const hasteWasActive=passiveState.mageSpeedBoostTimer>0;
+    passiveState.mageSpeedBoostTimer=Math.max(0,passiveState.mageSpeedBoostTimer-dt);
+    passiveState.mageHasteFxCooldown=(passiveState.mageHasteFxCooldown||0)-dt;
+    if(player && passiveState.mageHasteFxCooldown<=0){
+      passiveState.mageHasteFxCooldown=.24;
+      spawnMageHasteTrail(player.position);
+    }
+    const stage=passiveState.mageSpeedBoostTimer<=1?2:(passiveState.mageSpeedBoostTimer<=2?1:0);
+    if(stage>(passiveState.mageHastePulseStage||0) && player){
+      passiveState.mageHastePulseStage=stage;
+      spawnArcaneAura(player.position);
+    }
+    if(hasteWasActive && passiveState.mageSpeedBoostTimer<=0){
+      passiveState.mageHasteFxCooldown=0;
+      passiveState.mageHastePulseStage=0;
+      if(player) spawnArcaneRuneBurst(player.position,1.4);
+    }
+  }
   const p=passiveForAvatar();
   passiveState.battleFuryActive=state.avatarType==='barbarian' && countNearbyLivingEnemies(p.nearbyRadius||0)>=(p.nearbyCount||999);
 }
@@ -8577,6 +8757,11 @@ function updatePassiveHud(){
   if(state.avatarType==='hooded' && passiveState.shadowstepTimer>0) suffix=` · ACTIVE ${passiveState.shadowstepTimer.toFixed(1)}s`;
   else if(state.avatarType==='knight') suffix=` · GUARD ${passiveState.knightHitCounter}/${p.guardHits}`;
   else if(state.avatarType==='barbarian') suffix=passiveState.battleFuryActive?' · ACTIVE':'';
+  else if(state.avatarType==='mage') suffix=(passiveState.mageSpeedBoostTimer||0)>0
+    ? ` · ⚡ HASTE ${passiveState.mageSpeedBoostTimer.toFixed(1)}s`
+    : ` · CAST ${passiveState.mageAttackCounter||0}/3 · KILLS ${passiveState.mageKillCounter||0}/3`;
+  el.classList.toggle('mageHaste',state.avatarType==='mage' && (passiveState.mageSpeedBoostTimer||0)>0);
+  el.classList.toggle('mageReady',state.avatarType==='mage' && (passiveState.mageSpeedBoostTimer||0)<=0 && ((passiveState.mageAttackCounter||0)===2 || (passiveState.mageKillCounter||0)===2));
   el.textContent=`${p.icon} ${p.name}${suffix}`;
 }
 
@@ -8811,11 +8996,11 @@ function setupControls(){
   document.getElementById('actBtn').addEventListener('touchstart', e=>{
     e.preventDefault();
     doShoot();
-    // Automatic weapons (Uzi, AK-47) keep firing while held — the
-    // interval just re-attempts faster than any auto weapon's cooldown;
-    // doShoot()'s own attackCooldown check throttles it to the real
-    // fire rate, so this can't ever fire faster than the weapon allows.
-    if(weaponForAvatar().auto){
+    // Mage casting is always hold-to-attack, including the default spell.
+    // Existing automatic weapons keep their hold behavior too. The rapid
+    // retry only asks doShoot() to fire; the weapon cooldown remains the
+    // authority, so holding cannot exceed the intended attack speed.
+    if(state.avatarType==='mage' || weaponForAvatar().auto){
       clearInterval(autoFireInterval);
       autoFireInterval = setInterval(doShoot, 40);
     }
@@ -9216,8 +9401,32 @@ function flashZombie(z){
 // within a wide forward cone, snap the shot to it instead of firing
 // dead-straight — this is standard arcade/console aim-assist, and is
 // what makes this read as "fantasy game" rather than "realistic sim."
+function findNearestEnemy(maxRange){
+  maxRange = maxRange || 18;
+  let best = null, bestDist = maxRange;
+  zombies.forEach(z=>{
+    if(z.userData.dead) return;
+    const dist = Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z);
+    if(dist < bestDist){ bestDist = dist; best = z; }
+  });
+  return best;
+}
+function livingEnemiesByDistance(maxRange=Infinity){
+  return zombies.filter(z=>{
+    if(z.userData.dead) return false;
+    return Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=maxRange;
+  }).sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position));
+}
+function faceEnemyTarget(target){
+  if(!target) return false;
+  player.rotation.y=Math.atan2(target.position.x-player.position.x,target.position.z-player.position.z);
+  return true;
+}
 function findAutoAimTarget(maxRange){
   maxRange = maxRange || 16;
+  // Mage uses true 360-degree nearest-enemy targeting. Other heroes keep
+  // the previous forward-cone behavior until their individual phases.
+  if(state.avatarType==='mage') return findNearestEnemy(maxRange);
   const fx = Math.sin(player.rotation.y), fz = Math.cos(player.rotation.y);
   let best = null, bestScore = -Infinity;
   zombies.forEach(z=>{
@@ -9571,6 +9780,22 @@ function spawnArcaneAura(origin){
   }
   g.position.set(origin.x,origin.y,origin.z);scene.add(g);fx.push({kind:'arcaneAura',mesh:g,life:.72,maxLife:.72,spin:4.8,dispose:true});
 }
+function spawnMageHasteTrail(origin){
+  if(!scene || !origin || fx.length>175) return;
+  const g=new THREE.Group();
+  const colors=[0x6fe8ff,0xb868ff];
+  for(let i=0;i<4;i++){
+    const mat=new THREE.MeshBasicMaterial({color:colors[i%2],transparent:true,opacity:.34,depthWrite:false,blending:THREE.AdditiveBlending});
+    const shard=new THREE.Mesh(new THREE.OctahedronGeometry(.07+i*.012,0),mat);
+    const a=(performance.now()*.004)+(i*Math.PI/2);
+    shard.position.set(Math.sin(a)*(.45+i*.09),.18+i*.18,Math.cos(a)*(.45+i*.09));
+    shard.userData.baseOpacity=.34;g.add(shard);
+  }
+  const ringMat=new THREE.MeshBasicMaterial({color:0x6fe8ff,transparent:true,opacity:.18,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.42,.68,24),ringMat);ring.rotation.x=-Math.PI/2;ring.position.y=.04;ring.userData.baseOpacity=.18;g.add(ring);
+  g.position.set(origin.x,origin.y,origin.z);scene.add(g);
+  fx.push({kind:'mageHasteTrail',mesh:g,life:.38,maxLife:.38,spin:8.5,dispose:true});
+}
 function spawnArcanePillars(origin){
   const g=new THREE.Group();
   const colors=[0x35cfff,0xb85cff,0xff5a24,0xffc14d];
@@ -9617,7 +9842,7 @@ function spawnArcaneMeteor(target,element){
   fx.push({kind:'arcaneMeteor',mesh:g,targetY:target.y+.25,life:.34,maxLife:.34,fallSpeed:21,element,dispose:true});
 }
 function spawnChainLightning(origin,maxTargets=7,damage=1.4){
-  const live=zombies.filter(z=>!z.userData.dead).sort((a,b)=>a.position.distanceTo(origin)-b.position.distanceTo(origin)).slice(0,maxTargets);
+  const live=zombies.filter(z=>!z.userData.dead).sort((a,b)=>a.position.distanceToSquared(origin)-b.position.distanceToSquared(origin)).slice(0,maxTargets);
   let from=new THREE.Vector3(origin.x,origin.y+1.05,origin.z);
   live.forEach((z,i)=>{
     applyBulletDamage(z,damage*playerStats.power);
@@ -9631,6 +9856,10 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
 function triggerArcaneCataclysm(){
   if(!gameRunning||state.avatarType!=='mage'||mageUltimateActive>0)return;
   if(mageUltimateCharge<199.5){toast('Arcane Cataclysm is still charging');return;}
+  // Specials share the Mage's universal target selection. Cataclysm is
+  // still an arena-wide spell, but the hero visibly faces the nearest
+  // enemy so activation always reads as intentional auto-aim.
+  faceEnemyTarget(findNearestEnemy(30));
   mageUltimateCharge=0;mageUltimateActive=3.6;mageUltimatePulse=0;updateHoodedHud();
   document.body.style.filter='saturate(1.22) contrast(1.08) brightness(.88)';
   spawnArcaneAura(player.position);spawnArcaneAura(player.position);spawnArcanePillars(player.position);spawnArcaneRuneBurst(player.position,3.7);spawnArcaneRuneBurst(player.position,5.1);spawnArcaneSigil(player.position.x,player.position.y,player.position.z,5.2);spawnChainLightning(player.position,10,1.8);
@@ -9641,7 +9870,8 @@ function updateArcaneCataclysm(dt){
   mageUltimateActive-=dt;mageUltimatePulse-=dt;
   if(mageUltimatePulse<=0){
     mageUltimatePulse=.28;
-    const live=zombies.filter(z=>!z.userData.dead).slice(0,12);
+    const live=livingEnemiesByDistance().slice(0,12);
+    faceEnemyTarget(live[0]);
     live.forEach((z,i)=>{spawnArcaneMeteor(z.position,i%2?'ice':'fire');applyBulletDamage(z,1.35*playerStats.power);});
     // One short lightning chain per pulse is readable and has a guaranteed cleanup.
     spawnArcaneAura(player.position);spawnArcanePillars(player.position);spawnArcaneRuneBurst(player.position,2.8+Math.random()*1.8);spawnChainLightning(player.position,Math.min(9,live.length),1.05);
@@ -9651,7 +9881,7 @@ function updateArcaneCataclysm(dt){
 }
 
 // ---------------------------------------------------------------------
-// Arcane Nova — Mage Survival ability (purchasable, see ARCANE_NOVA).
+// Arcane Nova — centered 360-degree Mage Survival ability (purchasable, see ARCANE_NOVA).
 // Unlike the charge-based Ultimate above, this runs on a flat cooldown
 // once bought, so it's reliably there when a run gets desperate.
 //   - Instant-kills Walkers/Runners/Spitters caught in the blast
@@ -9758,14 +9988,15 @@ function updateArcaneLaser(dt){
   }
   laserCharge = Math.max(0, laserCharge - LASER_DRAIN_RATE*dt);
 
-  // Aim: prefer the same soft auto-aim target other weapons use so the
-  // beam tracks the nearest well-aligned enemy; otherwise fire straight
-  // ahead so it's never a dead button with nothing in the forward cone.
+  // Aim: use the Mage's true 360-degree nearest-enemy targeting so the
+  // beam locks to the closest living target. With no enemy available it
+  // fires along the current movement/facing direction.
   const aimTarget = findAutoAimTarget(LASER_RANGE);
   let dx, dz;
   if(aimTarget){
     dx = aimTarget.position.x-player.position.x; dz = aimTarget.position.z-player.position.z;
     const dl = Math.hypot(dx,dz)||1; dx/=dl; dz/=dl;
+    player.rotation.y=Math.atan2(dx,dz);
   } else {
     dx = Math.sin(player.rotation.y); dz = Math.cos(player.rotation.y);
   }
@@ -9962,9 +10193,14 @@ function doMeleeAttack(w, origin=player.position, isClone=false){
 }
 
 function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
+  const target=findAutoAimTarget(18);
+  // Normal Mage casts visibly turn toward the selected enemy. With no
+  // enemy, the current facing direction is preserved as the fallback.
+  if(target && state.avatarType==='mage' && Math.abs(angleOffset)<0.001){
+    player.rotation.y=Math.atan2(target.position.x-player.position.x,target.position.z-player.position.z);
+  }
   let yaw=player.rotation.y+angleOffset;
   let dx=Math.sin(yaw),dy=0,dz=Math.cos(yaw);
-  const target=findAutoAimTarget(18);
   const rightX=Math.cos(yaw), rightZ=-Math.sin(yaw);
   const startX=pos.x+dx*0.72+rightX*lateralOffset, startY=pos.y+1.02, startZ=pos.z+dz*0.72+rightZ*lateralOffset;
   if(target && Math.abs(angleOffset)<0.001){
@@ -10048,6 +10284,9 @@ function doShoot(){
     if(state.avatarType==='rogue'){archerVolleyStep=(archerVolleyStep+1)%3;spawnArcherMuzzleFan(archerVolleyStep===0);spawnHeroIdentityAura();}
     if(state.avatarType==='hooded') cloneAttack(w);
   }
+  // Only the regular Fire-button attack advances the Mage cast passive.
+  // Specials (Nova, Laser, Ultimate) use separate functions and never reach here.
+  if(state.avatarType==='mage') registerMageNormalAttack();
   if(w.kind!=='melee' && w.kind!=='spin') navigator.vibrate && navigator.vibrate(10);
 }
 
@@ -10154,6 +10393,7 @@ function killZombie(z){
   if(state.avatarType==='hooded'){spawnSoulOrb(z.position);hoodedUltimateCharge=Math.min(100,hoodedUltimateCharge+4);passiveState.shadowstepTimer=passiveForAvatar().killMoveDuration||0;updateHoodedHud();}
   if(state.avatarType==='rogue'){archerUltimateCharge=Math.min(100,archerUltimateCharge+4);spawnArcherSpark(z.position.x,z.position.y+0.8,z.position.z);updateHoodedHud();}
   if(state.avatarType==='mage'){
+    registerMageKill();
     const archetype=z.userData.archetype||'walker';
     const baseCharge=archetype==='boss'?15:(archetype==='brute'?3:(archetype==='spitter'?2:1));
     const gainedCharge=archetype==='boss'?15:baseCharge*(passiveForAvatar().ultimateChargeMult||1);
@@ -10431,7 +10671,7 @@ function update(dt){
     const len = Math.hypot(mx,mz)||1;
     const speedStat = playerStats.speed;
     const characterMoveMult = combatForAvatar().baseMoveMult || 1;
-    const passiveMoveMult=(state.avatarType==='hooded' && passiveState.shadowstepTimer>0)?(passiveForAvatar().killMoveMult||1):1;
+    const passiveMoveMult=(state.avatarType==='hooded' && passiveState.shadowstepTimer>0)?(passiveForAvatar().killMoveMult||1):((state.avatarType==='mage' && passiveState.mageSpeedBoostTimer>0)?MAGE_SPEED_BOOST_MULT:1);
     const novaMoveMult = novaSpeedBoostTimer>0 ? NOVA_SPEED_BOOST_MULT : 1;
     const speed = PLAYER_SPEED * characterMoveMult * passiveMoveMult * novaMoveMult * (1 + (speedStat-1)*0.15);
     const nx = player.position.x + (mx/len)*speed*dt;
@@ -10667,12 +10907,12 @@ function startSurvival(){
   clearCritters();
   bullets.forEach(b=>scene.remove(b.mesh)); // BULLET_GEO/MAT are shared — never dispose
   bullets = [];
-  enemyProjectiles.forEach(p=>{scene.remove(p.mesh);disposeGroup(p.mesh);});enemyProjectiles=[];
+  enemyProjectiles.forEach(p=>{scene.remove(p.mesh);disposeGroup(p.mesh);if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}});enemyProjectiles=[];
   fx.forEach(f=>scene.remove(f.mesh));
   fx = [];
   hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;mageUltimateCharge=0;mageUltimateActive=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;document.body.style.filter='';updateHoodedHud();
-  playerStats = {power:1, speed:1, hp:1};
-  passiveState = {shadowstepTimer:0, knightHitCounter:0, battleFuryActive:false};
+  playerStats = startingStatsForActiveHero();
+  passiveState = createFreshPassiveState();
   updatePassiveHud();
   unspentStatPoints = 0;
   runTokens = 0;
