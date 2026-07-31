@@ -7,6 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
+<!-- V22.9.11 Effect Visibility Fix: toast() now has a hard 2.2s max-lifetime cap so a rapidly re-triggered notification (e.g. Mage's Arcane Shockwave firing every 3rd cast on a fast weapon) can never stay stuck on screen — this protects every hero that calls toast(), not just Mage. Also throttles the Arcane Shockwave banner specifically to at most once per 1.8s; the underlying stun/knockback effect still procs every 3rd cast as designed, only the notification spam is limited. Standing rule going forward: no visual effect, for any hero, may reduce visibility enough to make the game hard to play. -->
 <!-- V22.9.10 Landing Hub: adds selected-player high score, featured hero display, and cache-clearing Refresh / Sync button prepared for future cloud synchronization. -->
 <!-- V22.9.9 Mage Phase 6 FINAL: completes the Mage pass with data-driven passive tuning, centralized passive-state resets, Arcane Haste expiration cleanup, and regression validation. -->
 <!-- V22.9.9 Mage Phase 5: adds readable Mage passive polish: persistent Arcane Haste aura/trails, pulse feedback as Haste expires, highlighted passive HUD states, and clearer Arcane Flow descriptions. -->
@@ -624,7 +625,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.10 - Landing Hub';
+const GAME_VERSION='22.9.11 - Effect Visibility Fix';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · MAGE COMPLETE`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -8778,7 +8779,17 @@ function triggerMageAttackShockwave(){
   }
   triggerCombatShake(6,150);
   navigator.vibrate&&navigator.vibrate([20,18,35]);
-  toast('ARCANE SHOCKWAVE!');
+  // The stun/knockback above still fires every 3rd cast as designed —
+  // that's the actual gameplay effect. But at a rapid-fire weapon's
+  // cooldown (as low as 0.075s), "every 3rd cast" can mean a proc every
+  // ~0.2s while FIRE is held, which is far faster than a banner should
+  // ever re-announce itself. Only the notification is throttled here,
+  // to a floor of 1.8s between appearances, so it can't camp on screen.
+  const nowMs=performance.now();
+  if(nowMs-(passiveState.lastShockwaveToastAt||0)>1800){
+    passiveState.lastShockwaveToastAt=nowMs;
+    toast('ARCANE SHOCKWAVE!');
+  }
 }
 function registerMageNormalAttack(){
   if(state.avatarType!=='mage') return;
@@ -8992,13 +9003,23 @@ function renderHearts(){
   }
 }
 
-let toastTimer = null;
+let toastTimer = null, toastFirstShownAt = 0;
+// A toast that's re-triggered faster than its own fade timer (e.g. a
+// passive proc'ing on every shot of a rapid-fire weapon) would cancel
+// and restart that timer forever, so it visually never clears — a
+// screen-blocking effect that never fades is a hard no regardless of
+// which hero or ability causes it. TOAST_MAX_LIFETIME guarantees a
+// forced clear no matter how often toast() gets called back-to-back.
+const TOAST_MAX_LIFETIME = 2200;
 function toast(msg){
   const t = document.getElementById('toast');
+  const now = performance.now();
+  if(!t.classList.contains('show')) toastFirstShownAt = now;
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>t.classList.remove('show'), 1600);
+  const remainingBudget = Math.max(300, TOAST_MAX_LIFETIME - (now - toastFirstShownAt));
+  toastTimer = setTimeout(()=>t.classList.remove('show'), Math.min(1600, remainingBudget));
 }
 
 // ---- Touch controls ----
