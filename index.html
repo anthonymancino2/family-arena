@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.9.6 TEST: Cataclysm Rebalance — hidden Mage Ultimate capacity increased to 200 while the HUD still displays 0–100%. -->
+<!-- V22.9.7: Arcane Nova — new Mage Survival ability, purchasable in the shop, own HUD button/cooldown. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -177,6 +177,13 @@
     pointer-events:auto;display:flex;align-items:center;justify-content:center;
     transition:opacity 0.15s;text-shadow:none;}
   .dashBtn.cooling{opacity:0.3;}
+  .novaBtn{position:absolute;bottom:calc(48px + env(safe-area-inset-bottom));right:206px;
+    width:62px;height:62px;border-radius:50%;background:rgba(53,207,255,0.82);
+    border:2.5px solid rgba(255,255,255,0.85);font-weight:800;font-size:11px;color:#04222c;
+    pointer-events:auto;display:flex;align-items:center;justify-content:center;
+    transition:opacity 0.15s;text-shadow:none;}
+  .novaBtn.cooling{opacity:0.3;}
+  .novaBtn.hidden{display:none;}
   .ultimateBtn{position:absolute;bottom:calc(170px + env(safe-area-inset-bottom));right:126px;width:76px;height:76px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:45;font-size:12px;font-weight:1000;letter-spacing:.6px;color:#fff;border:3px solid rgba(255,255,255,.8);background:conic-gradient(#b95cff var(--charge,0%),rgba(33,11,52,.92) 0);box-shadow:0 0 20px rgba(164,72,255,.65),inset 0 0 0 5px rgba(0,0,0,.28);text-shadow:0 2px 4px #000;user-select:none;-webkit-user-select:none;touch-action:manipulation;pointer-events:auto;cursor:pointer;}
   .ultimateBtn.ready{animation:ultimatePulse .75s infinite alternate;box-shadow:0 0 34px rgba(209,108,255,1),0 0 70px rgba(126,36,255,.72),inset 0 0 0 5px rgba(255,255,255,.18);}
   .ultimateBtn.hidden{display:none;}
@@ -198,7 +205,7 @@
   .vertBtn .vbLabel{font-size:10px;line-height:1;}
   .upBtn{bottom:calc(150px + env(safe-area-inset-bottom));}
   .downBtn{bottom:calc(84px + env(safe-area-inset-bottom));}
-  .jumpBtn.freeHide, .dashBtn.freeHide, .actBtn.freeHide{display:none;}
+  .jumpBtn.freeHide, .dashBtn.freeHide, .actBtn.freeHide, .novaBtn.freeHide{display:none;}
   .freeBanner{position:absolute;top:calc(60px + env(safe-area-inset-top));left:50%;
     transform:translateX(-50%);background:rgba(127,216,240,0.92);color:#052233;
     font-weight:800;font-size:12px;padding:6px 14px;border-radius:999px;display:none;}
@@ -471,6 +478,7 @@
           <div class="camZoomBtn" id="camInBtn">&plus;</div>
         </div>
         <div class="dashBtn" id="dashBtn">DASH</div>
+        <div class="novaBtn hidden" id="novaBtn">NOVA</div>
         <div class="ultimateBtn hidden" id="ultimateBtn" style="--charge:0%">ECLIPSE</div>
         <div class="soulMeter" id="soulMeter">SOULS 0/25</div>
         <div class="lookFwdBtn" id="lookFwdBtn">LOOK<br>FWD</div>
@@ -562,7 +570,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.6 TEST - Cataclysm Rebalance';
+const GAME_VERSION='22.9.7 - Arcane Nova';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · OUTSIDE ENEMY ENTRY`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -1104,6 +1112,12 @@ const WEAPONS = {
   sniper: {name:'Sniper Rifle',   price:450, cooldown:1.0,  damage:999, dual:false, splash:0,   rangeMult:2.2, color:0x9affea, desc:'One shot, one kill, from way further away.'},
   rocket: {name:'Rocket Launcher',price:700, cooldown:1.2,  damage:999, dual:false, splash:3.2, rangeMult:1.0, color:0xff8a3c, desc:'Instant kill with a big splash — clears a crowd in one hit.'}
 };
+// Purchasable Survival ability (Mage only, for now) — separate from the
+// weapon loadout above and from the charge-based Ultimate. Once bought
+// it's a standing unlock for the run, activated on its own cooldown via
+// novaBtn. See triggerArcaneNova() for what it actually does.
+const ARCANE_NOVA = {id:'arcane_nova', name:'Arcane Nova', price:640,
+  desc:'Survival panic button. A giant blast around you instantly kills weak zombies, badly hurts Brutes, and deals real damage to Bosses. Stragglers outside the blast get yanked in, anything that survives is knocked back and stunned, and you get a burst of speed to reposition.'};
 // Coins earned per kill — a flat rate that inches up in later rounds so
 // the pricier weapons stay reachable in a long run.
 function tokensPerKill(){ return 5 + Math.floor(round/5); }
@@ -8579,6 +8593,7 @@ function updateEnemyRadar(){
 // step, which keeps this readable for a young player.
 // ---------------------------------------------------------------------
 let ownedWeapons = {pistol:true};
+let ownedAbilities = {};
 
 function updateShopPrompt(){
   const btn = document.getElementById('shopPromptBtn');
@@ -8631,6 +8646,44 @@ function renderShopList(){
         if(runTokens<w.price) return;
         runTokens-=w.price; ownedWeapons[id]=true; currentWeaponId=id;
         updateRunTokensHud(); updateWeaponHud(); syncShadowClones(); renderShopList(); toast('Bought '+w.name+'!');
+      };
+    }
+    row.append(swatch,info,btn); list.appendChild(row);
+  }
+  renderAbilityShopList(list);
+}
+
+// Abilities are a standing unlock (not equipped/swapped like weapons) —
+// once bought they stay active for the rest of the run and are used from
+// their own HUD button on its own cooldown.
+const HERO_ABILITIES = { mage:[ARCANE_NOVA] };
+function renderAbilityShopList(list){
+  const abilities = HERO_ABILITIES[state.avatarType];
+  if(!abilities || !abilities.length) return;
+  const header = document.createElement('div');
+  header.className = 'wName';
+  header.style.cssText = 'margin:14px 0 4px;opacity:.75;font-size:12px;letter-spacing:.5px;';
+  header.textContent = 'ABILITIES';
+  list.appendChild(header);
+  for(const a of abilities){
+    const owned = !!ownedAbilities[a.id];
+    const row = document.createElement('div');
+    row.className = 'weaponRow' + (owned ? ' equipped' : '');
+    const swatch = document.createElement('div');
+    swatch.className = 'weaponSwatch';
+    swatch.style.background = '#35cfff';
+    const info = document.createElement('div');
+    info.className = 'weaponInfo';
+    info.innerHTML = `<div class="wName">${a.name}</div><div class="wDesc">${a.desc}</div>`;
+    const btn = document.createElement('button');
+    if(owned){
+      btn.className='weaponBuyBtn equippedTag'; btn.textContent='Owned'; btn.disabled=true;
+    } else {
+      btn.className='weaponBuyBtn'; btn.textContent=a.price+'🪙'; btn.disabled=runTokens<a.price;
+      btn.onclick=()=>{
+        if(runTokens<a.price) return;
+        runTokens-=a.price; ownedAbilities[a.id]=true;
+        updateRunTokensHud(); updateHoodedHud(); renderShopList(); toast('Learned '+a.name+'!');
       };
     }
     row.append(swatch,info,btn); list.appendChild(row);
@@ -8766,6 +8819,8 @@ function setupControls(){
   }, {passive:false});
   const dashBtnEl=document.getElementById('dashBtn');
   dashBtnEl.addEventListener('touchstart',e=>{e.preventDefault();doDash();});
+  const novaBtnEl=document.getElementById('novaBtn');
+  novaBtnEl.addEventListener('touchstart',e=>{e.preventDefault();triggerArcaneNova();});
   const ultimateBtnEl=document.getElementById('ultimateBtn');
   const activateUltimate=e=>{
     if(e){ e.preventDefault(); e.stopPropagation(); }
@@ -8875,6 +8930,7 @@ function toggleFreeMode(){
   document.getElementById('downBtn').classList.toggle('on', freeMode);
   document.getElementById('jumpBtn').classList.toggle('freeHide', freeMode);
   document.getElementById('dashBtn').classList.toggle('freeHide', freeMode);
+  document.getElementById('novaBtn').classList.toggle('freeHide', freeMode);
   document.getElementById('actBtn').classList.toggle('freeHide', freeMode);
   if(freeMode){
     runUsedFreeMode = true; // this run no longer counts for the leaderboard
@@ -9258,6 +9314,8 @@ function updateHoodedHud(){
   else if(isMage){btn.textContent=pct>=100?'CATACLYSM!':'CATACLYSM';meter.textContent='ARCANA '+Math.round(pct)+'%';}
   else if(isKnight){btn.textContent=pct>=100?"KING'S JUDGMENT!":"JUDGMENT";meter.textContent='VALOR '+Math.round(pct)+'%';}
   else if(isBarbarian){btn.textContent=pct>=100?"PRIMAL RAGE!":"RAGE";meter.textContent='FURY '+Math.round(pct)+'%';}
+  const novaBtn=document.getElementById('novaBtn');
+  if(novaBtn) novaBtn.classList.toggle('hidden', !(isMage && ownedAbilities.arcane_nova));
 }
 function spawnAfterimage(){
   if(!player||!player.userData.kayRoot)return; const ghost=player.userData.kayRoot.clone(true);
@@ -9555,6 +9613,68 @@ function updateArcaneCataclysm(dt){
     damageNearby(player.position,6.5,.75);triggerCombatShake(4,70);
   }
   if(mageUltimateActive<=0){document.body.style.filter='';spawnArcaneAura(player.position);spawnArcanePillars(player.position);spawnArcanePillars(player.position);spawnArcaneRuneBurst(player.position,4.4);spawnArcaneRuneBurst(player.position,6.0);spawnArcaneSigil(player.position.x,player.position.y,player.position.z,6.2);spawnChainLightning(player.position,12,1.4);damageNearby(player.position,6.2,2.5);triggerCombatShake(11,220);}
+}
+
+// ---------------------------------------------------------------------
+// Arcane Nova — Mage Survival ability (purchasable, see ARCANE_NOVA).
+// Unlike the charge-based Ultimate above, this runs on a flat cooldown
+// once bought, so it's reliably there when a run gets desperate.
+//   - Instant-kills Walkers/Runners/Spitters caught in the blast
+//   - Heavy (not lethal) damage to Brutes, meaningful damage to Bosses
+//   - Anything that survives is hard-knocked-back and stunned (reuses
+//     the existing hitStun field the zombie AI already respects)
+//   - Stragglers just outside the blast get yanked toward the player
+//     (reusing the same stun/knockback fields, just pulling inward and
+//     much more briefly) so they don't sit out of position sniping
+//   - Player gets a short movement speed boost to reposition/escape
+// ---------------------------------------------------------------------
+const NOVA_RADIUS = 6.6, NOVA_PULL_RADIUS = 11.5, NOVA_COOLDOWN = 16,
+  NOVA_STUN = 1.4, NOVA_PULL_STUN = 0.4, NOVA_KNOCKBACK = 7.8, NOVA_PULL_FORCE = 5.2,
+  NOVA_SPEED_BOOST_DURATION = 2.0, NOVA_SPEED_BOOST_MULT = 1.45;
+let novaCooldownTimer = 0, novaSpeedBoostTimer = 0;
+function triggerArcaneNova(){
+  if(!gameRunning||state.avatarType!=='mage'||!ownedAbilities.arcane_nova||novaCooldownTimer>0)return;
+  novaCooldownTimer=NOVA_COOLDOWN;
+  novaSpeedBoostTimer=NOVA_SPEED_BOOST_DURATION;
+  const btn=document.getElementById('novaBtn');
+  if(btn){ btn.classList.add('cooling'); setTimeout(()=>btn.classList.remove('cooling'), NOVA_COOLDOWN*1000); }
+  document.body.style.filter='saturate(1.35) brightness(1.2)';
+  setTimeout(()=>{ if(mageUltimateActive<=0) document.body.style.filter=''; }, 260);
+  spawnArcaneAura(player.position);spawnArcaneAura(player.position);
+  spawnArcaneRuneBurst(player.position,NOVA_RADIUS*0.55);
+  spawnArcaneRuneBurst(player.position,NOVA_RADIUS*0.85);
+  spawnArcaneSigil(player.position.x,player.position.y,player.position.z,NOVA_RADIUS);
+  for(const z of zombies){
+    if(z.userData.dead) continue;
+    const dist=Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z);
+    if(dist>NOVA_PULL_RADIUS) continue;
+    if(dist<=NOVA_RADIUS){
+      const type=z.userData.archetype||'walker';
+      let dmg;
+      if(type==='brute') dmg=(z.userData.maxHp||z.userData.hp)*0.55;
+      else if(type==='boss') dmg=(z.userData.maxHp||z.userData.hp)*0.14;
+      else dmg=9999; // Walkers/Runners/Spitters/Shadow: instant kill
+      applyBulletDamage(z,dmg);
+      if(!z.userData.dead){
+        const kx=z.position.x-player.position.x, kz=z.position.z-player.position.z;
+        const kl=Math.hypot(kx,kz)||1;
+        z.userData.knockbackX=(kx/kl)*NOVA_KNOCKBACK;
+        z.userData.knockbackZ=(kz/kl)*NOVA_KNOCKBACK;
+        z.userData.hitStun=Math.max(z.userData.hitStun||0,NOVA_STUN);
+      }
+    } else {
+      const kx=player.position.x-z.position.x, kz=player.position.z-z.position.z;
+      const kl=Math.hypot(kx,kz)||1;
+      z.userData.knockbackX=(kx/kl)*NOVA_PULL_FORCE;
+      z.userData.knockbackZ=(kz/kl)*NOVA_PULL_FORCE;
+      z.userData.hitStun=Math.max(z.userData.hitStun||0,NOVA_PULL_STUN);
+    }
+  }
+  triggerCombatShake(13,320);navigator.vibrate&&navigator.vibrate([45,25,95]);toast('ARCANE NOVA!');
+}
+function updateArcaneNova(dt){
+  if(novaCooldownTimer>0) novaCooldownTimer=Math.max(0,novaCooldownTimer-dt);
+  if(novaSpeedBoostTimer>0) novaSpeedBoostTimer=Math.max(0,novaSpeedBoostTimer-dt);
 }
 
 
@@ -10087,6 +10207,7 @@ function update(dt){
   updateShadowEclipse(dt);
   updateArrowStorm(dt);
   updateArcaneCataclysm(dt);
+  updateArcaneNova(dt);
   updateKingsJudgment(dt);
   updatePrimalRage(dt);
   if(player && player.userData.kayMixer){
@@ -10176,7 +10297,8 @@ function update(dt){
     const speedStat = playerStats.speed;
     const characterMoveMult = combatForAvatar().baseMoveMult || 1;
     const passiveMoveMult=(state.avatarType==='hooded' && passiveState.shadowstepTimer>0)?(passiveForAvatar().killMoveMult||1):1;
-    const speed = PLAYER_SPEED * characterMoveMult * passiveMoveMult * (1 + (speedStat-1)*0.15);
+    const novaMoveMult = novaSpeedBoostTimer>0 ? NOVA_SPEED_BOOST_MULT : 1;
+    const speed = PLAYER_SPEED * characterMoveMult * passiveMoveMult * novaMoveMult * (1 + (speedStat-1)*0.15);
     const nx = player.position.x + (mx/len)*speed*dt;
     const nz = player.position.z + (mz/len)*speed*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
@@ -10421,6 +10543,8 @@ function startSurvival(){
   runTokens = 0;
   crystalsEarned = 0;
   ownedWeapons = {pistol:true};
+  ownedAbilities = {};
+  novaCooldownTimer = 0; novaSpeedBoostTimer = 0;
   resetCharacterLoadout();
   clearShadowClones();
   powerUps.forEach(p=>{ scene.remove(p.mesh); disposeGroup(p.mesh); });
