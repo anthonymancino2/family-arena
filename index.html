@@ -7,13 +7,15 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.9.18 Orientation & Radar Fix: avatar preview starts front-facing, and enemy radar X/Y coordinates are corrected so left/right and top/bottom match enemy positions. -->
-<!-- V22.9.18 Knight Phase 3 FINAL: final Knight cleanup. Whirlwind tuning is fully data-driven, armor/Whirlwind state is confirmed to reset per run, passive announcements remain disabled, and Knight HUD/effect behavior is finalized before Rogue development. -->
-<!-- V22.9.18 Knight Phase 2: adds the Knight's every-fifth-kill 3-second Whirlwind passive with repeating radial damage, stun, knockback, spinning hero feedback, and HUD progress. Passive activation uses effects only and never displays an announcement box. -->
+<!-- V22.9.20 HUD Layout Update: moves JUMP and LOOK FWD into the camera-control stack directly below the zoom + button, keeping camera/navigation controls grouped and leaving the combat cluster clearer. -->
+<!-- V22.9.19 Mage Secondary Combat Overhaul: avatar preview starts front-facing, and enemy radar X/Y coordinates are corrected so left/right and top/bottom match enemy positions. -->
+<!-- V22.9.19 Knight Phase 3 FINAL: final Knight cleanup. Whirlwind tuning is fully data-driven, armor/Whirlwind state is confirmed to reset per run, passive announcements remain disabled, and Knight HUD/effect behavior is finalized before Rogue development. -->
+<!-- V22.9.19 Knight Phase 2: adds the Knight's every-fifth-kill 3-second Whirlwind passive with repeating radial damage, stun, knockback, spinning hero feedback, and HUD progress. Passive activation uses effects only and never displays an announcement box. -->
 <!-- V22.9.15 Knight Phase 1: adds Knight-specific +2 starting HP and +2 HP upgrades, replaces the old every-fourth-hit guard with a two-charge regenerating Magical Armor system, adds a dedicated armor HUD meter, and standardizes nearest-enemy melee auto-facing. Passive activations remain free of repetitive announcement boxes. -->
 <!-- V22.9.14 Passive Announcement Fix: removes repetitive toast/text-box announcements from automatic hero passive triggers across current avatars. Passive gameplay effects, sounds, vibration, particles, HUD counters, and timers remain intact. Manual signature/ultimate announcements and important game-event notices remain unchanged. -->
 <!-- V22.9.14 Passive Announcement Fix: adds independent kill counters. Every third Barbarian defeat releases a damaging ground Shockwave with brief stun and knockback; every fifth defeat grants 3 seconds of Invincibility. The passive HUD shows both progress counters and active invincibility. -->
 <!-- V22.9.12 Barbarian Phase 1: adds Barbarian-specific +2 starting HP, +2 starting Power, +2 HP per between-round HP choice, roughly 25% longer default axe reach, and 360-degree nearest-enemy melee auto-aim. -->
+<!-- V22.9.19 Mage Secondary Combat Overhaul: replaces Chain Elements with the visible, balanced Arcane Lance piercing attack; turns Giant Fireball into a much larger direct-hit execution projectile with a wider explosion; and adds a universal locked secondary-attack slot beside FIRE. Purchased/equipped shop weapons now occupy the secondary slot while every hero keeps their default move on FIRE. -->
 <!-- V22.9.11 Effect Visibility Fix: toast() now has a hard 2.2s max-lifetime cap so a rapidly re-triggered notification (e.g. Mage's Arcane Shockwave firing every 3rd cast on a fast weapon) can never stay stuck on screen — this protects every hero that calls toast(), not just Mage. Also throttles the Arcane Shockwave banner specifically to at most once per 1.8s; the underlying stun/knockback effect still procs every 3rd cast as designed, only the notification spam is limited. Standing rule going forward: no visual effect, for any hero, may reduce visibility enough to make the game hard to play. -->
 <!-- V22.9.10 Landing Hub: adds selected-player high score, featured hero display, and cache-clearing Refresh / Sync button prepared for future cloud synchronization. -->
 <!-- V22.9.9 Mage Phase 6 FINAL: completes the Mage pass with data-driven passive tuning, centralized passive-state resets, Arcane Haste expiration cleanup, and regression validation. -->
@@ -157,7 +159,7 @@
   .moveKnobDot{position:absolute;width:32px;height:32px;border-radius:50%;
     background:rgba(255,255,255,0.4);left:28px;top:28px;pointer-events:none;}
   .lookZone{position:absolute;right:0;top:0;bottom:0;width:55%;pointer-events:auto;}
-  .actBtn,.jumpBtn,.dashBtn,.freeBtn,.vertBtn,.camZoomBtn,.camLabelBox,.pauseBtn,.lookFwdBtn{
+  .actBtn,.secondaryBtn,.jumpBtn,.dashBtn,.freeBtn,.vertBtn,.camZoomBtn,.camLabelBox,.pauseBtn,.lookFwdBtn{
     -webkit-backdrop-filter:blur(8px) saturate(150%);backdrop-filter:blur(8px) saturate(150%);
     box-shadow:0 3px 12px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(0,0,0,0.3);
     text-shadow:0 1px 3px rgba(0,0,0,0.85);}
@@ -165,9 +167,18 @@
     width:98px;height:98px;border-radius:50%;background:rgba(255,80,80,0.62);
     border:2.5px solid rgba(255,255,255,0.75);font-weight:800;font-size:15px;color:#fff;
     pointer-events:auto;display:flex;align-items:center;justify-content:center;}
-  .jumpBtn{position:absolute;bottom:calc(150px + env(safe-area-inset-bottom));right:40px;
-    width:56px;height:56px;border-radius:50%;background:rgba(20,22,28,0.5);
-    border:2.5px solid rgba(255,255,255,0.75);font-weight:800;font-size:11px;color:#fff;
+  .secondaryBtn{position:absolute;bottom:calc(42px + env(safe-area-inset-bottom));right:128px;
+    width:72px;height:72px;border-radius:50%;background:rgba(74,47,112,.78);
+    border:2.5px solid rgba(255,255,255,.82);font-weight:900;font-size:10px;line-height:1.05;
+    color:#fff;pointer-events:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:4px;overflow:hidden;transition:opacity .15s,filter .15s;}
+  .secondaryBtn.locked{background:rgba(38,40,48,.72);color:rgba(255,255,255,.72);filter:saturate(.35);}
+  .secondaryBtn .secondaryIcon{font-size:19px;line-height:1;margin-bottom:2px;}
+  .secondaryBtn .secondaryLabel{font-size:8px;max-width:62px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .secondaryBtn:active{transform:scale(.96);}
+  .jumpBtn{position:relative;bottom:auto;right:auto;
+    width:52px;height:46px;border-radius:12px;background:rgba(20,22,28,0.5);
+    border:2.5px solid rgba(255,255,255,0.75);font-weight:800;font-size:10px;color:#fff;
     pointer-events:auto;display:flex;align-items:center;justify-content:center;}
   .camCluster{position:absolute;top:calc(56px + env(safe-area-inset-top));right:14px;
     display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none;}
@@ -183,7 +194,7 @@
     box-shadow:0 3px 12px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(0,0,0,0.3);
     text-shadow:0 1px 3px rgba(0,0,0,0.85);}
   .camLabelBox span{font-size:15px;}
-  .dashBtn{position:absolute;bottom:calc(48px + env(safe-area-inset-bottom));right:132px;
+  .dashBtn{position:absolute;bottom:calc(128px + env(safe-area-inset-bottom));right:126px;
     width:62px;height:62px;border-radius:50%;background:rgba(255,199,54,0.82);
     border:2.5px solid rgba(255,255,255,0.85);font-weight:800;font-size:11px;color:#1a1400;
     pointer-events:auto;display:flex;align-items:center;justify-content:center;
@@ -225,17 +236,17 @@
   .vertBtn .vbLabel{font-size:10px;line-height:1;}
   .upBtn{bottom:calc(150px + env(safe-area-inset-bottom));}
   .downBtn{bottom:calc(84px + env(safe-area-inset-bottom));}
-  .jumpBtn.freeHide, .dashBtn.freeHide, .actBtn.freeHide, .novaBtn.freeHide, .laserBtn.freeHide{display:none;}
+  .jumpBtn.freeHide, .dashBtn.freeHide, .actBtn.freeHide, .secondaryBtn.freeHide, .novaBtn.freeHide, .laserBtn.freeHide{display:none;}
   .freeBanner{position:absolute;top:calc(60px + env(safe-area-inset-top));left:50%;
     transform:translateX(-50%);background:rgba(127,216,240,0.92);color:#052233;
     font-weight:800;font-size:12px;padding:6px 14px;border-radius:999px;display:none;}
   .freeBanner.on{display:block;}
   .leftCluster{position:absolute;top:50%;left:14px;transform:translateY(-50%);
     display:flex;flex-direction:column;align-items:center;gap:10px;}
-  .lookFwdBtn{position:absolute;bottom:calc(220px + env(safe-area-inset-bottom));right:40px;
-    width:56px;height:56px;border-radius:14px;background:rgba(20,22,28,0.5);
-    border:2.5px solid rgba(255,255,255,0.75);font-weight:800;font-size:9px;color:#fff;
-    line-height:1.2;pointer-events:auto;display:flex;flex-direction:column;
+  .lookFwdBtn{position:relative;bottom:auto;right:auto;
+    width:52px;height:46px;border-radius:12px;background:rgba(20,22,28,0.5);
+    border:2.5px solid rgba(255,255,255,0.75);font-weight:800;font-size:8px;color:#fff;
+    line-height:1.15;pointer-events:auto;display:flex;flex-direction:column;
     align-items:center;justify-content:center;text-align:center;}
   .pauseBtn{width:52px;height:52px;border-radius:50%;background:rgba(20,22,28,0.5);
     border:2.5px solid rgba(255,255,255,0.75);pointer-events:auto;display:flex;
@@ -537,21 +548,22 @@
         <div class="toast" id="toast"></div>
         <div class="freeBanner" id="freeBanner">FREE ROAM · INVINCIBLE</div>
         <div class="shopPromptBtn" id="shopPromptBtn">🛒 TAP TO SHOP</div>
-        <div class="jumpBtn" id="jumpBtn">JUMP</div>
         <div class="vertBtn upBtn" id="upBtn"><span class="vbIcon">▲</span><span class="vbLabel">UP</span></div>
         <div class="vertBtn downBtn" id="downBtn"><span class="vbIcon">▼</span><span class="vbLabel">DOWN</span></div>
         <div class="actBtn" id="actBtn">FIRE</div>
+        <div class="secondaryBtn locked" id="secondaryBtn"><span class="secondaryIcon">🔒</span><span class="secondaryLabel">SECONDARY</span></div>
         <div class="camCluster">
           <div class="camZoomBtn" id="camOutBtn">&minus;</div>
           <div class="camLabelBox">VIEW<br><span id="camLabel">3</span></div>
           <div class="camZoomBtn" id="camInBtn">&plus;</div>
+          <div class="jumpBtn" id="jumpBtn">JUMP</div>
+          <div class="lookFwdBtn" id="lookFwdBtn">LOOK<br>FWD</div>
         </div>
         <div class="dashBtn" id="dashBtn">DASH</div>
         <div class="novaBtn hidden" id="novaBtn">NOVA</div>
         <div class="laserBtn hidden" id="laserBtn" style="--charge:100%">LASER</div>
         <div class="ultimateBtn hidden" id="ultimateBtn" style="--charge:0%">ECLIPSE</div>
         <div class="soulMeter" id="soulMeter">SOULS 0/25</div>
-        <div class="lookFwdBtn" id="lookFwdBtn">LOOK<br>FWD</div>
         <div class="leftCluster">
           <div class="freeBtn" id="freeBtn">FREE</div>
           <div class="pauseBtn" id="pauseBtn">❚❚</div>
@@ -640,8 +652,8 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.13 - Barbarian Phase 2';
-const GAME_BUILD_LABEL = `V${GAME_VERSION} · BARBARIAN STARTED`;
+const GAME_VERSION='22.9.20 - HUD Layout Update';
+const GAME_BUILD_LABEL = `V${GAME_VERSION} · CAMERA CONTROLS REPOSITIONED`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
 window.addEventListener('DOMContentLoaded', ()=>{
@@ -1203,7 +1215,7 @@ let passiveState = createFreshPassiveState();
 let unspentStatPoints = 0;
 let runTokens = 0;             // per-run currency, earned by killing zombies, spent at the shop
 let crystalsEarned = 0;        // this run's crystal total, earned per round cleared, saved to the profile at run end
-let currentWeaponId = 'pistol';
+let currentWeaponId = null; // equipped secondary move; FIRE always keeps the hero default
 let runStartTime = 0;
 let roundStartTime = 0;      // when the current round began — the whole point of this mode
 let heartsLostThisRound = 0; // tracks whether this round was "flawless" (no damage taken)
@@ -1300,10 +1312,10 @@ const CHARACTER_COMBAT = {
         desc:'Alternates fireballs and ice bolts.'},
       rapid_elemental:{name:'Rapid Fire & Ice', price:210, kind:'elemental', cooldown:0.075, damage:0.72, auto:true,
         desc:'Hold FIRE for Uzi-speed alternating fire and ice.'},
-      chain_elemental:{name:'Chain Elements', price:390, kind:'chain', cooldown:0.48, damage:1,
-        desc:'Hits four times, bouncing among nearby zombies.'},
-      giant_fireball:{name:'Giant Fireball', price:560, kind:'giant_fireball', cooldown:0.72, damage:2, splash:3.4, auto:true,
-        desc:'Huge explosive fireball dealing 2× damage in a radius.'}
+      arcane_lance:{name:'Arcane Lance', price:390, kind:'arcane_lance', cooldown:0.58, damage:2.15, pierce:2, auto:true,
+        desc:'A large elemental spear that pierces up to three enemies in a straight line.'},
+      giant_fireball:{name:'Giant Fireball', price:560, kind:'giant_fireball', cooldown:1.15, damage:999, splash:5.4, splashDamage:4.5, directInstakill:true, auto:true,
+        desc:'A colossal fireball. Direct hits execute any non-boss and the impact damages a wide surrounding area.'}
     }
   }
 };
@@ -1313,11 +1325,16 @@ let previewRenderer=null, previewScene=null, previewCamera=null, previewRoot=nul
 function combatForAvatar(){ return CHARACTER_COMBAT[state.avatarType] || CHARACTER_COMBAT.rogue; }
 function weaponForAvatar(){
   const c = combatForAvatar();
-  return c.weapons[currentWeaponId] || c.weapons[c.defaultId];
+  return c.weapons[c.defaultId];
+}
+function secondaryWeaponForAvatar(){
+  const c=combatForAvatar();
+  if(!currentWeaponId || currentWeaponId===c.defaultId) return null;
+  return c.weapons[currentWeaponId] || null;
 }
 function resetCharacterLoadout(){
   const c = combatForAvatar();
-  currentWeaponId = c.defaultId;
+  currentWeaponId = null;
   ownedWeapons = {[c.defaultId]:true};
 }
 
@@ -8461,6 +8478,7 @@ function spawnPlayer(){
   player.userData.facing = 0;
   player.userData.hp = 3;
   player.userData.attackCooldown = 0;
+  player.userData.secondaryAttackCooldown = 0;
   player.userData.spinVisualTimer = 0;
   player.userData.spinVisualSpeed = 26;
   player.userData.spinBaseY = undefined;
@@ -9009,8 +9027,20 @@ function updateRunTokensHud(){
   const shopTokens = document.getElementById('shopTokensCount');
   if(shopTokens) shopTokens.textContent = runTokens;
 }
+function updateSecondaryButton(){
+  const btn=document.getElementById('secondaryBtn');
+  if(!btn) return;
+  const w=secondaryWeaponForAvatar();
+  btn.classList.toggle('locked',!w);
+  btn.innerHTML=w
+    ? `<span class="secondaryIcon">${w.kind==='giant_fireball'?'☄️':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'))}</span><span class="secondaryLabel">${w.name}</span>`
+    : '<span class="secondaryIcon">🔒</span><span class="secondaryLabel">SECONDARY</span>';
+}
 function updateWeaponHud(){
-  document.getElementById('weaponPill').textContent = weaponForAvatar().name;
+  const primary=weaponForAvatar();
+  const secondary=secondaryWeaponForAvatar();
+  document.getElementById('weaponPill').textContent = secondary ? `${primary.name} + ${secondary.name}` : primary.name;
+  updateSecondaryButton();
 }
 function updateInvincibleHud(){
   const pill = document.getElementById('invinciblePill');
@@ -9076,29 +9106,32 @@ function renderShopList(){
   for(const id in weapons){
     const w = weapons[id];
     const owned = !!ownedWeapons[id];
-    const equipped = currentWeaponId === id;
+    const isDefault = id === combatForAvatar().defaultId;
+    const equipped = !isDefault && currentWeaponId === id;
     const row = document.createElement('div');
-    row.className = 'weaponRow' + (equipped ? ' equipped' : '');
+    row.className = 'weaponRow' + ((equipped||isDefault) ? ' equipped' : '');
     const swatch = document.createElement('div');
     swatch.className = 'weaponSwatch';
     swatch.style.background = w.kind.includes('fire') ? '#ff7a3d'
-      : (w.kind.includes('element') || w.kind==='chain' ? '#78d8ff'
+      : (w.kind.includes('element') || w.kind==='arcane_lance' ? '#78d8ff'
       : (w.kind.includes('arrow') ? '#d9b36c' : '#b88cff'));
     const info = document.createElement('div');
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${w.name}</div><div class="wDesc">${w.desc}</div>`;
     const btn = document.createElement('button');
-    if(equipped){
-      btn.className='weaponBuyBtn equippedTag'; btn.textContent='Equipped'; btn.disabled=true;
+    if(isDefault){
+      btn.className='weaponBuyBtn equippedTag'; btn.textContent='Primary'; btn.disabled=true;
+    } else if(equipped){
+      btn.className='weaponBuyBtn equippedTag'; btn.textContent='Secondary'; btn.disabled=true;
     } else if(owned){
       btn.className='weaponBuyBtn'; btn.textContent='Equip';
-      btn.onclick=()=>{ currentWeaponId=id; updateWeaponHud(); syncShadowClones(); renderShopList(); toast('Equipped '+w.name); };
+      btn.onclick=()=>{ currentWeaponId=id; updateWeaponHud(); syncShadowClones(); renderShopList(); toast('Secondary equipped: '+w.name); };
     } else {
       btn.className='weaponBuyBtn'; btn.textContent=w.price+'🪙'; btn.disabled=runTokens<w.price;
       btn.onclick=()=>{
         if(runTokens<w.price) return;
         runTokens-=w.price; ownedWeapons[id]=true; currentWeaponId=id;
-        updateRunTokensHud(); updateWeaponHud(); syncShadowClones(); renderShopList(); toast('Bought '+w.name+'!');
+        updateRunTokensHud(); updateWeaponHud(); syncShadowClones(); renderShopList(); toast('Bought and equipped '+w.name+' as secondary!');
       };
     }
     row.append(swatch,info,btn); list.appendChild(row);
@@ -9249,7 +9282,7 @@ function setupControls(){
     // Existing automatic weapons keep their hold behavior too. The rapid
     // retry only asks doShoot() to fire; the weapon cooldown remains the
     // authority, so holding cannot exceed the intended attack speed.
-    if(state.avatarType==='mage' || weaponForAvatar().auto){
+    if(true){
       clearInterval(autoFireInterval);
       autoFireInterval = setInterval(doShoot, 40);
     }
@@ -9262,6 +9295,20 @@ function setupControls(){
   document.getElementById('actBtn').addEventListener('touchcancel', ()=>{
     clearInterval(autoFireInterval);
     autoFireInterval = null;
+  });
+  let secondaryFireInterval=null;
+  document.getElementById('secondaryBtn').addEventListener('touchstart', e=>{
+    e.preventDefault();
+    if(!secondaryWeaponForAvatar()){ navigator.vibrate&&navigator.vibrate(12); return; }
+    doSecondaryShoot();
+    clearInterval(secondaryFireInterval);
+    secondaryFireInterval=setInterval(doSecondaryShoot,40);
+  });
+  document.getElementById('secondaryBtn').addEventListener('touchend', e=>{
+    e.preventDefault(); clearInterval(secondaryFireInterval); secondaryFireInterval=null;
+  });
+  document.getElementById('secondaryBtn').addEventListener('touchcancel', ()=>{
+    clearInterval(secondaryFireInterval); secondaryFireInterval=null;
   });
   const jumpBtnEl = document.getElementById('jumpBtn');
   jumpBtnEl.addEventListener('touchstart', e=>{ e.preventDefault(); doJump(); });
@@ -9401,6 +9448,7 @@ function toggleFreeMode(){
   document.getElementById('laserBtn').classList.toggle('freeHide', freeMode);
   if(freeMode) stopArcaneLaser();
   document.getElementById('actBtn').classList.toggle('freeHide', freeMode);
+  document.getElementById('secondaryBtn').classList.toggle('freeHide', freeMode);
   if(freeMode){
     runUsedFreeMode = true; // this run no longer counts for the leaderboard
     vy = 0; dashActive = false; dashTimer = 0; dashStartedAt = 0;
@@ -10478,8 +10526,11 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
   if(b){
     b.kind=w.kind;
     b.splashMult=w.splashMult||1;
+    b.splashDamage=w.splashDamage||0;
+    b.directInstakill=!!w.directInstakill;
     b.pierces=w.pierce||0;
-    if(w.kind==='giant_fireball'){ b.mesh.scale.setScalar(3.0); spawnArcaneSigil(startX,0,startZ,1.25); }
+    if(w.kind==='giant_fireball'){ b.mesh.scale.setScalar(9.0); spawnArcaneSigil(startX,0,startZ,2.15); }
+    if(w.kind==='arcane_lance'){ b.mesh.scale.set(1.7,1.7,5.2); b.pierces=2; spawnArcaneSigil(startX,0,startZ,1.55); spawnBurst(startX,startY,startZ,14,FX_MAT_DUST,4.0); }
     if(w.kind==='elemental'){ b.mesh.scale.setScalar(1.45); spawnBurst(startX,startY,startZ,10,mageElementToggle?FX_MAT_DUST:FX_MAT_SPARK,3.0); }
     if(w.kind==='rocket_arrow') b.mesh.scale.setScalar(1.55);
     if(w.kind==='holy_wave'){b.mesh.scale.set(3.4,1.8,.55);b.pierces=2;spawnKnightCleave({x:startX,y:startY-.9,z:startZ},player.rotation.y,0,1.25);}
@@ -10487,32 +10538,15 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
     if(state.avatarType==='rogue'&&w.kind!=='rocket_arrow') b.mesh.scale.set(0.82,0.82,1.45);
   }
 }
-function chainElementAttack(w){
-  spawnArcaneSigil(player.position.x,player.position.y,player.position.z,2.2);
-  let live=zombies.filter(z=>!z.userData.dead);
-  if(!live.length) return;
-  let current=findAutoAimTarget(20)||live[0];
-  const struck=[];
-  for(let i=0;i<4;i++){
-    applyBulletDamage(current,w.damage*playerStats.power);
-    struck.push(current);
-    spawnBurst(current.position.x,current.position.y+0.8,current.position.z,8,i%2?FX_MAT_DUST:FX_MAT_SPARK,2.7);
-    const candidates=live.filter(z=>!z.userData.dead && z!==current)
-      .sort((a,b)=>a.position.distanceTo(current.position)-b.position.distanceTo(current.position));
-    current=candidates[0] || live[i%live.length] || current;
-  }
-}
+// Arcane Lance uses the shared visible projectile path and piercing logic.
 function cloneAttack(w){
   shadowClones.forEach(c=>{
     if(w.kind==='spin') doMeleeAttack(w,c.position,true);
     else shootFromPosition(w,c.position,0);
   });
 }
-function doShoot(){
-  if(!gameRunning || player.userData.attackCooldown>0) return;
-  const w=weaponForAvatar();
-  player.userData.attackCooldown=attackCooldownFor(w);
-
+function performWeaponAttack(w, countsAsPrimary=true){
+  if(!w) return;
   if(w.kind==='barbarian_melee' || w.kind==='earthbreaker' || w.kind==='barbarian_spin'){
     doBarbarianAttack(w);
   } else if(w.kind==='knight_melee' || w.kind==='shield_bash' || w.kind==='knight_spin'){
@@ -10523,9 +10557,6 @@ function doShoot(){
   } else if(w.kind==='multi_arrow'){
     [-0.34,-0.17,0,0.17,0.34].forEach(a=>shootFromPosition(w,player.position,a));
     spawnArcherMuzzleFan();spawnHeroIdentityAura();
-  } else if(w.kind==='chain'){
-    if(player.userData.playKayClip) player.userData.playKayClip(findClipByWords(['magic']),true,true,0.3);
-    chainElementAttack(w);
   } else {
     if(player.userData.playKayClip){
       const words=state.avatarType==='mage'?['magic']:['ranged','shoot'];
@@ -10542,8 +10573,20 @@ function doShoot(){
   }
   // Only the regular Fire-button attack advances the Mage cast passive.
   // Specials (Nova, Laser, Ultimate) use separate functions and never reach here.
-  if(state.avatarType==='mage') registerMageNormalAttack();
+  if(countsAsPrimary && state.avatarType==='mage') registerMageNormalAttack();
   if(w.kind!=='melee' && w.kind!=='spin') navigator.vibrate && navigator.vibrate(10);
+}
+function doShoot(){
+  if(!gameRunning || player.userData.attackCooldown>0) return;
+  const w=weaponForAvatar();
+  player.userData.attackCooldown=attackCooldownFor(w);
+  performWeaponAttack(w,true);
+}
+function doSecondaryShoot(){
+  const w=secondaryWeaponForAvatar();
+  if(!gameRunning || !w || (player.userData.secondaryAttackCooldown||0)>0) return;
+  player.userData.secondaryAttackCooldown=attackCooldownFor(w);
+  performWeaponAttack(w,false);
 }
 
 // True if (x,y,z) sits inside any solid obstacle/landmark box — used to
@@ -10611,7 +10654,11 @@ function updateBullets(dt){
       const ddy = (z.position.y+0.8)-b.mesh.position.y; // toward torso height
       const ddz = z.position.z-b.mesh.position.z;
       if(Math.hypot(ddx,ddy,ddz) < 0.9){ // generous arcade hitbox — bigger than the zombie's actual body
-        applyBulletDamage(z, b.damage);
+        if(b.directInstakill){
+          const type=z.userData.archetype||'walker';
+          const directDamage=type==='boss' ? (z.userData.maxHp||z.userData.hp)*0.18 : (z.userData.hp+1);
+          applyBulletDamage(z,directDamage);
+        } else applyBulletDamage(z, b.damage);
         spawnBurst(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 5, FX_MAT_SPARK, 2.5);
         if(b.splash > 0){
           // Rocket launcher: every zombie within the splash radius takes
@@ -10619,7 +10666,10 @@ function updateBullets(dt){
           for(const z2 of zombies){
             if(z2===z || z2.userData.dead) continue;
             const sdx = z2.position.x-b.mesh.position.x, sdz = z2.position.z-b.mesh.position.z;
-            if(Math.hypot(sdx,sdz) < b.splash) applyBulletDamage(z2, b.damage*(b.splashMult||1));
+            if(Math.hypot(sdx,sdz) < b.splash){
+              const splashDamage=b.splashDamage>0 ? b.splashDamage*playerStats.power : b.damage*(b.splashMult||1);
+              applyBulletDamage(z2,splashDamage);
+            }
           }
           spawnBurst(b.mesh.position.x, b.mesh.position.y+0.3, b.mesh.position.z, 14, FX_MAT_SPARK, 4.5);
         }
@@ -11008,6 +11058,7 @@ function update(dt){
   }
 
   if(player.userData.attackCooldown>0) player.userData.attackCooldown -= dt;
+  if((player.userData.secondaryAttackCooldown||0)>0) player.userData.secondaryAttackCooldown -= dt;
   refreshPassiveState(dt);
   updatePassiveHud();
   // Whirlwind is a real full-body spin, independent of whichever KayKit arm clip exists.
