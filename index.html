@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
-<!-- V22.9.8: Arcane Laser — new Mage Boss Killer ability, hold-to-channel piercing beam on its own charge meter, purchasable in the shop. -->
+<!-- V22.9.8: Arcane Laser — new Mage Boss Killer ability, hold-to-channel piercing beam on its own charge meter, purchasable in the shop. Also fixes landscape play: the HUD no longer scales down to a portrait-shaped target box, so buttons stay full-size and pinned to the real screen edges instead of shrinking and drifting toward the center. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -579,7 +579,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.8 - Arcane Laser';
+const GAME_VERSION='22.9.8 - Arcane Laser + Landscape HUD Fix';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · OUTSIDE ENEMY ENTRY`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -6948,14 +6948,28 @@ function buildFloaters(theme){
 // natural footprint, scales the whole button/hearts layer down evenly
 // around its center so nothing gets pushed off-screen. On any normal
 // phone screen the scale stays at 1 and nothing changes.
+//
+// The "natural footprint" is different in portrait vs. landscape: in
+// portrait the HUD is built tall (info pills stacked down the left
+// edge, action buttons stacked up the bottom-right corner), but in
+// landscape those same stacks fit in a much shorter, wider box. Using
+// the portrait footprint's 640px target height against a landscape
+// phone's real ~375-430px height was forcing every button down to
+// ~60% size and dragging them in from the true screen edges toward the
+// center — small, cramped, and wasting all the extra landscape width.
+// Picking the target box per orientation keeps buttons full-size (and
+// pinned to the real corners) on any landscape phone, only shrinking
+// on something genuinely smaller than that.
 // ---------------------------------------------------------------------
-const HUD_NEEDED_W = 340, HUD_NEEDED_H = 640;
+const HUD_NEEDED_PORTRAIT = {w:340, h:640};
+const HUD_NEEDED_LANDSCAPE = {w:620, h:330};
 function fitHudChrome(){
   const el = document.getElementById('hudChrome');
   if(!el) return;
   const w = window.visualViewport ? window.visualViewport.width : window.innerWidth;
   const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  const scale = Math.min(1, w/HUD_NEEDED_W, h/HUD_NEEDED_H);
+  const target = w >= h ? HUD_NEEDED_LANDSCAPE : HUD_NEEDED_PORTRAIT;
+  const scale = Math.min(1, w/target.w, h/target.h);
   el.style.transform = scale < 0.999 ? 'scale('+scale.toFixed(3)+')' : '';
 }
 window.addEventListener('resize', fitHudChrome);
