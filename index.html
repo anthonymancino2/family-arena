@@ -8,6 +8,7 @@
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
 <!-- V22.9.28 Approved Combat HUD Layout: preserves the existing FIRE, DASH, NOVA, and SECONDARY positions in a stable 2x2 cluster and places the avatar-specific ECHOES signature button directly above SECONDARY without shifting the approved controls. -->
+<!-- V22.9.31 Shared Mage Ability Slot: Arcane Nova and Arcane Laser are now mutually exclusive equipped abilities sharing the approved button directly left of FIRE. Buying either equips it; owned abilities can be swapped in the shop; Laser retains hold-to-channel behavior in the shared slot. -->
 <!-- V22.9.30 Arcane Echo Elite Contact Damage: normal enemies are instantly defeated on Echo contact without consuming the Echo; Brutes consume the Echo and take 25% of the Mage's total attack damage; Bosses consume the Echo and take 10%; Echo projectiles continue damaging every enemy type. -->
 <!-- V22.9.29 Shop Close & Arcane Echo Combat Fix: adds a top-right circular X close control to the weapon shop while preserving the bottom Close button; fixes Arcane Echo target acquisition and visible attacks; and makes normal enemies die instantly on contact with an Echo while Brutes destroy the Echo and survive. -->
 <!-- V22.9.27 High-Contrast Timer Fix: makes the in-game timer readable against both light and dark environments with an opaque dark pill, bright border, white text, stronger shadow, and explicit HUD stacking. -->
@@ -219,8 +220,11 @@
     pointer-events:auto;display:flex;align-items:center;justify-content:center;
     transition:opacity 0.15s;text-shadow:none;}
   .novaBtn.cooling{opacity:0.3;}
+  .novaBtn.laserMode{color:#fff;background:conic-gradient(#d16cff var(--charge,100%),rgba(40,10,52,.92) 0);text-shadow:0 1px 3px rgba(0,0,0,.85);}
+  .novaBtn.laserMode.empty{opacity:.35;}
+  .novaBtn.laserMode.active{box-shadow:0 0 18px rgba(209,108,255,.9);}
   .novaBtn.hidden{display:none;}
-  .laserBtn{position:absolute;bottom:calc(122px + env(safe-area-inset-bottom));right:206px;
+  .laserBtn{display:none!important;position:absolute;bottom:calc(122px + env(safe-area-inset-bottom));right:206px;
     width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;
     font-weight:800;font-size:10px;color:#fff;border:2.5px solid rgba(255,255,255,0.85);
     background:conic-gradient(#d16cff var(--charge,100%),rgba(40,10,52,.85) 0);
@@ -679,7 +683,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.30 - Echo Elite Contact Damage';
+const GAME_VERSION='22.9.31 - Shared Mage Ability Slot';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -9191,6 +9195,7 @@ function updateEnemyRadar(){
 // ---------------------------------------------------------------------
 let ownedWeapons = {pistol:true};
 let ownedAbilities = {};
+let equippedAbilityId = null;
 
 function updateShopPrompt(){
   const btn = document.getElementById('shopPromptBtn');
@@ -9253,9 +9258,9 @@ function renderShopList(){
   renderAbilityShopList(list);
 }
 
-// Abilities are a standing unlock (not equipped/swapped like weapons) —
-// once bought they stay active for the rest of the run and are used from
-// their own HUD button on its own cooldown.
+// Mage abilities use one mutually-exclusive loadout slot. The shared HUD
+// button remains in the approved position directly left of FIRE. Buying
+// an ability equips it immediately; owned abilities can be swapped here.
 const HERO_ABILITIES = { mage:[ARCANE_NOVA, ARCANE_LASER] };
 function renderAbilityShopList(list){
   const abilities = HERO_ABILITIES[state.avatarType];
@@ -9263,12 +9268,13 @@ function renderAbilityShopList(list){
   const header = document.createElement('div');
   header.className = 'wName';
   header.style.cssText = 'margin:14px 0 4px;opacity:.75;font-size:12px;letter-spacing:.5px;';
-  header.textContent = 'ABILITIES';
+  header.textContent = 'ABILITIES · EQUIP ONE';
   list.appendChild(header);
   for(const a of abilities){
     const owned = !!ownedAbilities[a.id];
+    const equipped = equippedAbilityId === a.id;
     const row = document.createElement('div');
-    row.className = 'weaponRow' + (owned ? ' equipped' : '');
+    row.className = 'weaponRow' + (equipped ? ' equipped' : '');
     const swatch = document.createElement('div');
     swatch.className = 'weaponSwatch';
     swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : '#35cfff';
@@ -9276,14 +9282,22 @@ function renderAbilityShopList(list){
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${a.name}</div><div class="wDesc">${a.desc}</div>`;
     const btn = document.createElement('button');
-    if(owned){
-      btn.className='weaponBuyBtn equippedTag'; btn.textContent='Owned'; btn.disabled=true;
+    if(equipped){
+      btn.className='weaponBuyBtn equippedTag'; btn.textContent='Equipped'; btn.disabled=true;
+    } else if(owned){
+      btn.className='weaponBuyBtn'; btn.textContent='Equip';
+      btn.onclick=()=>{
+        stopArcaneLaser();
+        equippedAbilityId=a.id;
+        updateHoodedHud(); renderShopList(); toast('Ability equipped: '+a.name);
+      };
     } else {
       btn.className='weaponBuyBtn'; btn.textContent=a.price+'🪙'; btn.disabled=runTokens<a.price;
       btn.onclick=()=>{
         if(runTokens<a.price) return;
-        runTokens-=a.price; ownedAbilities[a.id]=true;
-        updateRunTokensHud(); updateHoodedHud(); renderShopList(); toast('Learned '+a.name+'!');
+        stopArcaneLaser();
+        runTokens-=a.price; ownedAbilities[a.id]=true; equippedAbilityId=a.id;
+        updateRunTokensHud(); updateHoodedHud(); renderShopList(); toast('Learned and equipped '+a.name+'!');
       };
     }
     row.append(swatch,info,btn); list.appendChild(row);
@@ -9444,11 +9458,22 @@ function setupControls(){
   const dashBtnEl=document.getElementById('dashBtn');
   dashBtnEl.addEventListener('touchstart',e=>{e.preventDefault();doDash();});
   const novaBtnEl=document.getElementById('novaBtn');
-  novaBtnEl.addEventListener('touchstart',e=>{e.preventDefault();triggerArcaneNova();});
+  const beginEquippedAbility=e=>{
+    e.preventDefault();
+    if(equippedAbilityId==='arcane_laser') startArcaneLaser();
+    else if(equippedAbilityId==='arcane_nova') triggerArcaneNova();
+  };
+  const endEquippedAbility=e=>{
+    if(e) e.preventDefault();
+    if(equippedAbilityId==='arcane_laser') stopArcaneLaser();
+  };
+  novaBtnEl.addEventListener('touchstart',beginEquippedAbility);
+  novaBtnEl.addEventListener('touchend',endEquippedAbility);
+  novaBtnEl.addEventListener('touchcancel',endEquippedAbility);
+  novaBtnEl.addEventListener('mousedown',beginEquippedAbility);
+  window.addEventListener('mouseup',endEquippedAbility);
   const laserBtnEl=document.getElementById('laserBtn');
-  laserBtnEl.addEventListener('touchstart',e=>{e.preventDefault();startArcaneLaser();});
-  laserBtnEl.addEventListener('touchend',e=>{e.preventDefault();stopArcaneLaser();});
-  laserBtnEl.addEventListener('touchcancel',()=>{stopArcaneLaser();});
+  laserBtnEl.classList.add('hidden');
   const ultimateBtnEl=document.getElementById('ultimateBtn');
   const activateUltimate=e=>{
     if(e){ e.preventDefault(); e.stopPropagation(); }
@@ -9981,7 +10006,21 @@ function updateHoodedHud(){
     meter.textContent='';
   }
   const novaBtn=document.getElementById('novaBtn');
-  if(novaBtn) novaBtn.classList.toggle('hidden', !(isMage && ownedAbilities.arcane_nova));
+  if(novaBtn){
+    const equipped = isMage && equippedAbilityId && ownedAbilities[equippedAbilityId];
+    const laserMode = equippedAbilityId==='arcane_laser';
+    novaBtn.classList.toggle('hidden', !equipped);
+    novaBtn.classList.toggle('laserMode', !!equipped && laserMode);
+    if(equipped){
+      novaBtn.textContent = laserMode ? 'LASER' : 'NOVA';
+      if(!laserMode){
+        novaBtn.style.removeProperty('--charge');
+        novaBtn.classList.remove('empty','active');
+      }
+    }
+  }
+  const obsoleteLaserBtn=document.getElementById('laserBtn');
+  if(obsoleteLaserBtn) obsoleteLaserBtn.classList.add('hidden');
 }
 
 function clearArcaneEchoes(){
@@ -10436,7 +10475,7 @@ const NOVA_RADIUS = 6.6, NOVA_PULL_RADIUS = 11.5, NOVA_COOLDOWN = 16,
   NOVA_SPEED_BOOST_DURATION = 2.0, NOVA_SPEED_BOOST_MULT = 1.45;
 let novaCooldownTimer = 0, novaSpeedBoostTimer = 0;
 function triggerArcaneNova(){
-  if(!gameRunning||state.avatarType!=='mage'||!ownedAbilities.arcane_nova||novaCooldownTimer>0)return;
+  if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='arcane_nova'||!ownedAbilities.arcane_nova||novaCooldownTimer>0)return;
   novaCooldownTimer=NOVA_COOLDOWN;
   novaSpeedBoostTimer=NOVA_SPEED_BOOST_DURATION;
   const btn=document.getElementById('novaBtn');
@@ -10492,14 +10531,14 @@ const LASER_RANGE = 22, LASER_WIDTH = 1.15, LASER_DPS_PRIMARY = 15, LASER_DPS_PI
   LASER_MAX_CHARGE = 100, LASER_DRAIN_RATE = 26, LASER_REGEN_RATE = 13, LASER_REGEN_DELAY = 0.6;
 let laserActive = false, laserCharge = LASER_MAX_CHARGE, laserRegenDelayTimer = 0, laserBeamMesh = null, laserHum = 0;
 function laserAvailable(){
-  return state.avatarType==='mage' && !!ownedAbilities.arcane_laser;
+  return state.avatarType==='mage' && equippedAbilityId==='arcane_laser' && !!ownedAbilities.arcane_laser;
 }
 function startArcaneLaser(){
   if(!gameRunning || !laserAvailable() || laserActive || laserCharge<=1) return;
   laserActive = true;
   laserRegenDelayTimer = LASER_REGEN_DELAY;
   spawnArcaneRuneBurst(player.position, 1.6); // brief charge-up flourish before the beam ticks damage
-  const btn = document.getElementById('laserBtn');
+  const btn = document.getElementById('novaBtn');
   if(btn) btn.classList.add('active');
   const mat = new THREE.MeshBasicMaterial({color:0xd16cff, transparent:true, opacity:0.75, depthWrite:false, blending:THREE.AdditiveBlending});
   laserBeamMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.16, 1, 8), mat);
@@ -10507,14 +10546,16 @@ function startArcaneLaser(){
 }
 function stopArcaneLaser(){
   laserActive = false;
-  const btn = document.getElementById('laserBtn');
+  const btn = document.getElementById('novaBtn');
   if(btn) btn.classList.remove('active');
   if(laserBeamMesh){ scene.remove(laserBeamMesh); laserBeamMesh.geometry.dispose(); laserBeamMesh.material.dispose(); laserBeamMesh = null; }
 }
 function updateArcaneLaser(dt){
-  const btn = document.getElementById('laserBtn');
-  if(btn){
+  const btn = document.getElementById('novaBtn');
+  if(btn && equippedAbilityId==='arcane_laser'){
     btn.classList.toggle('hidden', !laserAvailable());
+    btn.classList.add('laserMode');
+    btn.textContent='LASER';
     btn.style.setProperty('--charge', Math.max(0,Math.min(100,laserCharge))+'%');
     btn.classList.toggle('empty', laserCharge<=1);
   }
@@ -11465,6 +11506,7 @@ function startSurvival(){
   crystalsEarned = 0;
   ownedWeapons = {pistol:true};
   ownedAbilities = {};
+  equippedAbilityId = null;
   novaCooldownTimer = 0; novaSpeedBoostTimer = 0;
   stopArcaneLaser(); laserCharge = LASER_MAX_CHARGE; laserRegenDelayTimer = 0;
   resetCharacterLoadout();
