@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- V22.10.17 Tempest Archer Phase 3: improves forward target selection, adds swept arrow collision for fast targets and low frame rates, strengthens localized arrow-hit feedback, and tightens bow-facing/shot animation without changing other avatars. -->
 <!-- V22.10.16 Tempest Archer Phase 2: adds the Tailwind kill passive. Every fifth defeat grants 3 seconds of faster movement and firing, with HUD progress and localized wind feedback. Existing Archer weapons, Arrow Storm, and all other avatars remain intact. -->
 <!-- V22.10.15 Tempest Archer Phase 1: begins the next-avatar pass after Mage stabilization. Gives the Archer a clear speed-focused stat identity, keeps Eagle Eye projectile bonuses active, and updates roster/passive text without altering the completed Mage, Knight, Barbarian, or Shadow Rogue systems. -->
 <html lang="en">
@@ -686,7 +687,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.16 - Tempest Archer Phase 2';
+const GAME_VERSION='22.10.17 - Tempest Archer Phase 3';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -9995,10 +9996,10 @@ function faceEnemyTarget(target){
 }
 function findAutoAimTarget(maxRange){
   maxRange = maxRange || 16;
-  // Mage uses true 360-degree nearest-enemy targeting. Other heroes keep
-  // the previous forward-cone behavior until their individual phases.
+  // Mage and Barbarian use true 360-degree nearest-enemy targeting.
   if(state.avatarType==='mage' || state.avatarType==='barbarian') return findNearestEnemy(maxRange);
   const fx = Math.sin(player.rotation.y), fz = Math.cos(player.rotation.y);
+  const isArcher = state.avatarType==='rogue';
   let best = null, bestScore = -Infinity;
   zombies.forEach(z=>{
     if(z.userData.dead) return;
@@ -10007,12 +10008,15 @@ function findAutoAimTarget(maxRange){
     if(dist > maxRange) return;
     let dot;
     if(dist < 0.3){
-      dot = 1; // essentially right at/under you (e.g. zombies stacked below a platform) — always eligible
+      dot = 1;
     } else {
-      dot = (dx*fx + dz*fz) / dist; // 1 = dead ahead, 0 = perpendicular
-      if(dot < 0.77) return; // outside 40-degree forward cone
+      dot = (dx*fx + dz*fz) / dist;
+      // Archer gets a wider acquisition cone, but targets in front still score much higher.
+      if(dot < (isArcher ? 0.50 : 0.77)) return;
     }
-    const score = dot - dist*0.015; // prefer well-aligned, then closer
+    const score = isArcher
+      ? dot*1.35 - dist*0.032
+      : dot - dist*0.015;
     if(score > bestScore){ bestScore = score; best = z; }
   });
   return best;
@@ -10072,7 +10076,9 @@ function fireBullet(dx, dy, dz, startX, startY, startZ, weapon){
     mesh:bullet, dx, dy, dz, life:1.15*(passiveForAvatar().projectileLifeMult||1),
     speedMult:passiveForAvatar().projectileSpeedMult||1,
     damage:dmg, splash:weapon.splash||0,
-    pulse:Math.random()*Math.PI*2, ricochets:weapon.kind==='star'?1:0
+    pulse:Math.random()*Math.PI*2, ricochets:weapon.kind==='star'?1:0,
+    prevX:startX, prevY:startY, prevZ:startZ,
+    isArcherArrow:state.avatarType==='rogue' && String(weapon.kind||'').includes('arrow')
   });
 }
 
@@ -10933,10 +10939,9 @@ function doMeleeAttack(w, origin=player.position, isClone=false){
 }
 
 function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
-  const target=findAutoAimTarget(18);
-  // Normal Mage casts visibly turn toward the selected enemy. With no
-  // enemy, the current facing direction is preserved as the fallback.
-  if(target && state.avatarType==='mage' && Math.abs(angleOffset)<0.001){
+  const target=findAutoAimTarget(state.avatarType==='rogue'?22:18);
+  // Mage and Archer visibly face the selected target for readable casting/shooting.
+  if(target && (state.avatarType==='mage' || state.avatarType==='rogue') && Math.abs(angleOffset)<0.001){
     player.rotation.y=Math.atan2(target.position.x-player.position.x,target.position.z-player.position.z);
   }
   let yaw=player.rotation.y+angleOffset;
@@ -10996,7 +11001,8 @@ function performWeaponAttack(w, countsAsPrimary=true){
   } else {
     if(player.userData.playKayClip){
       const words=state.avatarType==='mage'?['magic']:['ranged','shoot'];
-      player.userData.playKayClip(findClipByWords(words,'1H_Ranged_Shoot'),true,true,0.25);
+      const shotBlend=state.avatarType==='rogue'?0.16:0.25;
+      player.userData.playKayClip(findClipByWords(words,'1H_Ranged_Shoot'),true,true,shotBlend);
     }
     if(w.kind==='elemental'){
       mageElementToggle=!mageElementToggle;
@@ -11066,10 +11072,26 @@ function applyBulletDamage(z, dmg){
   if(z.userData.hp<=0) killZombie(z);
 }
 
+function distancePointToBulletSegment(px,py,pz,ax,ay,az,bx,by,bz){
+  const abx=bx-ax, aby=by-ay, abz=bz-az;
+  const apx=px-ax, apy=py-ay, apz=pz-az;
+  const denom=abx*abx+aby*aby+abz*abz || 1;
+  const t=Math.max(0,Math.min(1,(apx*abx+apy*aby+apz*abz)/denom));
+  const cx=ax+abx*t, cy=ay+aby*t, cz=az+abz*t;
+  return Math.hypot(px-cx,py-cy,pz-cz);
+}
+function spawnArcherHitFeedback(x,y,z,heavy=false){
+  spawnArcherSpark(x,y,z);
+  spawnBurst(x,y,z,heavy?11:7,FX_MAT_SPARK,heavy?3.4:2.7);
+  if(heavy) spawnArcherMuzzleFan(false);
+}
+
 function updateBullets(dt){
   const speed = 18;
   for(let i=bullets.length-1;i>=0;i--){
     const b = bullets[i];
+    const oldX=b.mesh.position.x, oldY=b.mesh.position.y, oldZ=b.mesh.position.z;
+    b.prevX=oldX; b.prevY=oldY; b.prevZ=oldZ;
     b.mesh.position.x += b.dx*speed*(b.speedMult||1)*dt;
     b.mesh.position.y += b.dy*speed*(b.speedMult||1)*dt;
     b.mesh.position.z += b.dz*speed*(b.speedMult||1)*dt;
@@ -11086,16 +11108,22 @@ function updateBullets(dt){
     }
     if(!hit) for(const z of zombies){
       if(z.userData.dead) continue;
-      const ddx = z.position.x-b.mesh.position.x;
-      const ddy = (z.position.y+0.8)-b.mesh.position.y; // toward torso height
-      const ddz = z.position.z-b.mesh.position.z;
-      if(Math.hypot(ddx,ddy,ddz) < 0.9){ // generous arcade hitbox — bigger than the zombie's actual body
+      const torsoX=z.position.x, torsoY=z.position.y+0.8, torsoZ=z.position.z;
+      const directDist=Math.hypot(torsoX-b.mesh.position.x,torsoY-b.mesh.position.y,torsoZ-b.mesh.position.z);
+      const sweptDist=distancePointToBulletSegment(
+        torsoX,torsoY,torsoZ,
+        b.prevX??b.mesh.position.x,b.prevY??b.mesh.position.y,b.prevZ??b.mesh.position.z,
+        b.mesh.position.x,b.mesh.position.y,b.mesh.position.z
+      );
+      const hitRadius=b.isArcherArrow?1.08:0.9;
+      if(Math.min(directDist,sweptDist) < hitRadius){
         if(b.directInstakill){
           const type=z.userData.archetype||'walker';
           const directDamage=type==='boss' ? (z.userData.maxHp||z.userData.hp)*0.18 : (z.userData.hp+1);
           applyBulletDamage(z,directDamage);
         } else applyBulletDamage(z, b.damage);
-        spawnBurst(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 5, FX_MAT_SPARK, 2.5);
+        if(b.isArcherArrow) spawnArcherHitFeedback(z.position.x,z.position.y+.82,z.position.z,b.damage>=2.5);
+        else spawnBurst(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 5, FX_MAT_SPARK, 2.5);
         if(b.splash > 0){
           // Rocket launcher: every zombie within the splash radius takes
           // the same hit, so a cluster dies together in one shot.
