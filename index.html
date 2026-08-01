@@ -7,6 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
+<!-- V22.10.3 Blizzard Range + Meteor Impact + Main Play Button Fix: Blizzard now lasts 10 seconds and covers 70% of the arena radius; Cataclysm Meteor now has guaranteed visible impact feedback and reliable damage; the main Play button is isolated above decorative overlays. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
 <!-- V22.10.1 Pause Ability Shop + Mage Ultimates: adds Resume/Restart/Rerun/Abilities/Quit pause flow; keeps stat upgrades between rounds; replaces Arcane Nova with readable Blizzard Storm ice impacts; adds Cataclysm Meteor with 10x scale, stun, burn, and 20% boss impact damage; adds localized player visibility ring/outline with no full-screen tint. -->
 <!-- V22.9.28 Approved Combat HUD Layout: preserves the existing FIRE, DASH, NOVA, and SECONDARY positions in a stable 2x2 cluster and places the avatar-specific ECHOES signature button directly above SECONDARY without shifting the approved controls. -->
@@ -448,7 +449,8 @@
 #screenHome #btnRefreshSync{width:100%;min-height:39px;margin:0;padding:8px 12px;border-radius:13px;background:rgba(8,22,36,.62);border:1px solid rgba(159,223,255,.42);color:#dff7ff;font-size:12px;font-weight:850;letter-spacing:.25px;}
 #screenHome #btnRefreshSync:active{transform:scale(.985);background:rgba(18,52,76,.74);}
 .homeSyncStatus{min-height:13px;text-align:center;font-size:9px;color:#a9c8da;letter-spacing:.25px;opacity:.82;}
-#screenHome #btnGoModes{width:100%;margin:0;min-height:58px;border-radius:18px;font-size:20px;background:linear-gradient(#ffe46f,#f6b63e);color:#3d270a;border:3px solid rgba(255,255,255,.9);box-shadow:0 5px 0 #b76b22,0 10px 18px rgba(0,0,0,.3);text-transform:uppercase;letter-spacing:1px;}
+#screenHome #btnGoModes{position:relative;z-index:20;isolation:isolate;overflow:hidden;-webkit-appearance:none;appearance:none;width:100%;margin:0;min-height:58px;border-radius:18px;font-size:20px;background:linear-gradient(#ffe46f,#f6b63e)!important;color:#3d270a!important;border:3px solid rgba(255,255,255,.9);box-shadow:0 5px 0 #b76b22,0 10px 18px rgba(0,0,0,.3);text-transform:uppercase;letter-spacing:1px;}
+#screenHome #btnGoModes::before,#screenHome #btnGoModes::after{content:none!important;display:none!important;}
 #screenHome #btnGoModes:active{transform:translateY(4px);box-shadow:0 1px 0 #b76b22;}
 #screenHome #btnGoShop{width:100%;margin:0;min-height:58px;border-radius:18px;padding:10px 8px;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.6);font-size:12px;line-height:1.15;}
 .homeVersion{text-align:center;font-size:10px;opacity:.62;margin-top:10px;color:#fff;letter-spacing:.5px;}
@@ -687,7 +689,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.32 - Round Completion Failsafe';
+const GAME_VERSION='22.10.3 - Blizzard + Meteor Fix';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -1444,7 +1446,7 @@ const WEAPONS = {
 // Mage abilities purchased and equipped through Pause → Abilities.
 // Stats (HP, Power, Speed) remain exclusively in the between-round shop.
 const BLIZZARD_STORM = {id:'blizzard_storm', name:'Blizzard Storm', price:640,
-  desc:'Ultimate-tier battlefield control. For 6 seconds, giant ice masses rain over a very wide area, dealing moderate damage and freezing enemies for 3 seconds. Freeze-resistant enemies are heavily slowed instead. Effects stay localized and readable—no blinding white screen.'};
+  desc:'Ultimate-tier battlefield control. For 10 seconds, giant ice masses rain across roughly 70% of the arena, dealing moderate damage and freezing enemies for 3 seconds. Freeze-resistant enemies are heavily slowed instead. Effects stay localized and readable—no blinding white screen.'};
 const CATACLYSM_METEOR = {id:'cataclysm_meteor', name:'Cataclysm Meteor', price:900,
   desc:'Ultimate-tier burst attack. One colossal meteor—about 10× Giant Fireball size—descends slowly, then deals huge area damage, stuns for 3 seconds, and burns for 5 seconds. Boss impact damage is capped at 20% of max HP.'};
 // Boss Killer: hold to channel a piercing beam of massive sustained
@@ -10529,7 +10531,8 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
 // Visual rule: local spectacle only—never apply a full-screen color tint.
 // ---------------------------------------------------------------------
 const MAGE_ULTIMATE_COOLDOWN=16;
-const BLIZZARD_DURATION=6, BLIZZARD_RADIUS=11.5, BLIZZARD_FREEZE=3, BLIZZARD_IMPACT_RADIUS=2.65;
+const BLIZZARD_DURATION=10, BLIZZARD_FREEZE=3, BLIZZARD_IMPACT_RADIUS=2.65;
+function blizzardRadius(){ return Math.max(23, arenaSize*.70); }
 let novaCooldownTimer=0, novaSpeedBoostTimer=0;
 let blizzardActiveTimer=0, blizzardSpawnTimer=0, blizzardCenter=new THREE.Vector3();
 let fallingIce=[];
@@ -10546,7 +10549,7 @@ function makeIceMeteorMesh(radius=1.05){
   return mesh;
 }
 function spawnFallingIce(){
-  const a=Math.random()*Math.PI*2, r=Math.sqrt(Math.random())*BLIZZARD_RADIUS;
+  const a=Math.random()*Math.PI*2, r=Math.sqrt(Math.random())*blizzardRadius();
   const x=blizzardCenter.x+Math.cos(a)*r, z=blizzardCenter.z+Math.sin(a)*r;
   const mesh=makeIceMeteorMesh(.85+Math.random()*.45);
   mesh.position.set(x,10+Math.random()*4,z); mesh.rotation.set(Math.random()*2,Math.random()*2,Math.random()*2);
@@ -10577,8 +10580,9 @@ function triggerBlizzardStorm(){
   if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='blizzard_storm'||!ownedAbilities.blizzard_storm||novaCooldownTimer>0)return;
   novaCooldownTimer=MAGE_ULTIMATE_COOLDOWN; abilityButtonCooldown();
   blizzardActiveTimer=BLIZZARD_DURATION; blizzardSpawnTimer=0; blizzardCenter.copy(player.position);
-  spawnArcaneSigil(blizzardCenter.x,.03,blizzardCenter.z,BLIZZARD_RADIUS);
-  spawnArcaneRuneBurst(blizzardCenter,BLIZZARD_RADIUS*.55);
+  const radius=blizzardRadius();
+  spawnArcaneSigil(blizzardCenter.x,.03,blizzardCenter.z,radius);
+  spawnArcaneRuneBurst(blizzardCenter,radius*.55);
   triggerCombatShake(5,180);navigator.vibrate&&navigator.vibrate([35,25,55]);toast('BLIZZARD STORM!');
 }
 function triggerCataclysmMeteor(){
@@ -10594,20 +10598,45 @@ function triggerCataclysmMeteor(){
   toast('CATACLYSM METEOR!');navigator.vibrate&&navigator.vibrate(45);
 }
 function impactCataclysm(m){
-  spawnBurst(m.x,.7,m.z,55,FX_MAT_SPARK,8.5);spawnBurst(m.x,.4,m.z,35,FX_MAT_DUST,7.2);
-  spawnArcaneSigil(m.x,.03,m.z,8.5);triggerCombatShake(18,420);navigator.vibrate&&navigator.vibrate([90,35,140]);
+  const radius=12;
+  // Dedicated, readable impact spectacle: bright core, two expanding fire rings,
+  // debris bursts, and a strong but brief shake. No full-screen tint.
+  const impactGroup=new THREE.Group();
+  const core=new THREE.Mesh(new THREE.SphereGeometry(1.7,20,14),new THREE.MeshBasicMaterial({color:0xffb13b,transparent:true,opacity:.88,depthWrite:false}));
+  core.position.y=.85;core.userData.baseOpacity=.88;impactGroup.add(core);
+  for(const scale of [1,1.45]){
+    const ring=new THREE.Mesh(new THREE.RingGeometry(3.3*scale,4.2*scale,48),new THREE.MeshBasicMaterial({color:scale>1?0xff5522:0xffd15c,transparent:true,opacity:.78,side:THREE.DoubleSide,depthWrite:false}));
+    ring.rotation.x=-Math.PI/2;ring.position.y=.08;ring.userData.baseOpacity=.78;impactGroup.add(ring);
+  }
+  impactGroup.position.set(m.x,0,m.z);scene.add(impactGroup);
+  fx.push({kind:'arcaneImpact',mesh:impactGroup,life:.8,maxLife:.8,spin:1.1,dispose:true});
+  spawnBurst(m.x,.7,m.z,70,FX_MAT_SPARK,10.5);
+  spawnBurst(m.x,.4,m.z,45,FX_MAT_DUST,9.2);
+  spawnArcaneSigil(m.x,.03,m.z,radius);
+  spawnArcaneRuneBurst(new THREE.Vector3(m.x,.05,m.z),radius*.9);
+  triggerCombatShake(22,520);navigator.vibrate&&navigator.vibrate([110,35,170]);
+
+  let hitCount=0;
   for(const z of [...zombies]){
     if(z.userData.dead)continue;
-    if(Math.hypot(z.position.x-m.x,z.position.z-m.z)>8.5)continue;
+    if(Math.hypot(z.position.x-m.x,z.position.z-m.z)>radius)continue;
+    hitCount++;
     const type=z.userData.archetype||'walker';
-    const max=z.userData.maxHp||z.userData.hp;
-    const dmg=type==='boss'?max*.20:(type==='brute'?max*.72:Math.max(12,7.5*playerStats.power));
-    applyBulletDamage(z,dmg);
+    const max=Math.max(1,z.userData.maxHp||z.userData.hp||1);
+    // Normal enemies are decisively destroyed. Brutes take major damage.
+    // Bosses always lose exactly 20% max HP from the impact, never more.
+    if(type!=='boss'&&type!=='brute'){
+      applyBulletDamage(z,Math.max(max+1,9999));
+    }else{
+      const dmg=type==='boss'?max*.20:max*.72;
+      applyBulletDamage(z,dmg);
+    }
     if(z.userData.dead)continue;
     z.userData.hitStun=Math.max(z.userData.hitStun||0,type==='boss'?.5:3);
     z.userData.burnTimer=Math.max(z.userData.burnTimer||0,5);
-    z.userData.burnDps=Math.max(z.userData.burnDps||0,type==='boss'?max*.012:Math.max(.8,.65*playerStats.power));
+    z.userData.burnDps=Math.max(z.userData.burnDps||0,type==='boss'?max*.012:Math.max(1.2,.8*playerStats.power));
   }
+  toast(hitCount?`METEOR IMPACT · ${hitCount} HIT`:'METEOR IMPACT!');
 }
 function updateMageUltimates(dt){
   if(novaCooldownTimer>0)novaCooldownTimer=Math.max(0,novaCooldownTimer-dt);
