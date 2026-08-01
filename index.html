@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- V22.10.67 Mirror Volley Strategic Single-Placement Fix: each fresh tap now creates exactly one Mirror Volley decoy instead of spawning a paired set. Players can rapidly place up to three mirrors one at a time at separate map positions; independent slot cooldowns, seven-second lifetime, damage, Storm Beacon behavior, and manual tap-only casting remain unchanged. -->
+<!-- V22.10.66 Mirror Volley Manual-Cast Fix: Mirror Volley now fires exactly once per fresh button press. Holding the Secondary control no longer consumes multiple ready placement slots or creates an automatic double cast; independent slot cooldowns and the three-placement cap are unchanged. -->
 <!-- V22.10.65 Standalone Tempest Cleanup: removes the retired standalone Tempest Domain definition, activation routing, HUD branch, update loop, and round-cleanup call now that Frost Domain is permanently integrated into Supernova Piercer. Supernova's defensive freeze domain is unchanged. -->
 <!-- V22.10.64 Mirror Volley Round-Cleanup Cooldowns: clearing temporary Mirror Volley placements at round completion now starts each occupied slot's own cooldown instead of making every slot instantly ready. Existing independent slot cooldowns remain intact across the between-round transition. -->
 <!-- V22.10.63 Mirror Volley Late-Spawn Guard: prevents asynchronous Mirror Volley decoy assets from spawning after their placement has expired or after round/reset cleanup. Placement timing, independent slot cooldowns, damage, and three-placement cap are unchanged. -->
@@ -56,7 +58,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.65</title>
+<title>Family Arena V22.10.67</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -746,7 +748,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.65 - Standalone Tempest Cleanup';
+const GAME_VERSION='22.10.67 - Mirror Volley Strategic Single Placement';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1434,7 +1436,7 @@ const CHARACTER_COMBAT = {
       gale_drill_arrow:{slot:'secondary', name:'Gale Drill Arrow', price:430, kind:'gale_drill_arrow', cooldown:0.82, damage:2.45, pierce:6, auto:false,
         desc:'Launches one oversized spinning wind arrow through a crowd. Wide hitbox, heavy knockback, and up to seven enemy hits.'},
       mirror_volley:{slot:'secondary', name:'Mirror Volley', price:470, kind:'mirror_volley', cooldown:3.0, damage:0.28, pierce:0, auto:false,
-        desc:'Place up to three Mirror Volleys anywhere you stand. Each placement uses its own slot and begins its own round-scaled cooldown after that placement ends.'},
+        desc:'Rapidly place up to three individual Mirror Volleys, one per tap, wherever you stand. Each mirror uses its own independent slot and cooldown.'},
       chain_lightning_javelin:{slot:'secondary', name:'Chain-Lightning Javelin', price:560, kind:'chain_lightning_javelin', cooldown:1.0, damage:1.0, pierce:0, auto:false,
         desc:'Launches a heavy electrified javelin. The first strike chains to up to five nearby enemies. Normal enemies are defeated, large enemies survive at 1 HP, bosses lose 20% max HP, and every survivor is stunned for 3 seconds.'},
       rocket_arrow:{slot:'secondary', name:'Phoenix Fireball', price:500, kind:'rocket_arrow', cooldown:0, damage:0, splash:0, pierce:0, auto:false,
@@ -9707,7 +9709,7 @@ function setupControls(){
     // Phoenix is a manual one-volley ability: holding the button must never
     // launch a new volley when the current three spheres expire. Other secondary
     // attacks keep hold-to-fire behavior and remain limited by their cooldowns.
-    if(w.kind!=='rocket_arrow')secondaryFireInterval=setInterval(doSecondaryShoot,40);
+    if(w.kind!=='rocket_arrow'&&w.kind!=='mirror_volley')secondaryFireInterval=setInterval(doSecondaryShoot,40);
   };
   const endSecondaryFire=e=>{
     if(e)e.preventDefault();
@@ -12798,7 +12800,10 @@ function spawnMirrorVolleyDecoys(originX,originZ,rotationY,placementId){
   getKayKitAssetPromise('rogue').then(({gltf,THREEAsset,cloneSkinned})=>{
     // Asset loading is asynchronous. The placement may have expired or been cleared before it finishes.
     if(!mirrorVolleyPlacements.some(p=>p.id===placementId))return;
-    for(let i=0;i<2;i++){
+    // One tap creates one independently placed mirror. Additional taps can
+    // immediately use the other ready slots, letting the player spread all
+    // three mirrors strategically instead of receiving a paired spawn.
+    for(let i=0;i<1;i++){
       const wrap=new THREE.Group();
       const root=cloneSkinned(gltf.scene);
       root.rotation.y=0;
@@ -12811,7 +12816,7 @@ function spawnMirrorVolleyDecoys(originX,originZ,rotationY,placementId){
       wrap.add(root);
 
       const rightX=Math.cos(rotationY),rightZ=-Math.sin(rotationY);
-      const side=i===0?-1.35:1.35;
+      const side=0;
       wrap.position.set(originX+rightX*side,player?player.position.y:0,originZ+rightZ*side);
       wrap.rotation.y=rotationY;
       wrap.userData.isMirrorVolleyDecoy=true;
