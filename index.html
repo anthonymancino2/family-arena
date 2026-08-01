@@ -1,14 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- V22.10.9 Clone Persistence Correction: active clone companions are no longer removed by round completion or new-round special cleanup. Blizzard, Meteor Boulder, Arcane Laser, and temporary battlefield effects still reset normally. -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena</title>
+<title>Family Arena V22.10.9</title>
+<!-- V22.10.8 Blizzard Coverage + Rolling Meteor Boulder + Round Effect Reset: Blizzard is set to 45% of the playable map radius with many more semi-transparent giant ice balls; Cataclysm Meteor is replaced by a visible ground-rolling homing meteor boulder lasting 10 seconds with tiered enemy damage and a longer cooldown; all active special moves are cleared when a round ends or a new round begins. -->
 <!-- V22.10.4 Meteor Descent & Damage Reliability Fix: Cataclysm Meteor now visibly descends from the sky as a translucent 10x fireball with a readable fiery shell and trail, uses a large persistent landing telegraph, and guarantees impact damage/stun/burn inside the marked zone. -->
-<!-- V22.10.7 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
+<!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.6 Blizzard Performance + Meteor Activation Reliability: fixes the undefined Blizzard targeting radius that could halt the game loop, reduces ice-impact load, makes snowballs semi-transparent, applies readable arena-wide storm damage/control ticks, and hardens mobile Meteor activation with a clearly visible descending meteor and guaranteed impact. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.3 Blizzard Range + Meteor Impact + Main Play Button Fix: Blizzard now lasts 10 seconds and covers 70% of the arena radius; Cataclysm Meteor now has guaranteed visible impact feedback and reliable damage; the main Play button is isolated above decorative overlays. -->
@@ -1467,8 +1469,8 @@ const WEAPONS = {
 // Stats (HP, Power, Speed) remain exclusively in the between-round shop.
 const BLIZZARD_STORM = {id:'blizzard_storm', name:'Blizzard Storm', price:640,
   desc:'Ultimate-tier battlefield control. For 10 seconds, giant ice masses rain across almost the entire playable arena. Its gameplay radius is five times larger than before, while impacts are kept inside the real map boundary. Moderate damage; normal enemies freeze for 3 seconds and resistant enemies are heavily slowed. No blinding white screen.'};
-const CATACLYSM_METEOR = {id:'cataclysm_meteor', name:'Cataclysm Meteor', price:900,
-  desc:'Ultimate-tier burst attack. One colossal meteor—about 10× Giant Fireball size—descends slowly, then deals huge area damage, stuns for 3 seconds, and burns for 5 seconds. Boss impact damage is capped at 20% of max HP.'};
+const CATACLYSM_METEOR = {id:'cataclysm_meteor', name:'Meteor Boulder', price:900,
+  desc:'Ultimate-tier homing attack. A colossal semi-transparent meteor boulder rolls across the ground for 10 seconds, hunting the nearest enemy. It instantly defeats normal enemies, defeats Brutes and other large enemies in two hits, and removes 40% of a boss\'s max HP per cast (hard-capped below 50%). Its cooldown is longer than Blizzard Storm.'};
 // Boss Killer: hold to channel a piercing beam of massive sustained
 // damage at the nearest well-aligned target (falling back to wherever
 // you're facing). Drains a charge meter while firing and regenerates
@@ -8815,6 +8817,7 @@ function clearZombies(){
 }
 
 function startRound(){
+  clearMageRoundSpecials(true);
   roundCompletionPending = false;
   roundCompletionStartedAt = 0;
   roundTimerFrozenElapsed = null;
@@ -10602,38 +10605,41 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
 // Mage ultimate-tier abilities. Both use the shared ability HUD slot.
 // Visual rule: local spectacle only—never apply a full-screen color tint.
 // ---------------------------------------------------------------------
-const MAGE_ULTIMATE_COOLDOWN=16;
-const BLIZZARD_DURATION=10, BLIZZARD_FREEZE=3, BLIZZARD_IMPACT_RADIUS=2.65;
-function blizzardRadius(){ return Math.max(115, arenaSize*3.85); } // five-times-larger than the previous ~23-unit radius
-let novaCooldownTimer=0, novaSpeedBoostTimer=0;
+const BLIZZARD_COOLDOWN=16, METEOR_BOULDER_COOLDOWN=26;
+const BLIZZARD_DURATION=10, BLIZZARD_FREEZE=3, BLIZZARD_IMPACT_RADIUS=3.1;
+function blizzardRadius(){ return Math.max(12, arenaSize*.45); } // exactly 45% of playable map radius
+let novaCooldownTimer=0, meteorCooldownTimer=0, novaSpeedBoostTimer=0;
 let blizzardActiveTimer=0, blizzardSpawnTimer=0, blizzardDamageTimer=0, blizzardCenter=new THREE.Vector3();
 let fallingIce=[];
-let fallingCataclysm=null;
+let rollingMeteorBoulder=null;
+let meteorCastSerial=0;
 
-function abilityButtonCooldown(){
+function abilityButtonCooldown(seconds){
   const btn=document.getElementById('novaBtn');
-  if(btn){btn.classList.add('cooling');setTimeout(()=>btn.classList.remove('cooling'),MAGE_ULTIMATE_COOLDOWN*1000);}
+  if(btn){btn.classList.add('cooling');setTimeout(()=>btn.classList.remove('cooling'),seconds*1000);}
 }
 function makeIceMeteorMesh(radius=1.05){
-  const mat=new THREE.MeshStandardMaterial({color:0x75dfff,emissive:0x143f66,roughness:.34,metalness:.08,transparent:true,opacity:.68});
+  const mat=new THREE.MeshStandardMaterial({color:0x75dfff,emissive:0x143f66,roughness:.34,metalness:.08,transparent:true,opacity:.58,depthWrite:true});
   const mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(radius,1),mat);
   mesh.castShadow=true;
   return mesh;
 }
 function spawnFallingIce(){
-  // The effect radius is intentionally huge, but impacts must land on the actual map.
-  // Sample the playable disk directly so none of the storm's spectacle is wasted off-map.
-  const a=Math.random()*Math.PI*2, r=Math.sqrt(Math.random())*(arenaSize-2.2);
-  const x=Math.cos(a)*r, z=Math.sin(a)*r;
-  const mesh=makeIceMeteorMesh(.85+Math.random()*.45);
-  mesh.position.set(x,10+Math.random()*4,z); mesh.rotation.set(Math.random()*2,Math.random()*2,Math.random()*2);
-  scene.add(mesh);
-  const ring=new THREE.Mesh(new THREE.RingGeometry(BLIZZARD_IMPACT_RADIUS*.72,BLIZZARD_IMPACT_RADIUS,32),new THREE.MeshBasicMaterial({color:0x62d9ff,transparent:true,opacity:.58,side:THREE.DoubleSide,depthWrite:false}));
-  ring.rotation.x=-Math.PI/2; ring.position.set(x,.035,z);scene.add(ring);
-  fallingIce.push({mesh,ring,x,z,vy:9+Math.random()*2,life:1.05});
+  const stormR=Math.min(blizzardRadius(),arenaSize-2.4);
+  const a=Math.random()*Math.PI*2, r=Math.sqrt(Math.random())*stormR;
+  const x=blizzardCenter.x+Math.cos(a)*r, z=blizzardCenter.z+Math.sin(a)*r;
+  const boundedR=Math.hypot(x,z);
+  const clamp=boundedR>arenaSize-2.2?(arenaSize-2.2)/boundedR:1;
+  const bx=x*clamp,bz=z*clamp;
+  const mesh=makeIceMeteorMesh(1.25+Math.random()*.75);
+  mesh.position.set(bx,11+Math.random()*5,bz); mesh.rotation.set(Math.random()*2,Math.random()*2,Math.random()*2);
+  mesh.renderOrder=18; scene.add(mesh);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(BLIZZARD_IMPACT_RADIUS*.72,BLIZZARD_IMPACT_RADIUS,32),new THREE.MeshBasicMaterial({color:0x62d9ff,transparent:true,opacity:.46,side:THREE.DoubleSide,depthWrite:false}));
+  ring.rotation.x=-Math.PI/2; ring.position.set(bx,.035,bz);scene.add(ring);
+  fallingIce.push({mesh,ring,x:bx,z:bz,vy:13+Math.random()*4,life:1.15});
 }
 function impactIce(m){
-  spawnBurst(m.x,.35,m.z,10,FX_MAT_SPARK,3.2);
+  spawnBurst(m.x,.35,m.z,7,FX_MAT_SPARK,2.7);
   spawnArcaneSigil(m.x,.04,m.z,BLIZZARD_IMPACT_RADIUS);
   for(const z of [...zombies]){
     if(z.userData.dead)continue;
@@ -10652,155 +10658,123 @@ function impactIce(m){
 }
 function triggerBlizzardStorm(){
   if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='blizzard_storm'||!ownedAbilities.blizzard_storm||novaCooldownTimer>0)return;
-  novaCooldownTimer=MAGE_ULTIMATE_COOLDOWN; abilityButtonCooldown();
+  novaCooldownTimer=BLIZZARD_COOLDOWN; abilityButtonCooldown(BLIZZARD_COOLDOWN);
   blizzardActiveTimer=BLIZZARD_DURATION; blizzardSpawnTimer=0; blizzardDamageTimer=0; blizzardCenter.copy(player.position);
-  const radius=blizzardRadius();
-  spawnArcaneSigil(0,.03,0,arenaSize-1.2);
-  spawnArcaneRuneBurst(new THREE.Vector3(0,0,0),(arenaSize-1.2)*.72);
+  spawnArcaneSigil(blizzardCenter.x,.03,blizzardCenter.z,blizzardRadius());
+  spawnArcaneRuneBurst(blizzardCenter,blizzardRadius()*.72);
   triggerCombatShake(5,180);navigator.vibrate&&navigator.vibrate([35,25,55]);toast('BLIZZARD STORM!');
 }
-function triggerCataclysmMeteor(){
-  if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='cataclysm_meteor'||!ownedAbilities.cataclysm_meteor||novaCooldownTimer>0||fallingCataclysm)return;
-  novaCooldownTimer=MAGE_ULTIMATE_COOLDOWN; abilityButtonCooldown();
-  const target=nearestLivingZombie();
-  const x=target?target.position.x:player.position.x, z=target?target.position.z:player.position.z;
-
-  // A readable 10x meteor: translucent enough to see the player/enemies through it,
-  // but with an opaque fiery shell so it still clearly reads as a meteor.
-  const mesh=new THREE.Group();
+function makeRollingMeteorBoulder(){
+  const group=new THREE.Group();
   const body=new THREE.Mesh(
-    new THREE.IcosahedronGeometry(5.2,2),
-    new THREE.MeshStandardMaterial({color:0xff5a18,emissive:0x8a1b05,emissiveIntensity:1.1,roughness:.48,metalness:.04,transparent:true,opacity:.72,depthWrite:true})
+    new THREE.IcosahedronGeometry(3.7,2),
+    new THREE.MeshStandardMaterial({color:0x5a2115,emissive:0x8b2408,emissiveIntensity:.8,roughness:.8,metalness:.02,transparent:true,opacity:.76,depthWrite:true})
   );
-  const shell=new THREE.Mesh(
-    new THREE.IcosahedronGeometry(5.45,1),
-    new THREE.MeshBasicMaterial({color:0xffd060,wireframe:true,transparent:true,opacity:.92,depthWrite:false})
+  const magma=new THREE.Mesh(
+    new THREE.IcosahedronGeometry(3.82,1),
+    new THREE.MeshBasicMaterial({color:0xff7a24,wireframe:true,transparent:true,opacity:.72,depthWrite:false})
   );
-  const core=new THREE.Mesh(
-    new THREE.SphereGeometry(3.15,18,12),
-    new THREE.MeshBasicMaterial({color:0x7a1608,transparent:true,opacity:.48,depthWrite:false})
+  const glow=new THREE.Mesh(
+    new THREE.SphereGeometry(4.08,18,14),
+    new THREE.MeshBasicMaterial({color:0xff5b19,transparent:true,opacity:.14,depthWrite:false})
   );
-  mesh.add(body,core,shell);
-  for(let i=0;i<5;i++){
-    const tail=new THREE.Mesh(
-      new THREE.ConeGeometry(1.25+i*.24,5.5+i*1.25,12,1,true),
-      new THREE.MeshBasicMaterial({color:i%2?0xff7a20:0xffd05a,transparent:true,opacity:.34-i*.035,depthWrite:false,side:THREE.DoubleSide})
-    );
-    tail.rotation.x=Math.PI;
-    tail.position.set((Math.random()-.5)*2.2,5.8+i*2.4,(Math.random()-.5)*2.2);
-    mesh.add(tail);
-  }
-  mesh.position.set(x,16,z);mesh.scale.setScalar(.68);mesh.renderOrder=50;mesh.traverse(o=>{o.renderOrder=50;});scene.add(mesh);
-
-  const telegraph=new THREE.Group();
-  const ring=new THREE.Mesh(new THREE.RingGeometry(10.6,12.2,64),new THREE.MeshBasicMaterial({color:0xff5b22,transparent:true,opacity:.78,side:THREE.DoubleSide,depthWrite:false}));
-  ring.rotation.x=-Math.PI/2;ring.position.y=.045;telegraph.add(ring);
-  const fill=new THREE.Mesh(new THREE.CircleGeometry(10.6,64),new THREE.MeshBasicMaterial({color:0xff7a20,transparent:true,opacity:.13,side:THREE.DoubleSide,depthWrite:false}));
-  fill.rotation.x=-Math.PI/2;fill.position.y=.035;telegraph.add(fill);
-  telegraph.position.set(x,0,z);scene.add(telegraph);
-
-  fallingCataclysm={mesh,ring:telegraph,x,z,time:3,total:3,startY:16,endY:.9};
-  spawnArcaneRuneBurst(new THREE.Vector3(x,.05,z),7.5);
-  toast('CATACLYSM METEOR INCOMING!');navigator.vibrate&&navigator.vibrate([45,30,45]);
+  group.add(body,magma,glow);
+  group.traverse(o=>{o.renderOrder=35;});
+  return group;
 }
-function impactCataclysm(m){
-  const radius=12.2;
-  // Dedicated, readable impact spectacle: bright core, two expanding fire rings,
-  // debris bursts, and a strong but brief shake. No full-screen tint.
-  const impactGroup=new THREE.Group();
-  const core=new THREE.Mesh(new THREE.SphereGeometry(1.7,20,14),new THREE.MeshBasicMaterial({color:0xffb13b,transparent:true,opacity:.88,depthWrite:false}));
-  core.position.y=.85;core.userData.baseOpacity=.88;impactGroup.add(core);
-  for(const scale of [1,1.45]){
-    const ring=new THREE.Mesh(new THREE.RingGeometry(3.3*scale,4.2*scale,48),new THREE.MeshBasicMaterial({color:scale>1?0xff5522:0xffd15c,transparent:true,opacity:.78,side:THREE.DoubleSide,depthWrite:false}));
-    ring.rotation.x=-Math.PI/2;ring.position.y=.08;ring.userData.baseOpacity=.78;impactGroup.add(ring);
+function nearestMeteorTarget(m){
+  const eligible=zombies.filter(z=>!z.userData.dead && !(z.userData.archetype==='boss' && m.bossesHit.has(z)));
+  if(!eligible.length)return null;
+  eligible.sort((a,b)=>a.position.distanceToSquared(m.mesh.position)-b.position.distanceToSquared(m.mesh.position));
+  return eligible[0];
+}
+function triggerCataclysmMeteor(){
+  if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='cataclysm_meteor'||!ownedAbilities.cataclysm_meteor||meteorCooldownTimer>0||rollingMeteorBoulder)return;
+  meteorCooldownTimer=METEOR_BOULDER_COOLDOWN; abilityButtonCooldown(METEOR_BOULDER_COOLDOWN);
+  const mesh=makeRollingMeteorBoulder();
+  const nearest=nearestLivingZombie();
+  let sx=player.position.x,sz=player.position.z;
+  if(nearest){
+    const dx=nearest.position.x-player.position.x,dz=nearest.position.z-player.position.z,l=Math.hypot(dx,dz)||1;
+    sx-=dx/l*5.5;sz-=dz/l*5.5;
+  }else sx-=5.5;
+  const rr=Math.hypot(sx,sz);if(rr>arenaSize-5){const k=(arenaSize-5)/rr;sx*=k;sz*=k;}
+  mesh.position.set(sx,3.7,sz);scene.add(mesh);
+  const castId=++meteorCastSerial;
+  rollingMeteorBoulder={mesh,time:10,total:10,speed:15.5,target:null,castId,hitCounts:new Map(),bossesHit:new Set(),lastHitAt:new Map()};
+  spawnArcaneRuneBurst(mesh.position,4.5);triggerCombatShake(8,220);
+  navigator.vibrate&&navigator.vibrate([60,30,70]);toast('METEOR BOULDER!');
+}
+function hitWithRollingMeteor(m,z){
+  const now=performance.now();
+  const last=m.lastHitAt.get(z)||0;
+  if(now-last<520)return;
+  m.lastHitAt.set(z,now);
+  const type=z.userData.archetype||'walker';
+  const max=Math.max(1,z.userData.maxHp||z.userData.hp||1);
+  if(type==='boss'){
+    if(m.bossesHit.has(z))return;
+    m.bossesHit.add(z);
+    applyBulletDamage(z,max*.40); // per-cast boss damage is 40%, hard below requested 50% ceiling
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,.65);
+  }else if(type==='brute'||type==='elite'||type==='giant'){
+    const hits=(m.hitCounts.get(z)||0)+1;m.hitCounts.set(z,hits);
+    if(hits>=2)applyBulletDamage(z,Math.max(max+1,9999));
+    else {applyBulletDamage(z,max*.50);z.userData.hitStun=Math.max(z.userData.hitStun||0,1.1);}
+  }else{
+    applyBulletDamage(z,Math.max(max+1,9999));
   }
-  impactGroup.position.set(m.x,0,m.z);scene.add(impactGroup);
-  fx.push({kind:'arcaneImpact',mesh:impactGroup,life:.8,maxLife:.8,spin:1.1,dispose:true});
-  spawnBurst(m.x,.7,m.z,70,FX_MAT_SPARK,10.5);
-  spawnBurst(m.x,.4,m.z,45,FX_MAT_DUST,9.2);
-  spawnArcaneSigil(m.x,.03,m.z,radius);
-  spawnArcaneRuneBurst(new THREE.Vector3(m.x,.05,m.z),radius*.9);
-  triggerCombatShake(22,520);navigator.vibrate&&navigator.vibrate([110,35,170]);
-
-  let hitCount=0;
-  for(const z of [...zombies]){
-    if(z.userData.dead)continue;
-    if(Math.hypot(z.position.x-m.x,z.position.z-m.z)>radius)continue;
-    hitCount++;
-    const type=z.userData.archetype||'walker';
-    const max=Math.max(1,z.userData.maxHp||z.userData.hp||1);
-    // Normal enemies are decisively destroyed. Brutes take major damage.
-    // Bosses always lose exactly 20% max HP from the impact, never more.
-    if(type!=='boss'&&type!=='brute'){
-      applyBulletDamage(z,Math.max(max+1,9999));
-    }else{
-      const dmg=type==='boss'?max*.20:max*.72;
-      applyBulletDamage(z,dmg);
-    }
-    if(z.userData.dead)continue;
-    z.userData.hitStun=Math.max(z.userData.hitStun||0,type==='boss'?.5:3);
-    z.userData.burnTimer=Math.max(z.userData.burnTimer||0,5);
-    z.userData.burnDps=Math.max(z.userData.burnDps||0,type==='boss'?max*.012:Math.max(1.2,.8*playerStats.power));
-  }
-  toast(hitCount?`METEOR IMPACT · ${hitCount} HIT`:'METEOR IMPACT!');
+  spawnBurst(z.position.x,z.position.y+.5,z.position.z,18,FX_MAT_SPARK,4.8);
+  triggerCombatShake(8,160);navigator.vibrate&&navigator.vibrate(35);
+  if(z.userData.dead || type==='boss')m.target=null;
+}
+function clearMageRoundSpecials(resetCooldowns=true){
+  blizzardActiveTimer=0;blizzardSpawnTimer=0;blizzardDamageTimer=0;
+  for(const m of fallingIce){scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);} fallingIce=[];
+  if(rollingMeteorBoulder){scene.remove(rollingMeteorBoulder.mesh);disposeGroup(rollingMeteorBoulder.mesh);rollingMeteorBoulder=null;}
+  if(typeof stopArcaneLaser==='function')stopArcaneLaser();
+  // Clone-type companions intentionally persist between rounds. Do not clear
+  // Arcane Echoes or avatar shadow clones as part of round-special cleanup.
+  if(resetCooldowns){novaCooldownTimer=0;meteorCooldownTimer=0;}
 }
 function updateMageUltimates(dt){
   if(novaCooldownTimer>0)novaCooldownTimer=Math.max(0,novaCooldownTimer-dt);
+  if(meteorCooldownTimer>0)meteorCooldownTimer=Math.max(0,meteorCooldownTimer-dt);
   if(blizzardActiveTimer>0){
     blizzardActiveTimer=Math.max(0,blizzardActiveTimer-dt);
-    blizzardSpawnTimer-=dt;
-    blizzardDamageTimer-=dt;
-    // One readable falling ice mass at a time keeps the 10-second ultimate smooth on mobile.
-    if(blizzardSpawnTimer<=0){blizzardSpawnTimer=.72;spawnFallingIce();}
-    // The storm itself affects every enemy inside the true arena-scale radius. This makes
-    // damage/control reliable even when a random ice impact lands elsewhere.
+    blizzardSpawnTimer-=dt;blizzardDamageTimer-=dt;
+    // Many more giant ice balls, while keeping a hard cap for mobile stability.
+    if(blizzardSpawnTimer<=0){blizzardSpawnTimer=.24;if(fallingIce.length<18)spawnFallingIce();}
     if(blizzardDamageTimer<=0){
-      blizzardDamageTimer=1.0;
-      const br=blizzardRadius();
-      let affected=0, defeated=0;
+      blizzardDamageTimer=.85;
+      const br=blizzardRadius();let affected=0,defeated=0;
       for(const z of [...zombies]){
         if(z.userData.dead)continue;
         if(Math.hypot(z.position.x-blizzardCenter.x,z.position.z-blizzardCenter.z)>br)continue;
-        affected++;
-        const type=z.userData.archetype||'walker';
-        const wasDead=!!z.userData.dead;
+        affected++;const type=z.userData.archetype||'walker';const wasDead=!!z.userData.dead;
         applyBulletDamage(z,.62*playerStats.power);
         if(!wasDead&&z.userData.dead){defeated++;continue;}
-        if(type==='boss'||type==='brute'){
-          z.userData.slowTimer=Math.max(z.userData.slowTimer||0,BLIZZARD_FREEZE);
-          z.userData.slowMult=Math.min(z.userData.slowMult||1,.18);
-        }else{
-          z.userData.hitStun=Math.max(z.userData.hitStun||0,BLIZZARD_FREEZE);
-        }
+        if(type==='boss'||type==='brute'){z.userData.slowTimer=Math.max(z.userData.slowTimer||0,BLIZZARD_FREEZE);z.userData.slowMult=Math.min(z.userData.slowMult||1,.18);}
+        else z.userData.hitStun=Math.max(z.userData.hitStun||0,BLIZZARD_FREEZE);
       }
-      if(affected && blizzardActiveTimer>BLIZZARD_DURATION-1.2) toast(`BLIZZARD · ${affected} AFFECTED${defeated?` · ${defeated} DEFEATED`:''}`);
+      if(affected&&blizzardActiveTimer>BLIZZARD_DURATION-1.0)toast(`BLIZZARD · ${affected} AFFECTED${defeated?` · ${defeated} DEFEATED`:''}`);
     }
   }
-  for(let i=fallingIce.length-1;i>=0;i--){const m=fallingIce[i];m.life-=dt;m.mesh.position.y-=m.vy*dt;m.mesh.rotation.x+=dt*2.4;m.mesh.rotation.z+=dt*1.7;m.ring.material.opacity=Math.max(.15,m.life*.58);if(m.mesh.position.y<=.55||m.life<=0){impactIce(m);scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);fallingIce.splice(i,1);}}
-  if(fallingCataclysm){
-    const m=fallingCataclysm;
-    m.time-=dt;
-    const p=1-Math.max(0,m.time)/m.total;
-    const eased=p*p*(3-2*p);
-    m.mesh.position.y=m.startY+(m.endY-m.startY)*eased;
-    const scale=.68+eased*.52;
-    m.mesh.scale.setScalar(scale);
-    m.mesh.rotation.x+=dt*.42;
-    m.mesh.rotation.y+=dt*.55;
-    m.mesh.rotation.z+=dt*.26;
-    if(m.ring&&m.ring.children){
-      const pulse=.62+.25*Math.sin(p*Math.PI*6);
-      if(m.ring.children[0]&&m.ring.children[0].material)m.ring.children[0].material.opacity=pulse;
-      if(m.ring.children[1]&&m.ring.children[1].material)m.ring.children[1].material.opacity=.10+.09*p;
-      m.ring.scale.setScalar(.92+.08*p);
+  for(let i=fallingIce.length-1;i>=0;i--){const m=fallingIce[i];m.life-=dt;m.mesh.position.y-=m.vy*dt;m.mesh.rotation.x+=dt*2.8;m.mesh.rotation.z+=dt*2.1;m.ring.material.opacity=Math.max(.10,m.life*.42);if(m.mesh.position.y<=.65||m.life<=0){impactIce(m);scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);fallingIce.splice(i,1);}}
+  if(rollingMeteorBoulder){
+    const m=rollingMeteorBoulder;m.time=Math.max(0,m.time-dt);
+    if(!m.target||m.target.userData.dead||!m.target.parent)m.target=nearestMeteorTarget(m);
+    if(m.target){
+      const dx=m.target.position.x-m.mesh.position.x,dz=m.target.position.z-m.mesh.position.z,l=Math.hypot(dx,dz)||1;
+      const step=Math.min(l,m.speed*dt);m.mesh.position.x+=dx/l*step;m.mesh.position.z+=dz/l*step;
+      m.mesh.rotation.z-=dx/l*dt*4.1;m.mesh.rotation.x+=dz/l*dt*4.1;
+      if(l<4.35)hitWithRollingMeteor(m,m.target);
+    }else{
+      m.mesh.rotation.x+=dt*2.2;m.mesh.rotation.z+=dt*1.4;
     }
-    if(Math.random()<dt*20)spawnBurst(m.mesh.position.x,m.mesh.position.y-3,m.mesh.position.z,2,FX_MAT_SPARK,2.4);
-    if(m.time<=0){
-      impactCataclysm(m);
-      scene.remove(m.mesh);disposeGroup(m.mesh);
-      scene.remove(m.ring);disposeGroup(m.ring);
-      fallingCataclysm=null;
-    }
+    const rr=Math.hypot(m.mesh.position.x,m.mesh.position.z);if(rr>arenaSize-4.2){const k=(arenaSize-4.2)/rr;m.mesh.position.x*=k;m.mesh.position.z*=k;}
+    if(Math.random()<dt*20)spawnBurst(m.mesh.position.x,1.0,m.mesh.position.z,2,FX_MAT_SPARK,2.0);
+    if(m.time<=0){scene.remove(m.mesh);disposeGroup(m.mesh);rollingMeteorBoulder=null;toast('METEOR BOULDER ENDED');}
   }
   for(const z of [...zombies]){
     if(z.userData.dead)continue;
@@ -11262,6 +11236,7 @@ function completeCurrentRound(force=false){
   // Freeze combat immediately. This also prevents the timer, enemies, and
   // projectiles from continuing underneath the between-round upgrade menu.
   gameRunning = false;
+  clearMageRoundSpecials(true);
   clearZombies();
   const clearTime = roundTimerFrozenElapsed;
   let bonusMsg = 'Round '+round+' cleared in '+clearTime.toFixed(1)+'s!';
@@ -11831,9 +11806,8 @@ function startSurvival(){
   ownedAbilities = {};
   equippedAbilityId = null;
   rerunEndsAfterRound=false;
-  blizzardActiveTimer=0;fallingIce.forEach(m=>{scene.remove(m.mesh);scene.remove(m.ring);});fallingIce=[];
-  if(fallingCataclysm){scene.remove(fallingCataclysm.mesh);scene.remove(fallingCataclysm.ring);fallingCataclysm=null;}
-  novaCooldownTimer = 0; novaSpeedBoostTimer = 0;
+  clearMageRoundSpecials(true);
+  novaCooldownTimer = 0; meteorCooldownTimer = 0; novaSpeedBoostTimer = 0;
   stopArcaneLaser(); laserCharge = LASER_MAX_CHARGE; laserRegenDelayTimer = 0;
   resetCharacterLoadout();
   resetAbilityLoadout();
