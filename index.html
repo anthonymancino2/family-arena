@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- V22.10.41 Always-Ready Chain Javelin: removes the Chain-Lightning Javelin cooldown so it can fire whenever the secondary control is pressed, including with no target. Repeated hits now finish large enemies after the first strike leaves them at 1 HP; bosses continue taking 20% max HP per hit and can be defeated through repeated casts. -->
 <!-- V22.10.40 Chain-Lightning Javelin Visual Polish: strengthens the projectile silhouette, adds rotating electric rings and a brighter layered travel trail, improves impact pulses, and doubles the readable chain-lightning core without changing damage, target caps, stun, or cooldown. -->
 <!-- V22.10.39 Triple Phoenix Balance Pass: spreads the three spheres across separate enemy clusters when possible, prevents duplicate contact and explosion damage from stacking on the same enemy within one volley, reduces additive gravity pull, and lowers trail particle frequency for steadier FPS. -->
 <!-- V22.10.38 Triple Phoenix Volley: one cast now launches three Phoenix Fireballs in a wide opening spread. Each sphere flies independently for a brief launch phase, then seeks enemy clusters. The volley still counts as one active Phoenix ability, so another cast remains blocked until all three spheres expire. -->
@@ -33,7 +34,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.40</title>
+<title>Family Arena V22.10.41</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -723,7 +724,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.40 - Chain Javelin Visual Polish';
+const GAME_VERSION='22.10.41 - Always-Ready Chain Javelin';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1412,7 +1413,7 @@ const CHARACTER_COMBAT = {
         desc:'Launches one oversized spinning wind arrow through a crowd. Wide hitbox, heavy knockback, and up to seven enemy hits.'},
       mirror_volley:{slot:'secondary', name:'Mirror Volley', price:470, kind:'mirror_volley', cooldown:3.0, damage:0.28, pierce:0, auto:false,
         desc:'Place up to three Mirror Volleys anywhere you stand. Each leaves two invincible decoys and a Storm Beacon for 6 seconds. Cooldown starts at 3 seconds and scales toward 0 at very high rounds.'},
-      chain_lightning_javelin:{slot:'secondary', name:'Chain-Lightning Javelin', price:560, kind:'chain_lightning_javelin', cooldown:4.2, damage:1.0, pierce:0, auto:false,
+      chain_lightning_javelin:{slot:'secondary', name:'Chain-Lightning Javelin', price:560, kind:'chain_lightning_javelin', cooldown:0, damage:1.0, pierce:0, auto:false,
         desc:'Launches a heavy electrified javelin. The first strike chains to up to five nearby enemies. Normal enemies are defeated, large enemies survive at 1 HP, bosses lose 20% max HP, and every survivor is stunned for 3 seconds.'},
       rocket_arrow:{slot:'secondary', name:'Phoenix Fireball', price:500, kind:'rocket_arrow', cooldown:0, damage:0, splash:0, pierce:0, auto:false,
         desc:'Instantly summons one giant molten fireball for 7 seconds. It seeks enemy clusters, pulls enemies inward, burns large targets and bosses, then erupts in a final fiery explosion. Only one may exist at a time.'}
@@ -12175,7 +12176,14 @@ function doShoot(){
 }
 function doSecondaryShoot(){
   const w=secondaryWeaponForAvatar();
-  if(!gameRunning||!w||(player.userData.secondaryAttackCooldown||0)>0)return;
+  if(!gameRunning||!w)return;
+  // Chain-Lightning Javelin is always ready: no target requirement and no cooldown gate.
+  if(w.kind==='chain_lightning_javelin'){
+    player.userData.secondaryAttackCooldown=0;
+    triggerChainLightningJavelin(w);
+    return;
+  }
+  if((player.userData.secondaryAttackCooldown||0)>0)return;
   if(w.kind==='rocket_arrow'){
     triggerPhoenixFireball();
     return;
@@ -12183,12 +12191,6 @@ function doSecondaryShoot(){
   if(w.kind==='mirror_volley'){
     if(mirrorVolleyCooldownTimer>0)return;
     triggerMirrorVolley(w);
-    return;
-  }
-  if(w.kind==='chain_lightning_javelin'){
-    if(triggerChainLightningJavelin(w)!==false){
-      player.userData.secondaryAttackCooldown=attackCooldownFor(w);
-    }
     return;
   }
   player.userData.secondaryAttackCooldown=attackCooldownFor(w);
@@ -12409,7 +12411,8 @@ function applyChainJavelinDamage(enemy){
   if(isBoss){
     applyBulletDamage(enemy,Math.min(currentHp,maxHp*CHAIN_JAVELIN_BOSS_DAMAGE));
   }else if(isLarge){
-    if(currentHp>1)applyBulletDamage(enemy,currentHp-1);
+    // First hit leaves a large enemy at 1 HP; any later javelin hit finishes it.
+    applyBulletDamage(enemy,currentHp>1?currentHp-1:currentHp+1);
   }else{
     applyBulletDamage(enemy,currentHp+1);
   }
