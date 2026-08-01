@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- V22.10.10 Meteor Boulder Reliability + Correct Build Stamp: guarantees mobile activation, visible ground spawn, continuous homing, collision damage, and correct displayed version. -->
 <!-- V22.10.9 Clone Persistence Correction: active clone companions are no longer removed by round completion or new-round special cleanup. Blizzard, Meteor Boulder, Arcane Laser, and temporary battlefield effects still reset normally. -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.9</title>
+<title>Family Arena V22.10.10</title>
 <!-- V22.10.8 Blizzard Coverage + Rolling Meteor Boulder + Round Effect Reset: Blizzard is set to 45% of the playable map radius with many more semi-transparent giant ice balls; Cataclysm Meteor is replaced by a visible ground-rolling homing meteor boulder lasting 10 seconds with tiered enemy damage and a longer cooldown; all active special moves are cleared when a round ends or a new round begins. -->
 <!-- V22.10.4 Meteor Descent & Damage Reliability Fix: Cataclysm Meteor now visibly descends from the sky as a translucent 10x fireball with a readable fiery shell and trail, uses a large persistent landing telegraph, and guarantees impact damage/stun/burn inside the marked zone. -->
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
@@ -695,7 +696,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.7 - Development Ability Testing Unlocks';
+const GAME_VERSION='22.10.10 - Meteor Boulder Reliability Fix';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -9591,7 +9592,12 @@ function setupControls(){
     novaBtnEl.addEventListener('touchcancel',endEquippedAbility,{passive:false});
     novaBtnEl.addEventListener('mousedown',beginEquippedAbility);
   }
-  novaBtnEl.addEventListener('click',e=>e.preventDefault());
+  novaBtnEl.addEventListener('click',e=>{
+    e.preventDefault();
+    // Pointer/touch normally activates first. This click fallback only fires if
+    // the meteor did not start, protecting iOS browser and home-screen variants.
+    if(equippedAbilityId==='cataclysm_meteor'&&!rollingMeteorBoulder&&meteorCooldownTimer<=0)triggerCataclysmMeteor();
+  });
   window.addEventListener('mouseup',endEquippedAbility);
   const laserBtnEl=document.getElementById('laserBtn');
   laserBtnEl.classList.add('hidden');
@@ -10667,19 +10673,29 @@ function triggerBlizzardStorm(){
 function makeRollingMeteorBoulder(){
   const group=new THREE.Group();
   const body=new THREE.Mesh(
-    new THREE.IcosahedronGeometry(3.7,2),
-    new THREE.MeshStandardMaterial({color:0x5a2115,emissive:0x8b2408,emissiveIntensity:.8,roughness:.8,metalness:.02,transparent:true,opacity:.76,depthWrite:true})
+    new THREE.IcosahedronGeometry(4.35,2),
+    new THREE.MeshStandardMaterial({color:0x6b2718,emissive:0xb8360b,emissiveIntensity:1.25,roughness:.72,metalness:.02,transparent:true,opacity:.72,depthWrite:true})
   );
   const magma=new THREE.Mesh(
-    new THREE.IcosahedronGeometry(3.82,1),
-    new THREE.MeshBasicMaterial({color:0xff7a24,wireframe:true,transparent:true,opacity:.72,depthWrite:false})
+    new THREE.IcosahedronGeometry(4.48,1),
+    new THREE.MeshBasicMaterial({color:0xff8a2b,wireframe:true,transparent:true,opacity:.88,depthWrite:false})
   );
   const glow=new THREE.Mesh(
-    new THREE.SphereGeometry(4.08,18,14),
-    new THREE.MeshBasicMaterial({color:0xff5b19,transparent:true,opacity:.14,depthWrite:false})
+    new THREE.SphereGeometry(4.85,22,18),
+    new THREE.MeshBasicMaterial({color:0xff5b19,transparent:true,opacity:.20,depthWrite:false,blending:THREE.AdditiveBlending})
   );
-  group.add(body,magma,glow);
-  group.traverse(o=>{o.renderOrder=35;});
+  const shadow=new THREE.Mesh(
+    new THREE.CircleGeometry(5.3,40),
+    new THREE.MeshBasicMaterial({color:0x2a0800,transparent:true,opacity:.36,depthWrite:false})
+  );
+  shadow.rotation.x=-Math.PI/2; shadow.position.y=-4.22;
+  const rim=new THREE.Mesh(
+    new THREE.RingGeometry(4.65,5.35,40),
+    new THREE.MeshBasicMaterial({color:0xff9a3a,transparent:true,opacity:.58,side:THREE.DoubleSide,depthWrite:false})
+  );
+  rim.rotation.x=-Math.PI/2; rim.position.y=-4.18;
+  group.add(body,magma,glow,shadow,rim);
+  group.traverse(o=>{o.renderOrder=60;});
   return group;
 }
 function nearestMeteorTarget(m){
@@ -10689,21 +10705,25 @@ function nearestMeteorTarget(m){
   return eligible[0];
 }
 function triggerCataclysmMeteor(){
-  if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='cataclysm_meteor'||!ownedAbilities.cataclysm_meteor||meteorCooldownTimer>0||rollingMeteorBoulder)return;
+  if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='cataclysm_meteor'||!ownedAbilities.cataclysm_meteor||meteorCooldownTimer>0)return;
+  // Restart cleanly if a stale invisible instance somehow survived.
+  if(rollingMeteorBoulder){scene.remove(rollingMeteorBoulder.mesh);disposeGroup(rollingMeteorBoulder.mesh);rollingMeteorBoulder=null;}
   meteorCooldownTimer=METEOR_BOULDER_COOLDOWN; abilityButtonCooldown(METEOR_BOULDER_COOLDOWN);
   const mesh=makeRollingMeteorBoulder();
   const nearest=nearestLivingZombie();
-  let sx=player.position.x,sz=player.position.z;
+  let dirX=1,dirZ=0;
   if(nearest){
-    const dx=nearest.position.x-player.position.x,dz=nearest.position.z-player.position.z,l=Math.hypot(dx,dz)||1;
-    sx-=dx/l*5.5;sz-=dz/l*5.5;
-  }else sx-=5.5;
-  const rr=Math.hypot(sx,sz);if(rr>arenaSize-5){const k=(arenaSize-5)/rr;sx*=k;sz*=k;}
-  mesh.position.set(sx,3.7,sz);scene.add(mesh);
+    dirX=nearest.position.x-player.position.x;dirZ=nearest.position.z-player.position.z;
+    const dl=Math.hypot(dirX,dirZ)||1;dirX/=dl;dirZ/=dl;
+  }else{dirX=Math.sin(player.rotation.y);dirZ=Math.cos(player.rotation.y);}
+  // Spawn visibly on the ground, behind the player relative to its first target.
+  let sx=player.position.x-dirX*7.5,sz=player.position.z-dirZ*7.5;
+  const rr=Math.hypot(sx,sz);if(rr>arenaSize-6){const k=(arenaSize-6)/rr;sx*=k;sz*=k;}
+  mesh.position.set(sx,4.35,sz);scene.add(mesh);
   const castId=++meteorCastSerial;
-  rollingMeteorBoulder={mesh,time:10,total:10,speed:15.5,target:null,castId,hitCounts:new Map(),bossesHit:new Set(),lastHitAt:new Map()};
-  spawnArcaneRuneBurst(mesh.position,4.5);triggerCombatShake(8,220);
-  navigator.vibrate&&navigator.vibrate([60,30,70]);toast('METEOR BOULDER!');
+  rollingMeteorBoulder={mesh,time:10,total:10,speed:17.5,target:null,castId,hitCounts:new Map(),bossesHit:new Set(),lastHitAt:new Map(),spawnGrace:.15};
+  spawnArcaneRuneBurst(mesh.position,6.0);spawnBurst(mesh.position.x,1.0,mesh.position.z,26,FX_MAT_SPARK,6.0);triggerCombatShake(10,260);
+  navigator.vibrate&&navigator.vibrate([70,25,85]);toast('METEOR BOULDER ACTIVE · 10 SEC');
 }
 function hitWithRollingMeteor(m,z){
   const now=performance.now();
@@ -10768,12 +10788,19 @@ function updateMageUltimates(dt){
       const dx=m.target.position.x-m.mesh.position.x,dz=m.target.position.z-m.mesh.position.z,l=Math.hypot(dx,dz)||1;
       const step=Math.min(l,m.speed*dt);m.mesh.position.x+=dx/l*step;m.mesh.position.z+=dz/l*step;
       m.mesh.rotation.z-=dx/l*dt*4.1;m.mesh.rotation.x+=dz/l*dt*4.1;
-      if(l<4.35)hitWithRollingMeteor(m,m.target);
+      if(l<5.45)hitWithRollingMeteor(m,m.target);
     }else{
       m.mesh.rotation.x+=dt*2.2;m.mesh.rotation.z+=dt*1.4;
     }
-    const rr=Math.hypot(m.mesh.position.x,m.mesh.position.z);if(rr>arenaSize-4.2){const k=(arenaSize-4.2)/rr;m.mesh.position.x*=k;m.mesh.position.z*=k;}
-    if(Math.random()<dt*20)spawnBurst(m.mesh.position.x,1.0,m.mesh.position.z,2,FX_MAT_SPARK,2.0);
+    // Collision sweep catches every enemy touched by the giant boulder, even if
+    // frame rate is low or the selected target changes between frames.
+    if(m.spawnGrace>0)m.spawnGrace=Math.max(0,m.spawnGrace-dt);
+    else for(const z of [...zombies]){
+      if(z.userData.dead)continue;
+      if(Math.hypot(z.position.x-m.mesh.position.x,z.position.z-m.mesh.position.z)<=5.45)hitWithRollingMeteor(m,z);
+    }
+    const rr=Math.hypot(m.mesh.position.x,m.mesh.position.z);if(rr>arenaSize-5.1){const k=(arenaSize-5.1)/rr;m.mesh.position.x*=k;m.mesh.position.z*=k;}
+    if(Math.random()<dt*32)spawnBurst(m.mesh.position.x,1.0,m.mesh.position.z,3,FX_MAT_SPARK,2.7);
     if(m.time<=0){scene.remove(m.mesh);disposeGroup(m.mesh);rollingMeteorBoulder=null;toast('METEOR BOULDER ENDED');}
   }
   for(const z of [...zombies]){
