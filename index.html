@@ -1,4 +1,8 @@
 <!DOCTYPE html>
+<!-- V22.10.45 Phoenix Low-Enemy Pursuit: when only one or two enemies remain, the three Phoenix spheres use separated approach lanes around their targets instead of collapsing into one path. They continue moving, reacquire quickly, and converge close enough to deal contact damage without visibly stacking. -->
+<!-- V22.10.44 Triple Phoenix Shared Balance: caps the three spheres' combined gravity per enemy each frame and slightly reduces large-enemy/boss contact, burn, and expiration damage so the volley remains powerful without acting like three stacked ultimates. Normal enemies remain instant defeats. -->
+<!-- V22.10.43 Archer Secondary Cooldown Readability: adds live cooldown feedback directly on the Secondary button, including tenths-of-a-second countdown and a clear ready state. Chain-Lightning Javelin remains instant-cast with its fixed 1.0-second cooldown; damage and targeting are unchanged. -->
+<!-- V22.10.42 Chain Javelin Cooldown Balance: restores a fixed 1.0-second cooldown to Chain-Lightning Javelin while preserving instant casting, target-free launching, repeated large-enemy finishing, 20% boss damage, six-target chaining, and 3-second survivor stun. -->
 <!-- V22.10.41 Always-Ready Chain Javelin: removes the Chain-Lightning Javelin cooldown so it can fire whenever the secondary control is pressed, including with no target. Repeated hits now finish large enemies after the first strike leaves them at 1 HP; bosses continue taking 20% max HP per hit and can be defeated through repeated casts. -->
 <!-- V22.10.40 Chain-Lightning Javelin Visual Polish: strengthens the projectile silhouette, adds rotating electric rings and a brighter layered travel trail, improves impact pulses, and doubles the readable chain-lightning core without changing damage, target caps, stun, or cooldown. -->
 <!-- V22.10.39 Triple Phoenix Balance Pass: spreads the three spheres across separate enemy clusters when possible, prevents duplicate contact and explosion damage from stacking on the same enemy within one volley, reduces additive gravity pull, and lowers trail particle frequency for steadier FPS. -->
@@ -34,7 +38,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.41</title>
+<title>Family Arena V22.10.45</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1413,7 +1417,7 @@ const CHARACTER_COMBAT = {
         desc:'Launches one oversized spinning wind arrow through a crowd. Wide hitbox, heavy knockback, and up to seven enemy hits.'},
       mirror_volley:{slot:'secondary', name:'Mirror Volley', price:470, kind:'mirror_volley', cooldown:3.0, damage:0.28, pierce:0, auto:false,
         desc:'Place up to three Mirror Volleys anywhere you stand. Each leaves two invincible decoys and a Storm Beacon for 6 seconds. Cooldown starts at 3 seconds and scales toward 0 at very high rounds.'},
-      chain_lightning_javelin:{slot:'secondary', name:'Chain-Lightning Javelin', price:560, kind:'chain_lightning_javelin', cooldown:0, damage:1.0, pierce:0, auto:false,
+      chain_lightning_javelin:{slot:'secondary', name:'Chain-Lightning Javelin', price:560, kind:'chain_lightning_javelin', cooldown:1.0, damage:1.0, pierce:0, auto:false,
         desc:'Launches a heavy electrified javelin. The first strike chains to up to five nearby enemies. Normal enemies are defeated, large enemies survive at 1 HP, bosses lose 20% max HP, and every survivor is stunned for 3 seconds.'},
       rocket_arrow:{slot:'secondary', name:'Phoenix Fireball', price:500, kind:'rocket_arrow', cooldown:0, damage:0, splash:0, pierce:0, auto:false,
         desc:'Instantly summons one giant molten fireball for 7 seconds. It seeks enemy clusters, pulls enemies inward, burns large targets and bosses, then erupts in a final fiery explosion. Only one may exist at a time.'}
@@ -9317,10 +9321,17 @@ function updateSecondaryButton(){
   const btn=document.getElementById('secondaryBtn');
   if(!btn) return;
   const w=secondaryWeaponForAvatar();
+  const cooldown=Math.max(0,player&&player.userData?(player.userData.secondaryAttackCooldown||0):0);
   btn.classList.toggle('locked',!w);
-  btn.innerHTML=w
-    ? `<span class="secondaryIcon">${w.kind==='giant_fireball'?'☄️':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'))}</span><span class="secondaryLabel">${w.name}</span>`
-    : '<span class="secondaryIcon">🔒</span><span class="secondaryLabel">SECONDARY</span>';
+  btn.classList.toggle('cooling',!!w&&cooldown>0);
+  btn.style.opacity=(!w)?'':(cooldown>0?'.72':'1');
+  if(!w){
+    btn.innerHTML='<span class="secondaryIcon">🔒</span><span class="secondaryLabel">SECONDARY</span>';
+    return;
+  }
+  const icon=w.kind==='giant_fireball'?'☄️':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'));
+  const status=cooldown>0?` · ${cooldown.toFixed(1)}s`:' · READY';
+  btn.innerHTML=`<span class="secondaryIcon">${icon}</span><span class="secondaryLabel">${w.name}${status}</span>`;
 }
 function updateWeaponHud(){
   const primary=weaponForAvatar();
@@ -11070,7 +11081,7 @@ function triggerPhoenixFireball(){
   for(let i=0;i<spreadAngles.length;i++){
     const a=yaw+spreadAngles[i],dx=Math.sin(a),dz=Math.cos(a),mesh=createPhoenixFireballMesh();
     mesh.position.set(player.position.x+dx*2.15,2.35,player.position.z+dz*2.15);scene.add(mesh);
-    balls.push({mesh,life:PHOENIX_LIFETIME,maxLife:PHOENIX_LIFETIME,hitEnemies:new Set(),targetTick:PHOENIX_SPREAD_TIME,target:null,fxTick:i*.018,smokeTick:i*.045,dirX:dx,dirZ:dz,spreadTimer:PHOENIX_SPREAD_TIME});
+    balls.push({mesh,life:PHOENIX_LIFETIME,maxLife:PHOENIX_LIFETIME,hitEnemies:new Set(),targetTick:PHOENIX_SPREAD_TIME,target:null,fxTick:i*.018,smokeTick:i*.045,dirX:dx,dirZ:dz,spreadTimer:PHOENIX_SPREAD_TIME,volleyIndex:i});
     spawnBurst(mesh.position.x,mesh.position.y,mesh.position.z,14,FX_MAT_SPARK,4.6);
   }
   phoenixFireball={balls,contactHits:new Set(),explosionHits:new Set()};
@@ -11084,11 +11095,11 @@ function damagePhoenixTarget(ball,z){
   ball.hitEnemies.add(z);if(phoenixFireball)phoenixFireball.contactHits.add(z);
   const type=z.userData.archetype||'walker',maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
   if(type==='boss'){
-    applyBulletDamage(z,maxHp*.12);
-    if(!z.userData.dead){z.userData.burnTimer=Math.max(z.userData.burnTimer||0,6);z.userData.burnDps=Math.max(z.userData.burnDps||0,maxHp*.012);}
+    applyBulletDamage(z,maxHp*.10);
+    if(!z.userData.dead){z.userData.burnTimer=Math.max(z.userData.burnTimer||0,6);z.userData.burnDps=Math.max(z.userData.burnDps||0,maxHp*.008);}
   }else if(type==='brute'){
-    applyBulletDamage(z,maxHp*.45);
-    if(!z.userData.dead){z.userData.burnTimer=Math.max(z.userData.burnTimer||0,6);z.userData.burnDps=Math.max(z.userData.burnDps||0,maxHp*.025);}
+    applyBulletDamage(z,maxHp*.38);
+    if(!z.userData.dead){z.userData.burnTimer=Math.max(z.userData.burnTimer||0,6);z.userData.burnDps=Math.max(z.userData.burnDps||0,maxHp*.020);}
   }else applyBulletDamage(z,(z.userData.hp||1)+1);
   spawnBurst(z.position.x,z.position.y+.75,z.position.z,type==='boss'?18:12,FX_MAT_SPARK,type==='boss'?4.5:3.5);
 }
@@ -11119,10 +11130,10 @@ function explodePhoenixBall(ball){
     const type=z.userData.archetype||'walker',maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
     const alreadyDamaged=phoenixFireball&&phoenixFireball.explosionHits.has(z);
     if(!alreadyDamaged){
-      if(type==='boss')applyBulletDamage(z,maxHp*.08);else if(type==='brute')applyBulletDamage(z,maxHp*.20);else applyBulletDamage(z,(z.userData.hp||1)+1);
+      if(type==='boss')applyBulletDamage(z,maxHp*.06);else if(type==='brute')applyBulletDamage(z,maxHp*.16);else applyBulletDamage(z,(z.userData.hp||1)+1);
       if(phoenixFireball)phoenixFireball.explosionHits.add(z);
     }
-    if(!z.userData.dead){const dl=dist||1,force=type==='boss'?1.35:(type==='brute'?3.5:7.0);z.userData.knockbackX=(dx/dl)*Math.max(force,Math.hypot(z.userData.knockbackX||0,z.userData.knockbackZ||0));z.userData.knockbackZ=(dz/dl)*Math.max(force,Math.hypot(z.userData.knockbackX||0,z.userData.knockbackZ||0));z.userData.hitStun=Math.max(z.userData.hitStun||0,type==='boss'?.32:.48);if(!alreadyDamaged&&(type==='boss'||type==='brute')){z.userData.burnTimer=Math.max(z.userData.burnTimer||0,6);z.userData.burnDps=Math.max(z.userData.burnDps||0,maxHp*(type==='boss'?.010:.020));z.userData.phoenixBurnFxTimer=0;}}
+    if(!z.userData.dead){const dl=dist||1,force=type==='boss'?1.35:(type==='brute'?3.5:7.0);z.userData.knockbackX=(dx/dl)*Math.max(force,Math.hypot(z.userData.knockbackX||0,z.userData.knockbackZ||0));z.userData.knockbackZ=(dz/dl)*Math.max(force,Math.hypot(z.userData.knockbackX||0,z.userData.knockbackZ||0));z.userData.hitStun=Math.max(z.userData.hitStun||0,type==='boss'?.32:.48);if(!alreadyDamaged&&(type==='boss'||type==='brute')){z.userData.burnTimer=Math.max(z.userData.burnTimer||0,6);z.userData.burnDps=Math.max(z.userData.burnDps||0,maxHp*(type==='boss'?.007:.016));z.userData.phoenixBurnFxTimer=0;}}
   }
   spawnPhoenixExpirationFx(p);spawnBurst(p.x,p.y,p.z,40,FX_MAT_SPARK,9.0);spawnBurst(p.x,p.y+.4,p.z,12,FX_MAT_DUST,5.4);spawnArcaneSigil(p.x,.04,p.z,PHOENIX_EXPLOSION_RADIUS*.72);
   if(ball.mesh.parent){scene.remove(ball.mesh);disposeGroup(ball.mesh);}ball.mesh=null;
@@ -11137,11 +11148,25 @@ function clearPhoenixFireball(explode=false){
 }
 function updatePhoenixFireball(dt){
   if(!phoenixFireball)return;const now=performance.now();let livingBalls=0;
+  const pullByEnemy=new Map();
   for(const ball of phoenixFireball.balls){
     if(!ball.mesh)continue;livingBalls++;const m=ball.mesh;ball.life=Math.max(0,ball.life-dt);ball.targetTick-=dt;ball.fxTick-=dt;ball.smokeTick-=dt;ball.spreadTimer=Math.max(0,ball.spreadTimer-dt);
     if(ball.spreadTimer<=0&&ball.targetTick<=0){ball.targetTick=.24;ball.target=phoenixClusterTarget(ball);}
     let desiredX=ball.dirX,desiredZ=ball.dirZ;
-    if(ball.spreadTimer<=0&&ball.target&&!ball.target.userData.dead&&ball.target.parent){const dx=ball.target.position.x-m.position.x,dz=ball.target.position.z-m.position.z,dl=Math.hypot(dx,dz)||1;desiredX=dx/dl;desiredZ=dz/dl;}
+    if(ball.spreadTimer<=0&&ball.target&&!ball.target.userData.dead&&ball.target.parent){
+      const livingCount=zombies.reduce((n,z)=>n+(z&&!z.userData.dead&&z.parent?1:0),0);
+      let aimX=ball.target.position.x,aimZ=ball.target.position.z;
+      if(livingCount<=2){
+        // Keep the three spheres readable when the battlefield is nearly empty.
+        // Each sphere approaches the target through a separate, slowly rotating lane,
+        // but the offset stays inside contact range so every sphere can still connect.
+        const laneAngle=(ball.volleyIndex||0)*(Math.PI*2/3)+now*.00055;
+        const laneRadius=livingCount===1?1.45:1.05;
+        aimX+=Math.sin(laneAngle)*laneRadius;
+        aimZ+=Math.cos(laneAngle)*laneRadius;
+      }
+      const dx=aimX-m.position.x,dz=aimZ-m.position.z,dl=Math.hypot(dx,dz)||1;desiredX=dx/dl;desiredZ=dz/dl;
+    }
     const steer=ball.spreadTimer>0?0:Math.min(1,dt*2.05);ball.dirX+=(desiredX-ball.dirX)*steer;ball.dirZ+=(desiredZ-ball.dirZ)*steer;
     let dirLen=Math.hypot(ball.dirX,ball.dirZ)||1;ball.dirX/=dirLen;ball.dirZ/=dirLen;m.position.x+=ball.dirX*PHOENIX_SPEED*dt;m.position.z+=ball.dirZ*PHOENIX_SPEED*dt;
     const radial=Math.hypot(m.position.x,m.position.z),limit=arenaSize-2.7;
@@ -11150,12 +11175,20 @@ function updatePhoenixFireball(dt){
     m.traverse(o=>{const role=o.userData.role;if(role==='crack'){o.rotation.z+=dt*(o.userData.spin||.4);o.material.opacity=.72+Math.sin(now*.012+o.id)*.20;}else if(role==='shellPlate')o.rotation.y+=dt*(o.userData.spin||.1);else if(role==='corona')o.rotation.z+=dt*(o.userData.spin||.8);else if(role==='glow'){const q=1+Math.sin(now*.009+o.id)*.085;o.scale.setScalar(q);o.material.opacity=.16+Math.sin(now*.010+o.id)*.055;}else if(role==='heat'){const q=1+Math.sin(now*.0065+o.id)*.055;o.scale.setScalar(q);o.rotation.y-=dt*.18;}else if(role==='core')o.material.emissiveIntensity=1.85+Math.sin(now*.011+o.id)*.35;});
     for(const z of [...zombies]){
       if(z.userData.dead)continue;const dx=m.position.x-z.position.x,dz=m.position.z-z.position.z,dist=Math.hypot(dx,dz);
-      if(dist<=PHOENIX_PULL_RADIUS){const type=z.userData.archetype||'walker',dl=dist||1,base=type==='boss'?.12:(type==='brute'?.55:1.35),strength=base*Math.max(.18,1-dist/PHOENIX_PULL_RADIUS);z.position.x+=dx/dl*strength*dt;z.position.z+=dz/dl*strength*dt;}
+      if(dist<=PHOENIX_PULL_RADIUS){
+        const type=z.userData.archetype||'walker',dl=dist||1,base=type==='boss'?.10:(type==='brute'?.46:1.12),strength=base*Math.max(.18,1-dist/PHOENIX_PULL_RADIUS);
+        const prior=pullByEnemy.get(z)||{x:0,z:0,type};prior.x+=dx/dl*strength;prior.z+=dz/dl*strength;pullByEnemy.set(z,prior);
+      }
       if(dist<=PHOENIX_CONTACT_RADIUS)damagePhoenixTarget(ball,z);
     }
     if(ball.fxTick<=0){ball.fxTick=.11;const backX=m.position.x-ball.dirX*2.0,backZ=m.position.z-ball.dirZ*2.0;spawnBurst(backX+(Math.random()-.5)*1.4,m.position.y+(Math.random()-.5)*1.0,backZ+(Math.random()-.5)*1.4,2,FX_MAT_SPARK,2.6);}
     if(ball.smokeTick<=0){ball.smokeTick=.25;const backX=m.position.x-ball.dirX*2.3,backZ=m.position.z-ball.dirZ*2.3;spawnBurst(backX,m.position.y+.35,backZ,1,FX_MAT_DUST,1.5);}
     if(ball.life<=0)explodePhoenixBall(ball);
+  }
+  for(const [z,pull] of pullByEnemy){
+    if(!z||z.userData.dead||!z.parent)continue;
+    const cap=pull.type==='boss'?.11:(pull.type==='brute'?.52:1.28),mag=Math.hypot(pull.x,pull.z)||1,scale=Math.min(1,cap/mag);
+    z.position.x+=pull.x*scale*dt;z.position.z+=pull.z*scale*dt;
   }
   if(livingBalls===0||phoenixFireball.balls.every(b=>!b.mesh)){phoenixFireball=null;triggerCombatShake(14,300);navigator.vibrate&&navigator.vibrate([65,24,105]);}
 }
@@ -12177,9 +12210,11 @@ function doShoot(){
 function doSecondaryShoot(){
   const w=secondaryWeaponForAvatar();
   if(!gameRunning||!w)return;
-  // Chain-Lightning Javelin is always ready: no target requirement and no cooldown gate.
+  // Chain-Lightning Javelin launches without a target or charge, but uses a fixed
+  // one-second cooldown so repeated casts remain powerful without becoming spammy.
   if(w.kind==='chain_lightning_javelin'){
-    player.userData.secondaryAttackCooldown=0;
+    if((player.userData.secondaryAttackCooldown||0)>0)return;
+    player.userData.secondaryAttackCooldown=1.0;
     triggerChainLightningJavelin(w);
     return;
   }
@@ -13352,7 +13387,10 @@ function update(dt){
   }
 
   if(player.userData.attackCooldown>0) player.userData.attackCooldown -= dt;
-  if((player.userData.secondaryAttackCooldown||0)>0) player.userData.secondaryAttackCooldown -= dt;
+  if((player.userData.secondaryAttackCooldown||0)>0){
+    player.userData.secondaryAttackCooldown=Math.max(0,player.userData.secondaryAttackCooldown-dt);
+  }
+  updateSecondaryButton();
   refreshPassiveState(dt);
   updatePassiveHud();
   updatePassiveHud();
