@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- V22.10.38 Triple Phoenix Volley: one cast now launches three Phoenix Fireballs in a wide opening spread. Each sphere flies independently for a brief launch phase, then seeks enemy clusters. The volley still counts as one active Phoenix ability, so another cast remains blocked until all three spheres expire. -->
+<!-- V22.10.37 Phoenix Expiration + Burn Feedback: adds a layered end-of-life blast, expanding fire rings, a short-lived scorched-ground mark, volcanic debris, stronger readable knockback, and brighter six-second burn feedback on surviving large enemies and bosses. Effects are capped and cleared between rounds. -->
 <!-- V22.10.36 Phoenix Fireball Polish: upgrades the persistent sphere with layered volcanic plates, animated lava seams, rotating flame coronas, smoke/ember wake, localized heat shimmer, smoother cluster-seeking steering, and true constant forward movement. Gameplay damage, pull, seven-second lifetime, and one-active restriction remain unchanged. -->
 <!-- V22.10.35 Phoenix Fireball Core: completely replaces the old Phoenix Arrows projectile with one persistent 7-second molten sphere. It instant-casts, slowly seeks the largest nearby enemy cluster, continuously pulls enemies, applies type-scaled damage and burn, then ends in a fiery AoE explosion. A second Phoenix cannot be cast while the first exists. -->
 <!-- V22.10.34 Supernova Beam Release Polish: upgrades the released beam with a brighter white-hot core, layered gold/orange plasma, animated edge ribbons, localized impact flares, stronger boss stagger, and a short lingering heat shimmer without reducing battlefield visibility. -->
@@ -29,7 +31,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.36</title>
+<title>Family Arena V22.10.38</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -11002,44 +11004,39 @@ function updateArcherMirrorClones(dt){
 }
 
 // ---------------------------------------------------------------------
-// Tempest Archer secondary: Phoenix Fireball.
-// One persistent molten sphere may exist at a time. It has no cooldown;
-// availability returns the instant the active sphere expires or is cleared.
+// Tempest Archer secondary: Triple Phoenix Fireball.
+// One cast launches three molten spheres. The three-ball volley counts as one
+// active ability and must fully expire before Phoenix may be cast again.
 // ---------------------------------------------------------------------
 const PHOENIX_LIFETIME=7;
 const PHOENIX_SPEED=3.15;
+const PHOENIX_SPREAD_TIME=.72;
 const PHOENIX_PULL_RADIUS=9.2;
 const PHOENIX_CONTACT_RADIUS=3.15;
 const PHOENIX_EXPLOSION_RADIUS=8.0;
 let phoenixFireball=null;
+let phoenixAfterEffects=[];
 
 function createPhoenixFireballMesh(){
   const g=new THREE.Group();
   const coreMat=new THREE.MeshStandardMaterial({color:0xff741d,emissive:0xff3506,emissiveIntensity:2.05,roughness:.24,metalness:.06});
   const core=new THREE.Mesh(new THREE.IcosahedronGeometry(2.48,3),coreMat);core.userData.role='core';g.add(core);
-
-  // A broken-looking volcanic shell leaves the brighter core and seams visible.
   const shellMat=new THREE.MeshStandardMaterial({color:0x1a0c0a,emissive:0x571207,emissiveIntensity:.48,roughness:.91,metalness:.08,transparent:true,opacity:.92});
   for(let i=0;i<7;i++){
     const plate=new THREE.Mesh(new THREE.IcosahedronGeometry(2.68,1),shellMat.clone());
-    plate.scale.set(1,0.24+Math.random()*.12,1);
-    plate.rotation.set((i/7)*Math.PI*2,Math.random()*Math.PI,Math.random()*Math.PI);
+    plate.scale.set(1,0.24+Math.random()*.12,1);plate.rotation.set((i/7)*Math.PI*2,Math.random()*Math.PI,Math.random()*Math.PI);
     plate.userData.role='shellPlate';plate.userData.spin=(i%2?1:-1)*(.10+i*.008);g.add(plate);
   }
-
   const crackMat=new THREE.MeshBasicMaterial({color:0xffc13b,transparent:true,opacity:.92,depthWrite:false,blending:THREE.AdditiveBlending});
   for(let i=0;i<8;i++){
     const ring=new THREE.Mesh(new THREE.TorusGeometry(2.57,.045+(i%3)*.012,6,42),crackMat.clone());
     ring.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);ring.userData.role='crack';ring.userData.spin=(i%2?1:-1)*(.45+i*.055);g.add(ring);
   }
-
-  // Two offset coronas suggest flame rotation without a screen-filling effect.
   const coronaMat=new THREE.MeshBasicMaterial({color:0xff6a16,transparent:true,opacity:.28,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
   for(let i=0;i<2;i++){
     const corona=new THREE.Mesh(new THREE.TorusGeometry(3.02+i*.20,.13,7,38),coronaMat.clone());
     corona.rotation.set(Math.PI*.5,i*Math.PI*.5,0);corona.userData.role='corona';corona.userData.spin=(i?-.82:1.0);g.add(corona);
   }
-
   const glowMat=new THREE.MeshBasicMaterial({color:0xff6517,transparent:true,opacity:.20,depthWrite:false,blending:THREE.AdditiveBlending});
   const glow=new THREE.Mesh(new THREE.SphereGeometry(3.22,20,14),glowMat);glow.userData.role='glow';g.add(glow);
   const heatMat=new THREE.MeshBasicMaterial({color:0xffd06a,transparent:true,opacity:.075,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
@@ -11047,39 +11044,38 @@ function createPhoenixFireballMesh(){
   const light=new THREE.PointLight(0xff5b18,2.45,17,2);light.position.y=.2;g.add(light);
   g.scale.setScalar(.78);return g;
 }
-function phoenixClusterTarget(){
+function phoenixClusterTarget(ball){
   const living=zombies.filter(z=>z&&!z.userData.dead&&z.parent);
-  if(!living.length)return null;
-  if(living.length===1)return living[0];
+  if(!living.length)return null;if(living.length===1)return living[0];
   let best=living[0],bestScore=-Infinity;
   for(const z of living){
     let nearby=0,weight=0;
-    for(const o of living){
-      const d=Math.hypot(o.position.x-z.position.x,o.position.z-z.position.z);
-      if(d<=8){nearby++;weight+=1-d/9;}
-    }
-    const distancePenalty=phoenixFireball?Math.hypot(z.position.x-phoenixFireball.mesh.position.x,z.position.z-phoenixFireball.mesh.position.z)*.025:0;
-    const score=nearby+weight-distancePenalty;
-    if(score>bestScore){bestScore=score;best=z;}
+    for(const o of living){const d=Math.hypot(o.position.x-z.position.x,o.position.z-z.position.z);if(d<=8){nearby++;weight+=1-d/9;}}
+    const distancePenalty=ball?Math.hypot(z.position.x-ball.mesh.position.x,z.position.z-ball.mesh.position.z)*.025:0;
+    const score=nearby+weight-distancePenalty;if(score>bestScore){bestScore=score;best=z;}
   }
   return best;
 }
 function triggerPhoenixFireball(){
   if(!gameRunning||state.avatarType!=='rogue'||phoenixFireball)return false;
-  const yaw=player.rotation.y,fx=Math.sin(yaw),fz=Math.cos(yaw);
-  const mesh=createPhoenixFireballMesh();
-  mesh.position.set(player.position.x+fx*2.25,2.35,player.position.z+fz*2.25);scene.add(mesh);
-  phoenixFireball={mesh,life:PHOENIX_LIFETIME,maxLife:PHOENIX_LIFETIME,hitEnemies:new Set(),targetTick:0,target:null,fxTick:0,smokeTick:0,dirX:fx,dirZ:fz};
-  spawnBurst(mesh.position.x,mesh.position.y,mesh.position.z,24,FX_MAT_SPARK,5.2);
-  spawnArcaneSigil(player.position.x,.035,player.position.z,2.25);
-  triggerCombatShake(6,150);navigator.vibrate&&navigator.vibrate([28,18,42]);toast('PHOENIX FIREBALL!');
+  const yaw=player.rotation.y;
+  const spreadAngles=[-.58,0,.58];
+  const balls=[];
+  for(let i=0;i<spreadAngles.length;i++){
+    const a=yaw+spreadAngles[i],dx=Math.sin(a),dz=Math.cos(a),mesh=createPhoenixFireballMesh();
+    mesh.position.set(player.position.x+dx*2.15,2.35,player.position.z+dz*2.15);scene.add(mesh);
+    balls.push({mesh,life:PHOENIX_LIFETIME,maxLife:PHOENIX_LIFETIME,hitEnemies:new Set(),targetTick:PHOENIX_SPREAD_TIME,target:null,fxTick:i*.018,smokeTick:i*.045,dirX:dx,dirZ:dz,spreadTimer:PHOENIX_SPREAD_TIME});
+    spawnBurst(mesh.position.x,mesh.position.y,mesh.position.z,14,FX_MAT_SPARK,4.6);
+  }
+  phoenixFireball={balls};
+  spawnArcaneSigil(player.position.x,.035,player.position.z,2.8);
+  triggerCombatShake(8,180);navigator.vibrate&&navigator.vibrate([32,18,48]);toast('TRIPLE PHOENIX!');
   return true;
 }
-function damagePhoenixTarget(z){
-  if(!z||z.userData.dead||!phoenixFireball||phoenixFireball.hitEnemies.has(z))return;
-  phoenixFireball.hitEnemies.add(z);
-  const type=z.userData.archetype||'walker';
-  const maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
+function damagePhoenixTarget(ball,z){
+  if(!z||z.userData.dead||!ball||ball.hitEnemies.has(z))return;
+  ball.hitEnemies.add(z);
+  const type=z.userData.archetype||'walker',maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
   if(type==='boss'){
     applyBulletDamage(z,maxHp*.12);
     if(!z.userData.dead){z.userData.burnTimer=Math.max(z.userData.burnTimer||0,6);z.userData.burnDps=Math.max(z.userData.burnDps||0,maxHp*.012);}
@@ -11089,87 +11085,68 @@ function damagePhoenixTarget(z){
   }else applyBulletDamage(z,(z.userData.hp||1)+1);
   spawnBurst(z.position.x,z.position.y+.75,z.position.z,type==='boss'?18:12,FX_MAT_SPARK,type==='boss'?4.5:3.5);
 }
-function explodePhoenixFireball(){
-  if(!phoenixFireball)return;
-  const p=phoenixFireball.mesh.position.clone();
-  for(const z of [...zombies]){
-    if(z.userData.dead)continue;
-    const dx=z.position.x-p.x,dz=z.position.z-p.z,dist=Math.hypot(dx,dz);
-    if(dist>PHOENIX_EXPLOSION_RADIUS)continue;
-    const type=z.userData.archetype||'walker',maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
-    if(type==='boss')applyBulletDamage(z,maxHp*.08);
-    else if(type==='brute')applyBulletDamage(z,maxHp*.20);
-    else applyBulletDamage(z,(z.userData.hp||1)+1);
-    if(!z.userData.dead){const dl=dist||1,force=type==='boss'?1.1:(type==='brute'?3.0:6.5);z.userData.knockbackX=(dx/dl)*force;z.userData.knockbackZ=(dz/dl)*force;}
+function spawnPhoenixExpirationFx(p){
+  const group=new THREE.Group();group.position.set(p.x,.045,p.z);const ringColors=[0xfff0a3,0xff9a24,0xff3d0a];
+  for(let i=0;i<3;i++){
+    const mat=new THREE.MeshBasicMaterial({color:ringColors[i],transparent:true,opacity:.78-i*.12,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+    const ring=new THREE.Mesh(new THREE.RingGeometry(1.4+i*.35,1.72+i*.38,48),mat);ring.rotation.x=-Math.PI/2;ring.position.y=.03+i*.025;ring.userData.role='blastRing';ring.userData.delay=i*.08;group.add(ring);
   }
-  spawnBurst(p.x,p.y,p.z,46,FX_MAT_SPARK,9.5);spawnArcaneSigil(p.x,.04,p.z,PHOENIX_EXPLOSION_RADIUS*.72);
-  triggerCombatShake(12,260);navigator.vibrate&&navigator.vibrate([55,25,90]);
-  scene.remove(phoenixFireball.mesh);disposeGroup(phoenixFireball.mesh);phoenixFireball=null;
+  const scorchMat=new THREE.MeshBasicMaterial({color:0x3b1008,transparent:true,opacity:.58,depthWrite:false,side:THREE.DoubleSide});
+  const scorch=new THREE.Mesh(new THREE.CircleGeometry(PHOENIX_EXPLOSION_RADIUS*.64,42),scorchMat);scorch.rotation.x=-Math.PI/2;scorch.position.y=.012;scorch.userData.role='scorch';group.add(scorch);
+  const flareMat=new THREE.MeshBasicMaterial({color:0xffb12a,transparent:true,opacity:.34,depthWrite:false,blending:THREE.AdditiveBlending});
+  const flare=new THREE.Mesh(new THREE.SphereGeometry(2.5,18,12),flareMat);flare.position.y=1.4;flare.userData.role='flare';group.add(flare);
+  scene.add(group);phoenixAfterEffects.push({group,life:3.6,maxLife:3.6});
+}
+function clearPhoenixAfterEffects(){for(const fx of phoenixAfterEffects){if(fx.group&&fx.group.parent){scene.remove(fx.group);disposeGroup(fx.group);}}phoenixAfterEffects=[];}
+function updatePhoenixAfterEffects(dt){
+  for(let i=phoenixAfterEffects.length-1;i>=0;i--){
+    const fx=phoenixAfterEffects[i];fx.life-=dt;const age=fx.maxLife-fx.life;
+    fx.group.traverse(o=>{const role=o.userData.role;if(role==='blastRing'){const local=Math.max(0,age-(o.userData.delay||0)),q=1+local*3.05;o.scale.setScalar(q);o.material.opacity=Math.max(0,.78-local*1.25);}else if(role==='flare'){const q=1+age*1.75;o.scale.setScalar(q);o.material.opacity=Math.max(0,.34-age*.62);}else if(role==='scorch')o.material.opacity=Math.max(0,.58*(fx.life/fx.maxLife));});
+    if(fx.life<=0){scene.remove(fx.group);disposeGroup(fx.group);phoenixAfterEffects.splice(i,1);}
+  }
+}
+function explodePhoenixBall(ball){
+  if(!ball||!ball.mesh)return;const p=ball.mesh.position.clone();
+  for(const z of [...zombies]){
+    if(z.userData.dead)continue;const dx=z.position.x-p.x,dz=z.position.z-p.z,dist=Math.hypot(dx,dz);if(dist>PHOENIX_EXPLOSION_RADIUS)continue;
+    const type=z.userData.archetype||'walker',maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
+    if(type==='boss')applyBulletDamage(z,maxHp*.08);else if(type==='brute')applyBulletDamage(z,maxHp*.20);else applyBulletDamage(z,(z.userData.hp||1)+1);
+    if(!z.userData.dead){const dl=dist||1,force=type==='boss'?1.35:(type==='brute'?3.5:7.0);z.userData.knockbackX=(dx/dl)*force;z.userData.knockbackZ=(dz/dl)*force;z.userData.hitStun=Math.max(z.userData.hitStun||0,type==='boss'?.32:.48);if(type==='boss'||type==='brute'){z.userData.burnTimer=Math.max(z.userData.burnTimer||0,6);z.userData.burnDps=Math.max(z.userData.burnDps||0,maxHp*(type==='boss'?.010:.020));z.userData.phoenixBurnFxTimer=0;}}
+  }
+  spawnPhoenixExpirationFx(p);spawnBurst(p.x,p.y,p.z,40,FX_MAT_SPARK,9.0);spawnBurst(p.x,p.y+.4,p.z,12,FX_MAT_DUST,5.4);spawnArcaneSigil(p.x,.04,p.z,PHOENIX_EXPLOSION_RADIUS*.72);
+  if(ball.mesh.parent){scene.remove(ball.mesh);disposeGroup(ball.mesh);}ball.mesh=null;
+}
+function explodePhoenixFireball(){
+  if(!phoenixFireball)return;for(const ball of phoenixFireball.balls)explodePhoenixBall(ball);
+  triggerCombatShake(16,330);navigator.vibrate&&navigator.vibrate([70,24,110]);phoenixFireball=null;
 }
 function clearPhoenixFireball(explode=false){
-  if(!phoenixFireball)return;
-  if(explode){explodePhoenixFireball();return;}
-  scene.remove(phoenixFireball.mesh);disposeGroup(phoenixFireball.mesh);phoenixFireball=null;
+  if(!phoenixFireball)return;if(explode){explodePhoenixFireball();return;}
+  for(const ball of phoenixFireball.balls){if(ball.mesh&&ball.mesh.parent){scene.remove(ball.mesh);disposeGroup(ball.mesh);}}phoenixFireball=null;
 }
 function updatePhoenixFireball(dt){
-  if(!phoenixFireball)return;
-  const f=phoenixFireball,m=f.mesh,now=performance.now();f.life=Math.max(0,f.life-dt);f.targetTick-=dt;f.fxTick-=dt;f.smokeTick-=dt;
-  if(f.targetTick<=0){f.targetTick=.24;f.target=phoenixClusterTarget();}
-
-  // Steer toward the best cluster instead of snapping direction. The normalized
-  // direction is always advanced at full PHOENIX_SPEED, so the fireball never stops.
-  let desiredX=f.dirX,desiredZ=f.dirZ;
-  if(f.target&&!f.target.userData.dead&&f.target.parent){
-    const dx=f.target.position.x-m.position.x,dz=f.target.position.z-m.position.z,dl=Math.hypot(dx,dz)||1;
-    desiredX=dx/dl;desiredZ=dz/dl;
-  }
-  const steer=Math.min(1,dt*2.05);
-  f.dirX+=(desiredX-f.dirX)*steer;f.dirZ+=(desiredZ-f.dirZ)*steer;
-  let dirLen=Math.hypot(f.dirX,f.dirZ)||1;f.dirX/=dirLen;f.dirZ/=dirLen;
-  m.position.x+=f.dirX*PHOENIX_SPEED*dt;m.position.z+=f.dirZ*PHOENIX_SPEED*dt;
-
-  const radial=Math.hypot(m.position.x,m.position.z),limit=arenaSize-2.7;
-  if(radial>limit){
-    const nx=m.position.x/radial,nz=m.position.z/radial;m.position.x=nx*limit;m.position.z=nz*limit;
-    // Slide along the arena edge rather than appearing to stall against it.
-    const dot=f.dirX*nx+f.dirZ*nz;f.dirX-=nx*dot*1.65;f.dirZ-=nz*dot*1.65;
-    dirLen=Math.hypot(f.dirX,f.dirZ)||1;f.dirX/=dirLen;f.dirZ/=dirLen;
-  }
-  m.position.y=2.25+Math.sin(now*.0042)*.18;m.rotation.y+=dt*.88;m.rotation.x+=dt*.36;m.rotation.z+=dt*.13;
-  m.traverse(o=>{
-    const role=o.userData.role;
-    if(role==='crack'){
-      o.rotation.z+=dt*(o.userData.spin||.4);
-      o.material.opacity=.72+Math.sin(now*.012+o.id)*.20;
-    }else if(role==='shellPlate')o.rotation.y+=dt*(o.userData.spin||.1);
-    else if(role==='corona')o.rotation.z+=dt*(o.userData.spin||.8);
-    else if(role==='glow'){
-      const q=1+Math.sin(now*.009)*.085;o.scale.setScalar(q);o.material.opacity=.16+Math.sin(now*.010)*.055;
-    }else if(role==='heat'){
-      const q=1+Math.sin(now*.0065)*.055;o.scale.setScalar(q);o.rotation.y-=dt*.18;
-    }else if(role==='core')o.material.emissiveIntensity=1.85+Math.sin(now*.011)*.35;
-  });
-  for(const z of [...zombies]){
-    if(z.userData.dead)continue;
-    const dx=m.position.x-z.position.x,dz=m.position.z-z.position.z,dist=Math.hypot(dx,dz);
-    if(dist<=PHOENIX_PULL_RADIUS){
-      const type=z.userData.archetype||'walker',dl=dist||1;
-      const base=type==='boss'?.32:(type==='brute'?1.35:3.15),strength=base*Math.max(.18,1-dist/PHOENIX_PULL_RADIUS);
-      z.position.x+=dx/dl*strength*dt;z.position.z+=dz/dl*strength*dt;
+  if(!phoenixFireball)return;const now=performance.now();let livingBalls=0;
+  for(const ball of phoenixFireball.balls){
+    if(!ball.mesh)continue;livingBalls++;const m=ball.mesh;ball.life=Math.max(0,ball.life-dt);ball.targetTick-=dt;ball.fxTick-=dt;ball.smokeTick-=dt;ball.spreadTimer=Math.max(0,ball.spreadTimer-dt);
+    if(ball.spreadTimer<=0&&ball.targetTick<=0){ball.targetTick=.24;ball.target=phoenixClusterTarget(ball);}
+    let desiredX=ball.dirX,desiredZ=ball.dirZ;
+    if(ball.spreadTimer<=0&&ball.target&&!ball.target.userData.dead&&ball.target.parent){const dx=ball.target.position.x-m.position.x,dz=ball.target.position.z-m.position.z,dl=Math.hypot(dx,dz)||1;desiredX=dx/dl;desiredZ=dz/dl;}
+    const steer=ball.spreadTimer>0?0:Math.min(1,dt*2.05);ball.dirX+=(desiredX-ball.dirX)*steer;ball.dirZ+=(desiredZ-ball.dirZ)*steer;
+    let dirLen=Math.hypot(ball.dirX,ball.dirZ)||1;ball.dirX/=dirLen;ball.dirZ/=dirLen;m.position.x+=ball.dirX*PHOENIX_SPEED*dt;m.position.z+=ball.dirZ*PHOENIX_SPEED*dt;
+    const radial=Math.hypot(m.position.x,m.position.z),limit=arenaSize-2.7;
+    if(radial>limit){const nx=m.position.x/radial,nz=m.position.z/radial;m.position.x=nx*limit;m.position.z=nz*limit;const dot=ball.dirX*nx+ball.dirZ*nz;ball.dirX-=nx*dot*1.65;ball.dirZ-=nz*dot*1.65;dirLen=Math.hypot(ball.dirX,ball.dirZ)||1;ball.dirX/=dirLen;ball.dirZ/=dirLen;}
+    m.position.y=2.25+Math.sin(now*.0042+m.id)*.18;m.rotation.y+=dt*.88;m.rotation.x+=dt*.36;m.rotation.z+=dt*.13;
+    m.traverse(o=>{const role=o.userData.role;if(role==='crack'){o.rotation.z+=dt*(o.userData.spin||.4);o.material.opacity=.72+Math.sin(now*.012+o.id)*.20;}else if(role==='shellPlate')o.rotation.y+=dt*(o.userData.spin||.1);else if(role==='corona')o.rotation.z+=dt*(o.userData.spin||.8);else if(role==='glow'){const q=1+Math.sin(now*.009+o.id)*.085;o.scale.setScalar(q);o.material.opacity=.16+Math.sin(now*.010+o.id)*.055;}else if(role==='heat'){const q=1+Math.sin(now*.0065+o.id)*.055;o.scale.setScalar(q);o.rotation.y-=dt*.18;}else if(role==='core')o.material.emissiveIntensity=1.85+Math.sin(now*.011+o.id)*.35;});
+    for(const z of [...zombies]){
+      if(z.userData.dead)continue;const dx=m.position.x-z.position.x,dz=m.position.z-z.position.z,dist=Math.hypot(dx,dz);
+      if(dist<=PHOENIX_PULL_RADIUS){const type=z.userData.archetype||'walker',dl=dist||1,base=type==='boss'?.32:(type==='brute'?1.35:3.15),strength=base*Math.max(.18,1-dist/PHOENIX_PULL_RADIUS);z.position.x+=dx/dl*strength*dt;z.position.z+=dz/dl*strength*dt;}
+      if(dist<=PHOENIX_CONTACT_RADIUS)damagePhoenixTarget(ball,z);
     }
-    if(dist<=PHOENIX_CONTACT_RADIUS)damagePhoenixTarget(z);
+    if(ball.fxTick<=0){ball.fxTick=.075;const backX=m.position.x-ball.dirX*2.0,backZ=m.position.z-ball.dirZ*2.0;spawnBurst(backX+(Math.random()-.5)*1.4,m.position.y+(Math.random()-.5)*1.0,backZ+(Math.random()-.5)*1.4,2,FX_MAT_SPARK,2.6);}
+    if(ball.smokeTick<=0){ball.smokeTick=.18;const backX=m.position.x-ball.dirX*2.3,backZ=m.position.z-ball.dirZ*2.3;spawnBurst(backX,m.position.y+.35,backZ,1,FX_MAT_DUST,1.5);}
+    if(ball.life<=0)explodePhoenixBall(ball);
   }
-  if(f.fxTick<=0){
-    f.fxTick=.065;
-    const backX=m.position.x-f.dirX*2.0,backZ=m.position.z-f.dirZ*2.0;
-    spawnBurst(backX+(Math.random()-.5)*1.6,m.position.y+(Math.random()-.5)*1.2,backZ+(Math.random()-.5)*1.6,2,FX_MAT_SPARK,2.8);
-  }
-  if(f.smokeTick<=0){
-    f.smokeTick=.16;
-    const backX=m.position.x-f.dirX*2.3,backZ=m.position.z-f.dirZ*2.3;
-    spawnBurst(backX,m.position.y+.35,backZ,2,FX_MAT_DUST,1.65);
-  }
-  if(f.life<=0)explodePhoenixFireball();
+  if(livingBalls===0||phoenixFireball.balls.every(b=>!b.mesh)){phoenixFireball=null;triggerCombatShake(14,300);navigator.vibrate&&navigator.vibrate([65,24,105]);}
 }
 
 // ---------------------------------------------------------------------
@@ -11769,6 +11746,7 @@ function triggerBlizzardStorm(){
 
 function clearMageRoundSpecials(resetCooldowns=true){
   clearPhoenixFireball(false);
+  clearPhoenixAfterEffects();
   clearTempestDomain(resetCooldowns);
   clearSupernovaPiercer(resetCooldowns);
   clearSkyfallBarrage(resetCooldowns);
@@ -11811,7 +11789,15 @@ function updateMageUltimates(dt){
   for(const z of [...zombies]){
     if(z.userData.dead)continue;
     if((z.userData.slowTimer||0)>0){z.userData.slowTimer=Math.max(0,z.userData.slowTimer-dt);if(z.userData.slowTimer<=0)z.userData.slowMult=1;}
-    if((z.userData.burnTimer||0)>0){z.userData.burnTimer=Math.max(0,z.userData.burnTimer-dt);z.userData.hp-=(z.userData.burnDps||0)*dt;if(Math.random()<dt*8)spawnBurst(z.position.x,z.position.y+.5,z.position.z,2,FX_MAT_SPARK,1.3);if(z.userData.hp<=0)killZombie(z);}
+    if((z.userData.burnTimer||0)>0){
+      z.userData.burnTimer=Math.max(0,z.userData.burnTimer-dt);z.userData.hp-=(z.userData.burnDps||0)*dt;
+      z.userData.phoenixBurnFxTimer=(z.userData.phoenixBurnFxTimer||0)-dt;
+      if(z.userData.phoenixBurnFxTimer<=0){
+        z.userData.phoenixBurnFxTimer=.16+Math.random()*.08;
+        spawnBurst(z.position.x+(Math.random()-.5)*.65,z.position.y+.45+Math.random()*.75,z.position.z+(Math.random()-.5)*.65,3,FX_MAT_SPARK,1.75);
+      }
+      if(z.userData.hp<=0)killZombie(z);
+    }
   }
 }
 function updateMageAbilityEffects(dt){updateMageUltimates(dt);}
@@ -13320,6 +13306,7 @@ function update(dt){
   }
   updateBullets(dt);
   updatePhoenixFireball(dt);
+  updatePhoenixAfterEffects(dt);
   updateEnemyProjectiles(dt);
   updateFx(dt);
   updateWeather(dt);
