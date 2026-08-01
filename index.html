@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- V22.10.24 Tempest Archer Phase 10: adds Round-10 Mirror Clones as an equipable Archer ability. Two cyan phantom Archers use the Mage Echo framework, draw enemy aggro, fire 10%-damage phantom arrows with small knockback, persist between rounds, and are unlocked immediately during development testing. -->
 <!-- V22.10.23 Tempest Archer Phase 9: adds Skyfall Barrage as a damage-focused ultimate-tier alternative to Tempest Domain. For 7 seconds, large translucent arrows rain onto enemy clusters with visible landing markers, strong area damage, and a 25-second cooldown. Boss damage is capped at 25% per cast, effects remain localized, and all Skyfall objects clear at round end. -->
 <!-- V22.10.22 Tempest Archer Phase 8: restores hold-to-fire for every primary and secondary attack, prevents browser pinch/double-tap zoom, and redesigns Cyclone Snare into a persistent Storm Beacon trap so it plays completely differently from the straight-line Gale Drill Arrow. -->
 <!-- V22.10.21 Tempest Archer Phase 7: stabilizes the Archer kit. Prevents pierced arrows from repeatedly hitting the same enemy, fixes Cyclone Snare power scaling, removes duplicate mobile Ability events, makes single-shot secondaries fire once per press, and adds live Tempest Domain active/cooldown HUD feedback. -->
@@ -16,7 +17,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.23</title>
+<title>Family Arena V22.10.24</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -695,7 +696,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.23 - Tempest Archer Phase 9';
+const GAME_VERSION='22.10.24 - Tempest Archer Mirror Clones';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1489,6 +1490,8 @@ const ARCANE_LASER = {id:'arcane_laser', name:'Arcane Laser', price:760,
   desc:'Hold to channel a piercing beam of massive sustained damage into whatever you\'re aimed at — the dedicated way to burn down a Brute or Boss. Pierces the crowd behind your target for lighter damage. Drains a charge meter that refills when you let go.'};
 const TEMPEST_DOMAIN = {id:'tempest_domain', name:'Tempest Domain', price:720,
   desc:'Ultimate-tier crowd control. For 8 seconds, a large wind field follows the Archer, repeatedly damaging, pulling, and heavily slowing enemies inside it. Uses a 22-second cooldown and never covers the screen.'};
+const ARCHER_MIRROR_CLONES = {id:'archer_mirror_clones', name:'Mirror Clones', price:620,
+  desc:'Round 10 summon. Creates two cyan phantom Archers that draw enemy attention and fire 10%-damage arrows with small knockback. Active clones persist between rounds.'};
 const SKYFALL_BARRAGE = {id:'skyfall_barrage', name:'Skyfall Barrage', price:780,
   desc:'Ultimate-tier damage. For 7 seconds, giant translucent arrows rain onto enemy clusters with clear landing markers and strong area damage. Boss damage is capped at 25% per cast. Uses a 25-second cooldown.'};
 // Coins earned per kill — a flat rate that inches up in later rounds so
@@ -8692,10 +8695,12 @@ function spawnPlayer(){
 
 // ---- Zombies ----
 function livingPlayers(){
-  // Arcane Echoes deliberately take enemy aggro before the real Mage.
-  const echoes=arcaneEchoes.filter(e=>e && e.parent && !e.userData.dead && e.userData.hp>0);
-  if(echoes.length) return echoes;
-  return player && player.parent && player.userData.hp>0 ? [player] : [];
+  // Summoned copies deliberately take enemy aggro before the real player.
+  const mirrors=archerMirrorClones.filter(e=>e&&e.parent&&!e.userData.dead&&e.userData.hp>0);
+  if(mirrors.length)return mirrors;
+  const echoes=arcaneEchoes.filter(e=>e&&e.parent&&!e.userData.dead&&e.userData.hp>0);
+  if(echoes.length)return echoes;
+  return player&&player.parent&&player.userData.hp>0?[player]:[];
 }
 function spawnPointBlocked(x,z,clearance=0.7){
   if(Math.hypot(x,z) > arenaSize-clearance) return true;
@@ -9403,7 +9408,7 @@ function renderShopList(){
 // Mage abilities use one mutually-exclusive loadout slot. The shared HUD
 // button remains in the approved position directly left of FIRE. Buying
 // an ability equips it immediately; owned abilities can be swapped here.
-const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER], rogue:[TEMPEST_DOMAIN, SKYFALL_BARRAGE] };
+const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER], rogue:[TEMPEST_DOMAIN, SKYFALL_BARRAGE, ARCHER_MIRROR_CLONES] };
 function renderAbilityShopList(list){
   const abilities = HERO_ABILITIES[state.avatarType];
   if(!abilities || !abilities.length) return;
@@ -9419,7 +9424,7 @@ function renderAbilityShopList(list){
     row.className = 'weaponRow' + (equipped ? ' equipped' : '');
     const swatch = document.createElement('div');
     swatch.className = 'weaponSwatch';
-    swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : (a.id==='tempest_domain' ? '#63ffd1' : (a.id==='skyfall_barrage' ? '#f6d36b' : '#75dfff'));
+    swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : (a.id==='tempest_domain' ? '#63ffd1' : (a.id==='skyfall_barrage' ? '#f6d36b' : (a.id==='archer_mirror_clones' ? '#55e8ff' : '#75dfff')));
     const info = document.createElement('div');
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${a.name}</div><div class="wDesc">${a.desc}</div>`;
@@ -9634,6 +9639,7 @@ function setupControls(){
     else if(equippedAbilityId==='blizzard_storm') triggerBlizzardStorm();
     else if(equippedAbilityId==='tempest_domain') triggerTempestDomain();
     else if(equippedAbilityId==='skyfall_barrage') triggerSkyfallBarrage();
+    else if(equippedAbilityId==='archer_mirror_clones') triggerArcherMirrorClones();
   };
   const beginEquippedAbility=e=>{
     e.preventDefault();
@@ -10235,12 +10241,18 @@ function updateHoodedHud(){
           : (skyfallCooldownTimer>0 ? `SKYFALL ${Math.ceil(skyfallCooldownTimer)}` : 'SKYFALL');
         abilityBtn.classList.toggle('active',skyfallActiveTimer>0);
         abilityBtn.classList.toggle('cooling',skyfallCooldownTimer>0&&skyfallActiveTimer<=0);
+      }else if(equippedAbilityId==='archer_mirror_clones'){
+        abilityBtn.textContent=archerMirrorCooldownTimer>0
+          ? `CLONES ${Math.ceil(archerMirrorCooldownTimer)}`
+          : `CLONES ${archerMirrorClones.length}/2`;
+        abilityBtn.classList.toggle('active',archerMirrorClones.length>0);
+        abilityBtn.classList.toggle('cooling',archerMirrorCooldownTimer>0);
       }else{
         abilityBtn.textContent='BLIZZARD';
       }
       if(!laserMode){
         abilityBtn.style.removeProperty('--charge');
-        if(equippedAbilityId!=='tempest_domain'&&equippedAbilityId!=='skyfall_barrage'){
+        if(equippedAbilityId!=='tempest_domain'&&equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='archer_mirror_clones'){
           abilityBtn.classList.remove('empty','active','cooling');
         }
       }
@@ -10666,6 +10678,186 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
     beam.position.copy(mid);beam.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),to.clone().sub(from).normalize());scene.add(beam);
     fx.push({kind:'lightning',mesh:beam,life:.12,maxLife:.12,dispose:true});spawnBurst(to.x,to.y,to.z,4,FX_MAT_SPARK,2.0);from=to;
   });
+}
+
+// ---------------------------------------------------------------------
+// Tempest Archer Round-10 Mirror Clones.
+// This reuses the Mage Echo movement/targeting pattern but keeps a separate
+// runtime so Archer clones never interfere with Mage Arcane Echoes.
+// ---------------------------------------------------------------------
+const ARCHER_MIRROR_COUNT=2;
+const ARCHER_MIRROR_INITIAL_CHARGE=25;
+let archerMirrorClones=[];
+let archerMirrorCooldownTimer=0;
+let archerMirrorCycleDuration=15;
+let archerMirrorInitialChargePending=true;
+
+function archerMirrorCooldownForLevel(level=avatarLevel()){
+  return Math.max(1.5,15-(Math.max(1,level)-1)*(10/19));
+}
+function archerMirrorUnlocked(){
+  return state.avatarType==='rogue'&&(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING||avatarLevel()>=10);
+}
+function tintArcherMirror(root){
+  root.traverse(o=>{
+    if(o.isMesh&&o.material){
+      if(Array.isArray(o.material))o.material=o.material.map(m=>m.clone());
+      else o.material=o.material.clone();
+      (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{
+        if(m.color)m.color.lerp(new THREE.Color(0x55e8ff),.72);
+        if(m.emissive)m.emissive.setHex(0x0b9fcc);
+        m.transparent=true;m.opacity=.52;m.depthWrite=false;
+      });
+      o.renderOrder=5;
+    }
+  });
+}
+function clearArcherMirrorClones(){
+  archerMirrorClones.forEach(c=>{
+    if(c&&c.parent){scene.remove(c);disposeGroup(c);}
+  });
+  archerMirrorClones=[];
+  zombies.forEach(z=>{
+    if(z.userData.targetPlayer&&z.userData.targetPlayer.userData&&z.userData.targetPlayer.userData.isArcherMirror){
+      z.userData.targetPlayer=null;
+    }
+  });
+  updateHoodedHud();
+}
+function destroyArcherMirrorClone(c){
+  if(!c||c.userData.dead)return;
+  c.userData.dead=true;c.userData.hp=0;
+  spawnBurst(c.position.x,c.position.y+.75,c.position.z,16,FX_MAT_SPARK,3.4);
+  setTimeout(()=>{
+    if(c.parent){scene.remove(c);disposeGroup(c);}
+    archerMirrorClones=archerMirrorClones.filter(x=>x!==c);
+    updateHoodedHud();
+  },0);
+}
+function spawnArcherMirrorArrow(from,to){
+  const points=[
+    new THREE.Vector3(from.x,from.y+1.0,from.z),
+    new THREE.Vector3(to.x,to.y+.75,to.z)
+  ];
+  const geometry=new THREE.BufferGeometry().setFromPoints(points);
+  const material=new THREE.LineBasicMaterial({
+    color:0x62efff,transparent:true,opacity:.78,depthWrite:false,
+    blending:THREE.AdditiveBlending
+  });
+  const line=new THREE.Line(geometry,material);
+  line.renderOrder=8;scene.add(line);
+  fx.push({kind:'lightning',mesh:line,life:.14,maxLife:.14});
+  spawnArcherSpark(to.x,to.y+.72,to.z);
+}
+function triggerArcherMirrorClones(){
+  if(!gameRunning||!archerMirrorUnlocked()||equippedAbilityId!=='archer_mirror_clones')return;
+  if(archerMirrorCooldownTimer>0){
+    toast('Mirror Clones ready in '+archerMirrorCooldownTimer.toFixed(1)+'s');
+    return;
+  }
+  clearArcherMirrorClones();
+  archerMirrorCycleDuration=archerMirrorCooldownForLevel();
+  archerMirrorCooldownTimer=archerMirrorCycleDuration;
+  updateHoodedHud();
+  toast('MIRROR CLONES!');
+  navigator.vibrate&&navigator.vibrate([28,22,50]);
+
+  getKayKitAssetPromise('rogue').then(({gltf,THREEAsset,cloneSkinned})=>{
+    for(let i=0;i<ARCHER_MIRROR_COUNT;i++){
+      setTimeout(()=>{
+        if(!player||state.avatarType!=='rogue')return;
+        const wrap=new THREE.Group();
+        const root=cloneSkinned(gltf.scene);root.rotation.y=0;
+        const box=new THREEAsset.Box3().setFromObject(root),size=box.getSize(new THREEAsset.Vector3());
+        root.scale.setScalar(1.48/Math.max(.001,size.y));
+        const box2=new THREEAsset.Box3().setFromObject(root);root.position.y-=box2.min.y;
+        tintArcherMirror(root);wrap.add(root);
+        const a=(i/ARCHER_MIRROR_COUNT)*Math.PI*2;
+        wrap.position.set(
+          player.position.x+Math.cos(a)*1.9,
+          player.position.y,
+          player.position.z+Math.sin(a)*1.9
+        );
+        wrap.userData.isArcherMirror=true;
+        wrap.userData.hp=1;wrap.userData.dead=false;
+        wrap.userData.mirrorIndex=i;
+        wrap.userData.attackCooldown=.2+i*.12;
+        wrap.userData.kayMixer=new THREEAsset.AnimationMixer(root);
+        wrap.userData.kayClips={};
+        gltf.animations.forEach(c=>wrap.userData.kayClips[c.name]=c);
+        scene.add(wrap);archerMirrorClones.push(wrap);
+        spawnBurst(wrap.position.x,wrap.position.y+.7,wrap.position.z,14,FX_MAT_SPARK,3.0);
+        updateHoodedHud();
+      },i*140);
+    }
+  });
+}
+function updateArcherMirrorClones(dt){
+  if(archerMirrorUnlocked()&&archerMirrorInitialChargePending){
+    archerMirrorInitialChargePending=false;
+    archerMirrorCycleDuration=ARCHER_MIRROR_INITIAL_CHARGE;
+    archerMirrorCooldownTimer=ARCHER_MIRROR_INITIAL_CHARGE;
+    updateHoodedHud();
+  }
+  if(archerMirrorCooldownTimer>0){
+    archerMirrorCooldownTimer=Math.max(0,archerMirrorCooldownTimer-dt);
+    if(state.avatarType==='rogue'&&equippedAbilityId==='archer_mirror_clones')updateHoodedHud();
+  }
+  if(!player)return;
+
+  const now=performance.now()*.001;
+  for(const c of [...archerMirrorClones]){
+    if(!c||c.userData.dead||c.userData.hp<=0){destroyArcherMirrorClone(c);continue;}
+    if(c.userData.kayMixer)c.userData.kayMixer.update(dt);
+    const i=c.userData.mirrorIndex||0;
+    const a=now*.38+(i/ARCHER_MIRROR_COUNT)*Math.PI*2;
+    const orbitDesired=new THREE.Vector3(
+      player.position.x+Math.cos(a)*2.4,
+      player.position.y,
+      player.position.z+Math.sin(a)*2.4
+    );
+
+    let target=null,best=16*16;
+    for(const z of zombies){
+      if(!z||z.userData.dead||z.userData.spawnPending||!z.visible)continue;
+      const d=c.position.distanceToSquared(z.position);
+      if(d<best){best=d;target=z;}
+    }
+
+    let desired=orbitDesired;
+    if(target){
+      const toward=target.position.clone().sub(c.position);toward.y=0;
+      const targetDist=toward.length();
+      if(targetDist>4){
+        toward.normalize();
+        const candidate=c.position.clone().addScaledVector(toward,Math.min(2.4,targetDist-3.5));
+        const fromPlayer=candidate.clone().sub(player.position);fromPlayer.y=0;
+        if(fromPlayer.length()>6)candidate.copy(player.position).add(fromPlayer.normalize().multiplyScalar(6));
+        candidate.y=player.position.y;desired=candidate;
+      }
+    }
+    const dist=c.position.distanceTo(desired);
+    if(dist>10)c.position.copy(desired);
+    else c.position.lerp(desired,Math.min(1,dt*(dist>4?9:5.5)));
+
+    c.userData.attackCooldown=Math.max(0,(c.userData.attackCooldown||0)-dt);
+    if(target&&!target.userData.dead&&target.parent){
+      c.rotation.y=Math.atan2(target.position.x-c.position.x,target.position.z-c.position.z);
+      if(c.userData.attackCooldown<=0){
+        c.userData.attackCooldown=.74;
+        const dx=target.position.x-c.position.x,dz=target.position.z-c.position.z;
+        const dl=Math.hypot(dx,dz)||1;
+        const damage=Math.max(.08,(weaponForAvatar().damage||1)*playerStats.power*.10);
+        spawnArcherMirrorArrow(c.position,target.position);
+        applyBulletDamage(target,damage);
+        if(!target.userData.dead){
+          target.userData.knockbackX=(dx/dl)*2.8;
+          target.userData.knockbackZ=(dz/dl)*2.8;
+          target.userData.hitStun=Math.max(target.userData.hitStun||0,.10);
+        }
+      }
+    }else c.rotation.y=player.rotation.y;
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -11850,6 +12042,7 @@ function tintCloneBlack(root){
 function syncShadowClones(){
   clearShadowClones();
   clearArcaneEchoes(); arcaneEchoesCooldownTimer=0; arcaneEchoesCycleDuration=15; arcaneEchoesInitialChargePending=true;
+  clearArcherMirrorClones(); archerMirrorCooldownTimer=0; archerMirrorCycleDuration=15; archerMirrorInitialChargePending=true;
   updateHoodedHud();
   const w=weaponForAvatar();
   if(state.avatarType!=='hooded' || !player) return;
@@ -11943,6 +12136,7 @@ function update(dt){
   updateHeroIdentityAura(dt);
   updateShadowClones(dt);
   updateArcaneEchoes(dt);
+  updateArcherMirrorClones(dt);
   updateShadowEclipse(dt);
   updateArrowStorm(dt);
   updateSkyfallBarrage(dt);
