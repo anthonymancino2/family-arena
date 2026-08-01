@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- V22.10.23 Tempest Archer Phase 9: adds Skyfall Barrage as a damage-focused ultimate-tier alternative to Tempest Domain. For 7 seconds, large translucent arrows rain onto enemy clusters with visible landing markers, strong area damage, and a 25-second cooldown. Boss damage is capped at 25% per cast, effects remain localized, and all Skyfall objects clear at round end. -->
 <!-- V22.10.22 Tempest Archer Phase 8: restores hold-to-fire for every primary and secondary attack, prevents browser pinch/double-tap zoom, and redesigns Cyclone Snare into a persistent Storm Beacon trap so it plays completely differently from the straight-line Gale Drill Arrow. -->
 <!-- V22.10.21 Tempest Archer Phase 7: stabilizes the Archer kit. Prevents pierced arrows from repeatedly hitting the same enemy, fixes Cyclone Snare power scaling, removes duplicate mobile Ability events, makes single-shot secondaries fire once per press, and adds live Tempest Domain active/cooldown HUD feedback. -->
 <!-- V22.10.20 Tempest Archer Phase 6: adds Tempest Domain as the Archer's first equipable ultimate-tier ability. For 8 seconds a large mobile wind field follows the Archer, repeatedly damages, pulls, and slows nearby enemies. It uses the shared Ability button, has a 22-second cooldown, remains readable, and clears at round end. -->
@@ -15,7 +16,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.22</title>
+<title>Family Arena V22.10.23</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -694,7 +695,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.22 - Tempest Archer Phase 8';
+const GAME_VERSION='22.10.23 - Tempest Archer Phase 9';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1488,6 +1489,8 @@ const ARCANE_LASER = {id:'arcane_laser', name:'Arcane Laser', price:760,
   desc:'Hold to channel a piercing beam of massive sustained damage into whatever you\'re aimed at — the dedicated way to burn down a Brute or Boss. Pierces the crowd behind your target for lighter damage. Drains a charge meter that refills when you let go.'};
 const TEMPEST_DOMAIN = {id:'tempest_domain', name:'Tempest Domain', price:720,
   desc:'Ultimate-tier crowd control. For 8 seconds, a large wind field follows the Archer, repeatedly damaging, pulling, and heavily slowing enemies inside it. Uses a 22-second cooldown and never covers the screen.'};
+const SKYFALL_BARRAGE = {id:'skyfall_barrage', name:'Skyfall Barrage', price:780,
+  desc:'Ultimate-tier damage. For 7 seconds, giant translucent arrows rain onto enemy clusters with clear landing markers and strong area damage. Boss damage is capped at 25% per cast. Uses a 25-second cooldown.'};
 // Coins earned per kill — a flat rate that inches up in later rounds so
 // the pricier weapons stay reachable in a long run.
 function tokensPerKill(){ return 5 + Math.floor(round/5); }
@@ -9400,7 +9403,7 @@ function renderShopList(){
 // Mage abilities use one mutually-exclusive loadout slot. The shared HUD
 // button remains in the approved position directly left of FIRE. Buying
 // an ability equips it immediately; owned abilities can be swapped here.
-const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER], rogue:[TEMPEST_DOMAIN] };
+const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER], rogue:[TEMPEST_DOMAIN, SKYFALL_BARRAGE] };
 function renderAbilityShopList(list){
   const abilities = HERO_ABILITIES[state.avatarType];
   if(!abilities || !abilities.length) return;
@@ -9416,7 +9419,7 @@ function renderAbilityShopList(list){
     row.className = 'weaponRow' + (equipped ? ' equipped' : '');
     const swatch = document.createElement('div');
     swatch.className = 'weaponSwatch';
-    swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : (a.id==='tempest_domain' ? '#63ffd1' : '#75dfff');
+    swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : (a.id==='tempest_domain' ? '#63ffd1' : (a.id==='skyfall_barrage' ? '#f6d36b' : '#75dfff'));
     const info = document.createElement('div');
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${a.name}</div><div class="wDesc">${a.desc}</div>`;
@@ -9630,6 +9633,7 @@ function setupControls(){
     if(equippedAbilityId==='arcane_laser') startArcaneLaser();
     else if(equippedAbilityId==='blizzard_storm') triggerBlizzardStorm();
     else if(equippedAbilityId==='tempest_domain') triggerTempestDomain();
+    else if(equippedAbilityId==='skyfall_barrage') triggerSkyfallBarrage();
   };
   const beginEquippedAbility=e=>{
     e.preventDefault();
@@ -10225,12 +10229,20 @@ function updateHoodedHud(){
           : (tempestDomainCooldownTimer>0 ? `TEMPEST ${Math.ceil(tempestDomainCooldownTimer)}` : 'TEMPEST');
         abilityBtn.classList.toggle('active',tempestDomainActiveTimer>0);
         abilityBtn.classList.toggle('cooling',tempestDomainCooldownTimer>0&&tempestDomainActiveTimer<=0);
+      }else if(equippedAbilityId==='skyfall_barrage'){
+        abilityBtn.textContent=skyfallActiveTimer>0
+          ? `SKYFALL ${skyfallActiveTimer.toFixed(1)}`
+          : (skyfallCooldownTimer>0 ? `SKYFALL ${Math.ceil(skyfallCooldownTimer)}` : 'SKYFALL');
+        abilityBtn.classList.toggle('active',skyfallActiveTimer>0);
+        abilityBtn.classList.toggle('cooling',skyfallCooldownTimer>0&&skyfallActiveTimer<=0);
       }else{
         abilityBtn.textContent='BLIZZARD';
       }
       if(!laserMode){
         abilityBtn.style.removeProperty('--charge');
-        if(equippedAbilityId!=='tempest_domain')abilityBtn.classList.remove('empty','active');
+        if(equippedAbilityId!=='tempest_domain'&&equippedAbilityId!=='skyfall_barrage'){
+          abilityBtn.classList.remove('empty','active','cooling');
+        }
       }
     }
   }
@@ -10657,6 +10669,200 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
 }
 
 // ---------------------------------------------------------------------
+// Tempest Archer damage-focused ultimate-tier ability.
+// Giant translucent arrows fall from above onto enemy clusters with clear
+// ground markers. Effects remain local and never cover the whole screen.
+// ---------------------------------------------------------------------
+const SKYFALL_COOLDOWN=25;
+const SKYFALL_DURATION=7;
+const SKYFALL_IMPACT_RADIUS=2.65;
+const SKYFALL_BOSS_CAP=.25;
+let skyfallCooldownTimer=0;
+let skyfallActiveTimer=0;
+let skyfallSpawnTimer=0;
+let skyfallArrows=[];
+let skyfallBossDamage=new Map();
+
+function makeSkyfallArrowMesh(){
+  const g=new THREE.Group();
+  const shaftMat=new THREE.MeshStandardMaterial({
+    color:0xe8c65c,emissive:0x8a5d12,emissiveIntensity:.75,
+    transparent:true,opacity:.70,roughness:.34,metalness:.18,depthWrite:false
+  });
+  const glowMat=new THREE.MeshBasicMaterial({
+    color:0xffe89a,transparent:true,opacity:.28,depthWrite:false,
+    blending:THREE.AdditiveBlending
+  });
+  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.16,.19,4.7,10),shaftMat);
+  shaft.rotation.x=Math.PI/2;g.add(shaft);
+  const head=new THREE.Mesh(new THREE.ConeGeometry(.58,1.55,10),shaftMat.clone());
+  head.rotation.x=-Math.PI/2;head.position.z=-3.05;g.add(head);
+  const glow=new THREE.Mesh(new THREE.CylinderGeometry(.32,.38,5.8,10),glowMat);
+  glow.rotation.x=Math.PI/2;glow.position.z=-.35;g.add(glow);
+  const fletchMat=new THREE.MeshBasicMaterial({
+    color:0x77e9ff,transparent:true,opacity:.54,depthWrite:false,
+    side:THREE.DoubleSide,blending:THREE.AdditiveBlending
+  });
+  for(let i=0;i<3;i++){
+    const feather=new THREE.Mesh(new THREE.PlaneGeometry(.68,1.0),fletchMat.clone());
+    feather.position.z=2.25;feather.rotation.z=i*Math.PI/3;g.add(feather);
+  }
+  g.scale.setScalar(1.55);
+  return g;
+}
+
+function makeSkyfallLandingRing(radius){
+  const mat=new THREE.MeshBasicMaterial({
+    color:0xffd861,transparent:true,opacity:.46,depthWrite:false,
+    side:THREE.DoubleSide,blending:THREE.AdditiveBlending
+  });
+  const ring=new THREE.Mesh(new THREE.RingGeometry(radius*.72,radius,48),mat);
+  ring.rotation.x=-Math.PI/2;ring.position.y=.065;
+  return ring;
+}
+
+function chooseSkyfallTarget(){
+  const living=zombies.filter(z=>!z.userData.dead);
+  if(!living.length)return null;
+  // Prefer dense enemy clusters, then nearer enemies.
+  let best=null,bestScore=-Infinity;
+  for(const z of living){
+    let nearby=0;
+    for(const o of living){
+      if(o===z)continue;
+      if(Math.hypot(o.position.x-z.position.x,o.position.z-z.position.z)<5.2)nearby++;
+    }
+    const dist=player?Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z):0;
+    const score=nearby*2.4-dist*.035+Math.random()*.35;
+    if(score>bestScore){bestScore=score;best=z;}
+  }
+  return best;
+}
+
+function spawnSkyfallArrow(){
+  const target=chooseSkyfallTarget();
+  if(!target)return;
+  const spread=2.5;
+  const x=THREE.MathUtils.clamp(target.position.x+(Math.random()-.5)*spread*2,-arenaSize+.8,arenaSize-.8);
+  const z=THREE.MathUtils.clamp(target.position.z+(Math.random()-.5)*spread*2,-arenaSize+.8,arenaSize-.8);
+  const mesh=makeSkyfallArrowMesh();
+  mesh.position.set(x,18+Math.random()*4,z);
+  mesh.rotation.y=Math.random()*Math.PI*2;
+  mesh.rotation.x=-Math.PI/2+.10;
+  scene.add(mesh);
+  const ring=makeSkyfallLandingRing(SKYFALL_IMPACT_RADIUS);
+  ring.position.x=x;ring.position.z=z;scene.add(ring);
+  skyfallArrows.push({
+    mesh,ring,x,z,
+    life:.72+Math.random()*.12,
+    maxLife:.84,
+    vy:25+Math.random()*3
+  });
+}
+
+function damageSkyfallImpact(x,z){
+  let hitCount=0;
+  spawnArcaneSigil(x,.025,z,SKYFALL_IMPACT_RADIUS*1.15);
+  spawnBurst(x,.45,z,20,FX_MAT_SPARK,5.8);
+  spawnBurst(x,.12,z,14,FX_MAT_DUST,5.0);
+  for(const enemy of [...zombies]){
+    if(enemy.userData.dead)continue;
+    const dist=Math.hypot(enemy.position.x-x,enemy.position.z-z);
+    if(dist>SKYFALL_IMPACT_RADIUS)continue;
+    hitCount++;
+    const type=enemy.userData.archetype||'walker';
+    let damage=2.15*playerStats.power;
+    if(type==='boss'){
+      const maxHp=enemy.userData.maxHp||enemy.userData.hp||1;
+      const already=skyfallBossDamage.get(enemy)||0;
+      const remaining=Math.max(0,maxHp*SKYFALL_BOSS_CAP-already);
+      damage=Math.min(damage,maxHp*.055,remaining);
+      if(damage<=0)continue;
+      skyfallBossDamage.set(enemy,already+damage);
+    }else if(type==='brute'){
+      damage*=1.15;
+    }
+    applyBulletDamage(enemy,damage);
+    if(!enemy.userData.dead){
+      const dx=enemy.position.x-x,dz=enemy.position.z-z;
+      const dl=Math.hypot(dx,dz)||1;
+      enemy.userData.knockbackX=(dx/dl)*5.4;
+      enemy.userData.knockbackZ=(dz/dl)*5.4;
+      enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,type==='boss'?.12:.38);
+    }
+  }
+  if(hitCount){
+    triggerCombatShake(6.2,115);
+    navigator.vibrate&&navigator.vibrate(18);
+  }
+}
+
+function triggerSkyfallBarrage(){
+  if(!gameRunning||state.avatarType!=='rogue'||equippedAbilityId!=='skyfall_barrage'||!ownedAbilities.skyfall_barrage)return;
+  if(skyfallActiveTimer>0){navigator.vibrate&&navigator.vibrate(8);return;}
+  if(skyfallCooldownTimer>0){toast(`Skyfall recharging · ${Math.ceil(skyfallCooldownTimer)}s`);return;}
+  skyfallCooldownTimer=SKYFALL_COOLDOWN;
+  abilityButtonCooldown(SKYFALL_COOLDOWN);
+  skyfallActiveTimer=SKYFALL_DURATION;
+  skyfallSpawnTimer=0;
+  skyfallBossDamage=new Map();
+  spawnArcherMuzzleFan(true);
+  spawnBurst(player.position.x,player.position.y+.6,player.position.z,24,FX_MAT_SPARK,6.2);
+  triggerCombatShake(8,190);
+  navigator.vibrate&&navigator.vibrate([40,22,70]);
+  toast('SKYFALL BARRAGE!');
+}
+
+function clearSkyfallBarrage(resetCooldown=true){
+  skyfallActiveTimer=0;skyfallSpawnTimer=0;skyfallBossDamage=new Map();
+  for(const a of skyfallArrows){
+    scene.remove(a.mesh);disposeGroup(a.mesh);
+    scene.remove(a.ring);disposeGroup(a.ring);
+  }
+  skyfallArrows=[];
+  if(resetCooldown)skyfallCooldownTimer=0;
+  updateHoodedHud();
+}
+
+function updateSkyfallBarrage(dt){
+  if(skyfallCooldownTimer>0)skyfallCooldownTimer=Math.max(0,skyfallCooldownTimer-dt);
+  if(state.avatarType==='rogue'&&equippedAbilityId==='skyfall_barrage')updateHoodedHud();
+
+  if(skyfallActiveTimer>0){
+    skyfallActiveTimer=Math.max(0,skyfallActiveTimer-dt);
+    skyfallSpawnTimer-=dt;
+    if(skyfallSpawnTimer<=0){
+      skyfallSpawnTimer=.34;
+      // Two impacts per wave gives spectacle without overwhelming mobile devices.
+      if(skyfallArrows.length<12){
+        spawnSkyfallArrow();
+        if(Math.random()<.78)spawnSkyfallArrow();
+      }
+    }
+  }
+
+  for(let i=skyfallArrows.length-1;i>=0;i--){
+    const a=skyfallArrows[i];
+    a.life-=dt;
+    a.mesh.position.y-=a.vy*dt;
+    a.mesh.rotation.z+=dt*3.8;
+    a.ring.material.opacity=Math.max(.12,Math.min(.52,(1-a.life/a.maxLife)*.60));
+    const pulse=1+Math.sin(performance.now()*.018+i)*.07;
+    a.ring.scale.setScalar(pulse);
+    if(a.mesh.position.y<=.75||a.life<=0){
+      damageSkyfallImpact(a.x,a.z);
+      scene.remove(a.mesh);disposeGroup(a.mesh);
+      scene.remove(a.ring);disposeGroup(a.ring);
+      skyfallArrows.splice(i,1);
+    }
+  }
+
+  if(skyfallActiveTimer<=0&&skyfallArrows.length===0&&skyfallBossDamage.size){
+    skyfallBossDamage=new Map();
+  }
+}
+
+// ---------------------------------------------------------------------
 // Tempest Archer equipable ultimate-tier ability.
 // A large mobile control field follows the Archer without using a screen tint.
 // ---------------------------------------------------------------------
@@ -10816,6 +11022,7 @@ function triggerBlizzardStorm(){
 
 function clearMageRoundSpecials(resetCooldowns=true){
   clearTempestDomain(resetCooldowns);
+  clearSkyfallBarrage(resetCooldowns);
   clearCycloneBeacons();
   blizzardActiveTimer=0;blizzardSpawnTimer=0;blizzardDamageTimer=0;
   for(const m of fallingIce){scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);} fallingIce=[];
@@ -11738,6 +11945,7 @@ function update(dt){
   updateArcaneEchoes(dt);
   updateShadowEclipse(dt);
   updateArrowStorm(dt);
+  updateSkyfallBarrage(dt);
   updateTempestDomain(dt);
   updateCycloneBeacons(dt);
   updateMageAbilityEffects(dt);
@@ -12099,6 +12307,10 @@ function startSurvival(){
   tempestDomainCooldownTimer = 0;
   tempestDomainActiveTimer = 0;
   tempestDomainPulseTimer = 0;
+  skyfallCooldownTimer = 0;
+  skyfallActiveTimer = 0;
+  skyfallSpawnTimer = 0;
+  skyfallBossDamage = new Map();
   stopArcaneLaser(); laserCharge = LASER_MAX_CHARGE; laserRegenDelayTimer = 0;
   resetCharacterLoadout();
   resetAbilityLoadout();
