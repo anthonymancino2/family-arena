@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- V22.10.31 Instant Attack + Chain Javelin Visual Rebuild: every non-charge attack activates on button-down. Chain-Lightning Javelin can always launch, even with no enemy selected, and now uses a large visible electrified spear, bright travel trail, impact burst, target markers, and thicker lingering chain arcs so every hit is easy to follow. -->
+<!-- V22.10.30 Tempest Archer Phase 13: adds Supernova Piercer as the Archer's signature damage ultimate. The Archer enters a 3-second rooted sniper charge, displays a full-map golden targeting line, then fires a readable solar beam that instantly defeats every non-boss enemy in its path and deals 50% max HP to bosses. Uses a 30-second cooldown and clears at round end. -->
 <!-- V22.10.29 Archer Loadout + Mirror Volley Placement: Windrunner Arrows and Fan of Arrows are now true Primary-slot choices, separate from Secondary attacks. Mirror Volley can be placed anywhere without an enemy target, supports up to three simultaneous placements, and uses a round-scaled cooldown that starts at 3 seconds, reaches 1 second by Round 20, and reaches 0 at very high rounds. -->
 <!-- V22.10.28 Archer Clone Detonation: permanent Mirror Clones now survive 10 enemy hits. On the tenth hit, the clone explodes, damages and knocks back nearby enemies, then disappears. Enemy melee and projectile attacks both count toward the same hit total. -->
 <!-- V22.10.27 Tempest Archer Phase 12: adds Chain-Lightning Javelin as the third Archer secondary. A heavy electrified javelin hits the primary target, chains to up to five additional nearby enemies, instantly defeats normal enemies, leaves large non-boss enemies at 1 HP, deals 20% max HP to bosses, and stuns every survivor for 3 seconds. -->
@@ -22,7 +24,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.29</title>
+<title>Family Arena V22.10.31</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -712,7 +714,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.29 - Archer Loadout + Mirror Volley Placement';
+const GAME_VERSION='22.10.31 - Instant Chain Javelin Visual Rebuild';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1526,6 +1528,8 @@ const ARROW_STORM_ABILITY = {id:'arrow_storm', name:'Arrow Storm', price:680,
   desc:'Unleashes the Archer’s charged battlefield barrage. Build Focus through combat, then activate it from the Ability button when Focus reaches 100%.'};
 const SKYFALL_BARRAGE = {id:'skyfall_barrage', name:'Skyfall Barrage', price:780,
   desc:'Ultimate-tier damage. For 7 seconds, giant translucent arrows rain onto enemy clusters with clear landing markers and strong area damage. Boss damage is capped at 25% per cast. Uses a 25-second cooldown.'};
+const SUPERNOVA_PIERCER = {id:'supernova_piercer', name:'Supernova Piercer', price:860,
+  desc:'Signature ultimate. Enter a 3-second rooted sniper charge, then fire a solar beam completely across the map. Instantly defeats non-boss enemies in its path and deals 50% max HP to bosses. Uses a 30-second cooldown.'};
 // Coins earned per kill — a flat rate that inches up in later rounds so
 // the pricier weapons stay reachable in a long run.
 function tokensPerKill(){ return 5 + Math.floor(round/5); }
@@ -9457,7 +9461,7 @@ function renderShopList(){
 // Mage abilities use one mutually-exclusive loadout slot. The shared HUD
 // button remains in the approved position directly left of FIRE. Buying
 // an ability equips it immediately; owned abilities can be swapped here.
-const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER], rogue:[ARROW_STORM_ABILITY, TEMPEST_DOMAIN, SKYFALL_BARRAGE] };
+const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER], rogue:[ARROW_STORM_ABILITY, TEMPEST_DOMAIN, SKYFALL_BARRAGE, SUPERNOVA_PIERCER] };
 function renderAbilityShopList(list){
   const abilities = HERO_ABILITIES[state.avatarType];
   if(!abilities || !abilities.length) return;
@@ -9473,7 +9477,7 @@ function renderAbilityShopList(list){
     row.className = 'weaponRow' + (equipped ? ' equipped' : '');
     const swatch = document.createElement('div');
     swatch.className = 'weaponSwatch';
-    swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : (a.id==='tempest_domain' ? '#63ffd1' : (a.id==='skyfall_barrage' ? '#f6d36b' : (a.id==='arrow_storm' ? '#b95cff' : '#75dfff')));
+    swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : (a.id==='tempest_domain' ? '#63ffd1' : (a.id==='skyfall_barrage' ? '#f6d36b' : (a.id==='supernova_piercer' ? '#fff0a6' : (a.id==='arrow_storm' ? '#b95cff' : '#75dfff'))));
     const info = document.createElement('div');
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${a.name}</div><div class="wDesc">${a.desc}</div>`;
@@ -9696,6 +9700,7 @@ function setupControls(){
     else if(equippedAbilityId==='blizzard_storm') triggerBlizzardStorm();
     else if(equippedAbilityId==='tempest_domain') triggerTempestDomain();
     else if(equippedAbilityId==='skyfall_barrage') triggerSkyfallBarrage();
+    else if(equippedAbilityId==='supernova_piercer') triggerSupernovaPiercer();
     else if(equippedAbilityId==='arrow_storm') triggerArrowStorm();
   };
   const beginEquippedAbility=e=>{
@@ -10309,6 +10314,12 @@ function updateHoodedHud(){
           : (skyfallCooldownTimer>0 ? `SKYFALL ${Math.ceil(skyfallCooldownTimer)}` : 'SKYFALL');
         abilityBtn.classList.toggle('active',skyfallActiveTimer>0);
         abilityBtn.classList.toggle('cooling',skyfallCooldownTimer>0&&skyfallActiveTimer<=0);
+      }else if(equippedAbilityId==='supernova_piercer'){
+        abilityBtn.textContent=supernovaChargeTimer>0
+          ? `CHARGE ${supernovaChargeTimer.toFixed(1)}`
+          : (supernovaCooldownTimer>0 ? `NOVA ${Math.ceil(supernovaCooldownTimer)}` : 'SUPERNOVA');
+        abilityBtn.classList.toggle('active',supernovaChargeTimer>0);
+        abilityBtn.classList.toggle('cooling',supernovaCooldownTimer>0&&supernovaChargeTimer<=0);
       }else if(equippedAbilityId==='arrow_storm'){
         abilityBtn.textContent=archerUltimateCharge>=100
           ? 'ARROW STORM!'
@@ -10320,7 +10331,7 @@ function updateHoodedHud(){
       }
       if(!laserMode){
         abilityBtn.style.removeProperty('--charge');
-        if(equippedAbilityId!=='tempest_domain'&&equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='arrow_storm'){
+        if(equippedAbilityId!=='tempest_domain'&&equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='supernova_piercer'&&equippedAbilityId!=='arrow_storm'){
           abilityBtn.classList.remove('empty','active','cooling');
         }
       }
@@ -10986,6 +10997,148 @@ function updateArcherMirrorClones(dt){
 }
 
 // ---------------------------------------------------------------------
+// Tempest Archer signature ultimate: Supernova Piercer.
+// The charge roots the Archer, shows a readable full-map aiming line, then
+// releases a narrow solar beam. No whiteout and no full-screen tint.
+// ---------------------------------------------------------------------
+const SUPERNOVA_COOLDOWN=30;
+const SUPERNOVA_CHARGE_DURATION=3;
+const SUPERNOVA_BEAM_LIFETIME=.68;
+const SUPERNOVA_BEAM_HALF_WIDTH=1.65;
+let supernovaCooldownTimer=0;
+let supernovaChargeTimer=0;
+let supernovaBeamTimer=0;
+let supernovaAimAngle=0;
+let supernovaAimFx=null;
+let supernovaBeamFx=null;
+
+function supernovaMapLength(){return Math.max(50,arenaSize*2.6);}
+function createSupernovaAimFx(){
+  const len=supernovaMapLength(),g=new THREE.Group();
+  const mat=new THREE.MeshBasicMaterial({color:0xffdd66,transparent:true,opacity:.56,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const line=new THREE.Mesh(new THREE.PlaneGeometry(.16,len),mat);
+  line.rotation.x=-Math.PI/2;line.position.set(0,.10,len*.5);g.add(line);
+  const coreMat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.38,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const core=new THREE.Mesh(new THREE.PlaneGeometry(.045,len),coreMat);
+  core.rotation.x=-Math.PI/2;core.position.set(0,.115,len*.5);g.add(core);
+  scene.add(g);return g;
+}
+function createSupernovaBeamFx(){
+  const len=supernovaMapLength(),g=new THREE.Group();
+  const layers=[
+    [SUPERNOVA_BEAM_HALF_WIDTH*2.7,0xffc83f,.34,.18],
+    [SUPERNOVA_BEAM_HALF_WIDTH*1.45,0xffef8f,.68,.20],
+    [.34,0xffffff,.88,.22]
+  ];
+  layers.forEach(([width,color,opacity,y])=>{
+    const mat=new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+    const beam=new THREE.Mesh(new THREE.PlaneGeometry(width,len),mat);
+    beam.rotation.x=-Math.PI/2;beam.position.set(0,y,len*.5);beam.userData.baseOpacity=opacity;g.add(beam);
+  });
+  scene.add(g);return g;
+}
+function pointDistanceToSupernovaLine(px,pz,ox,oz,angle){
+  const fx=Math.sin(angle),fz=Math.cos(angle),dx=px-ox,dz=pz-oz;
+  return {along:dx*fx+dz*fz,side:Math.abs(dx*fz-dz*fx)};
+}
+function fireSupernovaPiercer(){
+  if(!player)return;
+  const ox=player.position.x,oz=player.position.z,angle=supernovaAimAngle,maxLen=supernovaMapLength();
+  if(supernovaAimFx){scene.remove(supernovaAimFx);disposeGroup(supernovaAimFx);supernovaAimFx=null;}
+  supernovaBeamFx=createSupernovaBeamFx();
+  supernovaBeamFx.position.set(ox,0,oz);supernovaBeamFx.rotation.y=angle;
+  supernovaBeamTimer=SUPERNOVA_BEAM_LIFETIME;
+  spawnArcherMuzzleFan(true);
+  spawnBurst(ox,player.position.y+.8,oz,38,FX_MAT_SPARK,8);
+  spawnArcaneSigil(ox,.03,oz,3.2);
+
+  for(const enemy of [...zombies]){
+    if(!enemy||enemy.userData.dead)continue;
+    const hit=pointDistanceToSupernovaLine(enemy.position.x,enemy.position.z,ox,oz,angle);
+    if(hit.along<0||hit.along>maxLen||hit.side>SUPERNOVA_BEAM_HALF_WIDTH)continue;
+    const type=enemy.userData.archetype||'walker';
+    if(type==='boss'){
+      const maxHp=Math.max(1,enemy.userData.maxHp||enemy.userData.hp||1);
+      applyBulletDamage(enemy,Math.min(enemy.userData.hp||maxHp,maxHp*.50));
+    }else{
+      applyBulletDamage(enemy,(enemy.userData.hp||1)+1);
+    }
+    if(!enemy.userData.dead)enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,.75);
+    spawnBurst(enemy.position.x,enemy.position.y+.8,enemy.position.z,16,FX_MAT_SPARK,4.8);
+  }
+  triggerCombatShake(14,280);
+  navigator.vibrate&&navigator.vibrate([60,30,110]);
+  toast('SUPERNOVA PIERCER!');
+}
+function triggerSupernovaPiercer(){
+  if(!gameRunning||state.avatarType!=='rogue'||equippedAbilityId!=='supernova_piercer'||!ownedAbilities.supernova_piercer)return;
+  if(supernovaChargeTimer>0||supernovaBeamTimer>0){navigator.vibrate&&navigator.vibrate(8);return;}
+  if(supernovaCooldownTimer>0){toast(`Supernova recharging · ${Math.ceil(supernovaCooldownTimer)}s`);return;}
+
+  const target=findAutoAimTarget(60)||findNearestEnemy(60);
+  if(target){
+    supernovaAimAngle=Math.atan2(target.position.x-player.position.x,target.position.z-player.position.z);
+    player.rotation.y=supernovaAimAngle;
+  }else supernovaAimAngle=player.rotation.y;
+
+  supernovaCooldownTimer=SUPERNOVA_COOLDOWN;
+  abilityButtonCooldown(SUPERNOVA_COOLDOWN);
+  supernovaChargeTimer=SUPERNOVA_CHARGE_DURATION;
+  player.userData.supernovaRooted=true;
+
+  if(supernovaAimFx){scene.remove(supernovaAimFx);disposeGroup(supernovaAimFx);}
+  supernovaAimFx=createSupernovaAimFx();
+  supernovaAimFx.position.set(player.position.x,0,player.position.z);
+  supernovaAimFx.rotation.y=supernovaAimAngle;
+  spawnArcaneSigil(player.position.x,.02,player.position.z,2.2);
+  spawnBurst(player.position.x,player.position.y+.65,player.position.z,22,FX_MAT_SPARK,5);
+  navigator.vibrate&&navigator.vibrate([28,18,42]);
+  toast('SUPERNOVA CHARGING!');
+}
+function clearSupernovaPiercer(resetCooldown=true){
+  supernovaChargeTimer=0;supernovaBeamTimer=0;
+  if(player&&player.userData)player.userData.supernovaRooted=false;
+  if(supernovaAimFx){scene.remove(supernovaAimFx);disposeGroup(supernovaAimFx);supernovaAimFx=null;}
+  if(supernovaBeamFx){scene.remove(supernovaBeamFx);disposeGroup(supernovaBeamFx);supernovaBeamFx=null;}
+  if(resetCooldown)supernovaCooldownTimer=0;
+  updateHoodedHud();
+}
+function updateSupernovaPiercer(dt){
+  if(supernovaCooldownTimer>0)supernovaCooldownTimer=Math.max(0,supernovaCooldownTimer-dt);
+  if(state.avatarType==='rogue'&&equippedAbilityId==='supernova_piercer')updateHoodedHud();
+
+  if(supernovaChargeTimer>0){
+    supernovaChargeTimer=Math.max(0,supernovaChargeTimer-dt);
+    if(player){
+      player.userData.supernovaRooted=true;
+      player.rotation.y=supernovaAimAngle;
+      if(supernovaAimFx){
+        supernovaAimFx.position.set(player.position.x,0,player.position.z);
+        supernovaAimFx.rotation.y=supernovaAimAngle;
+        const pulse=.42+Math.sin(performance.now()*.018)*.12;
+        supernovaAimFx.traverse(o=>{if(o.material)o.material.opacity=Math.max(.18,pulse);});
+      }
+      if(Math.random()<Math.min(1,dt*18))spawnArcherSpark(player.position.x,player.position.y+.8,player.position.z);
+    }
+    if(supernovaChargeTimer<=0){
+      if(player&&player.userData)player.userData.supernovaRooted=false;
+      fireSupernovaPiercer();
+    }
+  }
+
+  if(supernovaBeamTimer>0){
+    supernovaBeamTimer=Math.max(0,supernovaBeamTimer-dt);
+    if(supernovaBeamFx){
+      const fade=Math.max(0,supernovaBeamTimer/SUPERNOVA_BEAM_LIFETIME);
+      supernovaBeamFx.traverse(o=>{if(o.material)o.material.opacity=(o.userData.baseOpacity||.5)*fade;});
+    }
+    if(supernovaBeamTimer<=0&&supernovaBeamFx){
+      scene.remove(supernovaBeamFx);disposeGroup(supernovaBeamFx);supernovaBeamFx=null;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------
 // Tempest Archer damage-focused ultimate-tier ability.
 // Giant translucent arrows fall from above onto enemy clusters with clear
 // ground markers. Effects remain local and never cover the whole screen.
@@ -11339,8 +11492,13 @@ function triggerBlizzardStorm(){
 
 function clearMageRoundSpecials(resetCooldowns=true){
   clearTempestDomain(resetCooldowns);
+  clearSupernovaPiercer(resetCooldowns);
   clearSkyfallBarrage(resetCooldowns);
   clearMirrorVolleyDecoys();mirrorVolleyCooldownTimer=0;
+  while(chainJavelinFlights.length){
+    const f=chainJavelinFlights.pop();
+    if(f.mesh&&f.mesh.parent){scene.remove(f.mesh);disposeGroup(f.mesh);}
+  }
   clearCycloneBeacons();
   blizzardActiveTimer=0;blizzardSpawnTimer=0;blizzardDamageTimer=0;
   for(const m of fallingIce){scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);} fallingIce=[];
@@ -11750,8 +11908,9 @@ function doSecondaryShoot(){
     return;
   }
   if(w.kind==='chain_lightning_javelin'){
-    player.userData.secondaryAttackCooldown=attackCooldownFor(w);
-    triggerChainLightningJavelin(w);
+    if(triggerChainLightningJavelin(w)!==false){
+      player.userData.secondaryAttackCooldown=attackCooldownFor(w);
+    }
     return;
   }
   player.userData.secondaryAttackCooldown=attackCooldownFor(w);
@@ -11814,36 +11973,104 @@ function spawnArcherHitFeedback(x,y,z,heavy=false){
 }
 
 const CHAIN_JAVELIN_MAX_EXTRA_TARGETS=5;
-const CHAIN_JAVELIN_RANGE=6.8;
+const CHAIN_JAVELIN_RANGE=7.8;
 const CHAIN_JAVELIN_STUN=3;
 const CHAIN_JAVELIN_BOSS_DAMAGE=.20;
+const CHAIN_JAVELIN_VISUAL_TIME=.28;
+const chainJavelinFlights=[];
+
+function createChainTargetMarker(enemy,index){
+  if(!enemy)return;
+  const color=index===0?0xffffff:0x65ddff;
+  const mat=new THREE.MeshBasicMaterial({
+    color,transparent:true,opacity:.72,depthWrite:false,
+    side:THREE.DoubleSide,blending:THREE.AdditiveBlending
+  });
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.55,.82,28),mat);
+  ring.rotation.x=-Math.PI/2;
+  ring.position.set(enemy.position.x,.12,enemy.position.z);
+  ring.renderOrder=11;
+  scene.add(ring);
+  fx.push({kind:'ring',mesh:ring,life:.48,maxLife:.48});
+}
 
 function createChainLightningArc(from,to,index=0){
-  const start=new THREE.Vector3(from.x,from.y+.75,from.z);
-  const end=new THREE.Vector3(to.x,to.y+.75,to.z);
+  const start=new THREE.Vector3(from.x,from.y+.82,from.z);
+  const end=new THREE.Vector3(to.x,to.y+.82,to.z);
   const points=[];
-  const segments=7;
+  const segments=12;
   for(let i=0;i<=segments;i++){
     const t=i/segments;
     const p=start.clone().lerp(end,t);
     if(i>0&&i<segments){
-      const jitter=(index%2?1:-1)*(.18+Math.random()*.16);
-      p.x+=(Math.random()-.5)*jitter;
-      p.y+=(Math.random()-.5)*.22;
-      p.z+=(Math.random()-.5)*jitter;
+      const strength=.25+Math.sin(t*Math.PI)*.36;
+      p.x+=(Math.random()-.5)*strength;
+      p.y+=(Math.random()-.5)*.34;
+      p.z+=(Math.random()-.5)*strength;
     }
     points.push(p);
   }
   const geometry=new THREE.BufferGeometry().setFromPoints(points);
   const material=new THREE.LineBasicMaterial({
-    color:index===0?0xd8fbff:0x7bdcff,
-    transparent:true,opacity:.92,depthWrite:false,
+    color:index===0?0xffffff:0x67e6ff,
+    transparent:true,opacity:1,depthWrite:false,
     blending:THREE.AdditiveBlending
   });
   const line=new THREE.Line(geometry,material);
-  line.renderOrder=10;
+  line.renderOrder=12;
   scene.add(line);
-  fx.push({kind:'lightning',mesh:line,life:.22,maxLife:.22});
+  fx.push({kind:'lightning',mesh:line,life:.46,maxLife:.46});
+
+  // Wider glow copy makes the chain readable on bright maps.
+  const glowMat=material.clone();
+  glowMat.color.setHex(index===0?0x8cefff:0x3caee8);
+  glowMat.opacity=.42;
+  const glow=new THREE.Line(geometry.clone(),glowMat);
+  glow.scale.set(1.012,1.012,1.012);
+  glow.renderOrder=11;
+  scene.add(glow);
+  fx.push({kind:'lightning',mesh:glow,life:.50,maxLife:.50});
+}
+
+function createChainJavelinMesh(){
+  const g=new THREE.Group();
+  const shaftMat=new THREE.MeshStandardMaterial({
+    color:0x77dfff,emissive:0x138fc5,emissiveIntensity:1.15,
+    metalness:.45,roughness:.25,transparent:true,opacity:.94
+  });
+  const glowMat=new THREE.MeshBasicMaterial({
+    color:0xbff8ff,transparent:true,opacity:.46,depthWrite:false,
+    blending:THREE.AdditiveBlending
+  });
+
+  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.16,.20,4.6,10),shaftMat);
+  shaft.rotation.x=Math.PI/2;
+  g.add(shaft);
+
+  const head=new THREE.Mesh(new THREE.ConeGeometry(.62,1.55,10),shaftMat.clone());
+  head.rotation.x=-Math.PI/2;
+  head.position.z=-3.05;
+  g.add(head);
+
+  const halo=new THREE.Mesh(new THREE.CylinderGeometry(.34,.40,5.9,10),glowMat);
+  halo.rotation.x=Math.PI/2;
+  halo.position.z=-.40;
+  g.add(halo);
+
+  for(let i=0;i<3;i++){
+    const fin=new THREE.Mesh(
+      new THREE.PlaneGeometry(.72,1.15),
+      new THREE.MeshBasicMaterial({
+        color:0xffffff,transparent:true,opacity:.72,depthWrite:false,
+        side:THREE.DoubleSide,blending:THREE.AdditiveBlending
+      })
+    );
+    fin.position.z=2.25;
+    fin.rotation.z=i*Math.PI/3;
+    g.add(fin);
+  }
+  g.scale.setScalar(1.55);
+  return g;
 }
 
 function classifyChainJavelinTarget(enemy){
@@ -11860,8 +12087,7 @@ function applyChainJavelinDamage(enemy){
   const maxHp=Math.max(1,enemy.userData.maxHp||currentHp||1);
 
   if(isBoss){
-    const damage=Math.min(currentHp,maxHp*CHAIN_JAVELIN_BOSS_DAMAGE);
-    applyBulletDamage(enemy,damage);
+    applyBulletDamage(enemy,Math.min(currentHp,maxHp*CHAIN_JAVELIN_BOSS_DAMAGE));
   }else if(isLarge){
     if(currentHp>1)applyBulletDamage(enemy,currentHp-1);
   }else{
@@ -11871,65 +12097,119 @@ function applyChainJavelinDamage(enemy){
   if(!enemy.userData.dead){
     enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,CHAIN_JAVELIN_STUN);
     enemy.userData.shockTimer=Math.max(enemy.userData.shockTimer||0,CHAIN_JAVELIN_STUN);
-    spawnArcherSpark(enemy.position.x,enemy.position.y+.85,enemy.position.z);
   }
+  spawnArcherSpark(enemy.position.x,enemy.position.y+.85,enemy.position.z);
 }
 
 function findNextChainJavelinTarget(current,alreadyHit){
-  let best=null;
-  let bestDist=CHAIN_JAVELIN_RANGE;
+  let best=null,bestDist=CHAIN_JAVELIN_RANGE;
   for(const z of zombies){
     if(!z||z.userData.dead||z.userData.spawnPending||alreadyHit.has(z))continue;
-    const d=Math.hypot(
-      z.position.x-current.position.x,
-      z.position.z-current.position.z
-    );
-    if(d<bestDist){
-      bestDist=d;
-      best=z;
-    }
+    const d=Math.hypot(z.position.x-current.position.x,z.position.z-current.position.z);
+    if(d<bestDist){bestDist=d;best=z;}
   }
   return best;
 }
 
-function triggerChainLightningJavelin(w){
-  if(!gameRunning||state.avatarType!=='rogue')return;
-  const primary=findAutoAimTarget(28)||findNearestEnemy(28);
-  if(!primary){
-    navigator.vibrate&&navigator.vibrate(10);
+function resolveChainJavelinImpact(flight){
+  const primary=flight.primary;
+  if(!primary||primary.userData.dead){
+    spawnBurst(flight.end.x,.75,flight.end.z,18,FX_MAT_SPARK,4.4);
+    spawnArcaneSigil(flight.end.x,.03,flight.end.z,1.5);
     return;
   }
 
-  const start=player.position.clone();
-  const hitTargets=[];
-  const seen=new Set();
+  const hitTargets=[],seen=new Set();
   let current=primary;
-
   for(let jump=0;jump<=CHAIN_JAVELIN_MAX_EXTRA_TARGETS&&current;jump++){
     seen.add(current);
     hitTargets.push(current);
+    createChainTargetMarker(current,jump);
 
     if(jump===0){
-      // Heavy javelin tracer from the Archer to the primary target.
-      createChainLightningArc(start,current.position,0);
-      spawnArcherMuzzleFan(true);
-      spawnBurst(start.x,start.y+.85,start.z,16,FX_MAT_SPARK,4.4);
+      createChainLightningArc(flight.start,current.position,0);
     }else{
-      const previous=hitTargets[jump-1];
-      createChainLightningArc(previous.position,current.position,jump);
+      createChainLightningArc(hitTargets[jump-1].position,current.position,jump);
     }
 
     applyChainJavelinDamage(current);
-    spawnBurst(current.position.x,current.position.y+.7,current.position.z,10,FX_MAT_SPARK,3.2);
+    spawnArcaneSigil(current.position.x,.03,current.position.z,jump===0?1.7:1.15);
+    spawnBurst(current.position.x,current.position.y+.75,current.position.z,jump===0?24:15,FX_MAT_SPARK,jump===0?5.5:4.0);
     current=findNextChainJavelinTarget(current,seen);
   }
 
-  if(hitTargets.length){
-    triggerCombatShake(6.8,135);
-    navigator.vibrate&&navigator.vibrate([24,14,34]);
-    toast(`CHAIN JAVELIN · ${hitTargets.length} HIT${hitTargets.length===1?'':'S'}`);
+  triggerCombatShake(8.5,170);
+  navigator.vibrate&&navigator.vibrate([30,16,48]);
+  toast(`CHAIN JAVELIN · ${hitTargets.length} HIT${hitTargets.length===1?'':'S'}`);
+}
+
+function triggerChainLightningJavelin(w){
+  if(!gameRunning||state.avatarType!=='rogue')return false;
+
+  const primary=findAutoAimTarget(32)||findNearestEnemy(32);
+  const start=player.position.clone();
+  start.y+=1.0;
+
+  let end;
+  if(primary){
+    end=primary.position.clone();
+    end.y+=.8;
+    player.rotation.y=Math.atan2(
+      primary.position.x-player.position.x,
+      primary.position.z-player.position.z
+    );
+  }else{
+    const angle=player.rotation.y;
+    end=new THREE.Vector3(
+      player.position.x+Math.sin(angle)*24,
+      player.position.y+.8,
+      player.position.z+Math.cos(angle)*24
+    );
+  }
+
+  const mesh=createChainJavelinMesh();
+  mesh.position.copy(start);
+  const dx=end.x-start.x,dy=end.y-start.y,dz=end.z-start.z;
+  mesh.rotation.y=Math.atan2(dx,dz);
+  mesh.rotation.x=-Math.atan2(dy,Math.hypot(dx,dz));
+  scene.add(mesh);
+
+  chainJavelinFlights.push({
+    mesh,start:start.clone(),end:end.clone(),primary,
+    life:CHAIN_JAVELIN_VISUAL_TIME,maxLife:CHAIN_JAVELIN_VISUAL_TIME,
+    trailTimer:0
+  });
+
+  spawnArcherMuzzleFan(true);
+  spawnArcaneSigil(player.position.x,.03,player.position.z,1.25);
+  spawnBurst(start.x,start.y,start.z,24,FX_MAT_SPARK,5.6);
+  triggerCombatShake(3.8,70);
+  navigator.vibrate&&navigator.vibrate(18);
+  return true;
+}
+
+function updateChainJavelinFlights(dt){
+  for(let i=chainJavelinFlights.length-1;i>=0;i--){
+    const f=chainJavelinFlights[i];
+    f.life-=dt;
+    const t=1-Math.max(0,f.life/f.maxLife);
+    f.mesh.position.lerpVectors(f.start,f.end,t);
+    f.mesh.rotation.z+=dt*18;
+
+    f.trailTimer-=dt;
+    if(f.trailTimer<=0){
+      f.trailTimer=.035;
+      spawnBurst(f.mesh.position.x,f.mesh.position.y,f.mesh.position.z,3,FX_MAT_SPARK,1.7);
+    }
+
+    if(f.life<=0){
+      resolveChainJavelinImpact(f);
+      scene.remove(f.mesh);disposeGroup(f.mesh);
+      chainJavelinFlights.splice(i,1);
+    }
   }
 }
+
 
 const mirrorVolleyDecoys=[];
 const mirrorVolleyPlacements=[];
@@ -12558,8 +12838,10 @@ function update(dt){
   updateArcaneEchoes(dt);
   updateArcherMirrorClones(dt);
   updateMirrorVolley(dt);
+  updateChainJavelinFlights(dt);
   updateShadowEclipse(dt);
   updateArrowStorm(dt);
+  updateSupernovaPiercer(dt);
   updateSkyfallBarrage(dt);
   updateTempestDomain(dt);
   updateCycloneBeacons(dt);
@@ -12654,7 +12936,9 @@ function update(dt){
     const speedStat = playerStats.speed;
     const characterMoveMult = combatForAvatar().baseMoveMult || 1;
     const passiveMoveMult=(state.avatarType==='hooded' && passiveState.shadowstepTimer>0)?(passiveForAvatar().killMoveMult||1):((state.avatarType==='rogue' && (passiveState.archerTailwindTimer||0)>0)?(passiveForAvatar().tailwindMoveMult||1):((state.avatarType==='mage' && passiveState.mageSpeedBoostTimer>0)?MAGE_SPEED_BOOST_MULT:1));
-    const speed = PLAYER_SPEED * characterMoveMult * passiveMoveMult * (1 + (speedStat-1)*0.15);
+    const speed=(player&&player.userData&&player.userData.supernovaRooted)
+      ? 0
+      : PLAYER_SPEED * characterMoveMult * passiveMoveMult * (1 + (speedStat-1)*0.15);
     const nx = player.position.x + (mx/len)*speed*dt;
     const nz = player.position.z + (mz/len)*speed*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
@@ -12928,6 +13212,9 @@ function startSurvival(){
   skyfallActiveTimer = 0;
   skyfallSpawnTimer = 0;
   skyfallBossDamage = new Map();
+  supernovaCooldownTimer = 0;
+  supernovaChargeTimer = 0;
+  supernovaBeamTimer = 0;
   stopArcaneLaser(); laserCharge = LASER_MAX_CHARGE; laserRegenDelayTimer = 0;
   resetCharacterLoadout();
   resetAbilityLoadout();
