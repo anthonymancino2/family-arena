@@ -8,6 +8,8 @@
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
 <!-- V22.10.4 Meteor Descent & Damage Reliability Fix: Cataclysm Meteor now visibly descends from the sky as a translucent 10x fireball with a readable fiery shell and trail, uses a large persistent landing telegraph, and guarantees impact damage/stun/burn inside the marked zone. -->
+<!-- V22.10.7 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
+<!-- V22.10.6 Blizzard Performance + Meteor Activation Reliability: fixes the undefined Blizzard targeting radius that could halt the game loop, reduces ice-impact load, makes snowballs semi-transparent, applies readable arena-wide storm damage/control ticks, and hardens mobile Meteor activation with a clearly visible descending meteor and guaranteed impact. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.3 Blizzard Range + Meteor Impact + Main Play Button Fix: Blizzard now lasts 10 seconds and covers 70% of the arena radius; Cataclysm Meteor now has guaranteed visible impact feedback and reliable damage; the main Play button is isolated above decorative overlays. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -691,7 +693,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.5 - Blizzard Radius + Arena Boundary';
+const GAME_VERSION='22.10.7 - Development Ability Testing Unlocks';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -1419,7 +1421,13 @@ const ARCANE_ECHO_INITIAL_CHARGE = 25;
 function arcaneEchoesCooldownForLevel(level=avatarLevel()){
   return Math.max(1.5, 15 - (Math.max(1,level)-1)*(10/19));
 }
-function arcaneEchoesUnlocked(){ return state.avatarType==='mage' && avatarLevel()>=10; }
+// Development-only testing switch. Keep enabled while the game is being built so
+// every combat move can be tested immediately. Set to false before release to
+// restore coin purchases and level-gated abilities.
+const UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING = true;
+function arcaneEchoesUnlocked(){
+  return state.avatarType==='mage' && (UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING || avatarLevel()>=10);
+}
 let previewRenderer=null, previewScene=null, previewCamera=null, previewRoot=null, previewMixer=null, previewRAF=0;
 function combatForAvatar(){ return CHARACTER_COMBAT[state.avatarType] || CHARACTER_COMBAT.rogue; }
 function weaponForAvatar(){
@@ -1435,6 +1443,16 @@ function resetCharacterLoadout(){
   const c = combatForAvatar();
   currentWeaponId = null;
   ownedWeapons = {[c.defaultId]:true};
+  if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING){
+    for(const id of Object.keys(c.weapons||{})) ownedWeapons[id]=true;
+  }
+}
+function resetAbilityLoadout(){
+  equippedAbilityId = null;
+  ownedAbilities = {};
+  if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING){
+    for(const ability of (HERO_ABILITIES[state.avatarType]||[])) ownedAbilities[ability.id]=true;
+  }
 }
 
 const WEAPONS = {
@@ -8860,7 +8878,7 @@ function recoverRoundIfNeeded(dt){
 // Shared enemy steering helpers. These keep movement behavior centralized so
 // every enemy archetype benefits without changing its damage, HP, or speed.
 function chooseEnemyTarget(z,dt){
-  if(blizzardActiveTimer>0 && player && Math.hypot(z.position.x-blizzardCenter.x,z.position.z-blizzardCenter.z)<=BLIZZARD_RADIUS && Math.hypot(player.position.x-blizzardCenter.x,player.position.z-blizzardCenter.z)<=BLIZZARD_RADIUS) return null;
+  if(blizzardActiveTimer>0 && player){ const br=blizzardRadius(); if(Math.hypot(z.position.x-blizzardCenter.x,z.position.z-blizzardCenter.z)<=br && Math.hypot(player.position.x-blizzardCenter.x,player.position.z-blizzardCenter.z)<=br) return null; }
   const candidates=livingPlayers();
   if(!candidates.length) return null;
   z.userData.targetRefresh=Math.max(0,(z.userData.targetRefresh||0)-dt);
@@ -9360,7 +9378,7 @@ function renderAbilityShopList(list){
   const header = document.createElement('div');
   header.className = 'wName';
   header.style.cssText = 'margin:14px 0 4px;opacity:.75;font-size:12px;letter-spacing:.5px;';
-  header.textContent = 'ULTIMATE-TIER ABILITIES · EQUIP ONE';
+  header.textContent = UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING ? 'ULTIMATE-TIER ABILITIES · ALL UNLOCKED FOR TESTING · EQUIP ONE' : 'ULTIMATE-TIER ABILITIES · EQUIP ONE';
   list.appendChild(header);
   for(const a of abilities){
     const owned = !!ownedAbilities[a.id];
@@ -9560,14 +9578,17 @@ function setupControls(){
     if(e) e.preventDefault();
     if(equippedAbilityId==='arcane_laser') stopArcaneLaser();
   };
-  novaBtnEl.addEventListener('touchstart',beginEquippedAbility,{passive:false});
-  novaBtnEl.addEventListener('touchend',endEquippedAbility,{passive:false});
-  novaBtnEl.addEventListener('touchcancel',endEquippedAbility,{passive:false});
-  novaBtnEl.addEventListener('mousedown',beginEquippedAbility);
-  novaBtnEl.addEventListener('click',e=>{
-    e.preventDefault();
-    if(equippedAbilityId==='cataclysm_meteor'&&!fallingCataclysm&&novaCooldownTimer<=0)triggerCataclysmMeteor();
-  });
+  if(window.PointerEvent){
+    novaBtnEl.addEventListener('pointerdown',beginEquippedAbility,{passive:false});
+    novaBtnEl.addEventListener('pointerup',endEquippedAbility,{passive:false});
+    novaBtnEl.addEventListener('pointercancel',endEquippedAbility,{passive:false});
+  }else{
+    novaBtnEl.addEventListener('touchstart',beginEquippedAbility,{passive:false});
+    novaBtnEl.addEventListener('touchend',endEquippedAbility,{passive:false});
+    novaBtnEl.addEventListener('touchcancel',endEquippedAbility,{passive:false});
+    novaBtnEl.addEventListener('mousedown',beginEquippedAbility);
+  }
+  novaBtnEl.addEventListener('click',e=>e.preventDefault());
   window.addEventListener('mouseup',endEquippedAbility);
   const laserBtnEl=document.getElementById('laserBtn');
   laserBtnEl.classList.add('hidden');
@@ -10312,7 +10333,7 @@ function spawnArrowRainVolley(){
   }
   live.forEach((z,i)=>{
     const x=z.position.x+(Math.random()-.5)*.7,zp=z.position.z+(Math.random()-.5)*.7;
-    const mat=new THREE.MeshBasicMaterial({color:i%3===0?0xffffff:0x62dfff,transparent:true,opacity:.96,depthWrite:false,blending:THREE.AdditiveBlending});
+    const mat=new THREE.MeshBasicMaterial({color:i%3===0?0xffffff:0x62dfff,transparent:true,opacity:.68,depthWrite:false,blending:THREE.AdditiveBlending});
     const arrow=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,3.8,6),mat);arrow.position.set(x,8+Math.random()*3,zp);arrow.rotation.z=.08;scene.add(arrow);
     fx.push({kind:'arrowRain',mesh:arrow,targetY:z.position.y+.25,life:.48,maxLife:.48,vx:0,vz:0});
     if(!z.userData.dead) applyBulletDamage(z,1.45*playerStats.power);
@@ -10398,7 +10419,7 @@ function updateKingsJudgment(dt){
 
 function spawnBarbarianArc(origin,yaw,step=0,scale=1){
   const g=new THREE.Group();
-  const hot=new THREE.MeshBasicMaterial({color:step===2?0xffffff:0xff7a20,transparent:true,opacity:.96,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const hot=new THREE.MeshBasicMaterial({color:step===2?0xffffff:0xff7a20,transparent:true,opacity:.68,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
   const red=new THREE.MeshBasicMaterial({color:0xff2f18,transparent:true,opacity:.72,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
   const arc=new THREE.Mesh(new THREE.RingGeometry(1.25*scale,2.75*scale,42,1,-1.12,2.24),hot);arc.rotation.x=-Math.PI/2;arc.rotation.z=-yaw+step*.42;g.add(arc);
   const inner=new THREE.Mesh(new THREE.RingGeometry(.95*scale,2.25*scale,36,1,-1.02,2.04),red);inner.rotation.x=-Math.PI/2;inner.rotation.z=-yaw+step*.42;inner.position.y=.025;g.add(inner);
@@ -10585,7 +10606,7 @@ const MAGE_ULTIMATE_COOLDOWN=16;
 const BLIZZARD_DURATION=10, BLIZZARD_FREEZE=3, BLIZZARD_IMPACT_RADIUS=2.65;
 function blizzardRadius(){ return Math.max(115, arenaSize*3.85); } // five-times-larger than the previous ~23-unit radius
 let novaCooldownTimer=0, novaSpeedBoostTimer=0;
-let blizzardActiveTimer=0, blizzardSpawnTimer=0, blizzardCenter=new THREE.Vector3();
+let blizzardActiveTimer=0, blizzardSpawnTimer=0, blizzardDamageTimer=0, blizzardCenter=new THREE.Vector3();
 let fallingIce=[];
 let fallingCataclysm=null;
 
@@ -10594,7 +10615,7 @@ function abilityButtonCooldown(){
   if(btn){btn.classList.add('cooling');setTimeout(()=>btn.classList.remove('cooling'),MAGE_ULTIMATE_COOLDOWN*1000);}
 }
 function makeIceMeteorMesh(radius=1.05){
-  const mat=new THREE.MeshStandardMaterial({color:0x75dfff,emissive:0x143f66,roughness:.34,metalness:.08,transparent:true,opacity:.96});
+  const mat=new THREE.MeshStandardMaterial({color:0x75dfff,emissive:0x143f66,roughness:.34,metalness:.08,transparent:true,opacity:.68});
   const mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(radius,1),mat);
   mesh.castShadow=true;
   return mesh;
@@ -10612,7 +10633,7 @@ function spawnFallingIce(){
   fallingIce.push({mesh,ring,x,z,vy:9+Math.random()*2,life:1.05});
 }
 function impactIce(m){
-  spawnBurst(m.x,.35,m.z,22,FX_MAT_SPARK,4.4);
+  spawnBurst(m.x,.35,m.z,10,FX_MAT_SPARK,3.2);
   spawnArcaneSigil(m.x,.04,m.z,BLIZZARD_IMPACT_RADIUS);
   for(const z of [...zombies]){
     if(z.userData.dead)continue;
@@ -10632,7 +10653,7 @@ function impactIce(m){
 function triggerBlizzardStorm(){
   if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='blizzard_storm'||!ownedAbilities.blizzard_storm||novaCooldownTimer>0)return;
   novaCooldownTimer=MAGE_ULTIMATE_COOLDOWN; abilityButtonCooldown();
-  blizzardActiveTimer=BLIZZARD_DURATION; blizzardSpawnTimer=0; blizzardCenter.copy(player.position);
+  blizzardActiveTimer=BLIZZARD_DURATION; blizzardSpawnTimer=0; blizzardDamageTimer=0; blizzardCenter.copy(player.position);
   const radius=blizzardRadius();
   spawnArcaneSigil(0,.03,0,arenaSize-1.2);
   spawnArcaneRuneBurst(new THREE.Vector3(0,0,0),(arenaSize-1.2)*.72);
@@ -10649,11 +10670,11 @@ function triggerCataclysmMeteor(){
   const mesh=new THREE.Group();
   const body=new THREE.Mesh(
     new THREE.IcosahedronGeometry(5.2,2),
-    new THREE.MeshBasicMaterial({color:0xff5a18,transparent:true,opacity:.66,depthWrite:false})
+    new THREE.MeshStandardMaterial({color:0xff5a18,emissive:0x8a1b05,emissiveIntensity:1.1,roughness:.48,metalness:.04,transparent:true,opacity:.72,depthWrite:true})
   );
   const shell=new THREE.Mesh(
     new THREE.IcosahedronGeometry(5.45,1),
-    new THREE.MeshBasicMaterial({color:0xffc04a,wireframe:true,transparent:true,opacity:.82,depthWrite:false})
+    new THREE.MeshBasicMaterial({color:0xffd060,wireframe:true,transparent:true,opacity:.92,depthWrite:false})
   );
   const core=new THREE.Mesh(
     new THREE.SphereGeometry(3.15,18,12),
@@ -10669,7 +10690,7 @@ function triggerCataclysmMeteor(){
     tail.position.set((Math.random()-.5)*2.2,5.8+i*2.4,(Math.random()-.5)*2.2);
     mesh.add(tail);
   }
-  mesh.position.set(x,21,z);mesh.scale.setScalar(.52);scene.add(mesh);
+  mesh.position.set(x,16,z);mesh.scale.setScalar(.68);mesh.renderOrder=50;mesh.traverse(o=>{o.renderOrder=50;});scene.add(mesh);
 
   const telegraph=new THREE.Group();
   const ring=new THREE.Mesh(new THREE.RingGeometry(10.6,12.2,64),new THREE.MeshBasicMaterial({color:0xff5b22,transparent:true,opacity:.78,side:THREE.DoubleSide,depthWrite:false}));
@@ -10678,7 +10699,7 @@ function triggerCataclysmMeteor(){
   fill.rotation.x=-Math.PI/2;fill.position.y=.035;telegraph.add(fill);
   telegraph.position.set(x,0,z);scene.add(telegraph);
 
-  fallingCataclysm={mesh,ring:telegraph,x,z,time:3,total:3,startY:21,endY:.9};
+  fallingCataclysm={mesh,ring:telegraph,x,z,time:3,total:3,startY:16,endY:.9};
   spawnArcaneRuneBurst(new THREE.Vector3(x,.05,z),7.5);
   toast('CATACLYSM METEOR INCOMING!');navigator.vibrate&&navigator.vibrate([45,30,45]);
 }
@@ -10726,8 +10747,34 @@ function impactCataclysm(m){
 function updateMageUltimates(dt){
   if(novaCooldownTimer>0)novaCooldownTimer=Math.max(0,novaCooldownTimer-dt);
   if(blizzardActiveTimer>0){
-    blizzardActiveTimer=Math.max(0,blizzardActiveTimer-dt);blizzardSpawnTimer-=dt;
-    if(blizzardSpawnTimer<=0){blizzardSpawnTimer=.52;spawnFallingIce();spawnFallingIce();}
+    blizzardActiveTimer=Math.max(0,blizzardActiveTimer-dt);
+    blizzardSpawnTimer-=dt;
+    blizzardDamageTimer-=dt;
+    // One readable falling ice mass at a time keeps the 10-second ultimate smooth on mobile.
+    if(blizzardSpawnTimer<=0){blizzardSpawnTimer=.72;spawnFallingIce();}
+    // The storm itself affects every enemy inside the true arena-scale radius. This makes
+    // damage/control reliable even when a random ice impact lands elsewhere.
+    if(blizzardDamageTimer<=0){
+      blizzardDamageTimer=1.0;
+      const br=blizzardRadius();
+      let affected=0, defeated=0;
+      for(const z of [...zombies]){
+        if(z.userData.dead)continue;
+        if(Math.hypot(z.position.x-blizzardCenter.x,z.position.z-blizzardCenter.z)>br)continue;
+        affected++;
+        const type=z.userData.archetype||'walker';
+        const wasDead=!!z.userData.dead;
+        applyBulletDamage(z,.62*playerStats.power);
+        if(!wasDead&&z.userData.dead){defeated++;continue;}
+        if(type==='boss'||type==='brute'){
+          z.userData.slowTimer=Math.max(z.userData.slowTimer||0,BLIZZARD_FREEZE);
+          z.userData.slowMult=Math.min(z.userData.slowMult||1,.18);
+        }else{
+          z.userData.hitStun=Math.max(z.userData.hitStun||0,BLIZZARD_FREEZE);
+        }
+      }
+      if(affected && blizzardActiveTimer>BLIZZARD_DURATION-1.2) toast(`BLIZZARD · ${affected} AFFECTED${defeated?` · ${defeated} DEFEATED`:''}`);
+    }
   }
   for(let i=fallingIce.length-1;i>=0;i--){const m=fallingIce[i];m.life-=dt;m.mesh.position.y-=m.vy*dt;m.mesh.rotation.x+=dt*2.4;m.mesh.rotation.z+=dt*1.7;m.ring.material.opacity=Math.max(.15,m.life*.58);if(m.mesh.position.y<=.55||m.life<=0){impactIce(m);scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);fallingIce.splice(i,1);}}
   if(fallingCataclysm){
@@ -10736,7 +10783,7 @@ function updateMageUltimates(dt){
     const p=1-Math.max(0,m.time)/m.total;
     const eased=p*p*(3-2*p);
     m.mesh.position.y=m.startY+(m.endY-m.startY)*eased;
-    const scale=.52+eased*.48;
+    const scale=.68+eased*.52;
     m.mesh.scale.setScalar(scale);
     m.mesh.rotation.x+=dt*.42;
     m.mesh.rotation.y+=dt*.55;
@@ -11789,6 +11836,7 @@ function startSurvival(){
   novaCooldownTimer = 0; novaSpeedBoostTimer = 0;
   stopArcaneLaser(); laserCharge = LASER_MAX_CHARGE; laserRegenDelayTimer = 0;
   resetCharacterLoadout();
+  resetAbilityLoadout();
   clearShadowClones();
   powerUps.forEach(p=>{ scene.remove(p.mesh); disposeGroup(p.mesh); });
   powerUps = [];
