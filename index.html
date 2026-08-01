@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- V22.10.46 Phoenix Manual-Cast + Slower Chain Javelin: Phoenix Fireball now activates only once per fresh button press and cannot auto-recast when its volley expires while the control is still held. Chain-Lightning Javelin travel time is increased for a slower, more readable projectile while preserving its 1-second cooldown, damage, chaining, and stun. -->
 <!-- V22.10.45 Phoenix Low-Enemy Pursuit: when only one or two enemies remain, the three Phoenix spheres use separated approach lanes around their targets instead of collapsing into one path. They continue moving, reacquire quickly, and converge close enough to deal contact damage without visibly stacking. -->
 <!-- V22.10.44 Triple Phoenix Shared Balance: caps the three spheres' combined gravity per enemy each frame and slightly reduces large-enemy/boss contact, burn, and expiration damage so the volley remains powerful without acting like three stacked ultimates. Normal enemies remain instant defeats. -->
 <!-- V22.10.43 Archer Secondary Cooldown Readability: adds live cooldown feedback directly on the Secondary button, including tenths-of-a-second countdown and a clear ready state. Chain-Lightning Javelin remains instant-cast with its fixed 1.0-second cooldown; damage and targeting are unchanged. -->
@@ -38,7 +39,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.45</title>
+<title>Family Arena V22.10.46</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -9676,9 +9677,10 @@ function setupControls(){
     if(!w){navigator.vibrate&&navigator.vibrate(12);return;}
     doSecondaryShoot();
     clearInterval(secondaryFireInterval);
-    // Every attack supports hold-to-fire. doSecondaryShoot() and each weapon's
-    // cooldown remain the authority, so holding never exceeds the intended rate.
-    secondaryFireInterval=setInterval(doSecondaryShoot,40);
+    // Phoenix is a manual one-volley ability: holding the button must never
+    // launch a new volley when the current three spheres expire. Other secondary
+    // attacks keep hold-to-fire behavior and remain limited by their cooldowns.
+    if(w.kind!=='rocket_arrow')secondaryFireInterval=setInterval(doSecondaryShoot,40);
   };
   const endSecondaryFire=e=>{
     if(e)e.preventDefault();
@@ -12291,7 +12293,7 @@ const CHAIN_JAVELIN_MAX_EXTRA_TARGETS=5;
 const CHAIN_JAVELIN_RANGE=7.8;
 const CHAIN_JAVELIN_STUN=3;
 const CHAIN_JAVELIN_BOSS_DAMAGE=.20;
-const CHAIN_JAVELIN_VISUAL_TIME=.28;
+const CHAIN_JAVELIN_VISUAL_TIME=.52;
 const chainJavelinFlights=[];
 
 function createChainTargetMarker(enemy,index){
