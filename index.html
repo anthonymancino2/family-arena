@@ -8,6 +8,8 @@
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
 <!-- V22.9.28 Approved Combat HUD Layout: preserves the existing FIRE, DASH, NOVA, and SECONDARY positions in a stable 2x2 cluster and places the avatar-specific ECHOES signature button directly above SECONDARY without shifting the approved controls. -->
+<!-- V22.9.30 Arcane Echo Elite Contact Damage: normal enemies are instantly defeated on Echo contact without consuming the Echo; Brutes consume the Echo and take 25% of the Mage's total attack damage; Bosses consume the Echo and take 10%; Echo projectiles continue damaging every enemy type. -->
+<!-- V22.9.29 Shop Close & Arcane Echo Combat Fix: adds a top-right circular X close control to the weapon shop while preserving the bottom Close button; fixes Arcane Echo target acquisition and visible attacks; and makes normal enemies die instantly on contact with an Echo while Brutes destroy the Echo and survive. -->
 <!-- V22.9.27 High-Contrast Timer Fix: makes the in-game timer readable against both light and dark environments with an opaque dark pill, bright border, white text, stronger shadow, and explicit HUD stacking. -->
 <!-- V22.9.26 HUD & Round Completion Fixes: fixes the rare Round 10/zero-enemy progression stall with a centralized idempotent round-completion guard; removes the FREE control; moves Pause into the camera stack; makes FIRE match SECONDARY size; stacks NOVA above ECHOES above FIRE in portrait; and provides dedicated compact landscape browser/app HUD positions. -->
 <!-- V22.9.25 Arcane Echoes Base Ability: implements the Mage signature summon unlocked at Level 10. Five 1-HP avatar copies prioritize enemy aggro, stay near the Mage, fire 10%-damage knockback bolts, use an initial 25-second charge, and then scale cooldown from 15 seconds at Level 1 to 5 seconds at Level 20 with a 1.5-second floor. -->
@@ -342,8 +344,12 @@
   .statChoiceBtn .scDesc{font-size:12px;opacity:0.7;font-weight:500;margin-top:2px;}
   .statChoiceBtn .scLevel{font-size:12px;opacity:0.85;font-weight:700;float:right;}
 
-  .shopPanel{background:var(--panel);border-radius:20px;padding:22px 18px;
+  .shopPanel{position:relative;background:var(--panel);border-radius:20px;padding:22px 18px;
     text-align:center;width:92%;max-width:420px;max-height:82vh;overflow-y:auto;}
+  .shopCloseIcon{position:sticky;top:0;float:right;z-index:4;width:44px;height:44px;margin:-8px -4px 0 8px;
+    border-radius:50%;border:2px solid var(--ice);background:rgba(8,18,31,.94);color:#fff;font-size:28px;line-height:1;
+    display:flex;align-items:center;justify-content:center;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,.45);}
+  .shopCloseIcon:active{transform:scale(.94);background:rgba(127,216,240,.24);}
   .shopTokensRow{display:flex;align-items:center;justify-content:center;gap:8px;
     font-weight:800;font-size:18px;margin-bottom:14px;color:#fff;}
   .shopTokensRow .coin{width:18px;height:18px;border-radius:50%;background:var(--gold);
@@ -620,6 +626,7 @@
         </div>
         <div class="shopOverlay" id="shopOverlay">
           <div class="shopPanel">
+            <button class="shopCloseIcon" id="btnCloseShopIcon" aria-label="Close weapon shop">×</button>
             <h2 style="margin:0 0 6px;">Weapon Shop</h2>
             <div class="shopTokensRow"><div class="coin"></div><span id="shopTokensCount">0</span></div>
             <div id="shopList"></div>
@@ -672,7 +679,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.28 - Approved Combat HUD';
+const GAME_VERSION='22.9.30 - Echo Elite Contact Damage';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -9491,6 +9498,8 @@ function setupControls(){
 
   document.getElementById('shopPromptBtn').addEventListener('touchstart', e=>{ e.preventDefault(); openShop(); });
   document.getElementById('btnCloseShop').addEventListener('touchstart', e=>{ e.preventDefault(); closeShop(); });
+  document.getElementById('btnCloseShopIcon').addEventListener('touchstart', e=>{ e.preventDefault(); closeShop(); });
+  document.getElementById('btnCloseShopIcon').addEventListener('click', e=>{ e.preventDefault(); closeShop(); });
 }
 
 // Pausing just stops the animate() loop (it already exits early when
@@ -10026,6 +10035,14 @@ function triggerArcaneEchoes(){
     }
   });
 }
+function spawnArcaneEchoBolt(from,to){
+  const points=[new THREE.Vector3(from.x,from.y+1.0,from.z),new THREE.Vector3(to.x,to.y+.75,to.z)];
+  const geometry=new THREE.BufferGeometry().setFromPoints(points);
+  const material=new THREE.LineBasicMaterial({color:0xb86cff,transparent:true,opacity:.95,depthWrite:false,blending:THREE.AdditiveBlending});
+  const line=new THREE.Line(geometry,material);line.renderOrder=8;scene.add(line);
+  fx.push({kind:'lightning',mesh:line,life:.16,maxLife:.16});
+  spawnBurst(to.x,to.y+.72,to.z,7,FX_MAT_SPARK,2.5);
+}
 function updateArcaneEchoes(dt){
   if(arcaneEchoesUnlocked()&&arcaneEchoesInitialChargePending){
     arcaneEchoesInitialChargePending=false;arcaneEchoesCycleDuration=ARCANE_ECHO_INITIAL_CHARGE;arcaneEchoesCooldownTimer=ARCANE_ECHO_INITIAL_CHARGE;updateHoodedHud();
@@ -10038,19 +10055,62 @@ function updateArcaneEchoes(dt){
     if(e.userData.kayMixer)e.userData.kayMixer.update(dt);
     const i=e.userData.echoIndex||0;
     const a=now*.35+(i/ARCANE_ECHO_COUNT)*Math.PI*2;
-    const desired=new THREE.Vector3(player.position.x+Math.cos(a)*2.25,player.position.y,player.position.z+Math.sin(a)*2.25);
-    const dist=e.position.distanceTo(desired);
-    if(dist>8)e.position.copy(desired);else e.position.lerp(desired,Math.min(1,dt*(dist>4?8:4.5)));
-    let target=null,best=8*8;
-    for(const z of zombies){if(z.userData.dead||z.userData.spawnPending)continue;const d=e.position.distanceToSquared(z.position);if(d<best){best=d;target=z;}}
-    e.userData.attackCooldown=Math.max(0,(e.userData.attackCooldown||0)-dt);
+    const orbitDesired=new THREE.Vector3(player.position.x+Math.cos(a)*2.25,player.position.y,player.position.z+Math.sin(a)*2.25);
+
+    let target=null,best=14*14;
+    for(const z of zombies){
+      if(!z||z.userData.dead||z.userData.spawnPending||!z.visible)continue;
+      const d=e.position.distanceToSquared(z.position);
+      if(d<best){best=d;target=z;}
+    }
+
+    // Echoes may step toward a target, but are leashed tightly to the Mage.
+    let desired=orbitDesired;
     if(target){
+      const toward=target.position.clone().sub(e.position);toward.y=0;
+      const targetDist=toward.length();
+      if(targetDist>3.4){
+        toward.normalize();
+        const candidate=e.position.clone().addScaledVector(toward,Math.min(2.2,targetDist-3.0));
+        const fromPlayer=candidate.clone().sub(player.position);fromPlayer.y=0;
+        if(fromPlayer.length()>5.5) candidate.copy(player.position).add(fromPlayer.normalize().multiplyScalar(5.5));
+        candidate.y=player.position.y;desired=candidate;
+      }
+    }
+    const dist=e.position.distanceTo(desired);
+    if(dist>9)e.position.copy(desired);else e.position.lerp(desired,Math.min(1,dt*(dist>4?9:5.5)));
+
+    // Contact behavior:
+    // - Normal enemies are instantly defeated and do not consume the Echo.
+    // - Brutes consume the Echo and take 25% of the Mage's total attack damage.
+    // - Bosses consume the Echo and take 10% of the Mage's total attack damage.
+    let echoConsumed=false;
+    for(const z of [...zombies]){
+      if(!z||z.userData.dead||z.userData.spawnPending||!z.visible)continue;
+      const type=z.userData.archetype||'walker';
+      const contactRadius=(type==='brute'||type==='boss'?1.05:.72)+.48;
+      if(e.position.distanceToSquared(z.position)>contactRadius*contactRadius)continue;
+
+      if(type==='brute'||type==='boss'){
+        const totalAttackDamage=Math.max(.08,(weaponForAvatar().damage||1)*playerStats.power);
+        const contactDamage=totalAttackDamage*(type==='brute'?.25:.10);
+        applyBulletDamage(z,contactDamage);
+        spawnBurst(z.position.x,z.position.y+.7,z.position.z,type==='brute'?16:20,FX_MAT_SPARK,type==='brute'?3.6:4.2);
+        destroyArcaneEcho(e);echoConsumed=true;break;
+      }
+
+      killZombie(z);
+    }
+    if(echoConsumed)continue;
+
+    e.userData.attackCooldown=Math.max(0,(e.userData.attackCooldown||0)-dt);
+    if(target&&!target.userData.dead&&target.parent){
       e.rotation.y=Math.atan2(target.position.x-e.position.x,target.position.z-e.position.z);
       if(e.userData.attackCooldown<=0){
-        e.userData.attackCooldown=.82;
+        e.userData.attackCooldown=.72;
         const dx=target.position.x-e.position.x,dz=target.position.z-e.position.z,dl=Math.hypot(dx,dz)||1;
         const damage=Math.max(.08,(weaponForAvatar().damage||1)*playerStats.power*.10);
-        spawnBurst(e.position.x,e.position.y+1.0,e.position.z,5,FX_MAT_SPARK,2.0);
+        spawnArcaneEchoBolt(e.position,target.position);
         applyBulletDamage(target,damage);
         if(!target.userData.dead){target.userData.knockbackX=(dx/dl)*3.2;target.userData.knockbackZ=(dz/dl)*3.2;target.userData.hitStun=Math.max(target.userData.hitStun||0,.12);}
       }
