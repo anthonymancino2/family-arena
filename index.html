@@ -1,27 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- V22.10.12 Fire Boulder Rebuild: completely removes the previous rolling meteor implementation and rebuilds the move from the Blizzard ice-ball geometry at 3x size, with reddish-brown rock, fire effects, ground rolling, nearest-enemy homing, chained retargeting, 10-second duration, tiered damage, and an independent longer cooldown. -->
-<!-- V22.10.9 Clone Persistence Correction: active clone companions are no longer removed by round completion or new-round special cleanup. Blizzard, Meteor Boulder, Arcane Laser, and temporary battlefield effects still reset normally. -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena V22.10.10</title>
-<!-- V22.10.8 Blizzard Coverage + Rolling Meteor Boulder + Round Effect Reset: Blizzard is set to 45% of the playable map radius with many more semi-transparent giant ice balls; Cataclysm Meteor is replaced by a visible ground-rolling homing meteor boulder lasting 10 seconds with tiered enemy damage and a longer cooldown; all active special moves are cleared when a round ends or a new round begins. -->
-<!-- V22.10.4 Meteor Descent & Damage Reliability Fix: Cataclysm Meteor now visibly descends from the sky as a translucent 10x fireball with a readable fiery shell and trail, uses a large persistent landing telegraph, and guarantees impact damage/stun/burn inside the marked zone. -->
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
-<!-- V22.10.6 Blizzard Performance + Meteor Activation Reliability: fixes the undefined Blizzard targeting radius that could halt the game loop, reduces ice-impact load, makes snowballs semi-transparent, applies readable arena-wide storm damage/control ticks, and hardens mobile Meteor activation with a clearly visible descending meteor and guaranteed impact. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
-<!-- V22.10.3 Blizzard Range + Meteor Impact + Main Play Button Fix: Blizzard now lasts 10 seconds and covers 70% of the arena radius; Cataclysm Meteor now has guaranteed visible impact feedback and reliable damage; the main Play button is isolated above decorative overlays. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
 <!-- V22.9.32 Round Completion & Timer Freeze: adds a forced zero-enemy completion failsafe, freezes the round timer the instant a round completes, and guarantees the between-round upgrade menu opens even if another pause state briefly interrupts the original transition. -->
 <!-- V22.9.30 Arcane Echo Elite Contact Damage: normal enemies are instantly defeated on Echo contact without consuming the Echo; Brutes consume the Echo and take 25% of the Mage's total attack damage; Bosses consume the Echo and take 10%; Echo projectiles continue damaging every enemy type. -->
 <!-- V22.9.29 Shop Close & Arcane Echo Combat Fix: adds a top-right circular X close control to the weapon shop while preserving the bottom Close button; fixes Arcane Echo target acquisition and visible attacks; and makes normal enemies die instantly on contact with an Echo while Brutes destroy the Echo and survive. -->
 <!-- V22.9.27 High-Contrast Timer Fix: makes the in-game timer readable against both light and dark environments with an opaque dark pill, bright border, white text, stronger shadow, and explicit HUD stacking. -->
 <!-- V22.9.25 Arcane Echoes Base Ability: implements the Mage signature summon unlocked at Level 10. Five 1-HP avatar copies prioritize enemy aggro, stay near the Mage, fire 10%-damage knockback bolts, use an initial 25-second charge, and then scale cooldown from 15 seconds at Level 1 to 5 seconds at Level 20 with a 1.5-second floor. -->
-<!-- V22.9.24 Avatar Signature Slot Cleanup: removes the Mage's Arcane Cataclysm move and its charge system. The shared ultimate control remains reserved for future avatar-specific signature moves such as Arcane Echoes, while the pause overlay now stays above all combat controls. -->
 <!-- V22.9.23 Between-Round Stat Shop: converts the mandatory free stat pick into a coin-funded between-round shop. Players may buy multiple affordable HP, Power, or Speed upgrades, see live prices and balances, or continue without purchasing. -->
 <!-- V22.9.22 Level Unlock Foundation: adds a centralized level milestone table, run-level unlock tracking, and visible unlock/next-unlock messaging on the between-round screen. Arcane Echoes is registered for Level 10 for the upcoming ability implementation. -->
 <!-- V22.9.21 Round-Level Sync: avatar level now always equals the active round, the HUD displays both values, and round-clear messaging announces the newly reached level. -->
@@ -690,7 +683,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.12 - Fire Boulder Rebuild';
+const GAME_VERSION='22.10.13 - Meteor Removed';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1465,8 +1458,6 @@ const WEAPONS = {
 // Stats (HP, Power, Speed) remain exclusively in the between-round shop.
 const BLIZZARD_STORM = {id:'blizzard_storm', name:'Blizzard Storm', price:640,
   desc:'Ultimate-tier battlefield control. For 10 seconds, giant ice masses rain across almost the entire playable arena. Its gameplay radius is five times larger than before, while impacts are kept inside the real map boundary. Moderate damage; normal enemies freeze for 3 seconds and resistant enemies are heavily slowed. No blinding white screen.'};
-const CATACLYSM_METEOR = {id:'cataclysm_meteor', name:'Meteor Boulder', price:900,
-  desc:'Ultimate-tier homing attack. A colossal semi-transparent meteor boulder rolls across the ground for 10 seconds, hunting the nearest enemy. It instantly defeats normal enemies, defeats Brutes and other large enemies in two hits, and removes 40% of a boss\'s max HP per cast (hard-capped below 50%). Its cooldown is longer than Blizzard Storm.'};
 // Boss Killer: hold to channel a piercing beam of massive sustained
 // damage at the nearest well-aligned target (falling back to wherever
 // you're facing). Drains a charge meter while firing and regenerates
@@ -9370,7 +9361,7 @@ function renderShopList(){
 // Mage abilities use one mutually-exclusive loadout slot. The shared HUD
 // button remains in the approved position directly left of FIRE. Buying
 // an ability equips it immediately; owned abilities can be swapped here.
-const HERO_ABILITIES = { mage:[BLIZZARD_STORM, CATACLYSM_METEOR, ARCANE_LASER] };
+const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER] };
 function renderAbilityShopList(list){
   const abilities = HERO_ABILITIES[state.avatarType];
   if(!abilities || !abilities.length) return;
@@ -9386,7 +9377,7 @@ function renderAbilityShopList(list){
     row.className = 'weaponRow' + (equipped ? ' equipped' : '');
     const swatch = document.createElement('div');
     swatch.className = 'weaponSwatch';
-    swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : (a.id==='cataclysm_meteor' ? '#ff7a35' : '#75dfff');
+    swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : '#75dfff';
     const info = document.createElement('div');
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${a.name}</div><div class="wDesc">${a.desc}</div>`;
@@ -9571,7 +9562,6 @@ function setupControls(){
     e.preventDefault();
     if(equippedAbilityId==='arcane_laser') startArcaneLaser();
     else if(equippedAbilityId==='blizzard_storm') triggerBlizzardStorm();
-    else if(equippedAbilityId==='cataclysm_meteor') triggerCataclysmMeteor();
   };
   const endEquippedAbility=e=>{
     if(e) e.preventDefault();
@@ -9583,10 +9573,6 @@ function setupControls(){
   abilityBtnEl.addEventListener('touchstart',beginEquippedAbility,{passive:false});
   abilityBtnEl.addEventListener('touchend',endEquippedAbility,{passive:false});
   abilityBtnEl.addEventListener('touchcancel',endEquippedAbility,{passive:false});
-  abilityBtnEl.addEventListener('click',e=>{
-    e.preventDefault();
-    if(equippedAbilityId==='cataclysm_meteor'&&!fireMeteorBoulder&&meteorCooldownTimer<=0) triggerCataclysmMeteor();
-  });
   window.addEventListener('mouseup',endEquippedAbility);
   const laserBtnEl=document.getElementById('laserBtn');
   laserBtnEl.classList.add('hidden');
@@ -9894,17 +9880,7 @@ function updateFx(dt){
       f.mesh.rotation.y += (f.spin||2.4)*dt;
       f.mesh.scale.setScalar(.92+(1-q)*.18);
       f.mesh.traverse(o=>{if(o.material)o.material.opacity=q*(o.userData.baseOpacity||.22);});
-    } else if(f.kind==='arcaneMeteor'){
-      f.life -= dt;
-      f.mesh.position.y -= (f.fallSpeed||20)*dt;
-      f.mesh.rotation.y += dt*9;
-      const q=Math.max(0,f.life/f.maxLife);
-      f.mesh.scale.setScalar(.78+(1-q)*.28);
-      f.mesh.traverse(o=>{if(o.material)o.material.opacity=Math.min(o.userData.baseOpacity||.74,q*1.7);});
-      if(f.mesh.position.y<=f.targetY || f.life<=0){
-        spawnArcaneImpact(f.mesh.position.x,f.targetY,f.mesh.position.z,f.element);
-        f.life=0;
-      }
+
     } else if(f.kind==='arcaneTarget'){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.rotation.z+=(f.spin||5)*dt;f.mesh.scale.setScalar(.88+(1-q)*.22);if(f.mesh.material)f.mesh.material.opacity=q*.42;
     } else if(f.kind==='arcaneImpact'){
@@ -10151,7 +10127,7 @@ function updateHoodedHud(){
     abilityBtn.classList.toggle('hidden', !equipped);
     abilityBtn.classList.toggle('laserMode', !!equipped && laserMode);
     if(equipped){
-      abilityBtn.textContent = laserMode ? 'LASER' : (equippedAbilityId==='cataclysm_meteor' ? 'METEOR' : 'BLIZZARD');
+      abilityBtn.textContent = laserMode ? 'LASER' : 'BLIZZARD';
       if(!laserMode){
         abilityBtn.style.removeProperty('--charge');
         abilityBtn.classList.remove('empty','active');
@@ -10567,22 +10543,6 @@ function spawnArcaneRuneBurst(origin,radius=3.4){
   const center=new THREE.Mesh(new THREE.RingGeometry(radius*.18,radius*.32,32),centerMat);center.rotation.x=-Math.PI/2;center.position.y=.04;center.userData.baseOpacity=.34;g.add(center);
   g.position.set(origin.x,origin.y,origin.z);scene.add(g);fx.push({kind:'arcaneRuneBurst',mesh:g,life:.46,maxLife:.46,spin:7.5,dispose:true});
 }
-function spawnArcaneMeteor(target,element){
-  const fire=element==='fire';
-  const g=new THREE.Group();
-  const coreMat=new THREE.MeshBasicMaterial({color:fire?0xff5a24:0x35cfff,transparent:true,opacity:.78,depthWrite:false,blending:THREE.NormalBlending});
-  const trailMat=new THREE.MeshBasicMaterial({color:fire?0xffc14d:0xb85cff,transparent:true,opacity:.54,depthWrite:false,blending:THREE.NormalBlending});
-  const core=new THREE.Mesh(new THREE.OctahedronGeometry(fire?.24:.22,0),coreMat);core.userData.baseOpacity=.78;g.add(core);
-  for(let i=0;i<3;i++){
-    const trail=new THREE.Mesh(new THREE.ConeGeometry(.07,.55+i*.13,5),trailMat);trail.position.y=.42+i*.27;trail.rotation.z=(i-1)*.22;trail.userData.baseOpacity=.54;g.add(trail);
-  }
-  const tx=target.x+(Math.random()-.5)*.35,tz=target.z+(Math.random()-.5)*.35;
-  g.position.set(tx,6.4+Math.random()*.8,tz);scene.add(g);
-  const markerMat=new THREE.MeshBasicMaterial({color:fire?0xff5a24:0x35cfff,transparent:true,opacity:.42,depthWrite:false,side:THREE.DoubleSide,blending:THREE.NormalBlending});
-  const marker=new THREE.Mesh(new THREE.RingGeometry(.35,.82,30),markerMat);marker.rotation.x=-Math.PI/2;marker.position.set(tx,target.y+.06,tz);scene.add(marker);
-  fx.push({kind:'arcaneTarget',mesh:marker,life:.34,maxLife:.34,spin:fire?5:-5,dispose:true});
-  fx.push({kind:'arcaneMeteor',mesh:g,targetY:target.y+.25,life:.34,maxLife:.34,fallSpeed:21,element,dispose:true});
-}
 function spawnChainLightning(origin,maxTargets=7,damage=1.4){
   const live=zombies.filter(z=>!z.userData.dead).sort((a,b)=>a.position.distanceToSquared(origin)-b.position.distanceToSquared(origin)).slice(0,maxTargets);
   let from=new THREE.Vector3(origin.x,origin.y+1.05,origin.z);
@@ -10600,20 +10560,18 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
 // Mage ultimate-tier abilities. Both use the shared ability HUD slot.
 // Visual rule: local spectacle only—never apply a full-screen color tint.
 // ---------------------------------------------------------------------
-const BLIZZARD_COOLDOWN=16, METEOR_BOULDER_COOLDOWN=26;
+const BLIZZARD_COOLDOWN=16;
 const BLIZZARD_DURATION=10, BLIZZARD_FREEZE=3, BLIZZARD_IMPACT_RADIUS=3.1;
 function blizzardRadius(){ return Math.max(12, arenaSize*.45); } // exactly 45% of playable map radius
-let blizzardCooldownTimer=0, meteorCooldownTimer=0;
+let blizzardCooldownTimer=0;
 let blizzardActiveTimer=0, blizzardSpawnTimer=0, blizzardDamageTimer=0, blizzardCenter=new THREE.Vector3();
 let fallingIce=[];
-let fireMeteorBoulder=null;
-let meteorCastSerial=0;
 
 function abilityButtonCooldown(seconds){
   const btn=document.getElementById('abilityBtn');
   if(btn){btn.classList.add('cooling');setTimeout(()=>btn.classList.remove('cooling'),seconds*1000);}
 }
-function makeIceMeteorMesh(radius=1.05){
+function makeIceBallMesh(radius=1.05){
   const mat=new THREE.MeshStandardMaterial({color:0x75dfff,emissive:0x143f66,roughness:.34,metalness:.08,transparent:true,opacity:.58,depthWrite:true});
   const mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(radius,1),mat);
   mesh.castShadow=true;
@@ -10626,7 +10584,7 @@ function spawnFallingIce(){
   const boundedR=Math.hypot(x,z);
   const clamp=boundedR>arenaSize-2.2?(arenaSize-2.2)/boundedR:1;
   const bx=x*clamp,bz=z*clamp;
-  const mesh=makeIceMeteorMesh(1.25+Math.random()*.75);
+  const mesh=makeIceBallMesh(1.25+Math.random()*.75);
   mesh.position.set(bx,11+Math.random()*5,bz); mesh.rotation.set(Math.random()*2,Math.random()*2,Math.random()*2);
   mesh.renderOrder=18; scene.add(mesh);
   const ring=new THREE.Mesh(new THREE.RingGeometry(BLIZZARD_IMPACT_RADIUS*.72,BLIZZARD_IMPACT_RADIUS,32),new THREE.MeshBasicMaterial({color:0x62d9ff,transparent:true,opacity:.46,side:THREE.DoubleSide,depthWrite:false}));
@@ -10659,116 +10617,17 @@ function triggerBlizzardStorm(){
   spawnArcaneRuneBurst(blizzardCenter,blizzardRadius()*.72);
   triggerCombatShake(5,180);navigator.vibrate&&navigator.vibrate([35,25,55]);toast('BLIZZARD STORM!');
 }
-function makeFireMeteorBoulder(){
-  // Intentionally reuse the exact Blizzard snowball geometry, scaled to 3x.
-  // Only the material/theme changes so this cannot depend on the deleted meteor renderer.
-  const group=new THREE.Group();
-  const body=makeIceMeteorMesh(4.5);
-  if(body.material&&body.material.dispose)body.material.dispose();
-  body.material=new THREE.MeshStandardMaterial({
-    color:0x7a2f20, emissive:0x8f2208, emissiveIntensity:.72,
-    roughness:.82, metalness:.03, transparent:true, opacity:.76, depthWrite:true
-  });
-  body.castShadow=true; body.receiveShadow=true;
-  const hotCracks=new THREE.Mesh(
-    new THREE.IcosahedronGeometry(4.58,1),
-    new THREE.MeshBasicMaterial({color:0xff6a1f,wireframe:true,transparent:true,opacity:.68,depthWrite:false})
-  );
-  const fireHalo=new THREE.Mesh(
-    new THREE.SphereGeometry(4.95,20,16),
-    new THREE.MeshBasicMaterial({color:0xff5a16,transparent:true,opacity:.13,depthWrite:false,blending:THREE.AdditiveBlending})
-  );
-  const groundShadow=new THREE.Mesh(
-    new THREE.CircleGeometry(4.9,36),
-    new THREE.MeshBasicMaterial({color:0x210700,transparent:true,opacity:.32,depthWrite:false})
-  );
-  groundShadow.rotation.x=-Math.PI/2; groundShadow.position.y=-4.42;
-  const groundRim=new THREE.Mesh(
-    new THREE.RingGeometry(4.25,4.95,36),
-    new THREE.MeshBasicMaterial({color:0xff7a27,transparent:true,opacity:.44,side:THREE.DoubleSide,depthWrite:false})
-  );
-  groundRim.rotation.x=-Math.PI/2; groundRim.position.y=-4.39;
-  group.add(body,hotCracks,fireHalo,groundShadow,groundRim);
-  group.traverse(o=>{o.renderOrder=70;});
-  group.userData.body=body;
-  return group;
-}
-function nearestFireBoulderTarget(boulder){
-  let best=null,bestD=Infinity;
-  for(const z of zombies){
-    if(!z||z.userData.dead||!z.parent)continue;
-    // A boss can be hit only once by a single cast; then seek another target.
-    if((z.userData.archetype||'walker')==='boss'&&boulder.bossesHit.has(z))continue;
-    const d=z.position.distanceToSquared(boulder.mesh.position);
-    if(d<bestD){bestD=d;best=z;}
-  }
-  return best;
-}
-function removeFireMeteorBoulder(showToast=false){
-  if(!fireMeteorBoulder)return;
-  scene.remove(fireMeteorBoulder.mesh);disposeGroup(fireMeteorBoulder.mesh);
-  fireMeteorBoulder=null;
-  if(showToast)toast('FIRE BOULDER ENDED');
-}
-function triggerCataclysmMeteor(){
-  if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='cataclysm_meteor'||!ownedAbilities.cataclysm_meteor||meteorCooldownTimer>0)return;
-  removeFireMeteorBoulder(false);
-  meteorCooldownTimer=METEOR_BOULDER_COOLDOWN;abilityButtonCooldown(METEOR_BOULDER_COOLDOWN);
-  const mesh=makeFireMeteorBoulder();
-  const first=nearestLivingZombie();
-  let dx=1,dz=0;
-  if(first){dx=first.position.x-player.position.x;dz=first.position.z-player.position.z;const l=Math.hypot(dx,dz)||1;dx/=l;dz/=l;}
-  else{dx=Math.sin(player.rotation.y);dz=Math.cos(player.rotation.y);}
-  // Spawn on the ground near the arena edge behind the player, immediately visible.
-  let sx=player.position.x-dx*8.5,sz=player.position.z-dz*8.5;
-  const maxR=Math.max(4,arenaSize-5.2),r=Math.hypot(sx,sz);
-  if(r>maxR){const k=maxR/r;sx*=k;sz*=k;}
-  mesh.position.set(sx,4.5,sz);scene.add(mesh);
-  fireMeteorBoulder={
-    mesh,time:10,speed:18.5,target:null,hitCounts:new Map(),bossesHit:new Set(),
-    hitCooldowns:new Map(),trailTimer:0,collisionRadius:4.8
-  };
-  fireMeteorBoulder.target=nearestFireBoulderTarget(fireMeteorBoulder);
-  spawnArcaneRuneBurst(mesh.position,6.2);spawnBurst(sx,1,sz,30,FX_MAT_SPARK,6.5);
-  triggerCombatShake(10,250);navigator.vibrate&&navigator.vibrate([75,30,90]);
-  toast('FIRE METEOR BOULDER · 10 SEC');
-}
-function damageWithFireBoulder(b,z){
-  if(!z||z.userData.dead)return;
-  const now=performance.now(),last=b.hitCooldowns.get(z)||0;
-  if(now-last<450)return;
-  b.hitCooldowns.set(z,now);
-  const type=z.userData.archetype||'walker';
-  const maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
-  if(type==='boss'){
-    if(b.bossesHit.has(z))return;
-    b.bossesHit.add(z);
-    applyBulletDamage(z,maxHp*.40);
-    z.userData.hitStun=Math.max(z.userData.hitStun||0,.55);
-  }else if(type==='brute'||type==='elite'||type==='giant'){
-    const hits=(b.hitCounts.get(z)||0)+1;b.hitCounts.set(z,hits);
-    if(hits>=2)applyBulletDamage(z,Math.max(maxHp+1,99999));
-    else{applyBulletDamage(z,maxHp*.50);z.userData.hitStun=Math.max(z.userData.hitStun||0,.9);}
-  }else{
-    applyBulletDamage(z,Math.max(maxHp+1,99999));
-  }
-  spawnBurst(z.position.x,z.position.y+.55,z.position.z,20,FX_MAT_SPARK,5.0);
-  triggerCombatShake(7,145);navigator.vibrate&&navigator.vibrate(30);
-  // Always choose again from the impact location. This is the chaining rule.
-  b.target=null;
-}
+
 function clearMageRoundSpecials(resetCooldowns=true){
   blizzardActiveTimer=0;blizzardSpawnTimer=0;blizzardDamageTimer=0;
   for(const m of fallingIce){scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);} fallingIce=[];
-  removeFireMeteorBoulder(false);
   if(typeof stopArcaneLaser==='function')stopArcaneLaser();
   // Clone-type companions intentionally persist between rounds. Do not clear
   // Arcane Echoes or avatar shadow clones as part of round-special cleanup.
-  if(resetCooldowns){blizzardCooldownTimer=0;meteorCooldownTimer=0;}
+  if(resetCooldowns){blizzardCooldownTimer=0;}
 }
 function updateMageUltimates(dt){
   if(blizzardCooldownTimer>0)blizzardCooldownTimer=Math.max(0,blizzardCooldownTimer-dt);
-  if(meteorCooldownTimer>0)meteorCooldownTimer=Math.max(0,meteorCooldownTimer-dt);
   if(blizzardActiveTimer>0){
     blizzardActiveTimer=Math.max(0,blizzardActiveTimer-dt);
     blizzardSpawnTimer-=dt;blizzardDamageTimer-=dt;
@@ -10790,39 +10649,6 @@ function updateMageUltimates(dt){
     }
   }
   for(let i=fallingIce.length-1;i>=0;i--){const m=fallingIce[i];m.life-=dt;m.mesh.position.y-=m.vy*dt;m.mesh.rotation.x+=dt*2.8;m.mesh.rotation.z+=dt*2.1;m.ring.material.opacity=Math.max(.10,m.life*.42);if(m.mesh.position.y<=.65||m.life<=0){impactIce(m);scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);fallingIce.splice(i,1);}}
-  if(fireMeteorBoulder){
-    const b=fireMeteorBoulder;
-    b.time=Math.max(0,b.time-dt);
-    if(!b.target||b.target.userData.dead||!b.target.parent||((b.target.userData.archetype||'walker')==='boss'&&b.bossesHit.has(b.target))){
-      b.target=nearestFireBoulderTarget(b);
-    }
-    if(b.target){
-      const dx=b.target.position.x-b.mesh.position.x,dz=b.target.position.z-b.mesh.position.z;
-      const dist=Math.hypot(dx,dz)||1,step=Math.min(dist,b.speed*dt);
-      b.mesh.position.x+=dx/dist*step;b.mesh.position.z+=dz/dist*step;
-      // Roll around the axis perpendicular to travel direction.
-      b.mesh.rotation.x+=dz/dist*dt*4.4;
-      b.mesh.rotation.z-=dx/dist*dt*4.4;
-      if(dist<=b.collisionRadius+1.1)damageWithFireBoulder(b,b.target);
-    }else{
-      b.mesh.rotation.x+=dt*1.7;b.mesh.rotation.z+=dt*1.2;
-    }
-    // Swept area collision makes contact reliable at low mobile frame rates.
-    for(const z of [...zombies]){
-      if(z.userData.dead)continue;
-      if(Math.hypot(z.position.x-b.mesh.position.x,z.position.z-b.mesh.position.z)<=b.collisionRadius+1.0){
-        damageWithFireBoulder(b,z);
-      }
-    }
-    const rr=Math.hypot(b.mesh.position.x,b.mesh.position.z),limit=Math.max(4,arenaSize-5.0);
-    if(rr>limit){const k=limit/rr;b.mesh.position.x*=k;b.mesh.position.z*=k;b.target=nearestFireBoulderTarget(b);}
-    b.trailTimer-=dt;
-    if(b.trailTimer<=0){
-      b.trailTimer=.07;
-      spawnBurst(b.mesh.position.x,1.0,b.mesh.position.z,4,FX_MAT_SPARK,3.0);
-    }
-    if(b.time<=0)removeFireMeteorBoulder(true);
-  }
   for(const z of [...zombies]){
     if(z.userData.dead)continue;
     if((z.userData.slowTimer||0)>0){z.userData.slowTimer=Math.max(0,z.userData.slowTimer-dt);if(z.userData.slowTimer<=0)z.userData.slowMult=1;}
@@ -11853,7 +11679,7 @@ function startSurvival(){
   equippedAbilityId = null;
   rerunEndsAfterRound=false;
   clearMageRoundSpecials(true);
-  blizzardCooldownTimer = 0; meteorCooldownTimer = 0;
+  blizzardCooldownTimer = 0;
   stopArcaneLaser(); laserCharge = LASER_MAX_CHARGE; laserRegenDelayTimer = 0;
   resetCharacterLoadout();
   resetAbilityLoadout();
