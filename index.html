@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<!-- V22.10.65 Standalone Tempest Cleanup: removes the retired standalone Tempest Domain definition, activation routing, HUD branch, update loop, and round-cleanup call now that Frost Domain is permanently integrated into Supernova Piercer. Supernova's defensive freeze domain is unchanged. -->
+<!-- V22.10.64 Mirror Volley Round-Cleanup Cooldowns: clearing temporary Mirror Volley placements at round completion now starts each occupied slot's own cooldown instead of making every slot instantly ready. Existing independent slot cooldowns remain intact across the between-round transition. -->
+<!-- V22.10.63 Mirror Volley Late-Spawn Guard: prevents asynchronous Mirror Volley decoy assets from spawning after their placement has expired or after round/reset cleanup. Placement timing, independent slot cooldowns, damage, and three-placement cap are unchanged. -->
 <!-- V22.10.62 Mirror Volley Independent Slots: replaces the shared Mirror Volley cooldown with three independent placement slots. Each cast occupies one slot; when that placement ends, only that slot begins its round-scaled cooldown. Other placements and slot timers continue independently. -->
 <!-- V22.10.61 Mirror Volley True Three-Placement Timing: extends Mirror Volley placement life from 6 to 7 seconds so the starting 3-second cooldown can produce three simultaneous active placements before the first expires. Placement cap, damage, targeting, cooldown scaling, and decoy behavior are otherwise unchanged. -->
 <!-- V22.10.60 Skyfall Performance Guard: caps overlapping impact shockwaves and embedded remnants, and dynamically suppresses only the optional second arrow when Skyfall visual load is already high. Core duration, primary spawn cadence, damage, radius, targeting, and cooldown remain unchanged. -->
@@ -53,7 +56,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.62</title>
+<title>Family Arena V22.10.65</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -743,7 +746,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.62 - Mirror Volley Independent Slots';
+const GAME_VERSION='22.10.65 - Standalone Tempest Cleanup';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1551,8 +1554,6 @@ const BLIZZARD_STORM = {id:'blizzard_storm', name:'Blizzard Storm', price:640,
 // when idle — weak against crowds, built to melt one tough target.
 const ARCANE_LASER = {id:'arcane_laser', name:'Arcane Laser', price:760,
   desc:'Hold to channel a piercing beam of massive sustained damage into whatever you\'re aimed at — the dedicated way to burn down a Brute or Boss. Pierces the crowd behind your target for lighter damage. Drains a charge meter that refills when you let go.'};
-const TEMPEST_DOMAIN = {id:'tempest_domain', name:'Tempest Domain', price:720,
-  desc:'Ultimate-tier crowd control. For 8 seconds, a large wind field follows the Archer, repeatedly damaging, pulling, and heavily slowing enemies inside it. Uses a 22-second cooldown and never covers the screen.'};
 const SKYFALL_BARRAGE = {id:'skyfall_barrage', name:'Skyfall Barrage', price:780,
   desc:'Ultimate-tier damage. For 7 seconds, giant translucent arrows rain onto enemy clusters with clear landing markers and strong area damage. Boss damage is capped at 25% per cast. Uses a 25-second cooldown.'};
 const SUPERNOVA_PIERCER = {id:'supernova_piercer', name:'Supernova Piercer', price:860,
@@ -8901,7 +8902,7 @@ function clearZombies(){
 }
 
 function startRound(){
-  clearMageRoundSpecials(true);
+  clearMageRoundSpecials(true,true);
   roundCompletionPending = false;
   roundCompletionStartedAt = 0;
   roundTimerFrozenElapsed = null;
@@ -9747,7 +9748,6 @@ function setupControls(){
   const activateEquippedAbilityNow=()=>{
     if(equippedAbilityId==='arcane_laser') startArcaneLaser();
     else if(equippedAbilityId==='blizzard_storm') triggerBlizzardStorm();
-    else if(equippedAbilityId==='tempest_domain') triggerTempestDomain();
     else if(equippedAbilityId==='skyfall_barrage') triggerSkyfallBarrage();
     else if(equippedAbilityId==='supernova_piercer') triggerSupernovaPiercer();
   };
@@ -10347,12 +10347,6 @@ function updateHoodedHud(){
     if(equipped){
       if(laserMode){
         abilityBtn.textContent='LASER';
-      }else if(equippedAbilityId==='tempest_domain'){
-        abilityBtn.textContent=tempestDomainActiveTimer>0
-          ? `TEMPEST ${tempestDomainActiveTimer.toFixed(1)}`
-          : (tempestDomainCooldownTimer>0 ? `TEMPEST ${Math.ceil(tempestDomainCooldownTimer)}` : 'TEMPEST');
-        abilityBtn.classList.toggle('active',tempestDomainActiveTimer>0);
-        abilityBtn.classList.toggle('cooling',tempestDomainCooldownTimer>0&&tempestDomainActiveTimer<=0);
       }else if(equippedAbilityId==='skyfall_barrage'){
         abilityBtn.textContent=skyfallActiveTimer>0
           ? `SKYFALL ${skyfallActiveTimer.toFixed(1)}`
@@ -10370,7 +10364,7 @@ function updateHoodedHud(){
       }
       if(!laserMode){
         abilityBtn.style.removeProperty('--charge');
-        if(equippedAbilityId!=='tempest_domain'&&equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='supernova_piercer'){
+        if(equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='supernova_piercer'){
           abilityBtn.classList.remove('empty','active','cooling');
         }
       }
@@ -11906,98 +11900,6 @@ function updateSkyfallBarrage(dt){
 // Tempest Archer equipable ultimate-tier ability.
 // A large mobile control field follows the Archer without using a screen tint.
 // ---------------------------------------------------------------------
-const TEMPEST_DOMAIN_COOLDOWN=22;
-const TEMPEST_DOMAIN_DURATION=8;
-function tempestDomainRadius(){ return Math.max(8.5,Math.min(13,arenaSize*.30)); }
-let tempestDomainCooldownTimer=0;
-let tempestDomainActiveTimer=0;
-let tempestDomainPulseTimer=0;
-let tempestDomainFx=null;
-
-function createTempestDomainFx(){
-  const radius=tempestDomainRadius();
-  const g=new THREE.Group();
-  const outerMat=new THREE.MeshBasicMaterial({color:0x63ffd1,transparent:true,opacity:.34,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
-  const outer=new THREE.Mesh(new THREE.RingGeometry(radius*.90,radius,72),outerMat);
-  outer.rotation.x=-Math.PI/2;outer.position.y=.055;outer.userData.baseOpacity=.34;g.add(outer);
-  const innerMat=new THREE.MeshBasicMaterial({color:0x67dfff,transparent:true,opacity:.16,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
-  for(let i=0;i<3;i++){
-    const ring=new THREE.Mesh(new THREE.RingGeometry(radius*(.24+i*.20),radius*(.27+i*.20),64),innerMat.clone());
-    ring.rotation.x=-Math.PI/2;ring.position.y=.045+i*.012;ring.rotation.z=i*.7;ring.userData.baseOpacity=.16;g.add(ring);
-  }
-  for(let i=0;i<12;i++){
-    const streak=new THREE.Mesh(new THREE.PlaneGeometry(.07,1.65),outerMat.clone());
-    const a=i*Math.PI/6;
-    streak.rotation.x=-Math.PI/2;streak.rotation.z=a+.35;
-    streak.position.set(Math.sin(a)*radius*.72,.09,Math.cos(a)*radius*.72);
-    streak.userData.baseOpacity=.24;g.add(streak);
-  }
-  scene.add(g);
-  return g;
-}
-function triggerTempestDomain(){
-  if(!gameRunning||state.avatarType!=='rogue'||equippedAbilityId!=='tempest_domain'||!ownedAbilities.tempest_domain)return;
-  if(tempestDomainActiveTimer>0){navigator.vibrate&&navigator.vibrate(8);return;}
-  if(tempestDomainCooldownTimer>0){toast(`Tempest recharging · ${Math.ceil(tempestDomainCooldownTimer)}s`);return;}
-  tempestDomainCooldownTimer=TEMPEST_DOMAIN_COOLDOWN;
-  abilityButtonCooldown(TEMPEST_DOMAIN_COOLDOWN);
-  tempestDomainActiveTimer=TEMPEST_DOMAIN_DURATION;
-  tempestDomainPulseTimer=0;
-  if(tempestDomainFx){scene.remove(tempestDomainFx);disposeGroup(tempestDomainFx);}
-  tempestDomainFx=createTempestDomainFx();
-  tempestDomainFx.position.copy(player.position);
-  spawnArcherMuzzleFan(true);
-  spawnBurst(player.position.x,player.position.y+.4,player.position.z,26,FX_MAT_DUST,6);
-  triggerCombatShake(7,180);
-  navigator.vibrate&&navigator.vibrate([35,25,60]);
-  toast('TEMPEST DOMAIN!');
-}
-function clearTempestDomain(resetCooldown=true){
-  tempestDomainActiveTimer=0;tempestDomainPulseTimer=0;
-  if(tempestDomainFx){scene.remove(tempestDomainFx);disposeGroup(tempestDomainFx);tempestDomainFx=null;}
-  if(resetCooldown)tempestDomainCooldownTimer=0;
-  updateHoodedHud();
-}
-function updateTempestDomain(dt){
-  if(tempestDomainCooldownTimer>0)tempestDomainCooldownTimer=Math.max(0,tempestDomainCooldownTimer-dt);
-  if(state.avatarType==='rogue'&&equippedAbilityId==='tempest_domain')updateHoodedHud();
-  if(tempestDomainActiveTimer<=0)return;
-  tempestDomainActiveTimer=Math.max(0,tempestDomainActiveTimer-dt);
-  if(!player){clearTempestDomain(false);return;}
-  if(tempestDomainFx){
-    tempestDomainFx.position.copy(player.position);
-    tempestDomainFx.rotation.y+=dt*2.7;
-    const q=Math.max(0,tempestDomainActiveTimer/TEMPEST_DOMAIN_DURATION);
-    tempestDomainFx.traverse(o=>{if(o.material)o.material.opacity=(o.userData.baseOpacity||.2)*Math.min(1,q*3);});
-  }
-  tempestDomainPulseTimer-=dt;
-  if(tempestDomainPulseTimer<=0){
-    tempestDomainPulseTimer=.48;
-    const radius=tempestDomainRadius();
-    let affected=0;
-    for(const enemy of [...zombies]){
-      if(enemy.userData.dead)continue;
-      const dx=enemy.position.x-player.position.x,dz=enemy.position.z-player.position.z;
-      const dist=Math.hypot(dx,dz);
-      if(dist>radius)continue;
-      affected++;
-      const type=enemy.userData.archetype||'walker';
-      applyBulletDamage(enemy,.52*playerStats.power);
-      if(enemy.userData.dead)continue;
-      const dl=dist||1;
-      const pull=Math.max(.7,2.7*(1-dist/radius));
-      enemy.userData.knockbackX=(-dx/dl)*pull;
-      enemy.userData.knockbackZ=(-dz/dl)*pull;
-      enemy.userData.slowTimer=Math.max(enemy.userData.slowTimer||0,.85);
-      enemy.userData.slowMult=Math.min(enemy.userData.slowMult||1,type==='boss'?.62:(type==='brute'?.45:.32));
-      if(type!=='boss'&&type!=='brute')enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,.14);
-      if(Math.random()<.36)spawnArcherSpark(enemy.position.x,enemy.position.y+.65,enemy.position.z);
-    }
-    if(affected)spawnBurst(player.position.x,player.position.y+.15,player.position.z,7,FX_MAT_DUST,4.4);
-  }
-  if(tempestDomainActiveTimer<=0)clearTempestDomain(false);
-}
-
 // ---------------------------------------------------------------------
 // Mage ultimate-tier abilities. Both use the shared ability HUD slot.
 // Visual rule: local spectacle only—never apply a full-screen color tint.
@@ -12060,13 +11962,12 @@ function triggerBlizzardStorm(){
   triggerCombatShake(5,180);navigator.vibrate&&navigator.vibrate([35,25,55]);toast('BLIZZARD STORM!');
 }
 
-function clearMageRoundSpecials(resetCooldowns=true){
+function clearMageRoundSpecials(resetCooldowns=true,preserveMirrorCooldowns=false){
   clearPhoenixFireball(false);
   clearPhoenixAfterEffects();
-  clearTempestDomain(resetCooldowns);
   clearSupernovaPiercer(resetCooldowns);
   clearSkyfallBarrage(resetCooldowns);
-  clearMirrorVolleyDecoys();
+  clearMirrorVolleyDecoys(preserveMirrorCooldowns);
   while(chainJavelinFlights.length){
     const f=chainJavelinFlights.pop();
     if(f.mesh&&f.mesh.parent){scene.remove(f.mesh);disposeGroup(f.mesh);}
@@ -12865,13 +12766,20 @@ function mirrorVolleyCooldownForLevel(level=avatarLevel()){
   return Math.max(1,3-(lv-1)*(2/19));
 }
 
-function clearMirrorVolleyDecoys(){
+function clearMirrorVolleyDecoys(preserveSlotCooldowns=false){
   while(mirrorVolleyDecoys.length){
     const d=mirrorVolleyDecoys.pop();
     if(d&&d.parent){scene.remove(d);disposeGroup(d);}
   }
   mirrorVolleyPlacements.length=0;
-  for(const slot of mirrorVolleySlots){slot.placementId=null;slot.cooldown=0;}
+  for(const slot of mirrorVolleySlots){
+    if(preserveSlotCooldowns){
+      if(slot.placementId!==null)slot.cooldown=Math.max(slot.cooldown||0,mirrorVolleyCooldownForLevel());
+    }else{
+      slot.cooldown=0;
+    }
+    slot.placementId=null;
+  }
 }
 function tintMirrorVolleyDecoy(root){
   root.traverse(o=>{
@@ -12888,6 +12796,8 @@ function tintMirrorVolleyDecoy(root){
 }
 function spawnMirrorVolleyDecoys(originX,originZ,rotationY,placementId){
   getKayKitAssetPromise('rogue').then(({gltf,THREEAsset,cloneSkinned})=>{
+    // Asset loading is asynchronous. The placement may have expired or been cleared before it finishes.
+    if(!mirrorVolleyPlacements.some(p=>p.id===placementId))return;
     for(let i=0;i<2;i++){
       const wrap=new THREE.Group();
       const root=cloneSkinned(gltf.scene);
@@ -13255,7 +13165,7 @@ function completeCurrentRound(force=false){
   // Freeze combat immediately. This also prevents the timer, enemies, and
   // projectiles from continuing underneath the between-round upgrade menu.
   gameRunning = false;
-  clearMageRoundSpecials(true);
+  clearMageRoundSpecials(true,true);
   clearZombies();
   const clearTime = roundTimerFrozenElapsed;
   let bonusMsg = 'Round '+round+' cleared in '+clearTime.toFixed(1)+'s!';
@@ -13492,7 +13402,6 @@ function update(dt){
   updateShadowEclipse(dt);
   updateSupernovaPiercer(dt);
   updateSkyfallBarrage(dt);
-  updateTempestDomain(dt);
   updateCycloneBeacons(dt);
   updateMageAbilityEffects(dt);
   updateArcaneLaser(dt);
