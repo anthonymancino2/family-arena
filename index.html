@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- V22.10.12 Fire Boulder Rebuild: completely removes the previous rolling meteor implementation and rebuilds the move from the Blizzard ice-ball geometry at 3x size, with reddish-brown rock, fire effects, ground rolling, nearest-enemy homing, chained retargeting, 10-second duration, tiered damage, and an independent longer cooldown. -->
 <!-- V22.10.9 Clone Persistence Correction: active clone companions are no longer removed by round completion or new-round special cleanup. Blizzard, Meteor Boulder, Arcane Laser, and temporary battlefield effects still reset normally. -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -689,7 +690,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.11 - Legacy Nova Removal';
+const GAME_VERSION='22.10.12 - Fire Boulder Rebuild';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -9584,7 +9585,7 @@ function setupControls(){
   abilityBtnEl.addEventListener('touchcancel',endEquippedAbility,{passive:false});
   abilityBtnEl.addEventListener('click',e=>{
     e.preventDefault();
-    if(equippedAbilityId==='cataclysm_meteor'&&!rollingMeteorBoulder&&meteorCooldownTimer<=0) triggerCataclysmMeteor();
+    if(equippedAbilityId==='cataclysm_meteor'&&!fireMeteorBoulder&&meteorCooldownTimer<=0) triggerCataclysmMeteor();
   });
   window.addEventListener('mouseup',endEquippedAbility);
   const laserBtnEl=document.getElementById('laserBtn');
@@ -10605,7 +10606,7 @@ function blizzardRadius(){ return Math.max(12, arenaSize*.45); } // exactly 45% 
 let blizzardCooldownTimer=0, meteorCooldownTimer=0;
 let blizzardActiveTimer=0, blizzardSpawnTimer=0, blizzardDamageTimer=0, blizzardCenter=new THREE.Vector3();
 let fallingIce=[];
-let rollingMeteorBoulder=null;
+let fireMeteorBoulder=null;
 let meteorCastSerial=0;
 
 function abilityButtonCooldown(seconds){
@@ -10658,88 +10659,108 @@ function triggerBlizzardStorm(){
   spawnArcaneRuneBurst(blizzardCenter,blizzardRadius()*.72);
   triggerCombatShake(5,180);navigator.vibrate&&navigator.vibrate([35,25,55]);toast('BLIZZARD STORM!');
 }
-function makeRollingMeteorBoulder(){
+function makeFireMeteorBoulder(){
+  // Intentionally reuse the exact Blizzard snowball geometry, scaled to 3x.
+  // Only the material/theme changes so this cannot depend on the deleted meteor renderer.
   const group=new THREE.Group();
-  const body=new THREE.Mesh(
-    new THREE.IcosahedronGeometry(4.35,2),
-    new THREE.MeshStandardMaterial({color:0x6b2718,emissive:0xb8360b,emissiveIntensity:1.25,roughness:.72,metalness:.02,transparent:true,opacity:.72,depthWrite:true})
+  const body=makeIceMeteorMesh(4.5);
+  if(body.material&&body.material.dispose)body.material.dispose();
+  body.material=new THREE.MeshStandardMaterial({
+    color:0x7a2f20, emissive:0x8f2208, emissiveIntensity:.72,
+    roughness:.82, metalness:.03, transparent:true, opacity:.76, depthWrite:true
+  });
+  body.castShadow=true; body.receiveShadow=true;
+  const hotCracks=new THREE.Mesh(
+    new THREE.IcosahedronGeometry(4.58,1),
+    new THREE.MeshBasicMaterial({color:0xff6a1f,wireframe:true,transparent:true,opacity:.68,depthWrite:false})
   );
-  const magma=new THREE.Mesh(
-    new THREE.IcosahedronGeometry(4.48,1),
-    new THREE.MeshBasicMaterial({color:0xff8a2b,wireframe:true,transparent:true,opacity:.88,depthWrite:false})
+  const fireHalo=new THREE.Mesh(
+    new THREE.SphereGeometry(4.95,20,16),
+    new THREE.MeshBasicMaterial({color:0xff5a16,transparent:true,opacity:.13,depthWrite:false,blending:THREE.AdditiveBlending})
   );
-  const glow=new THREE.Mesh(
-    new THREE.SphereGeometry(4.85,22,18),
-    new THREE.MeshBasicMaterial({color:0xff5b19,transparent:true,opacity:.20,depthWrite:false,blending:THREE.AdditiveBlending})
+  const groundShadow=new THREE.Mesh(
+    new THREE.CircleGeometry(4.9,36),
+    new THREE.MeshBasicMaterial({color:0x210700,transparent:true,opacity:.32,depthWrite:false})
   );
-  const shadow=new THREE.Mesh(
-    new THREE.CircleGeometry(5.3,40),
-    new THREE.MeshBasicMaterial({color:0x2a0800,transparent:true,opacity:.36,depthWrite:false})
+  groundShadow.rotation.x=-Math.PI/2; groundShadow.position.y=-4.42;
+  const groundRim=new THREE.Mesh(
+    new THREE.RingGeometry(4.25,4.95,36),
+    new THREE.MeshBasicMaterial({color:0xff7a27,transparent:true,opacity:.44,side:THREE.DoubleSide,depthWrite:false})
   );
-  shadow.rotation.x=-Math.PI/2; shadow.position.y=-4.22;
-  const rim=new THREE.Mesh(
-    new THREE.RingGeometry(4.65,5.35,40),
-    new THREE.MeshBasicMaterial({color:0xff9a3a,transparent:true,opacity:.58,side:THREE.DoubleSide,depthWrite:false})
-  );
-  rim.rotation.x=-Math.PI/2; rim.position.y=-4.18;
-  group.add(body,magma,glow,shadow,rim);
-  group.traverse(o=>{o.renderOrder=60;});
+  groundRim.rotation.x=-Math.PI/2; groundRim.position.y=-4.39;
+  group.add(body,hotCracks,fireHalo,groundShadow,groundRim);
+  group.traverse(o=>{o.renderOrder=70;});
+  group.userData.body=body;
   return group;
 }
-function nearestMeteorTarget(m){
-  const eligible=zombies.filter(z=>!z.userData.dead && !(z.userData.archetype==='boss' && m.bossesHit.has(z)));
-  if(!eligible.length)return null;
-  eligible.sort((a,b)=>a.position.distanceToSquared(m.mesh.position)-b.position.distanceToSquared(m.mesh.position));
-  return eligible[0];
+function nearestFireBoulderTarget(boulder){
+  let best=null,bestD=Infinity;
+  for(const z of zombies){
+    if(!z||z.userData.dead||!z.parent)continue;
+    // A boss can be hit only once by a single cast; then seek another target.
+    if((z.userData.archetype||'walker')==='boss'&&boulder.bossesHit.has(z))continue;
+    const d=z.position.distanceToSquared(boulder.mesh.position);
+    if(d<bestD){bestD=d;best=z;}
+  }
+  return best;
+}
+function removeFireMeteorBoulder(showToast=false){
+  if(!fireMeteorBoulder)return;
+  scene.remove(fireMeteorBoulder.mesh);disposeGroup(fireMeteorBoulder.mesh);
+  fireMeteorBoulder=null;
+  if(showToast)toast('FIRE BOULDER ENDED');
 }
 function triggerCataclysmMeteor(){
   if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='cataclysm_meteor'||!ownedAbilities.cataclysm_meteor||meteorCooldownTimer>0)return;
-  // Restart cleanly if a stale invisible instance somehow survived.
-  if(rollingMeteorBoulder){scene.remove(rollingMeteorBoulder.mesh);disposeGroup(rollingMeteorBoulder.mesh);rollingMeteorBoulder=null;}
-  meteorCooldownTimer=METEOR_BOULDER_COOLDOWN; abilityButtonCooldown(METEOR_BOULDER_COOLDOWN);
-  const mesh=makeRollingMeteorBoulder();
-  const nearest=nearestLivingZombie();
-  let dirX=1,dirZ=0;
-  if(nearest){
-    dirX=nearest.position.x-player.position.x;dirZ=nearest.position.z-player.position.z;
-    const dl=Math.hypot(dirX,dirZ)||1;dirX/=dl;dirZ/=dl;
-  }else{dirX=Math.sin(player.rotation.y);dirZ=Math.cos(player.rotation.y);}
-  // Spawn visibly on the ground, behind the player relative to its first target.
-  let sx=player.position.x-dirX*7.5,sz=player.position.z-dirZ*7.5;
-  const rr=Math.hypot(sx,sz);if(rr>arenaSize-6){const k=(arenaSize-6)/rr;sx*=k;sz*=k;}
-  mesh.position.set(sx,4.35,sz);scene.add(mesh);
-  const castId=++meteorCastSerial;
-  rollingMeteorBoulder={mesh,time:10,total:10,speed:17.5,target:null,castId,hitCounts:new Map(),bossesHit:new Set(),lastHitAt:new Map(),spawnGrace:.15};
-  spawnArcaneRuneBurst(mesh.position,6.0);spawnBurst(mesh.position.x,1.0,mesh.position.z,26,FX_MAT_SPARK,6.0);triggerCombatShake(10,260);
-  navigator.vibrate&&navigator.vibrate([70,25,85]);toast('METEOR BOULDER ACTIVE · 10 SEC');
+  removeFireMeteorBoulder(false);
+  meteorCooldownTimer=METEOR_BOULDER_COOLDOWN;abilityButtonCooldown(METEOR_BOULDER_COOLDOWN);
+  const mesh=makeFireMeteorBoulder();
+  const first=nearestLivingZombie();
+  let dx=1,dz=0;
+  if(first){dx=first.position.x-player.position.x;dz=first.position.z-player.position.z;const l=Math.hypot(dx,dz)||1;dx/=l;dz/=l;}
+  else{dx=Math.sin(player.rotation.y);dz=Math.cos(player.rotation.y);}
+  // Spawn on the ground near the arena edge behind the player, immediately visible.
+  let sx=player.position.x-dx*8.5,sz=player.position.z-dz*8.5;
+  const maxR=Math.max(4,arenaSize-5.2),r=Math.hypot(sx,sz);
+  if(r>maxR){const k=maxR/r;sx*=k;sz*=k;}
+  mesh.position.set(sx,4.5,sz);scene.add(mesh);
+  fireMeteorBoulder={
+    mesh,time:10,speed:18.5,target:null,hitCounts:new Map(),bossesHit:new Set(),
+    hitCooldowns:new Map(),trailTimer:0,collisionRadius:4.8
+  };
+  fireMeteorBoulder.target=nearestFireBoulderTarget(fireMeteorBoulder);
+  spawnArcaneRuneBurst(mesh.position,6.2);spawnBurst(sx,1,sz,30,FX_MAT_SPARK,6.5);
+  triggerCombatShake(10,250);navigator.vibrate&&navigator.vibrate([75,30,90]);
+  toast('FIRE METEOR BOULDER · 10 SEC');
 }
-function hitWithRollingMeteor(m,z){
-  const now=performance.now();
-  const last=m.lastHitAt.get(z)||0;
-  if(now-last<520)return;
-  m.lastHitAt.set(z,now);
+function damageWithFireBoulder(b,z){
+  if(!z||z.userData.dead)return;
+  const now=performance.now(),last=b.hitCooldowns.get(z)||0;
+  if(now-last<450)return;
+  b.hitCooldowns.set(z,now);
   const type=z.userData.archetype||'walker';
-  const max=Math.max(1,z.userData.maxHp||z.userData.hp||1);
+  const maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
   if(type==='boss'){
-    if(m.bossesHit.has(z))return;
-    m.bossesHit.add(z);
-    applyBulletDamage(z,max*.40); // per-cast boss damage is 40%, hard below requested 50% ceiling
-    z.userData.hitStun=Math.max(z.userData.hitStun||0,.65);
+    if(b.bossesHit.has(z))return;
+    b.bossesHit.add(z);
+    applyBulletDamage(z,maxHp*.40);
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,.55);
   }else if(type==='brute'||type==='elite'||type==='giant'){
-    const hits=(m.hitCounts.get(z)||0)+1;m.hitCounts.set(z,hits);
-    if(hits>=2)applyBulletDamage(z,Math.max(max+1,9999));
-    else {applyBulletDamage(z,max*.50);z.userData.hitStun=Math.max(z.userData.hitStun||0,1.1);}
+    const hits=(b.hitCounts.get(z)||0)+1;b.hitCounts.set(z,hits);
+    if(hits>=2)applyBulletDamage(z,Math.max(maxHp+1,99999));
+    else{applyBulletDamage(z,maxHp*.50);z.userData.hitStun=Math.max(z.userData.hitStun||0,.9);}
   }else{
-    applyBulletDamage(z,Math.max(max+1,9999));
+    applyBulletDamage(z,Math.max(maxHp+1,99999));
   }
-  spawnBurst(z.position.x,z.position.y+.5,z.position.z,18,FX_MAT_SPARK,4.8);
-  triggerCombatShake(8,160);navigator.vibrate&&navigator.vibrate(35);
-  if(z.userData.dead || type==='boss')m.target=null;
+  spawnBurst(z.position.x,z.position.y+.55,z.position.z,20,FX_MAT_SPARK,5.0);
+  triggerCombatShake(7,145);navigator.vibrate&&navigator.vibrate(30);
+  // Always choose again from the impact location. This is the chaining rule.
+  b.target=null;
 }
 function clearMageRoundSpecials(resetCooldowns=true){
   blizzardActiveTimer=0;blizzardSpawnTimer=0;blizzardDamageTimer=0;
   for(const m of fallingIce){scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);} fallingIce=[];
-  if(rollingMeteorBoulder){scene.remove(rollingMeteorBoulder.mesh);disposeGroup(rollingMeteorBoulder.mesh);rollingMeteorBoulder=null;}
+  removeFireMeteorBoulder(false);
   if(typeof stopArcaneLaser==='function')stopArcaneLaser();
   // Clone-type companions intentionally persist between rounds. Do not clear
   // Arcane Echoes or avatar shadow clones as part of round-special cleanup.
@@ -10769,27 +10790,38 @@ function updateMageUltimates(dt){
     }
   }
   for(let i=fallingIce.length-1;i>=0;i--){const m=fallingIce[i];m.life-=dt;m.mesh.position.y-=m.vy*dt;m.mesh.rotation.x+=dt*2.8;m.mesh.rotation.z+=dt*2.1;m.ring.material.opacity=Math.max(.10,m.life*.42);if(m.mesh.position.y<=.65||m.life<=0){impactIce(m);scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);fallingIce.splice(i,1);}}
-  if(rollingMeteorBoulder){
-    const m=rollingMeteorBoulder;m.time=Math.max(0,m.time-dt);
-    if(!m.target||m.target.userData.dead||!m.target.parent)m.target=nearestMeteorTarget(m);
-    if(m.target){
-      const dx=m.target.position.x-m.mesh.position.x,dz=m.target.position.z-m.mesh.position.z,l=Math.hypot(dx,dz)||1;
-      const step=Math.min(l,m.speed*dt);m.mesh.position.x+=dx/l*step;m.mesh.position.z+=dz/l*step;
-      m.mesh.rotation.z-=dx/l*dt*4.1;m.mesh.rotation.x+=dz/l*dt*4.1;
-      if(l<5.45)hitWithRollingMeteor(m,m.target);
+  if(fireMeteorBoulder){
+    const b=fireMeteorBoulder;
+    b.time=Math.max(0,b.time-dt);
+    if(!b.target||b.target.userData.dead||!b.target.parent||((b.target.userData.archetype||'walker')==='boss'&&b.bossesHit.has(b.target))){
+      b.target=nearestFireBoulderTarget(b);
+    }
+    if(b.target){
+      const dx=b.target.position.x-b.mesh.position.x,dz=b.target.position.z-b.mesh.position.z;
+      const dist=Math.hypot(dx,dz)||1,step=Math.min(dist,b.speed*dt);
+      b.mesh.position.x+=dx/dist*step;b.mesh.position.z+=dz/dist*step;
+      // Roll around the axis perpendicular to travel direction.
+      b.mesh.rotation.x+=dz/dist*dt*4.4;
+      b.mesh.rotation.z-=dx/dist*dt*4.4;
+      if(dist<=b.collisionRadius+1.1)damageWithFireBoulder(b,b.target);
     }else{
-      m.mesh.rotation.x+=dt*2.2;m.mesh.rotation.z+=dt*1.4;
+      b.mesh.rotation.x+=dt*1.7;b.mesh.rotation.z+=dt*1.2;
     }
-    // Collision sweep catches every enemy touched by the giant boulder, even if
-    // frame rate is low or the selected target changes between frames.
-    if(m.spawnGrace>0)m.spawnGrace=Math.max(0,m.spawnGrace-dt);
-    else for(const z of [...zombies]){
+    // Swept area collision makes contact reliable at low mobile frame rates.
+    for(const z of [...zombies]){
       if(z.userData.dead)continue;
-      if(Math.hypot(z.position.x-m.mesh.position.x,z.position.z-m.mesh.position.z)<=5.45)hitWithRollingMeteor(m,z);
+      if(Math.hypot(z.position.x-b.mesh.position.x,z.position.z-b.mesh.position.z)<=b.collisionRadius+1.0){
+        damageWithFireBoulder(b,z);
+      }
     }
-    const rr=Math.hypot(m.mesh.position.x,m.mesh.position.z);if(rr>arenaSize-5.1){const k=(arenaSize-5.1)/rr;m.mesh.position.x*=k;m.mesh.position.z*=k;}
-    if(Math.random()<dt*32)spawnBurst(m.mesh.position.x,1.0,m.mesh.position.z,3,FX_MAT_SPARK,2.7);
-    if(m.time<=0){scene.remove(m.mesh);disposeGroup(m.mesh);rollingMeteorBoulder=null;toast('METEOR BOULDER ENDED');}
+    const rr=Math.hypot(b.mesh.position.x,b.mesh.position.z),limit=Math.max(4,arenaSize-5.0);
+    if(rr>limit){const k=limit/rr;b.mesh.position.x*=k;b.mesh.position.z*=k;b.target=nearestFireBoulderTarget(b);}
+    b.trailTimer-=dt;
+    if(b.trailTimer<=0){
+      b.trailTimer=.07;
+      spawnBurst(b.mesh.position.x,1.0,b.mesh.position.z,4,FX_MAT_SPARK,3.0);
+    }
+    if(b.time<=0)removeFireMeteorBoulder(true);
   }
   for(const z of [...zombies]){
     if(z.userData.dead)continue;
