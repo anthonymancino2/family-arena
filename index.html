@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+<!-- V22.10.36 Phoenix Fireball Polish: upgrades the persistent sphere with layered volcanic plates, animated lava seams, rotating flame coronas, smoke/ember wake, localized heat shimmer, smoother cluster-seeking steering, and true constant forward movement. Gameplay damage, pull, seven-second lifetime, and one-active restriction remain unchanged. -->
+<!-- V22.10.35 Phoenix Fireball Core: completely replaces the old Phoenix Arrows projectile with one persistent 7-second molten sphere. It instant-casts, slowly seeks the largest nearby enemy cluster, continuously pulls enemies, applies type-scaled damage and burn, then ends in a fiery AoE explosion. A second Phoenix cannot be cast while the first exists. -->
+<!-- V22.10.34 Supernova Beam Release Polish: upgrades the released beam with a brighter white-hot core, layered gold/orange plasma, animated edge ribbons, localized impact flares, stronger boss stagger, and a short lingering heat shimmer without reducing battlefield visibility. -->
+<!-- V22.10.33 Supernova Charge Visual Polish: keeps the Archer's internal avatar ID routing intact and upgrades the 3-second charge with a growing solar orb, rotating ground rune rings, escalating localized sparks, pulsing aim glow, and progressively stronger camera shake without a whiteout. -->
+<!-- V22.10.32 Archer Supernova Routing Review: verified that the Tempest Archer intentionally uses the internal avatar ID “rogue”; no avatar-ID conversion is required. -->
 <!-- V22.10.31 Instant Attack + Chain Javelin Visual Rebuild: every non-charge attack activates on button-down. Chain-Lightning Javelin can always launch, even with no enemy selected, and now uses a large visible electrified spear, bright travel trail, impact burst, target markers, and thicker lingering chain arcs so every hit is easy to follow. -->
 <!-- V22.10.30 Tempest Archer Phase 13: adds Supernova Piercer as the Archer's signature damage ultimate. The Archer enters a 3-second rooted sniper charge, displays a full-map golden targeting line, then fires a readable solar beam that instantly defeats every non-boss enemy in its path and deals 50% max HP to bosses. Uses a 30-second cooldown and clears at round end. -->
 <!-- V22.10.29 Archer Loadout + Mirror Volley Placement: Windrunner Arrows and Fan of Arrows are now true Primary-slot choices, separate from Secondary attacks. Mirror Volley can be placed anywhere without an enemy target, supports up to three simultaneous placements, and uses a round-scaled cooldown that starts at 3 seconds, reaches 1 second by Round 20, and reaches 0 at very high rounds. -->
@@ -24,7 +29,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.31</title>
+<title>Family Arena V22.10.36</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1405,8 +1410,8 @@ const CHARACTER_COMBAT = {
         desc:'Place up to three Mirror Volleys anywhere you stand. Each leaves two invincible decoys and a Storm Beacon for 6 seconds. Cooldown starts at 3 seconds and scales toward 0 at very high rounds.'},
       chain_lightning_javelin:{slot:'secondary', name:'Chain-Lightning Javelin', price:560, kind:'chain_lightning_javelin', cooldown:4.2, damage:1.0, pierce:0, auto:false,
         desc:'Launches a heavy electrified javelin. The first strike chains to up to five nearby enemies. Normal enemies are defeated, large enemies survive at 1 HP, bosses lose 20% max HP, and every survivor is stunned for 3 seconds.'},
-      rocket_arrow:{slot:'secondary', name:'Phoenix Arrows', price:500, kind:'rocket_arrow', cooldown:0.42, damage:2.2, splash:3.4, splashMult:2, pierce:0, auto:true,
-        desc:'Explodes on impact. Nearby zombies take double splash damage.'}
+      rocket_arrow:{slot:'secondary', name:'Phoenix Fireball', price:500, kind:'rocket_arrow', cooldown:0, damage:0, splash:0, pierce:0, auto:false,
+        desc:'Instantly summons one giant molten fireball for 7 seconds. It seeks enemy clusters, pulls enemies inward, burns large targets and bosses, then erupts in a final fiery explosion. Only one may exist at a time.'}
     }
   },
   knight: {
@@ -10518,7 +10523,7 @@ function spawnArrowRainVolley(){
   triggerCombatShake(7,120);navigator.vibrate&&navigator.vibrate(22);
 }
 function triggerArrowStorm(){
-  if(!gameRunning||state.avatarType!=='rogue'||archerUltimateActive>0)return;
+  if(!gameRunning||state.avatarType!=='archer'||archerUltimateActive>0)return;
   if(archerUltimateCharge<99.5){toast('Arrow Storm is still charging');return;}
   archerUltimateCharge=0;archerUltimateActive=4.0;archerUltimatePulse=0;updateHoodedHud();
   document.body.style.filter='brightness(.78) saturate(1.55) contrast(1.08)';
@@ -10997,6 +11002,177 @@ function updateArcherMirrorClones(dt){
 }
 
 // ---------------------------------------------------------------------
+// Tempest Archer secondary: Phoenix Fireball.
+// One persistent molten sphere may exist at a time. It has no cooldown;
+// availability returns the instant the active sphere expires or is cleared.
+// ---------------------------------------------------------------------
+const PHOENIX_LIFETIME=7;
+const PHOENIX_SPEED=3.15;
+const PHOENIX_PULL_RADIUS=9.2;
+const PHOENIX_CONTACT_RADIUS=3.15;
+const PHOENIX_EXPLOSION_RADIUS=8.0;
+let phoenixFireball=null;
+
+function createPhoenixFireballMesh(){
+  const g=new THREE.Group();
+  const coreMat=new THREE.MeshStandardMaterial({color:0xff741d,emissive:0xff3506,emissiveIntensity:2.05,roughness:.24,metalness:.06});
+  const core=new THREE.Mesh(new THREE.IcosahedronGeometry(2.48,3),coreMat);core.userData.role='core';g.add(core);
+
+  // A broken-looking volcanic shell leaves the brighter core and seams visible.
+  const shellMat=new THREE.MeshStandardMaterial({color:0x1a0c0a,emissive:0x571207,emissiveIntensity:.48,roughness:.91,metalness:.08,transparent:true,opacity:.92});
+  for(let i=0;i<7;i++){
+    const plate=new THREE.Mesh(new THREE.IcosahedronGeometry(2.68,1),shellMat.clone());
+    plate.scale.set(1,0.24+Math.random()*.12,1);
+    plate.rotation.set((i/7)*Math.PI*2,Math.random()*Math.PI,Math.random()*Math.PI);
+    plate.userData.role='shellPlate';plate.userData.spin=(i%2?1:-1)*(.10+i*.008);g.add(plate);
+  }
+
+  const crackMat=new THREE.MeshBasicMaterial({color:0xffc13b,transparent:true,opacity:.92,depthWrite:false,blending:THREE.AdditiveBlending});
+  for(let i=0;i<8;i++){
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(2.57,.045+(i%3)*.012,6,42),crackMat.clone());
+    ring.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);ring.userData.role='crack';ring.userData.spin=(i%2?1:-1)*(.45+i*.055);g.add(ring);
+  }
+
+  // Two offset coronas suggest flame rotation without a screen-filling effect.
+  const coronaMat=new THREE.MeshBasicMaterial({color:0xff6a16,transparent:true,opacity:.28,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  for(let i=0;i<2;i++){
+    const corona=new THREE.Mesh(new THREE.TorusGeometry(3.02+i*.20,.13,7,38),coronaMat.clone());
+    corona.rotation.set(Math.PI*.5,i*Math.PI*.5,0);corona.userData.role='corona';corona.userData.spin=(i?-.82:1.0);g.add(corona);
+  }
+
+  const glowMat=new THREE.MeshBasicMaterial({color:0xff6517,transparent:true,opacity:.20,depthWrite:false,blending:THREE.AdditiveBlending});
+  const glow=new THREE.Mesh(new THREE.SphereGeometry(3.22,20,14),glowMat);glow.userData.role='glow';g.add(glow);
+  const heatMat=new THREE.MeshBasicMaterial({color:0xffd06a,transparent:true,opacity:.075,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const heat=new THREE.Mesh(new THREE.SphereGeometry(3.62,14,9),heatMat);heat.userData.role='heat';g.add(heat);
+  const light=new THREE.PointLight(0xff5b18,2.45,17,2);light.position.y=.2;g.add(light);
+  g.scale.setScalar(.78);return g;
+}
+function phoenixClusterTarget(){
+  const living=zombies.filter(z=>z&&!z.userData.dead&&z.parent);
+  if(!living.length)return null;
+  if(living.length===1)return living[0];
+  let best=living[0],bestScore=-Infinity;
+  for(const z of living){
+    let nearby=0,weight=0;
+    for(const o of living){
+      const d=Math.hypot(o.position.x-z.position.x,o.position.z-z.position.z);
+      if(d<=8){nearby++;weight+=1-d/9;}
+    }
+    const distancePenalty=phoenixFireball?Math.hypot(z.position.x-phoenixFireball.mesh.position.x,z.position.z-phoenixFireball.mesh.position.z)*.025:0;
+    const score=nearby+weight-distancePenalty;
+    if(score>bestScore){bestScore=score;best=z;}
+  }
+  return best;
+}
+function triggerPhoenixFireball(){
+  if(!gameRunning||state.avatarType!=='rogue'||phoenixFireball)return false;
+  const yaw=player.rotation.y,fx=Math.sin(yaw),fz=Math.cos(yaw);
+  const mesh=createPhoenixFireballMesh();
+  mesh.position.set(player.position.x+fx*2.25,2.35,player.position.z+fz*2.25);scene.add(mesh);
+  phoenixFireball={mesh,life:PHOENIX_LIFETIME,maxLife:PHOENIX_LIFETIME,hitEnemies:new Set(),targetTick:0,target:null,fxTick:0,smokeTick:0,dirX:fx,dirZ:fz};
+  spawnBurst(mesh.position.x,mesh.position.y,mesh.position.z,24,FX_MAT_SPARK,5.2);
+  spawnArcaneSigil(player.position.x,.035,player.position.z,2.25);
+  triggerCombatShake(6,150);navigator.vibrate&&navigator.vibrate([28,18,42]);toast('PHOENIX FIREBALL!');
+  return true;
+}
+function damagePhoenixTarget(z){
+  if(!z||z.userData.dead||!phoenixFireball||phoenixFireball.hitEnemies.has(z))return;
+  phoenixFireball.hitEnemies.add(z);
+  const type=z.userData.archetype||'walker';
+  const maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
+  if(type==='boss'){
+    applyBulletDamage(z,maxHp*.12);
+    if(!z.userData.dead){z.userData.burnTimer=Math.max(z.userData.burnTimer||0,6);z.userData.burnDps=Math.max(z.userData.burnDps||0,maxHp*.012);}
+  }else if(type==='brute'){
+    applyBulletDamage(z,maxHp*.45);
+    if(!z.userData.dead){z.userData.burnTimer=Math.max(z.userData.burnTimer||0,6);z.userData.burnDps=Math.max(z.userData.burnDps||0,maxHp*.025);}
+  }else applyBulletDamage(z,(z.userData.hp||1)+1);
+  spawnBurst(z.position.x,z.position.y+.75,z.position.z,type==='boss'?18:12,FX_MAT_SPARK,type==='boss'?4.5:3.5);
+}
+function explodePhoenixFireball(){
+  if(!phoenixFireball)return;
+  const p=phoenixFireball.mesh.position.clone();
+  for(const z of [...zombies]){
+    if(z.userData.dead)continue;
+    const dx=z.position.x-p.x,dz=z.position.z-p.z,dist=Math.hypot(dx,dz);
+    if(dist>PHOENIX_EXPLOSION_RADIUS)continue;
+    const type=z.userData.archetype||'walker',maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
+    if(type==='boss')applyBulletDamage(z,maxHp*.08);
+    else if(type==='brute')applyBulletDamage(z,maxHp*.20);
+    else applyBulletDamage(z,(z.userData.hp||1)+1);
+    if(!z.userData.dead){const dl=dist||1,force=type==='boss'?1.1:(type==='brute'?3.0:6.5);z.userData.knockbackX=(dx/dl)*force;z.userData.knockbackZ=(dz/dl)*force;}
+  }
+  spawnBurst(p.x,p.y,p.z,46,FX_MAT_SPARK,9.5);spawnArcaneSigil(p.x,.04,p.z,PHOENIX_EXPLOSION_RADIUS*.72);
+  triggerCombatShake(12,260);navigator.vibrate&&navigator.vibrate([55,25,90]);
+  scene.remove(phoenixFireball.mesh);disposeGroup(phoenixFireball.mesh);phoenixFireball=null;
+}
+function clearPhoenixFireball(explode=false){
+  if(!phoenixFireball)return;
+  if(explode){explodePhoenixFireball();return;}
+  scene.remove(phoenixFireball.mesh);disposeGroup(phoenixFireball.mesh);phoenixFireball=null;
+}
+function updatePhoenixFireball(dt){
+  if(!phoenixFireball)return;
+  const f=phoenixFireball,m=f.mesh,now=performance.now();f.life=Math.max(0,f.life-dt);f.targetTick-=dt;f.fxTick-=dt;f.smokeTick-=dt;
+  if(f.targetTick<=0){f.targetTick=.24;f.target=phoenixClusterTarget();}
+
+  // Steer toward the best cluster instead of snapping direction. The normalized
+  // direction is always advanced at full PHOENIX_SPEED, so the fireball never stops.
+  let desiredX=f.dirX,desiredZ=f.dirZ;
+  if(f.target&&!f.target.userData.dead&&f.target.parent){
+    const dx=f.target.position.x-m.position.x,dz=f.target.position.z-m.position.z,dl=Math.hypot(dx,dz)||1;
+    desiredX=dx/dl;desiredZ=dz/dl;
+  }
+  const steer=Math.min(1,dt*2.05);
+  f.dirX+=(desiredX-f.dirX)*steer;f.dirZ+=(desiredZ-f.dirZ)*steer;
+  let dirLen=Math.hypot(f.dirX,f.dirZ)||1;f.dirX/=dirLen;f.dirZ/=dirLen;
+  m.position.x+=f.dirX*PHOENIX_SPEED*dt;m.position.z+=f.dirZ*PHOENIX_SPEED*dt;
+
+  const radial=Math.hypot(m.position.x,m.position.z),limit=arenaSize-2.7;
+  if(radial>limit){
+    const nx=m.position.x/radial,nz=m.position.z/radial;m.position.x=nx*limit;m.position.z=nz*limit;
+    // Slide along the arena edge rather than appearing to stall against it.
+    const dot=f.dirX*nx+f.dirZ*nz;f.dirX-=nx*dot*1.65;f.dirZ-=nz*dot*1.65;
+    dirLen=Math.hypot(f.dirX,f.dirZ)||1;f.dirX/=dirLen;f.dirZ/=dirLen;
+  }
+  m.position.y=2.25+Math.sin(now*.0042)*.18;m.rotation.y+=dt*.88;m.rotation.x+=dt*.36;m.rotation.z+=dt*.13;
+  m.traverse(o=>{
+    const role=o.userData.role;
+    if(role==='crack'){
+      o.rotation.z+=dt*(o.userData.spin||.4);
+      o.material.opacity=.72+Math.sin(now*.012+o.id)*.20;
+    }else if(role==='shellPlate')o.rotation.y+=dt*(o.userData.spin||.1);
+    else if(role==='corona')o.rotation.z+=dt*(o.userData.spin||.8);
+    else if(role==='glow'){
+      const q=1+Math.sin(now*.009)*.085;o.scale.setScalar(q);o.material.opacity=.16+Math.sin(now*.010)*.055;
+    }else if(role==='heat'){
+      const q=1+Math.sin(now*.0065)*.055;o.scale.setScalar(q);o.rotation.y-=dt*.18;
+    }else if(role==='core')o.material.emissiveIntensity=1.85+Math.sin(now*.011)*.35;
+  });
+  for(const z of [...zombies]){
+    if(z.userData.dead)continue;
+    const dx=m.position.x-z.position.x,dz=m.position.z-z.position.z,dist=Math.hypot(dx,dz);
+    if(dist<=PHOENIX_PULL_RADIUS){
+      const type=z.userData.archetype||'walker',dl=dist||1;
+      const base=type==='boss'?.32:(type==='brute'?1.35:3.15),strength=base*Math.max(.18,1-dist/PHOENIX_PULL_RADIUS);
+      z.position.x+=dx/dl*strength*dt;z.position.z+=dz/dl*strength*dt;
+    }
+    if(dist<=PHOENIX_CONTACT_RADIUS)damagePhoenixTarget(z);
+  }
+  if(f.fxTick<=0){
+    f.fxTick=.065;
+    const backX=m.position.x-f.dirX*2.0,backZ=m.position.z-f.dirZ*2.0;
+    spawnBurst(backX+(Math.random()-.5)*1.6,m.position.y+(Math.random()-.5)*1.2,backZ+(Math.random()-.5)*1.6,2,FX_MAT_SPARK,2.8);
+  }
+  if(f.smokeTick<=0){
+    f.smokeTick=.16;
+    const backX=m.position.x-f.dirX*2.3,backZ=m.position.z-f.dirZ*2.3;
+    spawnBurst(backX,m.position.y+.35,backZ,2,FX_MAT_DUST,1.65);
+  }
+  if(f.life<=0)explodePhoenixFireball();
+}
+
+// ---------------------------------------------------------------------
 // Tempest Archer signature ultimate: Supernova Piercer.
 // The charge roots the Archer, shows a readable full-map aiming line, then
 // releases a narrow solar beam. No whiteout and no full-screen tint.
@@ -11011,6 +11187,8 @@ let supernovaBeamTimer=0;
 let supernovaAimAngle=0;
 let supernovaAimFx=null;
 let supernovaBeamFx=null;
+let supernovaChargeFx=null;
+let supernovaShakeTick=0;
 
 function supernovaMapLength(){return Math.max(50,arenaSize*2.6);}
 function createSupernovaAimFx(){
@@ -11023,18 +11201,60 @@ function createSupernovaAimFx(){
   core.rotation.x=-Math.PI/2;core.position.set(0,.115,len*.5);g.add(core);
   scene.add(g);return g;
 }
+function createSupernovaChargeFx(){
+  const g=new THREE.Group();
+  const additive={transparent:true,depthWrite:false,blending:THREE.AdditiveBlending};
+  const orb=new THREE.Mesh(
+    new THREE.SphereGeometry(.72,14,10),
+    new THREE.MeshBasicMaterial({color:0xfff4b0,opacity:.82,...additive})
+  );
+  orb.position.y=1.35;orb.userData.role='orb';g.add(orb);
+
+  const halo=new THREE.Mesh(
+    new THREE.SphereGeometry(1.05,12,8),
+    new THREE.MeshBasicMaterial({color:0xffa62b,opacity:.22,side:THREE.BackSide,...additive})
+  );
+  halo.position.copy(orb.position);halo.userData.role='halo';g.add(halo);
+
+  const ringMat=new THREE.MeshBasicMaterial({color:0xffd45c,opacity:.68,side:THREE.DoubleSide,...additive});
+  [1.65,2.25,2.85].forEach((radius,i)=>{
+    const ring=new THREE.Mesh(new THREE.RingGeometry(radius-.055,radius+.055,48),ringMat.clone());
+    ring.rotation.x=-Math.PI/2;ring.position.y=.055;ring.userData.role='rune';ring.userData.spin=(i%2?1:-1)*(.55+i*.18);g.add(ring);
+  });
+  const spokes=new THREE.Group();
+  for(let i=0;i<8;i++){
+    const spoke=new THREE.Mesh(new THREE.PlaneGeometry(.055,2.5),ringMat.clone());
+    spoke.rotation.x=-Math.PI/2;spoke.rotation.z=i*Math.PI/4;spoke.position.y=.06;spokes.add(spoke);
+  }
+  spokes.userData.role='spokes';g.add(spokes);
+  g.scale.setScalar(.35);
+  scene.add(g);return g;
+}
 function createSupernovaBeamFx(){
   const len=supernovaMapLength(),g=new THREE.Group();
   const layers=[
-    [SUPERNOVA_BEAM_HALF_WIDTH*2.7,0xffc83f,.34,.18],
-    [SUPERNOVA_BEAM_HALF_WIDTH*1.45,0xffef8f,.68,.20],
-    [.34,0xffffff,.88,.22]
+    [SUPERNOVA_BEAM_HALF_WIDTH*3.15,0xff6a16,.20,.14,'outer'],
+    [SUPERNOVA_BEAM_HALF_WIDTH*2.35,0xffa51f,.34,.17,'plasma'],
+    [SUPERNOVA_BEAM_HALF_WIDTH*1.45,0xffe36b,.62,.20,'inner'],
+    [.52,0xfff8cf,.92,.235,'core'],
+    [.18,0xffffff,1,.255,'white']
   ];
-  layers.forEach(([width,color,opacity,y])=>{
+  layers.forEach(([width,color,opacity,y,role])=>{
     const mat=new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
     const beam=new THREE.Mesh(new THREE.PlaneGeometry(width,len),mat);
-    beam.rotation.x=-Math.PI/2;beam.position.set(0,y,len*.5);beam.userData.baseOpacity=opacity;g.add(beam);
+    beam.rotation.x=-Math.PI/2;beam.position.set(0,y,len*.5);
+    beam.userData.baseOpacity=opacity;beam.userData.role=role;g.add(beam);
   });
+  for(const side of [-1,1]){
+    const ribbonMat=new THREE.MeshBasicMaterial({color:side<0?0xff7b20:0xffc53d,transparent:true,opacity:.46,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+    const ribbon=new THREE.Mesh(new THREE.PlaneGeometry(.34,len),ribbonMat);
+    ribbon.rotation.x=-Math.PI/2;ribbon.position.set(side*SUPERNOVA_BEAM_HALF_WIDTH*.86,.225,len*.5);
+    ribbon.userData.baseOpacity=.46;ribbon.userData.role='ribbon';ribbon.userData.side=side;g.add(ribbon);
+  }
+  const heatMat=new THREE.MeshBasicMaterial({color:0xffd27a,transparent:true,opacity:.12,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const heat=new THREE.Mesh(new THREE.PlaneGeometry(SUPERNOVA_BEAM_HALF_WIDTH*3.8,len),heatMat);
+  heat.rotation.x=-Math.PI/2;heat.position.set(0,.285,len*.5);heat.userData.baseOpacity=.12;heat.userData.role='heat';g.add(heat);
+  g.userData.birth=performance.now();
   scene.add(g);return g;
 }
 function pointDistanceToSupernovaLine(px,pz,ox,oz,angle){
@@ -11045,6 +11265,7 @@ function fireSupernovaPiercer(){
   if(!player)return;
   const ox=player.position.x,oz=player.position.z,angle=supernovaAimAngle,maxLen=supernovaMapLength();
   if(supernovaAimFx){scene.remove(supernovaAimFx);disposeGroup(supernovaAimFx);supernovaAimFx=null;}
+  if(supernovaChargeFx){scene.remove(supernovaChargeFx);disposeGroup(supernovaChargeFx);supernovaChargeFx=null;}
   supernovaBeamFx=createSupernovaBeamFx();
   supernovaBeamFx.position.set(ox,0,oz);supernovaBeamFx.rotation.y=angle;
   supernovaBeamTimer=SUPERNOVA_BEAM_LIFETIME;
@@ -11060,11 +11281,17 @@ function fireSupernovaPiercer(){
     if(type==='boss'){
       const maxHp=Math.max(1,enemy.userData.maxHp||enemy.userData.hp||1);
       applyBulletDamage(enemy,Math.min(enemy.userData.hp||maxHp,maxHp*.50));
+      if(!enemy.userData.dead){
+        enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,1.55);
+        const push=new THREE.Vector3(enemy.position.x-ox,0,enemy.position.z-oz).normalize().multiplyScalar(1.35);
+        enemy.position.add(push);
+      }
     }else{
       applyBulletDamage(enemy,(enemy.userData.hp||1)+1);
+      if(!enemy.userData.dead)enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,.85);
     }
-    if(!enemy.userData.dead)enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,.75);
-    spawnBurst(enemy.position.x,enemy.position.y+.8,enemy.position.z,16,FX_MAT_SPARK,4.8);
+    spawnBurst(enemy.position.x,enemy.position.y+.8,enemy.position.z,type==='boss'?28:18,FX_MAT_SPARK,type==='boss'?6.8:5.2);
+    spawnArcaneSigil(enemy.position.x,.035,enemy.position.z,type==='boss'?2.2:1.25);
   }
   triggerCombatShake(14,280);
   navigator.vibrate&&navigator.vibrate([60,30,110]);
@@ -11084,12 +11311,17 @@ function triggerSupernovaPiercer(){
   supernovaCooldownTimer=SUPERNOVA_COOLDOWN;
   abilityButtonCooldown(SUPERNOVA_COOLDOWN);
   supernovaChargeTimer=SUPERNOVA_CHARGE_DURATION;
+  supernovaShakeTick=0;
   player.userData.supernovaRooted=true;
 
   if(supernovaAimFx){scene.remove(supernovaAimFx);disposeGroup(supernovaAimFx);}
   supernovaAimFx=createSupernovaAimFx();
   supernovaAimFx.position.set(player.position.x,0,player.position.z);
   supernovaAimFx.rotation.y=supernovaAimAngle;
+  if(supernovaChargeFx){scene.remove(supernovaChargeFx);disposeGroup(supernovaChargeFx);}
+  supernovaChargeFx=createSupernovaChargeFx();
+  supernovaChargeFx.position.set(player.position.x,0,player.position.z);
+  supernovaChargeFx.rotation.y=supernovaAimAngle;
   spawnArcaneSigil(player.position.x,.02,player.position.z,2.2);
   spawnBurst(player.position.x,player.position.y+.65,player.position.z,22,FX_MAT_SPARK,5);
   navigator.vibrate&&navigator.vibrate([28,18,42]);
@@ -11099,6 +11331,7 @@ function clearSupernovaPiercer(resetCooldown=true){
   supernovaChargeTimer=0;supernovaBeamTimer=0;
   if(player&&player.userData)player.userData.supernovaRooted=false;
   if(supernovaAimFx){scene.remove(supernovaAimFx);disposeGroup(supernovaAimFx);supernovaAimFx=null;}
+  if(supernovaChargeFx){scene.remove(supernovaChargeFx);disposeGroup(supernovaChargeFx);supernovaChargeFx=null;}
   if(supernovaBeamFx){scene.remove(supernovaBeamFx);disposeGroup(supernovaBeamFx);supernovaBeamFx=null;}
   if(resetCooldown)supernovaCooldownTimer=0;
   updateHoodedHud();
@@ -11112,13 +11345,41 @@ function updateSupernovaPiercer(dt){
     if(player){
       player.userData.supernovaRooted=true;
       player.rotation.y=supernovaAimAngle;
+      const progress=1-(supernovaChargeTimer/SUPERNOVA_CHARGE_DURATION);
+      const now=performance.now();
       if(supernovaAimFx){
         supernovaAimFx.position.set(player.position.x,0,player.position.z);
         supernovaAimFx.rotation.y=supernovaAimAngle;
-        const pulse=.42+Math.sin(performance.now()*.018)*.12;
-        supernovaAimFx.traverse(o=>{if(o.material)o.material.opacity=Math.max(.18,pulse);});
+        const pulse=.35+progress*.28+Math.sin(now*.020)*(.07+progress*.05);
+        supernovaAimFx.scale.x=.85+progress*.55;
+        supernovaAimFx.traverse(o=>{if(o.material)o.material.opacity=Math.max(.16,Math.min(.82,pulse));});
       }
-      if(Math.random()<Math.min(1,dt*18))spawnArcherSpark(player.position.x,player.position.y+.8,player.position.z);
+      if(supernovaChargeFx){
+        supernovaChargeFx.position.set(player.position.x,0,player.position.z);
+        supernovaChargeFx.rotation.y=supernovaAimAngle;
+        const grow=.35+progress*.92;
+        supernovaChargeFx.scale.setScalar(grow);
+        supernovaChargeFx.traverse(o=>{
+          if(o.userData.role==='rune')o.rotation.z+=dt*(o.userData.spin||.6)*(1+progress*1.4);
+          else if(o.userData.role==='spokes')o.rotation.y-=dt*(.45+progress*.8);
+          else if(o.userData.role==='orb'){
+            const p=1+Math.sin(now*.026)*(.06+progress*.08);
+            o.scale.setScalar(p);
+            if(o.material)o.material.opacity=.68+progress*.25;
+          }else if(o.userData.role==='halo'){
+            const p=1.05+Math.sin(now*.018)*.12;
+            o.scale.setScalar(p);
+            if(o.material)o.material.opacity=.15+progress*.24;
+          }
+        });
+      }
+      const sparkRate=10+progress*34;
+      if(Math.random()<Math.min(1,dt*sparkRate))spawnArcherSpark(player.position.x+(Math.random()-.5)*1.7,player.position.y+.55+Math.random()*1.25,player.position.z+(Math.random()-.5)*1.7);
+      supernovaShakeTick-=dt;
+      if(progress>.18&&supernovaShakeTick<=0){
+        triggerCombatShake(1.5+progress*5.5,45+progress*35);
+        supernovaShakeTick=Math.max(.07,.24-progress*.14);
+      }
     }
     if(supernovaChargeTimer<=0){
       if(player&&player.userData)player.userData.supernovaRooted=false;
@@ -11130,7 +11391,23 @@ function updateSupernovaPiercer(dt){
     supernovaBeamTimer=Math.max(0,supernovaBeamTimer-dt);
     if(supernovaBeamFx){
       const fade=Math.max(0,supernovaBeamTimer/SUPERNOVA_BEAM_LIFETIME);
-      supernovaBeamFx.traverse(o=>{if(o.material)o.material.opacity=(o.userData.baseOpacity||.5)*fade;});
+      const elapsed=(performance.now()-(supernovaBeamFx.userData.birth||performance.now()))*.001;
+      supernovaBeamFx.traverse(o=>{
+        if(!o.material)return;
+        const base=o.userData.baseOpacity||.5;
+        if(o.userData.role==='ribbon'){
+          o.position.x=o.userData.side*SUPERNOVA_BEAM_HALF_WIDTH*(.82+Math.sin(elapsed*28+o.userData.side)*.11);
+          o.material.opacity=base*fade*(.72+Math.sin(elapsed*35)*.22);
+        }else if(o.userData.role==='heat'){
+          o.scale.x=1+Math.sin(elapsed*22)*.08;
+          o.material.opacity=base*Math.min(1,fade*1.8)*(1+Math.sin(elapsed*18)*.18);
+        }else if(o.userData.role==='core'||o.userData.role==='white'){
+          o.scale.x=1+Math.sin(elapsed*42)*.05;
+          o.material.opacity=base*Math.min(1,fade*1.35);
+        }else{
+          o.material.opacity=base*fade;
+        }
+      });
     }
     if(supernovaBeamTimer<=0&&supernovaBeamFx){
       scene.remove(supernovaBeamFx);disposeGroup(supernovaBeamFx);supernovaBeamFx=null;
@@ -11491,6 +11768,7 @@ function triggerBlizzardStorm(){
 }
 
 function clearMageRoundSpecials(resetCooldowns=true){
+  clearPhoenixFireball(false);
   clearTempestDomain(resetCooldowns);
   clearSupernovaPiercer(resetCooldowns);
   clearSkyfallBarrage(resetCooldowns);
@@ -11902,6 +12180,10 @@ function doShoot(){
 function doSecondaryShoot(){
   const w=secondaryWeaponForAvatar();
   if(!gameRunning||!w||(player.userData.secondaryAttackCooldown||0)>0)return;
+  if(w.kind==='rocket_arrow'){
+    triggerPhoenixFireball();
+    return;
+  }
   if(w.kind==='mirror_volley'){
     if(mirrorVolleyCooldownTimer>0)return;
     triggerMirrorVolley(w);
@@ -13037,6 +13319,7 @@ function update(dt){
     player.userData.spinBaseY=undefined;
   }
   updateBullets(dt);
+  updatePhoenixFireball(dt);
   updateEnemyProjectiles(dt);
   updateFx(dt);
   updateWeather(dt);
