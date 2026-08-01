@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- V22.10.26 Archer Clone Control Fix: disables browser text selection/copy callouts during gameplay, moves permanent Mirror Clones to the signature button formerly used by Arrow Storm, increases the summon to five clones, widens clone spacing, and moves Arrow Storm into Pause → Abilities as an equipable Archer ability. -->
+<!-- V22.10.25 Tempest Archer Phase 11: replaces standalone Storm Beacon Arrow with Mirror Volley. The Archer dashes backward, leaves two invincible stationary decoys for 6 seconds, fires a launch barrage, and automatically plants one Storm Beacon at the departure point. The 3-second cooldown begins after the decoys expire. -->
 <!-- V22.10.24 Tempest Archer Phase 10: adds Round-10 Mirror Clones as an equipable Archer ability. Two cyan phantom Archers use the Mage Echo framework, draw enemy aggro, fire 10%-damage phantom arrows with small knockback, persist between rounds, and are unlocked immediately during development testing. -->
 <!-- V22.10.23 Tempest Archer Phase 9: adds Skyfall Barrage as a damage-focused ultimate-tier alternative to Tempest Domain. For 7 seconds, large translucent arrows rain onto enemy clusters with visible landing markers, strong area damage, and a 25-second cooldown. Boss damage is capped at 25% per cast, effects remain localized, and all Skyfall objects clear at round end. -->
 <!-- V22.10.22 Tempest Archer Phase 8: restores hold-to-fire for every primary and secondary attack, prevents browser pinch/double-tap zoom, and redesigns Cyclone Snare into a persistent Storm Beacon trap so it plays completely differently from the straight-line Gale Drill Arrow. -->
@@ -17,7 +19,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.24</title>
+<title>Family Arena V22.10.26</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -58,7 +60,18 @@
     --silver:#c9d6e0; --bronze:#d98a4a; --plat:#b7f0e0;
     --danger:#ff5b5b; --panel:rgba(14,27,42,0.86);
   }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  *{
+    box-sizing:border-box;
+    -webkit-tap-highlight-color:transparent;
+    user-select:none;
+    -webkit-user-select:none;
+    -webkit-touch-callout:none;
+  }
+  html,body,#app,#gameScreen,#gl,button,.bigBtn,.actBtn,.secondaryBtn,.abilityBtn,.ultimateBtn{
+    user-select:none!important;
+    -webkit-user-select:none!important;
+    -webkit-touch-callout:none!important;
+  }
   html,body{margin:0;height:100%;height:100dvh;background:#050b12;color:var(--snow);
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; overflow:hidden;
     overscroll-behavior:none;}
@@ -696,7 +709,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.24 - Tempest Archer Mirror Clones';
+const GAME_VERSION='22.10.26 - Archer Clone Control Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1373,8 +1386,8 @@ const CHARACTER_COMBAT = {
         desc:'Fires four arrows in a wide arc. Hold FIRE to continue.'},
       gale_drill_arrow:{name:'Gale Drill Arrow', price:430, kind:'gale_drill_arrow', cooldown:0.82, damage:2.45, pierce:6, auto:false,
         desc:'Launches one oversized spinning wind arrow through a crowd. Wide hitbox, heavy knockback, and up to seven enemy hits.'},
-      cyclone_snare_arrow:{name:'Storm Beacon Arrow', price:470, kind:'cyclone_snare_arrow', cooldown:4.6, damage:0.48, pierce:0, auto:false,
-        desc:'Plants a stationary tornado for 6 seconds. It repeatedly pulls, slows, and damages enemies inside. Up to two beacons can exist at once.'},
+      mirror_volley:{name:'Mirror Volley', price:470, kind:'mirror_volley', cooldown:9.0, damage:0.28, pierce:0, auto:false,
+        desc:'Dash backward and leave two invincible decoy Archers for 6 seconds. They fire phantom arrows while a Storm Beacon pulls enemies at the departure point. A 3-second cooldown begins after the decoys expire.'},
       rocket_arrow:{name:'Phoenix Arrows', price:500, kind:'rocket_arrow', cooldown:0.42, damage:2.2, splash:3.4, splashMult:2, pierce:0, auto:true,
         desc:'Explodes on impact. Nearby zombies take double splash damage.'}
     }
@@ -1490,8 +1503,8 @@ const ARCANE_LASER = {id:'arcane_laser', name:'Arcane Laser', price:760,
   desc:'Hold to channel a piercing beam of massive sustained damage into whatever you\'re aimed at — the dedicated way to burn down a Brute or Boss. Pierces the crowd behind your target for lighter damage. Drains a charge meter that refills when you let go.'};
 const TEMPEST_DOMAIN = {id:'tempest_domain', name:'Tempest Domain', price:720,
   desc:'Ultimate-tier crowd control. For 8 seconds, a large wind field follows the Archer, repeatedly damaging, pulling, and heavily slowing enemies inside it. Uses a 22-second cooldown and never covers the screen.'};
-const ARCHER_MIRROR_CLONES = {id:'archer_mirror_clones', name:'Mirror Clones', price:620,
-  desc:'Round 10 summon. Creates two cyan phantom Archers that draw enemy attention and fire 10%-damage arrows with small knockback. Active clones persist between rounds.'};
+const ARROW_STORM_ABILITY = {id:'arrow_storm', name:'Arrow Storm', price:680,
+  desc:'Unleashes the Archer’s charged battlefield barrage. Build Focus through combat, then activate it from the Ability button when Focus reaches 100%.'};
 const SKYFALL_BARRAGE = {id:'skyfall_barrage', name:'Skyfall Barrage', price:780,
   desc:'Ultimate-tier damage. For 7 seconds, giant translucent arrows rain onto enemy clusters with clear landing markers and strong area damage. Boss damage is capped at 25% per cast. Uses a 25-second cooldown.'};
 // Coins earned per kill — a flat rate that inches up in later rounds so
@@ -8695,7 +8708,9 @@ function spawnPlayer(){
 
 // ---- Zombies ----
 function livingPlayers(){
-  // Summoned copies deliberately take enemy aggro before the real player.
+  // Temporary Mirror Volley decoys and permanent summons take aggro before the real player.
+  const volleyDecoys=mirrorVolleyDecoys.filter(e=>e&&e.parent);
+  if(volleyDecoys.length)return volleyDecoys;
   const mirrors=archerMirrorClones.filter(e=>e&&e.parent&&!e.userData.dead&&e.userData.hp>0);
   if(mirrors.length)return mirrors;
   const echoes=arcaneEchoes.filter(e=>e&&e.parent&&!e.userData.dead&&e.userData.hp>0);
@@ -9378,9 +9393,10 @@ function renderShopList(){
     swatch.className = 'weaponSwatch';
     swatch.style.background = w.kind.includes('fire') ? '#ff7a3d'
       : (w.kind==='gale_drill_arrow' ? '#67f0ff'
+      : (w.kind==='mirror_volley' ? '#b987ff'
       : (w.kind==='cyclone_snare_arrow' ? '#63ffd1'
       : (w.kind.includes('element') || w.kind==='arcane_lance' ? '#78d8ff'
-      : (w.kind.includes('arrow') ? '#d9b36c' : '#b88cff'))));
+      : (w.kind.includes('arrow') ? '#d9b36c' : '#b88cff')))));
     const info = document.createElement('div');
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${w.name}</div><div class="wDesc">${w.desc}</div>`;
@@ -9408,7 +9424,7 @@ function renderShopList(){
 // Mage abilities use one mutually-exclusive loadout slot. The shared HUD
 // button remains in the approved position directly left of FIRE. Buying
 // an ability equips it immediately; owned abilities can be swapped here.
-const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER], rogue:[TEMPEST_DOMAIN, SKYFALL_BARRAGE, ARCHER_MIRROR_CLONES] };
+const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER], rogue:[ARROW_STORM_ABILITY, TEMPEST_DOMAIN, SKYFALL_BARRAGE] };
 function renderAbilityShopList(list){
   const abilities = HERO_ABILITIES[state.avatarType];
   if(!abilities || !abilities.length) return;
@@ -9424,7 +9440,7 @@ function renderAbilityShopList(list){
     row.className = 'weaponRow' + (equipped ? ' equipped' : '');
     const swatch = document.createElement('div');
     swatch.className = 'weaponSwatch';
-    swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : (a.id==='tempest_domain' ? '#63ffd1' : (a.id==='skyfall_barrage' ? '#f6d36b' : (a.id==='archer_mirror_clones' ? '#55e8ff' : '#75dfff')));
+    swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : (a.id==='tempest_domain' ? '#63ffd1' : (a.id==='skyfall_barrage' ? '#f6d36b' : (a.id==='arrow_storm' ? '#b95cff' : '#75dfff')));
     const info = document.createElement('div');
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${a.name}</div><div class="wDesc">${a.desc}</div>`;
@@ -9492,6 +9508,14 @@ document.addEventListener('touchend',e=>{
   if(now-lastGlobalTouchEnd<280)e.preventDefault();
   lastGlobalTouchEnd=now;
 },{passive:false});
+
+// Block browser text selection, copy callouts, and context menus during gameplay.
+['contextmenu','selectstart','dragstart'].forEach(type=>{
+  document.addEventListener(type,e=>{
+    const game=document.getElementById('gameScreen');
+    if(game&&game.contains(e.target))e.preventDefault();
+  },{passive:false});
+});
 
 // ---- Touch controls ----
 let moveVec = {x:0,y:0};
@@ -9639,7 +9663,7 @@ function setupControls(){
     else if(equippedAbilityId==='blizzard_storm') triggerBlizzardStorm();
     else if(equippedAbilityId==='tempest_domain') triggerTempestDomain();
     else if(equippedAbilityId==='skyfall_barrage') triggerSkyfallBarrage();
-    else if(equippedAbilityId==='archer_mirror_clones') triggerArcherMirrorClones();
+    else if(equippedAbilityId==='arrow_storm') triggerArrowStorm();
   };
   const beginEquippedAbility=e=>{
     e.preventDefault();
@@ -9671,7 +9695,7 @@ function setupControls(){
   const ultimateBtnEl=document.getElementById('ultimateBtn');
   const activateUltimate=e=>{
     if(e){ e.preventDefault(); e.stopPropagation(); }
-    if(state.avatarType==='mage') triggerArcaneEchoes(); else if(state.avatarType==='rogue') triggerArrowStorm(); else if(state.avatarType==='knight') triggerKingsJudgment(); else if(state.avatarType==='barbarian') triggerPrimalRage(); else if(state.avatarType==='hooded') triggerShadowEclipse();
+    if(state.avatarType==='mage') triggerArcaneEchoes(); else if(state.avatarType==='rogue') triggerArcherMirrorClones(); else if(state.avatarType==='knight') triggerKingsJudgment(); else if(state.avatarType==='barbarian') triggerPrimalRage(); else if(state.avatarType==='hooded') triggerShadowEclipse();
   };
   if(window.PointerEvent) ultimateBtnEl.addEventListener('pointerdown',activateUltimate,{passive:false});
   else ultimateBtnEl.addEventListener('touchstart',activateUltimate,{passive:false});
@@ -10204,14 +10228,22 @@ function updateHoodedHud(){
     if(mageEchoReady){
       const total=Math.max(.001,arcaneEchoesCycleDuration||arcaneEchoesCooldownForLevel());
       pct=arcaneEchoesCooldownTimer<=0?100:Math.max(0,Math.min(100,(1-arcaneEchoesCooldownTimer/total)*100));
+    }else if(isArcher){
+      const total=Math.max(.001,archerMirrorCycleDuration||archerMirrorCooldownForLevel());
+      pct=archerMirrorCooldownTimer<=0?100:Math.max(0,Math.min(100,(1-archerMirrorCooldownTimer/total)*100));
     }else{
-      const displayedCharge=isHooded?hoodedUltimateCharge:(isArcher?archerUltimateCharge:(isKnight?knightUltimateCharge:barbarianUltimateCharge));
+      const displayedCharge=isHooded?hoodedUltimateCharge:(isKnight?knightUltimateCharge:barbarianUltimateCharge);
       pct=Math.max(0,Math.min(100,displayedCharge));
     }
     btn.style.setProperty('--charge',pct+'%'); btn.classList.toggle('ready',pct>=100);
     if(mageEchoReady){btn.textContent=pct>=100?'ECHOES!':'ECHOES';meter.textContent=pct>=100?'ARCANE ECHOES READY':'ECHOES '+arcaneEchoesCooldownTimer.toFixed(1)+'s';}
     else if(isHooded){btn.textContent=pct>=100?'ECLIPSE!':'ECLIPSE';meter.textContent='VITALITY '+hoodedMeleeHits+'/25';}
-    else if(isArcher){btn.textContent=pct>=100?'ARROW STORM!':'ARROW STORM';meter.textContent='FOCUS '+Math.round(pct)+'%';}
+    else if(isArcher){
+      btn.textContent=pct>=100?'CLONES!':'CLONES';
+      meter.textContent=archerMirrorClones.length
+        ? `MIRRORS ${archerMirrorClones.length}/${ARCHER_MIRROR_COUNT}`
+        : (pct>=100?'MIRROR CLONES READY':`CLONES ${archerMirrorCooldownTimer.toFixed(1)}s`);
+    }
     else if(isKnight){btn.textContent=pct>=100?"KING'S JUDGMENT!":"JUDGMENT";meter.textContent='VALOR '+Math.round(pct)+'%';}
     else if(isBarbarian){btn.textContent=pct>=100?"PRIMAL RAGE!":"RAGE";meter.textContent='FURY '+Math.round(pct)+'%';}
   }else{
@@ -10241,18 +10273,18 @@ function updateHoodedHud(){
           : (skyfallCooldownTimer>0 ? `SKYFALL ${Math.ceil(skyfallCooldownTimer)}` : 'SKYFALL');
         abilityBtn.classList.toggle('active',skyfallActiveTimer>0);
         abilityBtn.classList.toggle('cooling',skyfallCooldownTimer>0&&skyfallActiveTimer<=0);
-      }else if(equippedAbilityId==='archer_mirror_clones'){
-        abilityBtn.textContent=archerMirrorCooldownTimer>0
-          ? `CLONES ${Math.ceil(archerMirrorCooldownTimer)}`
-          : `CLONES ${archerMirrorClones.length}/2`;
-        abilityBtn.classList.toggle('active',archerMirrorClones.length>0);
-        abilityBtn.classList.toggle('cooling',archerMirrorCooldownTimer>0);
+      }else if(equippedAbilityId==='arrow_storm'){
+        abilityBtn.textContent=archerUltimateCharge>=100
+          ? 'ARROW STORM!'
+          : `STORM ${Math.round(archerUltimateCharge)}%`;
+        abilityBtn.classList.toggle('active',archerUltimateCharge>=100);
+        abilityBtn.classList.toggle('cooling',archerUltimateCharge<100);
       }else{
         abilityBtn.textContent='BLIZZARD';
       }
       if(!laserMode){
         abilityBtn.style.removeProperty('--charge');
-        if(equippedAbilityId!=='tempest_domain'&&equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='archer_mirror_clones'){
+        if(equippedAbilityId!=='tempest_domain'&&equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='arrow_storm'){
           abilityBtn.classList.remove('empty','active','cooling');
         }
       }
@@ -10685,7 +10717,7 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
 // This reuses the Mage Echo movement/targeting pattern but keeps a separate
 // runtime so Archer clones never interfere with Mage Arcane Echoes.
 // ---------------------------------------------------------------------
-const ARCHER_MIRROR_COUNT=2;
+const ARCHER_MIRROR_COUNT=5;
 const ARCHER_MIRROR_INITIAL_CHARGE=25;
 let archerMirrorClones=[];
 let archerMirrorCooldownTimer=0;
@@ -10750,7 +10782,7 @@ function spawnArcherMirrorArrow(from,to){
   spawnArcherSpark(to.x,to.y+.72,to.z);
 }
 function triggerArcherMirrorClones(){
-  if(!gameRunning||!archerMirrorUnlocked()||equippedAbilityId!=='archer_mirror_clones')return;
+  if(!gameRunning||!archerMirrorUnlocked())return;
   if(archerMirrorCooldownTimer>0){
     toast('Mirror Clones ready in '+archerMirrorCooldownTimer.toFixed(1)+'s');
     return;
@@ -10774,9 +10806,9 @@ function triggerArcherMirrorClones(){
         tintArcherMirror(root);wrap.add(root);
         const a=(i/ARCHER_MIRROR_COUNT)*Math.PI*2;
         wrap.position.set(
-          player.position.x+Math.cos(a)*1.9,
+          player.position.x+Math.cos(a)*3.4,
           player.position.y,
-          player.position.z+Math.sin(a)*1.9
+          player.position.z+Math.sin(a)*3.4
         );
         wrap.userData.isArcherMirror=true;
         wrap.userData.hp=1;wrap.userData.dead=false;
@@ -10812,9 +10844,9 @@ function updateArcherMirrorClones(dt){
     const i=c.userData.mirrorIndex||0;
     const a=now*.38+(i/ARCHER_MIRROR_COUNT)*Math.PI*2;
     const orbitDesired=new THREE.Vector3(
-      player.position.x+Math.cos(a)*2.4,
+      player.position.x+Math.cos(a)*4.4,
       player.position.y,
-      player.position.z+Math.sin(a)*2.4
+      player.position.z+Math.sin(a)*4.4
     );
 
     let target=null,best=16*16;
@@ -10832,12 +10864,12 @@ function updateArcherMirrorClones(dt){
         toward.normalize();
         const candidate=c.position.clone().addScaledVector(toward,Math.min(2.4,targetDist-3.5));
         const fromPlayer=candidate.clone().sub(player.position);fromPlayer.y=0;
-        if(fromPlayer.length()>6)candidate.copy(player.position).add(fromPlayer.normalize().multiplyScalar(6));
+        if(fromPlayer.length()>8.5)candidate.copy(player.position).add(fromPlayer.normalize().multiplyScalar(8.5));
         candidate.y=player.position.y;desired=candidate;
       }
     }
     const dist=c.position.distanceTo(desired);
-    if(dist>10)c.position.copy(desired);
+    if(dist>14)c.position.copy(desired);
     else c.position.lerp(desired,Math.min(1,dt*(dist>4?9:5.5)));
 
     c.userData.attackCooldown=Math.max(0,(c.userData.attackCooldown||0)-dt);
@@ -11215,6 +11247,7 @@ function triggerBlizzardStorm(){
 function clearMageRoundSpecials(resetCooldowns=true){
   clearTempestDomain(resetCooldowns);
   clearSkyfallBarrage(resetCooldowns);
+  clearMirrorVolleyDecoys();mirrorVolleyActiveTimer=0;mirrorVolleyPostCooldown=0;
   clearCycloneBeacons();
   blizzardActiveTimer=0;blizzardSpawnTimer=0;blizzardDamageTimer=0;
   for(const m of fallingIce){scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);} fallingIce=[];
@@ -11617,7 +11650,11 @@ function doShoot(){
 }
 function doSecondaryShoot(){
   const w=secondaryWeaponForAvatar();
-  if(!gameRunning || !w || (player.userData.secondaryAttackCooldown||0)>0) return;
+  if(!gameRunning||!w||(player.userData.secondaryAttackCooldown||0)>0)return;
+  if(w.kind==='mirror_volley'){
+    triggerMirrorVolley(w);
+    return;
+  }
   player.userData.secondaryAttackCooldown=attackCooldownFor(w);
   performWeaponAttack(w,false);
 }
@@ -11675,6 +11712,146 @@ function spawnArcherHitFeedback(x,y,z,heavy=false){
   spawnArcherSpark(x,y,z);
   spawnBurst(x,y,z,heavy?11:7,FX_MAT_SPARK,heavy?3.4:2.7);
   if(heavy) spawnArcherMuzzleFan(false);
+}
+
+const mirrorVolleyDecoys=[];
+const MIRROR_VOLLEY_DECOY_DURATION=6;
+const MIRROR_VOLLEY_POST_COOLDOWN=3;
+let mirrorVolleyActiveTimer=0;
+let mirrorVolleyPostCooldown=0;
+
+function clearMirrorVolleyDecoys(){
+  while(mirrorVolleyDecoys.length){
+    const d=mirrorVolleyDecoys.pop();
+    if(d&&d.parent){scene.remove(d);disposeGroup(d);}
+  }
+}
+function tintMirrorVolleyDecoy(root){
+  root.traverse(o=>{
+    if(!o.isMesh||!o.material)return;
+    if(Array.isArray(o.material))o.material=o.material.map(m=>m.clone());
+    else o.material=o.material.clone();
+    (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{
+      if(m.color)m.color.lerp(new THREE.Color(0xb987ff),.72);
+      if(m.emissive)m.emissive.setHex(0x5724b8);
+      m.transparent=true;m.opacity=.46;m.depthWrite=false;
+    });
+    o.renderOrder=6;
+  });
+}
+function spawnMirrorVolleyDecoys(originX,originZ,rotationY){
+  getKayKitAssetPromise('rogue').then(({gltf,THREEAsset,cloneSkinned})=>{
+    for(let i=0;i<2;i++){
+      const wrap=new THREE.Group();
+      const root=cloneSkinned(gltf.scene);
+      root.rotation.y=0;
+      const box=new THREEAsset.Box3().setFromObject(root);
+      const size=box.getSize(new THREEAsset.Vector3());
+      root.scale.setScalar(1.48/Math.max(.001,size.y));
+      const box2=new THREEAsset.Box3().setFromObject(root);
+      root.position.y-=box2.min.y;
+      tintMirrorVolleyDecoy(root);
+      wrap.add(root);
+
+      const rightX=Math.cos(rotationY),rightZ=-Math.sin(rotationY);
+      const side=i===0?-1.35:1.35;
+      wrap.position.set(originX+rightX*side,player?player.position.y:0,originZ+rightZ*side);
+      wrap.rotation.y=rotationY;
+      wrap.userData.isMirrorVolleyDecoy=true;
+      wrap.userData.invincible=true;
+      wrap.userData.life=MIRROR_VOLLEY_DECOY_DURATION;
+      wrap.userData.attackCooldown=.12+i*.14;
+      wrap.userData.kayMixer=new THREEAsset.AnimationMixer(root);
+      wrap.userData.kayClips={};
+      gltf.animations.forEach(c=>wrap.userData.kayClips[c.name]=c);
+      scene.add(wrap);
+      mirrorVolleyDecoys.push(wrap);
+      spawnBurst(wrap.position.x,wrap.position.y+.7,wrap.position.z,12,FX_MAT_SPARK,2.8);
+    }
+  });
+}
+function fireMirrorVolleyPhantom(decoy,target){
+  if(!decoy||!target||target.userData.dead)return;
+  const dx=target.position.x-decoy.position.x;
+  const dz=target.position.z-decoy.position.z;
+  const dl=Math.hypot(dx,dz)||1;
+  spawnArcherMirrorArrow(decoy.position,target.position);
+  const damage=Math.max(.06,(weaponForAvatar().damage||1)*playerStats.power*.10);
+  applyBulletDamage(target,damage);
+  if(!target.userData.dead){
+    target.userData.knockbackX=(dx/dl)*2.35;
+    target.userData.knockbackZ=(dz/dl)*2.35;
+    target.userData.hitStun=Math.max(target.userData.hitStun||0,.07);
+  }
+}
+function triggerMirrorVolley(w){
+  if(!gameRunning||state.avatarType!=='rogue'||mirrorVolleyActiveTimer>0||mirrorVolleyPostCooldown>0)return;
+  const origin=player.position.clone();
+  const rotationY=player.rotation.y;
+  const backX=-Math.sin(rotationY),backZ=-Math.cos(rotationY);
+  const dashDistance=4.6;
+  const targetX=THREE.MathUtils.clamp(origin.x+backX*dashDistance,-arenaSize+.9,arenaSize-.9);
+  const targetZ=THREE.MathUtils.clamp(origin.z+backZ*dashDistance,-arenaSize+.9,arenaSize-.9);
+
+  clearMirrorVolleyDecoys();
+  mirrorVolleyActiveTimer=MIRROR_VOLLEY_DECOY_DURATION;
+  mirrorVolleyPostCooldown=0;
+  player.userData.secondaryAttackCooldown=MIRROR_VOLLEY_DECOY_DURATION+MIRROR_VOLLEY_POST_COOLDOWN;
+
+  // Launch barrage before the retreat.
+  [-.34,-.17,0,.17,.34].forEach(a=>{
+    const phantom={...weaponForAvatar(),kind:'arrow',damage:(weaponForAvatar().damage||1)*.65,pierce:1};
+    shootFromPosition(phantom,player.position,a);
+  });
+  spawnArcherMuzzleFan(true);
+  spawnBurst(origin.x,origin.y+.45,origin.z,22,FX_MAT_DUST,5.2);
+
+  // Plant one internal Storm Beacon at the departure point.
+  triggerCycloneSnare(origin.x,origin.y+.3,origin.z,{
+    cycloneDetonated:false,
+    cycloneRadius:5.8,
+    cycloneDuration:6,
+    damage:Math.max(.18,(w.damage||.28)*playerStats.power)
+  });
+
+  // Fast backward evasive dash.
+  player.position.x=targetX;
+  player.position.z=targetZ;
+  spawnBurst(player.position.x,player.position.y+.5,player.position.z,18,FX_MAT_SPARK,4.2);
+  spawnMirrorVolleyDecoys(origin.x,origin.z,rotationY);
+  navigator.vibrate&&navigator.vibrate([22,18,36]);
+  toast('MIRROR VOLLEY!');
+}
+function updateMirrorVolley(dt){
+  if(mirrorVolleyActiveTimer>0){
+    mirrorVolleyActiveTimer=Math.max(0,mirrorVolleyActiveTimer-dt);
+    if(mirrorVolleyActiveTimer<=0){
+      clearMirrorVolleyDecoys();
+      mirrorVolleyPostCooldown=MIRROR_VOLLEY_POST_COOLDOWN;
+    }
+  }else if(mirrorVolleyPostCooldown>0){
+    mirrorVolleyPostCooldown=Math.max(0,mirrorVolleyPostCooldown-dt);
+  }
+
+  for(const d of [...mirrorVolleyDecoys]){
+    if(!d||!d.parent)continue;
+    if(d.userData.kayMixer)d.userData.kayMixer.update(dt);
+    d.userData.life=Math.max(0,(d.userData.life||0)-dt);
+    d.userData.attackCooldown=Math.max(0,(d.userData.attackCooldown||0)-dt);
+    let target=null,best=18*18;
+    for(const z of zombies){
+      if(!z||z.userData.dead||z.userData.spawnPending||!z.visible)continue;
+      const dist=d.position.distanceToSquared(z.position);
+      if(dist<best){best=dist;target=z;}
+    }
+    if(target){
+      d.rotation.y=Math.atan2(target.position.x-d.position.x,target.position.z-d.position.z);
+      if(d.userData.attackCooldown<=0){
+        d.userData.attackCooldown=.56;
+        fireMirrorVolleyPhantom(d,target);
+      }
+    }
+  }
 }
 
 const cycloneBeaconZones=[];
@@ -12043,6 +12220,7 @@ function syncShadowClones(){
   clearShadowClones();
   clearArcaneEchoes(); arcaneEchoesCooldownTimer=0; arcaneEchoesCycleDuration=15; arcaneEchoesInitialChargePending=true;
   clearArcherMirrorClones(); archerMirrorCooldownTimer=0; archerMirrorCycleDuration=15; archerMirrorInitialChargePending=true;
+  clearMirrorVolleyDecoys(); mirrorVolleyActiveTimer=0; mirrorVolleyPostCooldown=0;
   updateHoodedHud();
   const w=weaponForAvatar();
   if(state.avatarType!=='hooded' || !player) return;
@@ -12137,6 +12315,7 @@ function update(dt){
   updateShadowClones(dt);
   updateArcaneEchoes(dt);
   updateArcherMirrorClones(dt);
+  updateMirrorVolley(dt);
   updateShadowEclipse(dt);
   updateArrowStorm(dt);
   updateSkyfallBarrage(dt);
