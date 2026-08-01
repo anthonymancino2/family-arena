@@ -7,6 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
+<!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
 <!-- V22.10.1 Pause Ability Shop + Mage Ultimates: adds Resume/Restart/Rerun/Abilities/Quit pause flow; keeps stat upgrades between rounds; replaces Arcane Nova with readable Blizzard Storm ice impacts; adds Cataclysm Meteor with 10x scale, stun, burn, and 20% boss impact damage; adds localized player visibility ring/outline with no full-screen tint. -->
 <!-- V22.9.28 Approved Combat HUD Layout: preserves the existing FIRE, DASH, NOVA, and SECONDARY positions in a stable 2x2 cluster and places the avatar-specific ECHOES signature button directly above SECONDARY without shifting the approved controls. -->
 <!-- V22.9.32 Round Completion & Timer Freeze: adds a forced zero-enemy completion failsafe, freezes the round timer the instant a round completes, and guarantees the between-round upgrade menu opens even if another pause state briefly interrupts the original transition. -->
@@ -9216,6 +9217,7 @@ let ownedWeapons = {pistol:true};
 let ownedAbilities = {};
 let equippedAbilityId = null;
 let shopMode = 'weapons';
+let shopOpenedFromPause = false;
 let rerunEndsAfterRound = false;
 
 function updateShopPrompt(){
@@ -9228,7 +9230,10 @@ function updateShopPrompt(){
 function openShop(mode='weapons'){
   if(!gameRunning && mode!=='abilities') return;
   shopMode=mode;
-  gameRunning = false; // same pause mechanism as the pause menu — nothing moves or hurts you while shopping
+  const pauseOverlay=document.getElementById('pauseOverlay');
+  shopOpenedFromPause = mode==='abilities' && pauseOverlay.classList.contains('show');
+  if(shopOpenedFromPause) pauseOverlay.classList.remove('show');
+  gameRunning = false; // combat stays fully frozen while either shop is open
   renderShopList();
   const title=document.getElementById('shopTitle');
   if(title) title.textContent=shopMode==='abilities'?'Abilities':'Weapon Shop';
@@ -9237,6 +9242,12 @@ function openShop(mode='weapons'){
 }
 function closeShop(){
   document.getElementById('shopOverlay').classList.remove('show');
+  if(shopOpenedFromPause){
+    shopOpenedFromPause=false;
+    document.getElementById('pauseOverlay').classList.add('show');
+    gameRunning=false;
+    return;
+  }
   if(document.getElementById('pauseOverlay').classList.contains('show')) return;
   gameRunning = true;
   clock.getDelta();
@@ -9247,7 +9258,14 @@ function renderShopList(){
   const list = document.getElementById('shopList');
   list.innerHTML = '';
   const weapons = combatForAvatar().weapons;
-  if(shopMode==='weapons') for(const id in weapons){
+  if(shopMode==='abilities'){
+    const attacksHeader=document.createElement('div');
+    attacksHeader.className='wName';
+    attacksHeader.style.cssText='margin:8px 0 4px;opacity:.75;font-size:12px;letter-spacing:.5px;';
+    attacksHeader.textContent='PRIMARY & SECONDARY ATTACKS';
+    list.appendChild(attacksHeader);
+  }
+  if(shopMode==='weapons' || shopMode==='abilities') for(const id in weapons){
     const w = weapons[id];
     const owned = !!ownedWeapons[id];
     const isDefault = id === combatForAvatar().defaultId;
@@ -9293,7 +9311,7 @@ function renderAbilityShopList(list){
   const header = document.createElement('div');
   header.className = 'wName';
   header.style.cssText = 'margin:14px 0 4px;opacity:.75;font-size:12px;letter-spacing:.5px;';
-  header.textContent = 'ABILITIES · EQUIP ONE';
+  header.textContent = 'ULTIMATE-TIER ABILITIES · EQUIP ONE';
   list.appendChild(header);
   for(const a of abilities){
     const owned = !!ownedAbilities[a.id];
