@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- V22.10.10 Meteor Boulder Reliability + Correct Build Stamp: guarantees mobile activation, visible ground spawn, continuous homing, collision damage, and correct displayed version. -->
 <!-- V22.10.9 Clone Persistence Correction: active clone companions are no longer removed by round completion or new-round special cleanup. Blizzard, Meteor Boulder, Arcane Laser, and temporary battlefield effects still reset normally. -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -16,14 +15,10 @@
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.3 Blizzard Range + Meteor Impact + Main Play Button Fix: Blizzard now lasts 10 seconds and covers 70% of the arena radius; Cataclysm Meteor now has guaranteed visible impact feedback and reliable damage; the main Play button is isolated above decorative overlays. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
-<!-- V22.10.1 Pause Ability Shop + Mage Ultimates: adds Resume/Restart/Rerun/Abilities/Quit pause flow; keeps stat upgrades between rounds; replaces Arcane Nova with readable Blizzard Storm ice impacts; adds Cataclysm Meteor with 10x scale, stun, burn, and 20% boss impact damage; adds localized player visibility ring/outline with no full-screen tint. -->
-<!-- V22.9.28 Approved Combat HUD Layout: preserves the existing FIRE, DASH, NOVA, and SECONDARY positions in a stable 2x2 cluster and places the avatar-specific ECHOES signature button directly above SECONDARY without shifting the approved controls. -->
 <!-- V22.9.32 Round Completion & Timer Freeze: adds a forced zero-enemy completion failsafe, freezes the round timer the instant a round completes, and guarantees the between-round upgrade menu opens even if another pause state briefly interrupts the original transition. -->
-<!-- V22.9.31 Shared Mage Ability Slot: Arcane Nova and Arcane Laser are now mutually exclusive equipped abilities sharing the approved button directly left of FIRE. Buying either equips it; owned abilities can be swapped in the shop; Laser retains hold-to-channel behavior in the shared slot. -->
 <!-- V22.9.30 Arcane Echo Elite Contact Damage: normal enemies are instantly defeated on Echo contact without consuming the Echo; Brutes consume the Echo and take 25% of the Mage's total attack damage; Bosses consume the Echo and take 10%; Echo projectiles continue damaging every enemy type. -->
 <!-- V22.9.29 Shop Close & Arcane Echo Combat Fix: adds a top-right circular X close control to the weapon shop while preserving the bottom Close button; fixes Arcane Echo target acquisition and visible attacks; and makes normal enemies die instantly on contact with an Echo while Brutes destroy the Echo and survive. -->
 <!-- V22.9.27 High-Contrast Timer Fix: makes the in-game timer readable against both light and dark environments with an opaque dark pill, bright border, white text, stronger shadow, and explicit HUD stacking. -->
-<!-- V22.9.26 HUD & Round Completion Fixes: fixes the rare Round 10/zero-enemy progression stall with a centralized idempotent round-completion guard; removes the FREE control; moves Pause into the camera stack; makes FIRE match SECONDARY size; stacks NOVA above ECHOES above FIRE in portrait; and provides dedicated compact landscape browser/app HUD positions. -->
 <!-- V22.9.25 Arcane Echoes Base Ability: implements the Mage signature summon unlocked at Level 10. Five 1-HP avatar copies prioritize enemy aggro, stay near the Mage, fire 10%-damage knockback bolts, use an initial 25-second charge, and then scale cooldown from 15 seconds at Level 1 to 5 seconds at Level 20 with a 1.5-second floor. -->
 <!-- V22.9.24 Avatar Signature Slot Cleanup: removes the Mage's Arcane Cataclysm move and its charge system. The shared ultimate control remains reserved for future avatar-specific signature moves such as Arcane Echoes, while the pause overlay now stays above all combat controls. -->
 <!-- V22.9.23 Between-Round Stat Shop: converts the mandatory free stat pick into a coin-funded between-round shop. Players may buy multiple affordable HP, Power, or Speed upgrades, see live prices and balances, or continue without purchasing. -->
@@ -42,8 +37,6 @@
 <!-- V22.9.10 Landing Hub: adds selected-player high score, featured hero display, and cache-clearing Refresh / Sync button prepared for future cloud synchronization. -->
 <!-- V22.9.9 Mage Phase 6 FINAL: completes the Mage pass with data-driven passive tuning, centralized passive-state resets, Arcane Haste expiration cleanup, and regression validation. -->
 <!-- V22.9.9 Mage Phase 5: adds readable Mage passive polish: persistent Arcane Haste aura/trails, pulse feedback as Haste expires, highlighted passive HUD states, and clearer Arcane Flow descriptions. -->
-<!-- V22.9.9 Mage Phase 4: completes Mage targeting consistency. Normal attacks and Arcane Laser use 360-degree nearest-enemy auto-targeting; Arcane Cataclysm prioritizes the nearest living enemies and turns the Mage toward its primary target; Arcane Nova remains a centered 360-degree survival special. Includes Mage stat scaling, hold-to-cast, and Mage passive framework from earlier phases. -->
-<!-- V22.9.9: Mage Phase 3 — adds reusable attack/kill passive counters. Every third Mage normal cast releases a 360-degree Arcane Shockwave that stuns nearby enemies for 1.5 seconds. Every third Mage kill grants a non-stacking 3-second speed surge; kills during the surge do not advance its counter. Arcane Nova, Arcane Laser, and Ultimate damage do not advance the normal-attack counter. -->
 <!-- Home screen icon: a modern gold coin badge with a bone-white
      skull and glowing teal eye accents — replaces the earlier
      cartoon-style icon with a cleaner, game-badge look. -->
@@ -225,16 +218,16 @@
     pointer-events:auto;display:flex;align-items:center;justify-content:center;
     transition:opacity 0.15s;text-shadow:none;}
   .dashBtn.cooling{opacity:0.3;}
-  .novaBtn{position:absolute;bottom:calc(34px + env(safe-area-inset-bottom));right:102px;
+  .abilityBtn{position:absolute;bottom:calc(34px + env(safe-area-inset-bottom));right:102px;
     width:62px;height:62px;border-radius:50%;background:rgba(53,207,255,0.82);
     border:2.5px solid rgba(255,255,255,0.85);font-weight:800;font-size:11px;color:#04222c;
     pointer-events:auto;display:flex;align-items:center;justify-content:center;
     transition:opacity 0.15s;text-shadow:none;}
-  .novaBtn.cooling{opacity:0.3;}
-  .novaBtn.laserMode{color:#fff;background:conic-gradient(#d16cff var(--charge,100%),rgba(40,10,52,.92) 0);text-shadow:0 1px 3px rgba(0,0,0,.85);}
-  .novaBtn.laserMode.empty{opacity:.35;}
-  .novaBtn.laserMode.active{box-shadow:0 0 18px rgba(209,108,255,.9);}
-  .novaBtn.hidden{display:none;}
+  .abilityBtn.cooling{opacity:0.3;}
+  .abilityBtn.laserMode{color:#fff;background:conic-gradient(#d16cff var(--charge,100%),rgba(40,10,52,.92) 0);text-shadow:0 1px 3px rgba(0,0,0,.85);}
+  .abilityBtn.laserMode.empty{opacity:.35;}
+  .abilityBtn.laserMode.active{box-shadow:0 0 18px rgba(209,108,255,.9);}
+  .abilityBtn.hidden{display:none;}
   .laserBtn{display:none!important;position:absolute;bottom:calc(122px + env(safe-area-inset-bottom));right:206px;
     width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;
     font-weight:800;font-size:10px;color:#fff;border:2.5px solid rgba(255,255,255,0.85);
@@ -260,7 +253,7 @@
   .vertBtn .vbLabel{font-size:10px;line-height:1;}
   .upBtn{bottom:calc(150px + env(safe-area-inset-bottom));}
   .downBtn{bottom:calc(84px + env(safe-area-inset-bottom));}
-  .jumpBtn.freeHide, .dashBtn.freeHide, .actBtn.freeHide, .secondaryBtn.freeHide, .novaBtn.freeHide, .laserBtn.freeHide{display:none;}
+  .jumpBtn.freeHide, .dashBtn.freeHide, .actBtn.freeHide, .secondaryBtn.freeHide, .abilityBtn.freeHide, .laserBtn.freeHide{display:none;}
   .freeBanner{position:absolute;top:calc(60px + env(safe-area-inset-top));left:50%;
     transform:translateX(-50%);background:rgba(127,216,240,0.92);color:#052233;
     font-weight:800;font-size:12px;padding:6px 14px;border-radius:999px;display:none;}
@@ -324,7 +317,7 @@
     .actBtn{right:calc(14px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));}
     .secondaryBtn{right:calc(14px + env(safe-area-inset-right));bottom:calc(96px + env(safe-area-inset-bottom));}
     .ultimateBtn{right:calc(14px + env(safe-area-inset-right));bottom:calc(176px + env(safe-area-inset-bottom));width:72px;height:72px;}
-    .novaBtn{right:calc(94px + env(safe-area-inset-right));bottom:calc(21px + env(safe-area-inset-bottom));}
+    .abilityBtn{right:calc(94px + env(safe-area-inset-right));bottom:calc(21px + env(safe-area-inset-bottom));}
     .dashBtn{right:calc(94px + env(safe-area-inset-right));bottom:calc(101px + env(safe-area-inset-bottom));}
     .camCluster{top:calc(10px + env(safe-area-inset-top));right:calc(10px + env(safe-area-inset-right));gap:4px;}
     .roundPill{top:calc(10px + env(safe-area-inset-top));}
@@ -603,7 +596,7 @@
           <div class="lookFwdBtn" id="lookFwdBtn">LOOK<br>FWD</div>
         </div>
         <div class="dashBtn" id="dashBtn">DASH</div>
-        <div class="novaBtn hidden" id="novaBtn">NOVA</div>
+        <div class="abilityBtn hidden" id="abilityBtn">ABILITY</div>
         <div class="laserBtn hidden" id="laserBtn" style="--charge:100%">LASER</div>
         <div class="ultimateBtn hidden" id="ultimateBtn" style="--charge:0%">ECLIPSE</div>
         <div class="soulMeter" id="soulMeter">SOULS 0/25</div>
@@ -696,7 +689,8 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.10 - Meteor Boulder Reliability Fix';
+const GAME_VERSION='22.10.11 - Legacy Nova Removal';
+const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -9571,7 +9565,7 @@ function setupControls(){
   }, {passive:false});
   const dashBtnEl=document.getElementById('dashBtn');
   dashBtnEl.addEventListener('touchstart',e=>{e.preventDefault();doDash();});
-  const novaBtnEl=document.getElementById('novaBtn');
+  const abilityBtnEl=document.getElementById('abilityBtn');
   const beginEquippedAbility=e=>{
     e.preventDefault();
     if(equippedAbilityId==='arcane_laser') startArcaneLaser();
@@ -9582,21 +9576,15 @@ function setupControls(){
     if(e) e.preventDefault();
     if(equippedAbilityId==='arcane_laser') stopArcaneLaser();
   };
-  if(window.PointerEvent){
-    novaBtnEl.addEventListener('pointerdown',beginEquippedAbility,{passive:false});
-    novaBtnEl.addEventListener('pointerup',endEquippedAbility,{passive:false});
-    novaBtnEl.addEventListener('pointercancel',endEquippedAbility,{passive:false});
-  }else{
-    novaBtnEl.addEventListener('touchstart',beginEquippedAbility,{passive:false});
-    novaBtnEl.addEventListener('touchend',endEquippedAbility,{passive:false});
-    novaBtnEl.addEventListener('touchcancel',endEquippedAbility,{passive:false});
-    novaBtnEl.addEventListener('mousedown',beginEquippedAbility);
-  }
-  novaBtnEl.addEventListener('click',e=>{
+  abilityBtnEl.addEventListener('pointerdown',beginEquippedAbility,{passive:false});
+  abilityBtnEl.addEventListener('pointerup',endEquippedAbility,{passive:false});
+  abilityBtnEl.addEventListener('pointercancel',endEquippedAbility,{passive:false});
+  abilityBtnEl.addEventListener('touchstart',beginEquippedAbility,{passive:false});
+  abilityBtnEl.addEventListener('touchend',endEquippedAbility,{passive:false});
+  abilityBtnEl.addEventListener('touchcancel',endEquippedAbility,{passive:false});
+  abilityBtnEl.addEventListener('click',e=>{
     e.preventDefault();
-    // Pointer/touch normally activates first. This click fallback only fires if
-    // the meteor did not start, protecting iOS browser and home-screen variants.
-    if(equippedAbilityId==='cataclysm_meteor'&&!rollingMeteorBoulder&&meteorCooldownTimer<=0)triggerCataclysmMeteor();
+    if(equippedAbilityId==='cataclysm_meteor'&&!rollingMeteorBoulder&&meteorCooldownTimer<=0) triggerCataclysmMeteor();
   });
   window.addEventListener('mouseup',endEquippedAbility);
   const laserBtnEl=document.getElementById('laserBtn');
@@ -9733,7 +9721,7 @@ function toggleFreeMode(){
   document.getElementById('downBtn').classList.toggle('on', freeMode);
   document.getElementById('jumpBtn').classList.toggle('freeHide', freeMode);
   document.getElementById('dashBtn').classList.toggle('freeHide', freeMode);
-  document.getElementById('novaBtn').classList.toggle('freeHide', freeMode);
+  document.getElementById('abilityBtn').classList.toggle('freeHide', freeMode);
   document.getElementById('laserBtn').classList.toggle('freeHide', freeMode);
   if(freeMode) stopArcaneLaser();
   document.getElementById('actBtn').classList.toggle('freeHide', freeMode);
@@ -10155,17 +10143,17 @@ function updateHoodedHud(){
     btn.style.setProperty('--charge','0%');
     meter.textContent='';
   }
-  const novaBtn=document.getElementById('novaBtn');
-  if(novaBtn){
+  const abilityBtn=document.getElementById('abilityBtn');
+  if(abilityBtn){
     const equipped = isMage && equippedAbilityId && ownedAbilities[equippedAbilityId];
     const laserMode = equippedAbilityId==='arcane_laser';
-    novaBtn.classList.toggle('hidden', !equipped);
-    novaBtn.classList.toggle('laserMode', !!equipped && laserMode);
+    abilityBtn.classList.toggle('hidden', !equipped);
+    abilityBtn.classList.toggle('laserMode', !!equipped && laserMode);
     if(equipped){
-      novaBtn.textContent = laserMode ? 'LASER' : (equippedAbilityId==='cataclysm_meteor' ? 'METEOR' : 'BLIZZARD');
+      abilityBtn.textContent = laserMode ? 'LASER' : (equippedAbilityId==='cataclysm_meteor' ? 'METEOR' : 'BLIZZARD');
       if(!laserMode){
-        novaBtn.style.removeProperty('--charge');
-        novaBtn.classList.remove('empty','active');
+        abilityBtn.style.removeProperty('--charge');
+        abilityBtn.classList.remove('empty','active');
       }
     }
   }
@@ -10614,14 +10602,14 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
 const BLIZZARD_COOLDOWN=16, METEOR_BOULDER_COOLDOWN=26;
 const BLIZZARD_DURATION=10, BLIZZARD_FREEZE=3, BLIZZARD_IMPACT_RADIUS=3.1;
 function blizzardRadius(){ return Math.max(12, arenaSize*.45); } // exactly 45% of playable map radius
-let novaCooldownTimer=0, meteorCooldownTimer=0, novaSpeedBoostTimer=0;
+let blizzardCooldownTimer=0, meteorCooldownTimer=0;
 let blizzardActiveTimer=0, blizzardSpawnTimer=0, blizzardDamageTimer=0, blizzardCenter=new THREE.Vector3();
 let fallingIce=[];
 let rollingMeteorBoulder=null;
 let meteorCastSerial=0;
 
 function abilityButtonCooldown(seconds){
-  const btn=document.getElementById('novaBtn');
+  const btn=document.getElementById('abilityBtn');
   if(btn){btn.classList.add('cooling');setTimeout(()=>btn.classList.remove('cooling'),seconds*1000);}
 }
 function makeIceMeteorMesh(radius=1.05){
@@ -10663,8 +10651,8 @@ function impactIce(m){
   }
 }
 function triggerBlizzardStorm(){
-  if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='blizzard_storm'||!ownedAbilities.blizzard_storm||novaCooldownTimer>0)return;
-  novaCooldownTimer=BLIZZARD_COOLDOWN; abilityButtonCooldown(BLIZZARD_COOLDOWN);
+  if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='blizzard_storm'||!ownedAbilities.blizzard_storm||blizzardCooldownTimer>0)return;
+  blizzardCooldownTimer=BLIZZARD_COOLDOWN; abilityButtonCooldown(BLIZZARD_COOLDOWN);
   blizzardActiveTimer=BLIZZARD_DURATION; blizzardSpawnTimer=0; blizzardDamageTimer=0; blizzardCenter.copy(player.position);
   spawnArcaneSigil(blizzardCenter.x,.03,blizzardCenter.z,blizzardRadius());
   spawnArcaneRuneBurst(blizzardCenter,blizzardRadius()*.72);
@@ -10755,10 +10743,10 @@ function clearMageRoundSpecials(resetCooldowns=true){
   if(typeof stopArcaneLaser==='function')stopArcaneLaser();
   // Clone-type companions intentionally persist between rounds. Do not clear
   // Arcane Echoes or avatar shadow clones as part of round-special cleanup.
-  if(resetCooldowns){novaCooldownTimer=0;meteorCooldownTimer=0;}
+  if(resetCooldowns){blizzardCooldownTimer=0;meteorCooldownTimer=0;}
 }
 function updateMageUltimates(dt){
-  if(novaCooldownTimer>0)novaCooldownTimer=Math.max(0,novaCooldownTimer-dt);
+  if(blizzardCooldownTimer>0)blizzardCooldownTimer=Math.max(0,blizzardCooldownTimer-dt);
   if(meteorCooldownTimer>0)meteorCooldownTimer=Math.max(0,meteorCooldownTimer-dt);
   if(blizzardActiveTimer>0){
     blizzardActiveTimer=Math.max(0,blizzardActiveTimer-dt);
@@ -10809,13 +10797,13 @@ function updateMageUltimates(dt){
     if((z.userData.burnTimer||0)>0){z.userData.burnTimer=Math.max(0,z.userData.burnTimer-dt);z.userData.hp-=(z.userData.burnDps||0)*dt;if(Math.random()<dt*8)spawnBurst(z.position.x,z.position.y+.5,z.position.z,2,FX_MAT_SPARK,1.3);if(z.userData.hp<=0)killZombie(z);}
   }
 }
-function updateArcaneNova(dt){updateMageUltimates(dt);}
+function updateMageAbilityEffects(dt){updateMageUltimates(dt);}
 // ---------------------------------------------------------------------
 // Arcane Laser — Mage Boss Killer ability (purchasable, see ARCANE_LASER).
 // Hold laserBtn to channel: a thin beam locks onto the best auto-aim
 // target (falling back to player facing) and pours massive damage into
 // it, with lighter piercing damage to whatever's stacked up behind it.
-// Runs on a charge meter (not a flat cooldown like Nova) so it rewards
+// Runs on a charge meter rather than a flat cooldown so it rewards
 // short precise bursts on a tough target over spamming it.
 // ---------------------------------------------------------------------
 const LASER_RANGE = 22, LASER_WIDTH = 1.15, LASER_DPS_PRIMARY = 15, LASER_DPS_PIERCE = 5,
@@ -10829,7 +10817,7 @@ function startArcaneLaser(){
   laserActive = true;
   laserRegenDelayTimer = LASER_REGEN_DELAY;
   spawnArcaneRuneBurst(player.position, 1.6); // brief charge-up flourish before the beam ticks damage
-  const btn = document.getElementById('novaBtn');
+  const btn = document.getElementById('abilityBtn');
   if(btn) btn.classList.add('active');
   const mat = new THREE.MeshBasicMaterial({color:0xd16cff, transparent:true, opacity:0.75, depthWrite:false, blending:THREE.AdditiveBlending});
   laserBeamMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.16, 1, 8), mat);
@@ -10837,12 +10825,12 @@ function startArcaneLaser(){
 }
 function stopArcaneLaser(){
   laserActive = false;
-  const btn = document.getElementById('novaBtn');
+  const btn = document.getElementById('abilityBtn');
   if(btn) btn.classList.remove('active');
   if(laserBeamMesh){ scene.remove(laserBeamMesh); laserBeamMesh.geometry.dispose(); laserBeamMesh.material.dispose(); laserBeamMesh = null; }
 }
 function updateArcaneLaser(dt){
-  const btn = document.getElementById('novaBtn');
+  const btn = document.getElementById('abilityBtn');
   if(btn && equippedAbilityId==='arcane_laser'){
     btn.classList.toggle('hidden', !laserAvailable());
     btn.classList.add('laserMode');
@@ -11138,7 +11126,7 @@ function performWeaponAttack(w, countsAsPrimary=true){
     if(state.avatarType==='hooded') cloneAttack(w);
   }
   // Only the regular Fire-button attack advances the Mage cast passive.
-  // Specials (Nova, Laser, Ultimate) use separate functions and never reach here.
+  // Special abilities use separate functions and never reach here.
   if(countsAsPrimary && state.avatarType==='mage') registerMageNormalAttack();
   if(w.kind!=='melee' && w.kind!=='spin') navigator.vibrate && navigator.vibrate(10);
 }
@@ -11479,7 +11467,7 @@ function update(dt){
   updateArcaneEchoes(dt);
   updateShadowEclipse(dt);
   updateArrowStorm(dt);
-  updateArcaneNova(dt);
+  updateMageAbilityEffects(dt);
   updateArcaneLaser(dt);
   updateKingsJudgment(dt);
   updatePrimalRage(dt);
@@ -11570,8 +11558,7 @@ function update(dt){
     const speedStat = playerStats.speed;
     const characterMoveMult = combatForAvatar().baseMoveMult || 1;
     const passiveMoveMult=(state.avatarType==='hooded' && passiveState.shadowstepTimer>0)?(passiveForAvatar().killMoveMult||1):((state.avatarType==='mage' && passiveState.mageSpeedBoostTimer>0)?MAGE_SPEED_BOOST_MULT:1);
-    const novaMoveMult = novaSpeedBoostTimer>0 ? NOVA_SPEED_BOOST_MULT : 1;
-    const speed = PLAYER_SPEED * characterMoveMult * passiveMoveMult * novaMoveMult * (1 + (speedStat-1)*0.15);
+    const speed = PLAYER_SPEED * characterMoveMult * passiveMoveMult * (1 + (speedStat-1)*0.15);
     const nx = player.position.x + (mx/len)*speed*dt;
     const nz = player.position.z + (mz/len)*speed*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
@@ -11834,7 +11821,7 @@ function startSurvival(){
   equippedAbilityId = null;
   rerunEndsAfterRound=false;
   clearMageRoundSpecials(true);
-  novaCooldownTimer = 0; meteorCooldownTimer = 0; novaSpeedBoostTimer = 0;
+  blizzardCooldownTimer = 0; meteorCooldownTimer = 0;
   stopArcaneLaser(); laserCharge = LASER_MAX_CHARGE; laserRegenDelayTimer = 0;
   resetCharacterLoadout();
   resetAbilityLoadout();
