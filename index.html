@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- V22.10.40 Chain-Lightning Javelin Visual Polish: strengthens the projectile silhouette, adds rotating electric rings and a brighter layered travel trail, improves impact pulses, and doubles the readable chain-lightning core without changing damage, target caps, stun, or cooldown. -->
+<!-- V22.10.39 Triple Phoenix Balance Pass: spreads the three spheres across separate enemy clusters when possible, prevents duplicate contact and explosion damage from stacking on the same enemy within one volley, reduces additive gravity pull, and lowers trail particle frequency for steadier FPS. -->
 <!-- V22.10.38 Triple Phoenix Volley: one cast now launches three Phoenix Fireballs in a wide opening spread. Each sphere flies independently for a brief launch phase, then seeks enemy clusters. The volley still counts as one active Phoenix ability, so another cast remains blocked until all three spheres expire. -->
 <!-- V22.10.37 Phoenix Expiration + Burn Feedback: adds a layered end-of-life blast, expanding fire rings, a short-lived scorched-ground mark, volcanic debris, stronger readable knockback, and brighter six-second burn feedback on surviving large enemies and bosses. Effects are capped and cleared between rounds. -->
 <!-- V22.10.36 Phoenix Fireball Polish: upgrades the persistent sphere with layered volcanic plates, animated lava seams, rotating flame coronas, smoke/ember wake, localized heat shimmer, smoother cluster-seeking steering, and true constant forward movement. Gameplay damage, pull, seven-second lifetime, and one-active restriction remain unchanged. -->
@@ -31,7 +33,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.38</title>
+<title>Family Arena V22.10.40</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -721,7 +723,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.31 - Instant Chain Javelin Visual Rebuild';
+const GAME_VERSION='22.10.40 - Chain Javelin Visual Polish';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -11047,12 +11049,15 @@ function createPhoenixFireballMesh(){
 function phoenixClusterTarget(ball){
   const living=zombies.filter(z=>z&&!z.userData.dead&&z.parent);
   if(!living.length)return null;if(living.length===1)return living[0];
+  const reserved=new Set();
+  if(phoenixFireball){for(const other of phoenixFireball.balls){if(other!==ball&&other.target&&!other.target.userData.dead&&other.target.parent)reserved.add(other.target);}}
   let best=living[0],bestScore=-Infinity;
   for(const z of living){
     let nearby=0,weight=0;
     for(const o of living){const d=Math.hypot(o.position.x-z.position.x,o.position.z-z.position.z);if(d<=8){nearby++;weight+=1-d/9;}}
     const distancePenalty=ball?Math.hypot(z.position.x-ball.mesh.position.x,z.position.z-ball.mesh.position.z)*.025:0;
-    const score=nearby+weight-distancePenalty;if(score>bestScore){bestScore=score;best=z;}
+    const reservationPenalty=reserved.has(z)?5.5:0;
+    const score=nearby+weight-distancePenalty-reservationPenalty;if(score>bestScore){bestScore=score;best=z;}
   }
   return best;
 }
@@ -11067,14 +11072,15 @@ function triggerPhoenixFireball(){
     balls.push({mesh,life:PHOENIX_LIFETIME,maxLife:PHOENIX_LIFETIME,hitEnemies:new Set(),targetTick:PHOENIX_SPREAD_TIME,target:null,fxTick:i*.018,smokeTick:i*.045,dirX:dx,dirZ:dz,spreadTimer:PHOENIX_SPREAD_TIME});
     spawnBurst(mesh.position.x,mesh.position.y,mesh.position.z,14,FX_MAT_SPARK,4.6);
   }
-  phoenixFireball={balls};
+  phoenixFireball={balls,contactHits:new Set(),explosionHits:new Set()};
   spawnArcaneSigil(player.position.x,.035,player.position.z,2.8);
   triggerCombatShake(8,180);navigator.vibrate&&navigator.vibrate([32,18,48]);toast('TRIPLE PHOENIX!');
   return true;
 }
 function damagePhoenixTarget(ball,z){
   if(!z||z.userData.dead||!ball||ball.hitEnemies.has(z))return;
-  ball.hitEnemies.add(z);
+  if(phoenixFireball&&phoenixFireball.contactHits.has(z))return;
+  ball.hitEnemies.add(z);if(phoenixFireball)phoenixFireball.contactHits.add(z);
   const type=z.userData.archetype||'walker',maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
   if(type==='boss'){
     applyBulletDamage(z,maxHp*.12);
@@ -11110,8 +11116,12 @@ function explodePhoenixBall(ball){
   for(const z of [...zombies]){
     if(z.userData.dead)continue;const dx=z.position.x-p.x,dz=z.position.z-p.z,dist=Math.hypot(dx,dz);if(dist>PHOENIX_EXPLOSION_RADIUS)continue;
     const type=z.userData.archetype||'walker',maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
-    if(type==='boss')applyBulletDamage(z,maxHp*.08);else if(type==='brute')applyBulletDamage(z,maxHp*.20);else applyBulletDamage(z,(z.userData.hp||1)+1);
-    if(!z.userData.dead){const dl=dist||1,force=type==='boss'?1.35:(type==='brute'?3.5:7.0);z.userData.knockbackX=(dx/dl)*force;z.userData.knockbackZ=(dz/dl)*force;z.userData.hitStun=Math.max(z.userData.hitStun||0,type==='boss'?.32:.48);if(type==='boss'||type==='brute'){z.userData.burnTimer=Math.max(z.userData.burnTimer||0,6);z.userData.burnDps=Math.max(z.userData.burnDps||0,maxHp*(type==='boss'?.010:.020));z.userData.phoenixBurnFxTimer=0;}}
+    const alreadyDamaged=phoenixFireball&&phoenixFireball.explosionHits.has(z);
+    if(!alreadyDamaged){
+      if(type==='boss')applyBulletDamage(z,maxHp*.08);else if(type==='brute')applyBulletDamage(z,maxHp*.20);else applyBulletDamage(z,(z.userData.hp||1)+1);
+      if(phoenixFireball)phoenixFireball.explosionHits.add(z);
+    }
+    if(!z.userData.dead){const dl=dist||1,force=type==='boss'?1.35:(type==='brute'?3.5:7.0);z.userData.knockbackX=(dx/dl)*Math.max(force,Math.hypot(z.userData.knockbackX||0,z.userData.knockbackZ||0));z.userData.knockbackZ=(dz/dl)*Math.max(force,Math.hypot(z.userData.knockbackX||0,z.userData.knockbackZ||0));z.userData.hitStun=Math.max(z.userData.hitStun||0,type==='boss'?.32:.48);if(!alreadyDamaged&&(type==='boss'||type==='brute')){z.userData.burnTimer=Math.max(z.userData.burnTimer||0,6);z.userData.burnDps=Math.max(z.userData.burnDps||0,maxHp*(type==='boss'?.010:.020));z.userData.phoenixBurnFxTimer=0;}}
   }
   spawnPhoenixExpirationFx(p);spawnBurst(p.x,p.y,p.z,40,FX_MAT_SPARK,9.0);spawnBurst(p.x,p.y+.4,p.z,12,FX_MAT_DUST,5.4);spawnArcaneSigil(p.x,.04,p.z,PHOENIX_EXPLOSION_RADIUS*.72);
   if(ball.mesh.parent){scene.remove(ball.mesh);disposeGroup(ball.mesh);}ball.mesh=null;
@@ -11139,11 +11149,11 @@ function updatePhoenixFireball(dt){
     m.traverse(o=>{const role=o.userData.role;if(role==='crack'){o.rotation.z+=dt*(o.userData.spin||.4);o.material.opacity=.72+Math.sin(now*.012+o.id)*.20;}else if(role==='shellPlate')o.rotation.y+=dt*(o.userData.spin||.1);else if(role==='corona')o.rotation.z+=dt*(o.userData.spin||.8);else if(role==='glow'){const q=1+Math.sin(now*.009+o.id)*.085;o.scale.setScalar(q);o.material.opacity=.16+Math.sin(now*.010+o.id)*.055;}else if(role==='heat'){const q=1+Math.sin(now*.0065+o.id)*.055;o.scale.setScalar(q);o.rotation.y-=dt*.18;}else if(role==='core')o.material.emissiveIntensity=1.85+Math.sin(now*.011+o.id)*.35;});
     for(const z of [...zombies]){
       if(z.userData.dead)continue;const dx=m.position.x-z.position.x,dz=m.position.z-z.position.z,dist=Math.hypot(dx,dz);
-      if(dist<=PHOENIX_PULL_RADIUS){const type=z.userData.archetype||'walker',dl=dist||1,base=type==='boss'?.32:(type==='brute'?1.35:3.15),strength=base*Math.max(.18,1-dist/PHOENIX_PULL_RADIUS);z.position.x+=dx/dl*strength*dt;z.position.z+=dz/dl*strength*dt;}
+      if(dist<=PHOENIX_PULL_RADIUS){const type=z.userData.archetype||'walker',dl=dist||1,base=type==='boss'?.12:(type==='brute'?.55:1.35),strength=base*Math.max(.18,1-dist/PHOENIX_PULL_RADIUS);z.position.x+=dx/dl*strength*dt;z.position.z+=dz/dl*strength*dt;}
       if(dist<=PHOENIX_CONTACT_RADIUS)damagePhoenixTarget(ball,z);
     }
-    if(ball.fxTick<=0){ball.fxTick=.075;const backX=m.position.x-ball.dirX*2.0,backZ=m.position.z-ball.dirZ*2.0;spawnBurst(backX+(Math.random()-.5)*1.4,m.position.y+(Math.random()-.5)*1.0,backZ+(Math.random()-.5)*1.4,2,FX_MAT_SPARK,2.6);}
-    if(ball.smokeTick<=0){ball.smokeTick=.18;const backX=m.position.x-ball.dirX*2.3,backZ=m.position.z-ball.dirZ*2.3;spawnBurst(backX,m.position.y+.35,backZ,1,FX_MAT_DUST,1.5);}
+    if(ball.fxTick<=0){ball.fxTick=.11;const backX=m.position.x-ball.dirX*2.0,backZ=m.position.z-ball.dirZ*2.0;spawnBurst(backX+(Math.random()-.5)*1.4,m.position.y+(Math.random()-.5)*1.0,backZ+(Math.random()-.5)*1.4,2,FX_MAT_SPARK,2.6);}
+    if(ball.smokeTick<=0){ball.smokeTick=.25;const backX=m.position.x-ball.dirX*2.3,backZ=m.position.z-ball.dirZ*2.3;spawnBurst(backX,m.position.y+.35,backZ,1,FX_MAT_DUST,1.5);}
     if(ball.life<=0)explodePhoenixBall(ball);
   }
   if(livingBalls===0||phoenixFireball.balls.every(b=>!b.mesh)){phoenixFireball=null;triggerCombatShake(14,300);navigator.vibrate&&navigator.vibrate([65,24,105]);}
@@ -12251,15 +12261,24 @@ function createChainTargetMarker(enemy,index){
   if(!enemy)return;
   const color=index===0?0xffffff:0x65ddff;
   const mat=new THREE.MeshBasicMaterial({
-    color,transparent:true,opacity:.72,depthWrite:false,
+    color,transparent:true,opacity:.78,depthWrite:false,
     side:THREE.DoubleSide,blending:THREE.AdditiveBlending
   });
-  const ring=new THREE.Mesh(new THREE.RingGeometry(.55,.82,28),mat);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(index===0?.62:.48,index===0?.96:.76,32),mat);
   ring.rotation.x=-Math.PI/2;
   ring.position.set(enemy.position.x,.12,enemy.position.z);
   ring.renderOrder=11;
   scene.add(ring);
-  fx.push({kind:'ring',mesh:ring,life:.48,maxLife:.48});
+  fx.push({kind:'ring',mesh:ring,life:.52,maxLife:.52});
+
+  const pulseMat=mat.clone();
+  pulseMat.opacity=.42;
+  const pulse=new THREE.Mesh(new THREE.RingGeometry(.34,.48,28),pulseMat);
+  pulse.rotation.x=-Math.PI/2;
+  pulse.position.set(enemy.position.x,.14,enemy.position.z);
+  pulse.renderOrder=10;
+  scene.add(pulse);
+  fx.push({kind:'ring',mesh:pulse,life:.36,maxLife:.36});
 }
 
 function createChainLightningArc(from,to,index=0){
@@ -12287,7 +12306,17 @@ function createChainLightningArc(from,to,index=0){
   const line=new THREE.Line(geometry,material);
   line.renderOrder=12;
   scene.add(line);
-  fx.push({kind:'lightning',mesh:line,life:.46,maxLife:.46});
+  fx.push({kind:'lightning',mesh:line,life:.50,maxLife:.50});
+
+  // Thin white-hot core keeps every jump readable through bright effects.
+  const coreMat=material.clone();
+  coreMat.color.setHex(0xffffff);
+  coreMat.opacity=.92;
+  const core=new THREE.Line(geometry.clone(),coreMat);
+  core.scale.set(.997,.997,.997);
+  core.renderOrder=13;
+  scene.add(core);
+  fx.push({kind:'lightning',mesh:core,life:.34,maxLife:.34});
 
   // Wider glow copy makes the chain readable on bright maps.
   const glowMat=material.clone();
@@ -12303,41 +12332,64 @@ function createChainLightningArc(from,to,index=0){
 function createChainJavelinMesh(){
   const g=new THREE.Group();
   const shaftMat=new THREE.MeshStandardMaterial({
-    color:0x77dfff,emissive:0x138fc5,emissiveIntensity:1.15,
-    metalness:.45,roughness:.25,transparent:true,opacity:.94
+    color:0x77dfff,emissive:0x138fc5,emissiveIntensity:1.45,
+    metalness:.52,roughness:.20,transparent:true,opacity:.98
   });
   const glowMat=new THREE.MeshBasicMaterial({
-    color:0xbff8ff,transparent:true,opacity:.46,depthWrite:false,
+    color:0xbff8ff,transparent:true,opacity:.56,depthWrite:false,
     blending:THREE.AdditiveBlending
   });
 
-  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.16,.20,4.6,10),shaftMat);
+  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.18,.23,4.9,12),shaftMat);
   shaft.rotation.x=Math.PI/2;
   g.add(shaft);
 
-  const head=new THREE.Mesh(new THREE.ConeGeometry(.62,1.55,10),shaftMat.clone());
+  const head=new THREE.Mesh(new THREE.ConeGeometry(.70,1.72,12),shaftMat.clone());
   head.rotation.x=-Math.PI/2;
-  head.position.z=-3.05;
+  head.position.z=-3.26;
   g.add(head);
 
-  const halo=new THREE.Mesh(new THREE.CylinderGeometry(.34,.40,5.9,10),glowMat);
+  const halo=new THREE.Mesh(new THREE.CylinderGeometry(.38,.46,6.35,12),glowMat);
   halo.rotation.x=Math.PI/2;
-  halo.position.z=-.40;
+  halo.position.z=-.42;
   g.add(halo);
+
+  const coreMat=new THREE.MeshBasicMaterial({
+    color:0xffffff,transparent:true,opacity:.88,depthWrite:false,
+    blending:THREE.AdditiveBlending
+  });
+  const core=new THREE.Mesh(new THREE.CylinderGeometry(.07,.10,5.45,8),coreMat);
+  core.rotation.x=Math.PI/2;
+  core.position.z=-.18;
+  g.add(core);
 
   for(let i=0;i<3;i++){
     const fin=new THREE.Mesh(
-      new THREE.PlaneGeometry(.72,1.15),
+      new THREE.PlaneGeometry(.82,1.32),
       new THREE.MeshBasicMaterial({
-        color:0xffffff,transparent:true,opacity:.72,depthWrite:false,
+        color:0xffffff,transparent:true,opacity:.78,depthWrite:false,
         side:THREE.DoubleSide,blending:THREE.AdditiveBlending
       })
     );
-    fin.position.z=2.25;
+    fin.position.z=2.38;
     fin.rotation.z=i*Math.PI/3;
     g.add(fin);
   }
-  g.scale.setScalar(1.55);
+
+  for(let i=0;i<2;i++){
+    const ring=new THREE.Mesh(
+      new THREE.TorusGeometry(.63,.055,6,24),
+      new THREE.MeshBasicMaterial({
+        color:i?0x65ddff:0xffffff,transparent:true,opacity:.72,depthWrite:false,
+        blending:THREE.AdditiveBlending
+      })
+    );
+    ring.rotation.x=Math.PI/2;
+    ring.position.z=i?-.7:.75;
+    ring.userData.chainSpin=i?1:-1;
+    g.add(ring);
+  }
+  g.scale.setScalar(1.58);
   return g;
 }
 
@@ -12401,8 +12453,16 @@ function resolveChainJavelinImpact(flight){
     }
 
     applyChainJavelinDamage(current);
-    spawnArcaneSigil(current.position.x,.03,current.position.z,jump===0?1.7:1.15);
-    spawnBurst(current.position.x,current.position.y+.75,current.position.z,jump===0?24:15,FX_MAT_SPARK,jump===0?5.5:4.0);
+    spawnArcaneSigil(current.position.x,.03,current.position.z,jump===0?1.85:1.22);
+    spawnBurst(current.position.x,current.position.y+.75,current.position.z,jump===0?30:18,FX_MAT_SPARK,jump===0?6.1:4.4);
+    if(jump===0){
+      const impactMat=new THREE.MeshBasicMaterial({color:0xbff8ff,transparent:true,opacity:.66,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+      const impactRing=new THREE.Mesh(new THREE.RingGeometry(.55,1.05,32),impactMat);
+      impactRing.rotation.x=-Math.PI/2;
+      impactRing.position.set(current.position.x,.16,current.position.z);
+      scene.add(impactRing);
+      fx.push({kind:'ring',mesh:impactRing,life:.44,maxLife:.44});
+    }
     current=findNextChainJavelinTarget(current,seen);
   }
 
@@ -12462,12 +12522,16 @@ function updateChainJavelinFlights(dt){
     f.life-=dt;
     const t=1-Math.max(0,f.life/f.maxLife);
     f.mesh.position.lerpVectors(f.start,f.end,t);
-    f.mesh.rotation.z+=dt*18;
+    f.mesh.rotation.z+=dt*20;
+    for(const child of f.mesh.children){
+      if(child.userData&&child.userData.chainSpin)child.rotation.z+=dt*7*child.userData.chainSpin;
+    }
 
     f.trailTimer-=dt;
     if(f.trailTimer<=0){
-      f.trailTimer=.035;
-      spawnBurst(f.mesh.position.x,f.mesh.position.y,f.mesh.position.z,3,FX_MAT_SPARK,1.7);
+      f.trailTimer=.032;
+      spawnBurst(f.mesh.position.x,f.mesh.position.y,f.mesh.position.z,4,FX_MAT_SPARK,1.9);
+      if(Math.random()<.55)spawnArcherSpark(f.mesh.position.x,f.mesh.position.y,f.mesh.position.z);
     }
 
     if(f.life<=0){
