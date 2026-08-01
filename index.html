@@ -8,6 +8,7 @@
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
 <!-- V22.9.28 Approved Combat HUD Layout: preserves the existing FIRE, DASH, NOVA, and SECONDARY positions in a stable 2x2 cluster and places the avatar-specific ECHOES signature button directly above SECONDARY without shifting the approved controls. -->
+<!-- V22.9.32 Round Completion & Timer Freeze: adds a forced zero-enemy completion failsafe, freezes the round timer the instant a round completes, and guarantees the between-round upgrade menu opens even if another pause state briefly interrupts the original transition. -->
 <!-- V22.9.31 Shared Mage Ability Slot: Arcane Nova and Arcane Laser are now mutually exclusive equipped abilities sharing the approved button directly left of FIRE. Buying either equips it; owned abilities can be swapped in the shop; Laser retains hold-to-channel behavior in the shared slot. -->
 <!-- V22.9.30 Arcane Echo Elite Contact Damage: normal enemies are instantly defeated on Echo contact without consuming the Echo; Brutes consume the Echo and take 25% of the Mage's total attack damage; Bosses consume the Echo and take 10%; Echo projectiles continue damaging every enemy type. -->
 <!-- V22.9.29 Shop Close & Arcane Echo Combat Fix: adds a top-right circular X close control to the weapon shop while preserving the bottom Close button; fixes Arcane Echo target acquisition and visible attacks; and makes normal enemies die instantly on contact with an Echo while Brutes destroy the Echo and survive. -->
@@ -683,7 +684,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.9.31 - Shared Mage Ability Slot';
+const GAME_VERSION='22.9.32 - Round Completion Failsafe';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -1297,6 +1298,8 @@ let crystalsEarned = 0;        // this run's crystal total, earned per round cle
 let currentWeaponId = null; // equipped secondary move; FIRE always keeps the hero default
 let runStartTime = 0;
 let roundStartTime = 0;      // when the current round began — the whole point of this mode
+let roundTimerFrozenElapsed = null; // locked clear time while the between-round upgrade menu is visible
+let roundCompletionStartedAt = 0;   // watchdog timestamp for guaranteed round-end transition
 let heartsLostThisRound = 0; // tracks whether this round was "flawless" (no damage taken)
 let gameRunning = false;
 let camYaw = 0, camPitch = 0.35, camDist = 7;
@@ -8740,6 +8743,8 @@ function clearZombies(){
 
 function startRound(){
   roundCompletionPending = false;
+  roundCompletionStartedAt = 0;
+  roundTimerFrozenElapsed = null;
   clearZombies();
   applyTheme(round);
   // Rounds 1-3 add one zombie at a time (4, 5, 6). From round 4 on, the
@@ -8879,6 +8884,9 @@ function refreshRoundStatShop(){
   }
 }
 function showLevelUp(){
+  gameRunning = false;
+  if(roundTimerFrozenElapsed === null) roundTimerFrozenElapsed = Math.max(0,(performance.now()-roundStartTime)/1000);
+  updateRoundTimerHud();
   const subtitle=document.getElementById('levelUpSubtitle');
   if(subtitle) subtitle.textContent='Level '+avatarLevel()+' reached · Spend coins or continue';
   renderLevelUnlockNotice(avatarLevel());
@@ -8903,7 +8911,10 @@ function pickStat(stat){
 }
 function continueAfterRoundShop(){
   document.getElementById('levelUpOverlay').classList.remove('show');
-  if(gameRunning) startRound();
+  gameRunning = true;
+  startRound();
+  clock.getDelta();
+  animate();
 }
 
 function countNearbyLivingEnemies(radius){
@@ -9170,8 +9181,10 @@ function updateInvincibleHud(){
   }
 }
 function updateRoundTimerHud(){
-  const elapsed = (performance.now() - roundStartTime) / 1000;
-  document.getElementById('roundTimerPill').textContent = '⏱ ' + elapsed.toFixed(1) + 's';
+  const elapsed = roundTimerFrozenElapsed === null
+    ? (performance.now() - roundStartTime) / 1000
+    : roundTimerFrozenElapsed;
+  document.getElementById('roundTimerPill').textContent = '⏱ ' + Math.max(0,elapsed).toFixed(1) + 's';
 }
 
 function updateEnemyCountHud(){
@@ -10962,10 +10975,18 @@ function updateBullets(dt){
 }
 
 let roundCompletionPending = false;
-function completeCurrentRound(){
-  if(roundCompletionPending || !gameRunning || roundKillsDone < roundKillTarget) return;
+function completeCurrentRound(force=false){
+  if(roundCompletionPending || (!force && !gameRunning) || roundKillsDone < roundKillTarget) return;
   roundCompletionPending = true;
-  const clearTime = (performance.now() - roundStartTime) / 1000;
+  roundCompletionStartedAt = performance.now();
+  roundTimerFrozenElapsed = Math.max(0,(performance.now() - roundStartTime) / 1000);
+  updateRoundTimerHud();
+
+  // Freeze combat immediately. This also prevents the timer, enemies, and
+  // projectiles from continuing underneath the between-round upgrade menu.
+  gameRunning = false;
+  clearZombies();
+  const clearTime = roundTimerFrozenElapsed;
   let bonusMsg = 'Round '+round+' cleared in '+clearTime.toFixed(1)+'s!';
   const paceBudget = roundKillTarget * 3;
   if(clearTime < paceBudget){
@@ -10983,7 +11004,25 @@ function completeCurrentRound(){
   toast(bonusMsg);
   round++;
   crystalsEarned += crystalsPerRound();
-  setTimeout(()=>{ if(gameRunning) showLevelUp(); }, 900);
+
+  // Never gate this on gameRunning: the round intentionally stops above.
+  setTimeout(()=>{
+    if(!document.getElementById('levelUpOverlay').classList.contains('show')) showLevelUp();
+  }, 500);
+}
+
+function enforceRoundCompletionFailsafe(){
+  const remaining=Math.max(0,roundKillTarget-roundKillsDone);
+  const overlay=document.getElementById('levelUpOverlay');
+  if(remaining===0 && !roundCompletionPending){
+    completeCurrentRound(true);
+    return;
+  }
+  // If a browser lifecycle/pause event interrupted the delayed popup, force it
+  // visible rather than leaving the player stranded on ENEMIES 0.
+  if(roundCompletionPending && !overlay.classList.contains('show') && roundCompletionStartedAt && performance.now()-roundCompletionStartedAt>1200){
+    showLevelUp();
+  }
 }
 
 function killZombie(z){
@@ -11356,8 +11395,8 @@ function update(dt){
   updateEnemyCountHud();
   updateEnemyRadar();
   recoverRoundIfNeeded(dt);
-  // Final safety net: if the HUD reaches ENEMIES 0 through any damage path, finish exactly once.
-  if(roundKillsDone >= roundKillTarget) completeCurrentRound();
+  // Final safety net: ENEMIES 0 must always transition to the upgrade menu.
+  enforceRoundCompletionFailsafe();
   if(invincibleTimer > 0){
     invincibleTimer -= dt;
     if(invincibleTimer < 0) invincibleTimer = 0;
@@ -11527,6 +11566,8 @@ function startSurvival(){
   updateRunTokensHud();
   updateWeaponHud();
   runStartTime = performance.now();
+  roundTimerFrozenElapsed = null;
+  roundCompletionStartedAt = 0;
   startRound();
   gameRunning = true;
   onResize();
