@@ -1,6 +1,9 @@
 <!DOCTYPE html>
+<!-- V22.10.16 Tempest Archer Phase 2: adds the Tailwind kill passive. Every fifth defeat grants 3 seconds of faster movement and firing, with HUD progress and localized wind feedback. Existing Archer weapons, Arrow Storm, and all other avatars remain intact. -->
+<!-- V22.10.15 Tempest Archer Phase 1: begins the next-avatar pass after Mage stabilization. Gives the Archer a clear speed-focused stat identity, keeps Eagle Eye projectile bonuses active, and updates roster/passive text without altering the completed Mage, Knight, Barbarian, or Shadow Rogue systems. -->
 <html lang="en">
 <head>
+<!-- V22.10.14 Mage Stability Pass: removes stale removed-ability state at loadout reset, keeps all current abilities unlocked for development testing, preserves active clones between rounds, and confirms temporary Mage battlefield effects cannot leak into the next round. -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -683,7 +686,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.13 - Meteor Removed';
+const GAME_VERSION='22.10.16 - Tempest Archer Phase 2';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -756,7 +759,7 @@ const AVATAR_TYPE_LABELS = {
   barbarian:'🪓 Barbarian'
 };
 const HERO_ROSTER_INFO = {
-  rogue:{title:'Tempest Archer',role:'RANGED • EASY',desc:'Fast piercing arrows and precise crowd control. Knife removed for a clean bow-and-quiver silhouette.'},
+  rogue:{title:'Tempest Archer',role:'RANGED • EASY',desc:'The speed-focused ranged avatar: fast movement, long-lived piercing arrows, and precise crowd control. Every fifth defeat triggers Tailwind for a short burst of movement and firing speed.'},
   hooded:{title:'Shadow Rogue',role:'MELEE • HARD',desc:'Rapid close-range slashes, shadow clones, and evasive movement. Crossbow removed for a pure assassin silhouette.'},
   mage:{title:'Arcane Mage',role:'RANGED • MEDIUM',desc:'Alternating elemental attacks and powerful area magic.'},
   knight:{title:'Knight of Dawn',role:'MELEE • EASY',desc:'A durable melee guardian with regenerating Magical Armor. Every fifth defeat triggers a 3-second radiant Whirlwind.'},
@@ -766,7 +769,7 @@ const HERO_ROSTER_INFO = {
 // Data-driven hero passives. New heroes only need one entry here; the
 // shared hooks below read these values without duplicating hero logic.
 const HERO_PASSIVES = {
-  rogue:{name:'Eagle Eye',icon:'🎯',desc:'Arrows fly 18% faster and remain active 15% longer.',projectileSpeedMult:1.18,projectileLifeMult:1.15},
+  rogue:{name:'Eagle Eye',icon:'🎯',desc:'Arrows fly 18% faster and remain active 15% longer. Every fifth defeat triggers 3 seconds of Tailwind.',projectileSpeedMult:1.18,projectileLifeMult:1.15,tailwindKills:5,tailwindDuration:3,tailwindMoveMult:1.35,tailwindAttackMult:1.40},
   hooded:{name:'Shadowstep',icon:'💨',desc:'Defeating an enemy grants 20% movement speed for 2.5 seconds.',killMoveMult:1.20,killMoveDuration:2.5},
   knight:{name:'Radiant Guardian',icon:'🛡️',desc:'Two regenerating armor charges absorb hits. Every fifth defeat triggers a 3-second Whirlwind.',armorMax:2,armorRegenDelay:5,armorRegenInterval:3,whirlwindKills:5,whirlwindDuration:3,whirlwindRadius:3.15,whirlwindDamage:.72,whirlwindStun:.18,whirlwindPulse:.22,whirlwindKnockback:3.8,whirlwindSpinSpeed:24},
   barbarian:{name:'Relentless Fury',icon:'🔥',desc:'Every third defeat releases a ground Shockwave. Every fifth defeat grants 3 seconds of Invincibility.',shockwaveKills:3,shockwaveRadius:5.2,shockwaveDamage:1.25,shockwaveStun:.65,invincibleKills:5,invincibleDuration:3.0},
@@ -1254,6 +1257,10 @@ let enemySpawnRetryTimer = null;    // one shared retry timer prevents failed sp
 // Phase 1 enables the Mage values; heroes without an entry retain the original
 // 1/1/1 starting stats and +1 upgrade behavior.
 const HERO_STAT_CONFIG = {
+  rogue: {
+    startingBonus: {power:0, speed:2, hp:0},
+    upgradeAmount: {power:1, speed:2, hp:1}
+  },
   mage: {
     startingBonus: {power:2, speed:2, hp:0},
     upgradeAmount: {power:2, speed:2, hp:1}
@@ -1285,7 +1292,7 @@ function upgradeAmountForActiveHero(stat){
 let playerStats = {power:1, speed:1, hp:1};
 function createFreshPassiveState(){
   return {
-    shadowstepTimer:0, knightArmor:0, knightArmorRegenDelay:0, knightArmorRegenTimer:0, knightWhirlwindCounter:0, knightWhirlwindTimer:0, knightWhirlwindPulse:0, battleFuryActive:false,
+    shadowstepTimer:0, archerKillCounter:0, archerTailwindTimer:0, archerTailwindFxCooldown:0, knightArmor:0, knightArmorRegenDelay:0, knightArmorRegenTimer:0, knightWhirlwindCounter:0, knightWhirlwindTimer:0, knightWhirlwindPulse:0, battleFuryActive:false,
     barbarianShockwaveCounter:0, barbarianInvincibleCounter:0,
     mageAttackCounter:0, mageKillCounter:0, mageSpeedBoostTimer:0,
     mageHasteFxCooldown:0, mageHastePulseStage:0
@@ -1347,7 +1354,7 @@ const CHARACTER_COMBAT = {
   },
   rogue: {
     defaultId:'arrow',
-    baseMoveMult:1,
+    baseMoveMult:1.12,
     weapons:{
       arrow:{name:'Tempest Arrow', price:0, kind:'arrow', cooldown:0.30, damage:1.15, pierce:1, desc:'Glowing aimed arrow that pierces one extra enemy.'},
       rapid_arrow:{name:'Windrunner Arrows', price:190, kind:'arrow', cooldown:0.075, damage:0.78, pierce:1, auto:true,
@@ -1439,6 +1446,9 @@ function resetCharacterLoadout(){
   }
 }
 function resetAbilityLoadout(){
+  // Development cleanup: removed legacy abilities can never survive in runtime state.
+  const removedAbilityIds=['nova','arcane_nova','cataclysm_meteor','meteor_boulder','fire_meteor_boulder'];
+  if(removedAbilityIds.includes(equippedAbilityId)) equippedAbilityId=null;
   equippedAbilityId = null;
   ownedAbilities = {};
   if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING){
@@ -1457,7 +1467,7 @@ const WEAPONS = {
 // Mage abilities purchased and equipped through Pause → Abilities.
 // Stats (HP, Power, Speed) remain exclusively in the between-round shop.
 const BLIZZARD_STORM = {id:'blizzard_storm', name:'Blizzard Storm', price:640,
-  desc:'Ultimate-tier battlefield control. For 10 seconds, giant ice masses rain across almost the entire playable arena. Its gameplay radius is five times larger than before, while impacts are kept inside the real map boundary. Moderate damage; normal enemies freeze for 3 seconds and resistant enemies are heavily slowed. No blinding white screen.'};
+  desc:'Ultimate-tier battlefield control. For 10 seconds, many giant semi-transparent ice masses rain inside a radius equal to 45% of the playable map radius. Impacts stay inside the real map boundary. Moderate damage; normal enemies freeze for 3 seconds and resistant enemies are heavily slowed. No blinding white screen.'};
 // Boss Killer: hold to channel a piercing beam of massive sustained
 // damage at the nearest well-aligned target (falling back to wherever
 // you're facing). Drains a charge meter while firing and regenerates
@@ -9139,6 +9149,16 @@ function updateKnightArmorHud(){
 }
 function refreshPassiveState(dt=0){
   if(passiveState.shadowstepTimer>0) passiveState.shadowstepTimer=Math.max(0,passiveState.shadowstepTimer-dt);
+  if(passiveState.archerTailwindTimer>0){
+    passiveState.archerTailwindTimer=Math.max(0,passiveState.archerTailwindTimer-dt);
+    passiveState.archerTailwindFxCooldown=(passiveState.archerTailwindFxCooldown||0)-dt;
+    if(state.avatarType==='rogue' && player && passiveState.archerTailwindFxCooldown<=0){
+      passiveState.archerTailwindFxCooldown=.16;
+      spawnArcherSpark(player.position.x,player.position.y+.65,player.position.z);
+      spawnArcherMuzzleFan(false);
+    }
+    if(passiveState.archerTailwindTimer<=0) passiveState.archerTailwindFxCooldown=0;
+  }
   if(state.avatarType==='knight'){
     const p=HERO_PASSIVES.knight;
     if((passiveState.knightWhirlwindTimer||0)>0){
@@ -9203,6 +9223,9 @@ function updatePassiveHud(){
   const p=passiveForAvatar();
   let suffix='';
   if(state.avatarType==='hooded' && passiveState.shadowstepTimer>0) suffix=` · ACTIVE ${passiveState.shadowstepTimer.toFixed(1)}s`;
+  else if(state.avatarType==='rogue') suffix=(passiveState.archerTailwindTimer||0)>0
+    ? ` · 🌪 TAILWIND ${passiveState.archerTailwindTimer.toFixed(1)}s · KILLS ${passiveState.archerKillCounter||0}/${p.tailwindKills||5}`
+    : ` · KILLS ${passiveState.archerKillCounter||0}/${p.tailwindKills||5}`;
   else if(state.avatarType==='knight') suffix=(passiveState.knightWhirlwindTimer||0)>0 ? ` · 🌀 WHIRLWIND ${passiveState.knightWhirlwindTimer.toFixed(1)}s · KILLS ${passiveState.knightWhirlwindCounter||0}/${p.whirlwindKills||5} · ARMOR ${passiveState.knightArmor||0}/${p.armorMax||2}` : ` · KILLS ${passiveState.knightWhirlwindCounter||0}/${p.whirlwindKills||5} · ARMOR ${passiveState.knightArmor||0}/${p.armorMax||2}`;
   else if(state.avatarType==='barbarian') suffix=invincibleTimer>0
     ? ` · 🛡 INVINCIBLE ${invincibleTimer.toFixed(1)}s · WAVE ${passiveState.barbarianShockwaveCounter||0}/3 · FURY ${passiveState.barbarianInvincibleCounter||0}/5`
@@ -10062,6 +10085,7 @@ function findClipByWords(parts, fallback='1H_Melee_Attack_Chop'){
 function attackCooldownFor(w){
   let factor = 1 + (playerStats.speed-1)*0.16;
   const passive=passiveForAvatar();
+  if(state.avatarType==='rogue' && (passiveState.archerTailwindTimer||0)>0) factor *= (passive.tailwindAttackMult||1);
   // Barbarian Phase 2 replaces the old nearby-enemy attack-speed passive with kill-triggered Fury.
   if(w.fireRateCap) factor = Math.min(w.fireRateCap, factor);
   return w.cooldown / factor;
@@ -11166,7 +11190,23 @@ function killZombie(z){
   updateEnemyCountHud();
   updateEnemyRadar();
   if(state.avatarType==='hooded'){spawnSoulOrb(z.position);hoodedUltimateCharge=Math.min(100,hoodedUltimateCharge+4);passiveState.shadowstepTimer=passiveForAvatar().killMoveDuration||0;updateHoodedHud();}
-  if(state.avatarType==='rogue'){archerUltimateCharge=Math.min(100,archerUltimateCharge+4);spawnArcherSpark(z.position.x,z.position.y+0.8,z.position.z);updateHoodedHud();}
+  if(state.avatarType==='rogue'){
+    const p=HERO_PASSIVES.rogue;
+    archerUltimateCharge=Math.min(100,archerUltimateCharge+4);
+    passiveState.archerKillCounter=(passiveState.archerKillCounter||0)+1;
+    if(passiveState.archerKillCounter>=(p.tailwindKills||5)){
+      passiveState.archerKillCounter=0;
+      passiveState.archerTailwindTimer=p.tailwindDuration||3;
+      passiveState.archerTailwindFxCooldown=0;
+      spawnArcherMuzzleFan(true);
+      spawnArcherSpark(player.position.x,player.position.y+.8,player.position.z);
+      navigator.vibrate&&navigator.vibrate([18,18,36]);
+    }else{
+      spawnArcherSpark(z.position.x,z.position.y+0.8,z.position.z);
+    }
+    updateHoodedHud();
+    updatePassiveHud();
+  }
   if(state.avatarType==='mage'){
     registerMageKill();
     updateHoodedHud();
@@ -11415,7 +11455,7 @@ function update(dt){
     const len = Math.hypot(mx,mz)||1;
     const speedStat = playerStats.speed;
     const characterMoveMult = combatForAvatar().baseMoveMult || 1;
-    const passiveMoveMult=(state.avatarType==='hooded' && passiveState.shadowstepTimer>0)?(passiveForAvatar().killMoveMult||1):((state.avatarType==='mage' && passiveState.mageSpeedBoostTimer>0)?MAGE_SPEED_BOOST_MULT:1);
+    const passiveMoveMult=(state.avatarType==='hooded' && passiveState.shadowstepTimer>0)?(passiveForAvatar().killMoveMult||1):((state.avatarType==='rogue' && (passiveState.archerTailwindTimer||0)>0)?(passiveForAvatar().tailwindMoveMult||1):((state.avatarType==='mage' && passiveState.mageSpeedBoostTimer>0)?MAGE_SPEED_BOOST_MULT:1));
     const speed = PLAYER_SPEED * characterMoveMult * passiveMoveMult * (1 + (speedStat-1)*0.15);
     const nx = player.position.x + (mx/len)*speed*dt;
     const nz = player.position.z + (mz/len)*speed*dt;
@@ -11497,6 +11537,7 @@ function update(dt){
   if(player.userData.attackCooldown>0) player.userData.attackCooldown -= dt;
   if((player.userData.secondaryAttackCooldown||0)>0) player.userData.secondaryAttackCooldown -= dt;
   refreshPassiveState(dt);
+  updatePassiveHud();
   updatePassiveHud();
   // Whirlwind is a real full-body spin, independent of whichever KayKit arm clip exists.
   // Rotating only the imported visual root preserves movement direction and controls.
