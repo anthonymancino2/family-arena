@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<!-- V22.10.29 Archer Loadout + Mirror Volley Placement: Windrunner Arrows and Fan of Arrows are now true Primary-slot choices, separate from Secondary attacks. Mirror Volley can be placed anywhere without an enemy target, supports up to three simultaneous placements, and uses a round-scaled cooldown that starts at 3 seconds, reaches 1 second by Round 20, and reaches 0 at very high rounds. -->
+<!-- V22.10.28 Archer Clone Detonation: permanent Mirror Clones now survive 10 enemy hits. On the tenth hit, the clone explodes, damages and knocks back nearby enemies, then disappears. Enemy melee and projectile attacks both count toward the same hit total. -->
+<!-- V22.10.27 Tempest Archer Phase 12: adds Chain-Lightning Javelin as the third Archer secondary. A heavy electrified javelin hits the primary target, chains to up to five additional nearby enemies, instantly defeats normal enemies, leaves large non-boss enemies at 1 HP, deals 20% max HP to bosses, and stuns every survivor for 3 seconds. -->
 <!-- V22.10.26 Archer Clone Control Fix: disables browser text selection/copy callouts during gameplay, moves permanent Mirror Clones to the signature button formerly used by Arrow Storm, increases the summon to five clones, widens clone spacing, and moves Arrow Storm into Pause → Abilities as an equipable Archer ability. -->
 <!-- V22.10.25 Tempest Archer Phase 11: replaces standalone Storm Beacon Arrow with Mirror Volley. The Archer dashes backward, leaves two invincible stationary decoys for 6 seconds, fires a launch barrage, and automatically plants one Storm Beacon at the departure point. The 3-second cooldown begins after the decoys expire. -->
 <!-- V22.10.24 Tempest Archer Phase 10: adds Round-10 Mirror Clones as an equipable Archer ability. Two cyan phantom Archers use the Mage Echo framework, draw enemy aggro, fire 10%-damage phantom arrows with small knockback, persist between rounds, and are unlocked immediately during development testing. -->
@@ -19,7 +22,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.26</title>
+<title>Family Arena V22.10.29</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -709,7 +712,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.26 - Archer Clone Control Fix';
+const GAME_VERSION='22.10.29 - Archer Loadout + Mirror Volley Placement';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1221,7 +1224,16 @@ function updateEnemyProjectiles(dt){
     const targets=livingPlayers();
     let hitTarget=null,hitDist=Infinity;
     for(const t of targets){const d=Math.hypot(t.position.x-p.mesh.position.x,(t.position.y+.55)-p.mesh.position.y,t.position.z-p.mesh.position.z);if(d<hitDist){hitDist=d;hitTarget=t;}}
-    if(hitTarget&&hitDist<.55){spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,12,FX_MAT_ENEMY_SHOT,3.4);if(hitTarget.userData&&hitTarget.userData.isArcaneEcho)destroyArcaneEcho(hitTarget);else playerTakeHit();scene.remove(p.mesh);disposeGroup(p.mesh);if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}enemyProjectiles.splice(i,1);continue;}
+    if(hitTarget&&hitDist<.55){
+      spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,12,FX_MAT_ENEMY_SHOT,3.4);
+      if(hitTarget.userData&&hitTarget.userData.isArcaneEcho)destroyArcaneEcho(hitTarget);
+      else if(hitTarget.userData&&hitTarget.userData.isArcherMirror)damageArcherMirrorClone(hitTarget);
+      else playerTakeHit();
+      scene.remove(p.mesh);disposeGroup(p.mesh);
+      if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}
+      enemyProjectiles.splice(i,1);
+      continue;
+    }
     if(p.life<=0||bulletBlockedAt(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z)){scene.remove(p.mesh);disposeGroup(p.mesh);if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}enemyProjectiles.splice(i,1);}
   }
 }
@@ -1325,7 +1337,8 @@ let passiveState = createFreshPassiveState();
 let unspentStatPoints = 0;
 let runTokens = 0;             // per-run currency, earned by killing zombies, spent at the shop
 let crystalsEarned = 0;        // this run's crystal total, earned per round cleared, saved to the profile at run end
-let currentWeaponId = null; // equipped secondary move; FIRE always keeps the hero default
+let currentPrimaryWeaponId = null; // optional swappable Primary move for avatars that support it
+let currentWeaponId = null; // equipped Secondary move
 let runStartTime = 0;
 let roundStartTime = 0;      // when the current round began — the whole point of this mode
 let roundTimerFrozenElapsed = null; // locked clear time while the between-round upgrade menu is visible
@@ -1379,16 +1392,18 @@ const CHARACTER_COMBAT = {
     defaultId:'arrow',
     baseMoveMult:1.12,
     weapons:{
-      arrow:{name:'Tempest Arrow', price:0, kind:'arrow', cooldown:0.30, damage:1.15, pierce:1, desc:'Glowing aimed arrow that pierces one extra enemy.'},
-      rapid_arrow:{name:'Windrunner Arrows', price:190, kind:'arrow', cooldown:0.075, damage:0.78, pierce:1, auto:true,
+      arrow:{name:'Tempest Arrow', price:0, slot:'primary', kind:'arrow', cooldown:0.30, damage:1.15, pierce:1, desc:'Glowing aimed arrow that pierces one extra enemy.'},
+      rapid_arrow:{name:'Windrunner Arrows', price:190, slot:'primary', kind:'arrow', cooldown:0.075, damage:0.78, pierce:1, auto:true,
         desc:'Hold FIRE to launch arrows like an Uzi.'},
-      multi_arrow:{name:'Fan of Arrows', price:330, kind:'multi_arrow', cooldown:0.31, damage:0.90, pierce:1, auto:true, fireRateCap:2,
+      multi_arrow:{name:'Fan of Arrows', price:330, slot:'primary', kind:'multi_arrow', cooldown:0.31, damage:0.90, pierce:1, auto:true, fireRateCap:2,
         desc:'Fires four arrows in a wide arc. Hold FIRE to continue.'},
-      gale_drill_arrow:{name:'Gale Drill Arrow', price:430, kind:'gale_drill_arrow', cooldown:0.82, damage:2.45, pierce:6, auto:false,
+      gale_drill_arrow:{slot:'secondary', name:'Gale Drill Arrow', price:430, kind:'gale_drill_arrow', cooldown:0.82, damage:2.45, pierce:6, auto:false,
         desc:'Launches one oversized spinning wind arrow through a crowd. Wide hitbox, heavy knockback, and up to seven enemy hits.'},
-      mirror_volley:{name:'Mirror Volley', price:470, kind:'mirror_volley', cooldown:9.0, damage:0.28, pierce:0, auto:false,
-        desc:'Dash backward and leave two invincible decoy Archers for 6 seconds. They fire phantom arrows while a Storm Beacon pulls enemies at the departure point. A 3-second cooldown begins after the decoys expire.'},
-      rocket_arrow:{name:'Phoenix Arrows', price:500, kind:'rocket_arrow', cooldown:0.42, damage:2.2, splash:3.4, splashMult:2, pierce:0, auto:true,
+      mirror_volley:{slot:'secondary', name:'Mirror Volley', price:470, kind:'mirror_volley', cooldown:3.0, damage:0.28, pierce:0, auto:false,
+        desc:'Place up to three Mirror Volleys anywhere you stand. Each leaves two invincible decoys and a Storm Beacon for 6 seconds. Cooldown starts at 3 seconds and scales toward 0 at very high rounds.'},
+      chain_lightning_javelin:{slot:'secondary', name:'Chain-Lightning Javelin', price:560, kind:'chain_lightning_javelin', cooldown:4.2, damage:1.0, pierce:0, auto:false,
+        desc:'Launches a heavy electrified javelin. The first strike chains to up to five nearby enemies. Normal enemies are defeated, large enemies survive at 1 HP, bosses lose 20% max HP, and every survivor is stunned for 3 seconds.'},
+      rocket_arrow:{slot:'secondary', name:'Phoenix Arrows', price:500, kind:'rocket_arrow', cooldown:0.42, damage:2.2, splash:3.4, splashMult:2, pierce:0, auto:true,
         desc:'Explodes on impact. Nearby zombies take double splash damage.'}
     }
   },
@@ -1456,16 +1471,20 @@ function arcaneEchoesUnlocked(){
 let previewRenderer=null, previewScene=null, previewCamera=null, previewRoot=null, previewMixer=null, previewRAF=0;
 function combatForAvatar(){ return CHARACTER_COMBAT[state.avatarType] || CHARACTER_COMBAT.rogue; }
 function weaponForAvatar(){
-  const c = combatForAvatar();
+  const c=combatForAvatar();
+  const selected=currentPrimaryWeaponId&&c.weapons[currentPrimaryWeaponId];
+  if(selected&&selected.slot==='primary')return selected;
   return c.weapons[c.defaultId];
 }
 function secondaryWeaponForAvatar(){
   const c=combatForAvatar();
-  if(!currentWeaponId || currentWeaponId===c.defaultId) return null;
-  return c.weapons[currentWeaponId] || null;
+  if(!currentWeaponId)return null;
+  const selected=c.weapons[currentWeaponId];
+  return selected&&selected.slot!=='primary'?selected:null;
 }
 function resetCharacterLoadout(){
   const c = combatForAvatar();
+  currentPrimaryWeaponId = null;
   currentWeaponId = null;
   ownedWeapons = {[c.defaultId]:true};
   if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING){
@@ -9385,35 +9404,49 @@ function renderShopList(){
   if(shopMode==='weapons' || shopMode==='abilities') for(const id in weapons){
     const w = weapons[id];
     const owned = !!ownedWeapons[id];
-    const isDefault = id === combatForAvatar().defaultId;
-    const equipped = !isDefault && currentWeaponId === id;
-    const row = document.createElement('div');
-    row.className = 'weaponRow' + ((equipped||isDefault) ? ' equipped' : '');
+    const isDefault=id===combatForAvatar().defaultId;
+    const slot=w.slot||(isDefault?'primary':'secondary');
+    const isPrimary=slot==='primary';
+    const equipped=isPrimary
+      ? ((isDefault&&!currentPrimaryWeaponId)||currentPrimaryWeaponId===id)
+      : currentWeaponId===id;
+    const row=document.createElement('div');
+    row.className='weaponRow'+(equipped?' equipped':'');
     const swatch = document.createElement('div');
     swatch.className = 'weaponSwatch';
     swatch.style.background = w.kind.includes('fire') ? '#ff7a3d'
       : (w.kind==='gale_drill_arrow' ? '#67f0ff'
       : (w.kind==='mirror_volley' ? '#b987ff'
+      : (w.kind==='chain_lightning_javelin' ? '#8ee8ff'
       : (w.kind==='cyclone_snare_arrow' ? '#63ffd1'
       : (w.kind.includes('element') || w.kind==='arcane_lance' ? '#78d8ff'
-      : (w.kind.includes('arrow') ? '#d9b36c' : '#b88cff')))));
+      : (w.kind.includes('arrow') ? '#d9b36c' : '#b88cff'))))));
     const info = document.createElement('div');
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${w.name}</div><div class="wDesc">${w.desc}</div>`;
     const btn = document.createElement('button');
-    if(isDefault){
-      btn.className='weaponBuyBtn equippedTag'; btn.textContent='Primary'; btn.disabled=true;
-    } else if(equipped){
-      btn.className='weaponBuyBtn equippedTag'; btn.textContent='Secondary'; btn.disabled=true;
-    } else if(owned){
-      btn.className='weaponBuyBtn'; btn.textContent='Equip';
-      btn.onclick=()=>{ currentWeaponId=id; updateWeaponHud(); syncShadowClones(); renderShopList(); toast('Secondary equipped: '+w.name); };
-    } else {
-      btn.className='weaponBuyBtn'; btn.textContent=w.price+'🪙'; btn.disabled=runTokens<w.price;
+    if(equipped){
+      btn.className='weaponBuyBtn equippedTag';
+      btn.textContent=isPrimary?'Primary':'Secondary';
+      btn.disabled=true;
+    }else if(owned){
+      btn.className='weaponBuyBtn';
+      btn.textContent='Equip';
       btn.onclick=()=>{
-        if(runTokens<w.price) return;
-        runTokens-=w.price; ownedWeapons[id]=true; currentWeaponId=id;
-        updateRunTokensHud(); updateWeaponHud(); syncShadowClones(); renderShopList(); toast('Bought and equipped '+w.name+' as secondary!');
+        if(isPrimary)currentPrimaryWeaponId=isDefault?null:id;
+        else currentWeaponId=id;
+        updateWeaponHud();syncShadowClones();renderShopList();
+        toast((isPrimary?'Primary':'Secondary')+' equipped: '+w.name);
+      };
+    }else{
+      btn.className='weaponBuyBtn';btn.textContent=w.price+'🪙';btn.disabled=runTokens<w.price;
+      btn.onclick=()=>{
+        if(runTokens<w.price)return;
+        runTokens-=w.price;ownedWeapons[id]=true;
+        if(isPrimary)currentPrimaryWeaponId=isDefault?null:id;
+        else currentWeaponId=id;
+        updateRunTokensHud();updateWeaponHud();syncShadowClones();renderShopList();
+        toast('Bought and equipped '+w.name+' as '+(isPrimary?'Primary':'Secondary')+'!');
       };
     }
     row.append(swatch,info,btn); list.appendChild(row);
@@ -10240,8 +10273,11 @@ function updateHoodedHud(){
     else if(isHooded){btn.textContent=pct>=100?'ECLIPSE!':'ECLIPSE';meter.textContent='VITALITY '+hoodedMeleeHits+'/25';}
     else if(isArcher){
       btn.textContent=pct>=100?'CLONES!':'CLONES';
+      const remainingHits=archerMirrorClones.reduce(
+        (sum,c)=>sum+Math.max(0,ARCHER_MIRROR_HITS-(c.userData.hitsTaken||0)),0
+      );
       meter.textContent=archerMirrorClones.length
-        ? `MIRRORS ${archerMirrorClones.length}/${ARCHER_MIRROR_COUNT}`
+        ? `MIRRORS ${archerMirrorClones.length}/${ARCHER_MIRROR_COUNT} · HITS ${remainingHits}`
         : (pct>=100?'MIRROR CLONES READY':`CLONES ${archerMirrorCooldownTimer.toFixed(1)}s`);
     }
     else if(isKnight){btn.textContent=pct>=100?"KING'S JUDGMENT!":"JUDGMENT";meter.textContent='VALOR '+Math.round(pct)+'%';}
@@ -10718,6 +10754,8 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
 // runtime so Archer clones never interfere with Mage Arcane Echoes.
 // ---------------------------------------------------------------------
 const ARCHER_MIRROR_COUNT=5;
+const ARCHER_MIRROR_HITS=10;
+const ARCHER_MIRROR_EXPLOSION_RADIUS=4.2;
 const ARCHER_MIRROR_INITIAL_CHARGE=25;
 let archerMirrorClones=[];
 let archerMirrorCooldownTimer=0;
@@ -10756,15 +10794,67 @@ function clearArcherMirrorClones(){
   });
   updateHoodedHud();
 }
-function destroyArcherMirrorClone(c){
+function explodeArcherMirrorClone(c){
   if(!c||c.userData.dead)return;
   c.userData.dead=true;c.userData.hp=0;
-  spawnBurst(c.position.x,c.position.y+.75,c.position.z,16,FX_MAT_SPARK,3.4);
+  const x=c.position.x,y=c.position.y,z=c.position.z;
+  spawnArcaneSigil(x,.03,z,ARCHER_MIRROR_EXPLOSION_RADIUS*.72);
+  spawnBurst(x,y+.72,z,34,FX_MAT_SPARK,6.2);
+  spawnBurst(x,y+.25,z,22,FX_MAT_DUST,5.4);
+  triggerCombatShake(7.5,145);
+  navigator.vibrate&&navigator.vibrate([26,18,46]);
+
+  for(const enemy of [...zombies]){
+    if(!enemy||enemy.userData.dead)continue;
+    const dx=enemy.position.x-x,dz=enemy.position.z-z;
+    const dist=Math.hypot(dx,dz);
+    if(dist>ARCHER_MIRROR_EXPLOSION_RADIUS)continue;
+
+    const type=enemy.userData.archetype||'walker';
+    let damage=2.0*playerStats.power;
+    if(type==='boss'){
+      const maxHp=enemy.userData.maxHp||enemy.userData.hp||1;
+      damage=Math.min(damage,maxHp*.04);
+    }else if(type==='brute'){
+      damage*=1.35;
+    }
+    applyBulletDamage(enemy,damage);
+
+    if(!enemy.userData.dead){
+      const dl=dist||1;
+      const force=7.2*(1-dist/ARCHER_MIRROR_EXPLOSION_RADIUS)+2.0;
+      enemy.userData.knockbackX=(dx/dl)*force;
+      enemy.userData.knockbackZ=(dz/dl)*force;
+      enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,.45);
+    }
+  }
+
+  zombies.forEach(enemy=>{
+    if(enemy.userData.targetPlayer===c){
+      enemy.userData.targetPlayer=null;
+      enemy.userData.targetRefresh=0;
+    }
+  });
+
   setTimeout(()=>{
     if(c.parent){scene.remove(c);disposeGroup(c);}
     archerMirrorClones=archerMirrorClones.filter(x=>x!==c);
     updateHoodedHud();
   },0);
+}
+function damageArcherMirrorClone(c){
+  if(!c||c.userData.dead)return;
+  c.userData.hitsTaken=(c.userData.hitsTaken||0)+1;
+  c.userData.hp=Math.max(0,ARCHER_MIRROR_HITS-c.userData.hitsTaken);
+  spawnBurst(c.position.x,c.position.y+.8,c.position.z,7,FX_MAT_SPARK,2.0);
+  if(c.userData.hitsTaken>=ARCHER_MIRROR_HITS){
+    explodeArcherMirrorClone(c);
+  }else{
+    updateHoodedHud();
+  }
+}
+function destroyArcherMirrorClone(c){
+  explodeArcherMirrorClone(c);
 }
 function spawnArcherMirrorArrow(from,to){
   const points=[
@@ -10811,7 +10901,9 @@ function triggerArcherMirrorClones(){
           player.position.z+Math.sin(a)*3.4
         );
         wrap.userData.isArcherMirror=true;
-        wrap.userData.hp=1;wrap.userData.dead=false;
+        wrap.userData.hp=ARCHER_MIRROR_HITS;
+        wrap.userData.hitsTaken=0;
+        wrap.userData.dead=false;
         wrap.userData.mirrorIndex=i;
         wrap.userData.attackCooldown=.2+i*.12;
         wrap.userData.kayMixer=new THREEAsset.AnimationMixer(root);
@@ -10839,7 +10931,8 @@ function updateArcherMirrorClones(dt){
 
   const now=performance.now()*.001;
   for(const c of [...archerMirrorClones]){
-    if(!c||c.userData.dead||c.userData.hp<=0){destroyArcherMirrorClone(c);continue;}
+    if(!c||c.userData.dead){continue;}
+    if((c.userData.hitsTaken||0)>=ARCHER_MIRROR_HITS){explodeArcherMirrorClone(c);continue;}
     if(c.userData.kayMixer)c.userData.kayMixer.update(dt);
     const i=c.userData.mirrorIndex||0;
     const a=now*.38+(i/ARCHER_MIRROR_COUNT)*Math.PI*2;
@@ -11247,7 +11340,7 @@ function triggerBlizzardStorm(){
 function clearMageRoundSpecials(resetCooldowns=true){
   clearTempestDomain(resetCooldowns);
   clearSkyfallBarrage(resetCooldowns);
-  clearMirrorVolleyDecoys();mirrorVolleyActiveTimer=0;mirrorVolleyPostCooldown=0;
+  clearMirrorVolleyDecoys();mirrorVolleyCooldownTimer=0;
   clearCycloneBeacons();
   blizzardActiveTimer=0;blizzardSpawnTimer=0;blizzardDamageTimer=0;
   for(const m of fallingIce){scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);} fallingIce=[];
@@ -11652,7 +11745,13 @@ function doSecondaryShoot(){
   const w=secondaryWeaponForAvatar();
   if(!gameRunning||!w||(player.userData.secondaryAttackCooldown||0)>0)return;
   if(w.kind==='mirror_volley'){
+    if(mirrorVolleyCooldownTimer>0)return;
     triggerMirrorVolley(w);
+    return;
+  }
+  if(w.kind==='chain_lightning_javelin'){
+    player.userData.secondaryAttackCooldown=attackCooldownFor(w);
+    triggerChainLightningJavelin(w);
     return;
   }
   player.userData.secondaryAttackCooldown=attackCooldownFor(w);
@@ -11714,17 +11813,144 @@ function spawnArcherHitFeedback(x,y,z,heavy=false){
   if(heavy) spawnArcherMuzzleFan(false);
 }
 
+const CHAIN_JAVELIN_MAX_EXTRA_TARGETS=5;
+const CHAIN_JAVELIN_RANGE=6.8;
+const CHAIN_JAVELIN_STUN=3;
+const CHAIN_JAVELIN_BOSS_DAMAGE=.20;
+
+function createChainLightningArc(from,to,index=0){
+  const start=new THREE.Vector3(from.x,from.y+.75,from.z);
+  const end=new THREE.Vector3(to.x,to.y+.75,to.z);
+  const points=[];
+  const segments=7;
+  for(let i=0;i<=segments;i++){
+    const t=i/segments;
+    const p=start.clone().lerp(end,t);
+    if(i>0&&i<segments){
+      const jitter=(index%2?1:-1)*(.18+Math.random()*.16);
+      p.x+=(Math.random()-.5)*jitter;
+      p.y+=(Math.random()-.5)*.22;
+      p.z+=(Math.random()-.5)*jitter;
+    }
+    points.push(p);
+  }
+  const geometry=new THREE.BufferGeometry().setFromPoints(points);
+  const material=new THREE.LineBasicMaterial({
+    color:index===0?0xd8fbff:0x7bdcff,
+    transparent:true,opacity:.92,depthWrite:false,
+    blending:THREE.AdditiveBlending
+  });
+  const line=new THREE.Line(geometry,material);
+  line.renderOrder=10;
+  scene.add(line);
+  fx.push({kind:'lightning',mesh:line,life:.22,maxLife:.22});
+}
+
+function classifyChainJavelinTarget(enemy){
+  const type=enemy.userData.archetype||'walker';
+  const isBoss=type==='boss';
+  const isLarge=isBoss||type==='brute'||type==='elite'||type==='tank'||type==='giant';
+  return {type,isBoss,isLarge};
+}
+
+function applyChainJavelinDamage(enemy){
+  if(!enemy||enemy.userData.dead)return;
+  const {isBoss,isLarge}=classifyChainJavelinTarget(enemy);
+  const currentHp=Math.max(0,enemy.userData.hp||0);
+  const maxHp=Math.max(1,enemy.userData.maxHp||currentHp||1);
+
+  if(isBoss){
+    const damage=Math.min(currentHp,maxHp*CHAIN_JAVELIN_BOSS_DAMAGE);
+    applyBulletDamage(enemy,damage);
+  }else if(isLarge){
+    if(currentHp>1)applyBulletDamage(enemy,currentHp-1);
+  }else{
+    applyBulletDamage(enemy,currentHp+1);
+  }
+
+  if(!enemy.userData.dead){
+    enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,CHAIN_JAVELIN_STUN);
+    enemy.userData.shockTimer=Math.max(enemy.userData.shockTimer||0,CHAIN_JAVELIN_STUN);
+    spawnArcherSpark(enemy.position.x,enemy.position.y+.85,enemy.position.z);
+  }
+}
+
+function findNextChainJavelinTarget(current,alreadyHit){
+  let best=null;
+  let bestDist=CHAIN_JAVELIN_RANGE;
+  for(const z of zombies){
+    if(!z||z.userData.dead||z.userData.spawnPending||alreadyHit.has(z))continue;
+    const d=Math.hypot(
+      z.position.x-current.position.x,
+      z.position.z-current.position.z
+    );
+    if(d<bestDist){
+      bestDist=d;
+      best=z;
+    }
+  }
+  return best;
+}
+
+function triggerChainLightningJavelin(w){
+  if(!gameRunning||state.avatarType!=='rogue')return;
+  const primary=findAutoAimTarget(28)||findNearestEnemy(28);
+  if(!primary){
+    navigator.vibrate&&navigator.vibrate(10);
+    return;
+  }
+
+  const start=player.position.clone();
+  const hitTargets=[];
+  const seen=new Set();
+  let current=primary;
+
+  for(let jump=0;jump<=CHAIN_JAVELIN_MAX_EXTRA_TARGETS&&current;jump++){
+    seen.add(current);
+    hitTargets.push(current);
+
+    if(jump===0){
+      // Heavy javelin tracer from the Archer to the primary target.
+      createChainLightningArc(start,current.position,0);
+      spawnArcherMuzzleFan(true);
+      spawnBurst(start.x,start.y+.85,start.z,16,FX_MAT_SPARK,4.4);
+    }else{
+      const previous=hitTargets[jump-1];
+      createChainLightningArc(previous.position,current.position,jump);
+    }
+
+    applyChainJavelinDamage(current);
+    spawnBurst(current.position.x,current.position.y+.7,current.position.z,10,FX_MAT_SPARK,3.2);
+    current=findNextChainJavelinTarget(current,seen);
+  }
+
+  if(hitTargets.length){
+    triggerCombatShake(6.8,135);
+    navigator.vibrate&&navigator.vibrate([24,14,34]);
+    toast(`CHAIN JAVELIN · ${hitTargets.length} HIT${hitTargets.length===1?'':'S'}`);
+  }
+}
+
 const mirrorVolleyDecoys=[];
+const mirrorVolleyPlacements=[];
 const MIRROR_VOLLEY_DECOY_DURATION=6;
-const MIRROR_VOLLEY_POST_COOLDOWN=3;
-let mirrorVolleyActiveTimer=0;
-let mirrorVolleyPostCooldown=0;
+const MIRROR_VOLLEY_MAX_PLACEMENTS=3;
+let mirrorVolleyCooldownTimer=0;
+let mirrorVolleyCastSequence=0;
+function mirrorVolleyCooldownForLevel(level=avatarLevel()){
+  const lv=Math.max(1,level);
+  if(lv>=40)return 0;
+  if(lv>=20)return Math.max(0,1-(lv-20)/20);
+  return Math.max(1,3-(lv-1)*(2/19));
+}
 
 function clearMirrorVolleyDecoys(){
   while(mirrorVolleyDecoys.length){
     const d=mirrorVolleyDecoys.pop();
     if(d&&d.parent){scene.remove(d);disposeGroup(d);}
   }
+  mirrorVolleyPlacements.length=0;
+  mirrorVolleyCooldownTimer=0;
 }
 function tintMirrorVolleyDecoy(root){
   root.traverse(o=>{
@@ -11739,7 +11965,7 @@ function tintMirrorVolleyDecoy(root){
     o.renderOrder=6;
   });
 }
-function spawnMirrorVolleyDecoys(originX,originZ,rotationY){
+function spawnMirrorVolleyDecoys(originX,originZ,rotationY,placementId){
   getKayKitAssetPromise('rogue').then(({gltf,THREEAsset,cloneSkinned})=>{
     for(let i=0;i<2;i++){
       const wrap=new THREE.Group();
@@ -11758,6 +11984,7 @@ function spawnMirrorVolleyDecoys(originX,originZ,rotationY){
       wrap.position.set(originX+rightX*side,player?player.position.y:0,originZ+rightZ*side);
       wrap.rotation.y=rotationY;
       wrap.userData.isMirrorVolleyDecoy=true;
+      wrap.userData.mirrorVolleyPlacementId=placementId;
       wrap.userData.invincible=true;
       wrap.userData.life=MIRROR_VOLLEY_DECOY_DURATION;
       wrap.userData.attackCooldown=.12+i*.14;
@@ -11785,20 +12012,29 @@ function fireMirrorVolleyPhantom(decoy,target){
   }
 }
 function triggerMirrorVolley(w){
-  if(!gameRunning||state.avatarType!=='rogue'||mirrorVolleyActiveTimer>0||mirrorVolleyPostCooldown>0)return;
+  if(!gameRunning||state.avatarType!=='rogue'||mirrorVolleyCooldownTimer>0)return;
+  if(mirrorVolleyPlacements.length>=MIRROR_VOLLEY_MAX_PLACEMENTS){
+    toast('Mirror Volley limit · 3 active');
+    navigator.vibrate&&navigator.vibrate(8);
+    return;
+  }
+
   const origin=player.position.clone();
   const rotationY=player.rotation.y;
   const backX=-Math.sin(rotationY),backZ=-Math.cos(rotationY);
   const dashDistance=4.6;
   const targetX=THREE.MathUtils.clamp(origin.x+backX*dashDistance,-arenaSize+.9,arenaSize-.9);
   const targetZ=THREE.MathUtils.clamp(origin.z+backZ*dashDistance,-arenaSize+.9,arenaSize-.9);
+  const placementId=++mirrorVolleyCastSequence;
 
-  clearMirrorVolleyDecoys();
-  mirrorVolleyActiveTimer=MIRROR_VOLLEY_DECOY_DURATION;
-  mirrorVolleyPostCooldown=0;
-  player.userData.secondaryAttackCooldown=MIRROR_VOLLEY_DECOY_DURATION+MIRROR_VOLLEY_POST_COOLDOWN;
+  mirrorVolleyPlacements.push({
+    id:placementId,
+    life:MIRROR_VOLLEY_DECOY_DURATION
+  });
+  mirrorVolleyCooldownTimer=mirrorVolleyCooldownForLevel();
+  player.userData.secondaryAttackCooldown=mirrorVolleyCooldownTimer;
 
-  // Launch barrage before the retreat.
+  // Always works from the player's current position, even with no enemy nearby.
   [-.34,-.17,0,.17,.34].forEach(a=>{
     const phantom={...weaponForAvatar(),kind:'arrow',damage:(weaponForAvatar().damage||1)*.65,pierce:1};
     shootFromPosition(phantom,player.position,a);
@@ -11806,7 +12042,6 @@ function triggerMirrorVolley(w){
   spawnArcherMuzzleFan(true);
   spawnBurst(origin.x,origin.y+.45,origin.z,22,FX_MAT_DUST,5.2);
 
-  // Plant one internal Storm Beacon at the departure point.
   triggerCycloneSnare(origin.x,origin.y+.3,origin.z,{
     cycloneDetonated:false,
     cycloneRadius:5.8,
@@ -11814,29 +12049,36 @@ function triggerMirrorVolley(w){
     damage:Math.max(.18,(w.damage||.28)*playerStats.power)
   });
 
-  // Fast backward evasive dash.
   player.position.x=targetX;
   player.position.z=targetZ;
   spawnBurst(player.position.x,player.position.y+.5,player.position.z,18,FX_MAT_SPARK,4.2);
-  spawnMirrorVolleyDecoys(origin.x,origin.z,rotationY);
+  spawnMirrorVolleyDecoys(origin.x,origin.z,rotationY,placementId);
   navigator.vibrate&&navigator.vibrate([22,18,36]);
-  toast('MIRROR VOLLEY!');
+  toast(`MIRROR VOLLEY ${mirrorVolleyPlacements.length}/${MIRROR_VOLLEY_MAX_PLACEMENTS}`);
 }
 function updateMirrorVolley(dt){
-  if(mirrorVolleyActiveTimer>0){
-    mirrorVolleyActiveTimer=Math.max(0,mirrorVolleyActiveTimer-dt);
-    if(mirrorVolleyActiveTimer<=0){
-      clearMirrorVolleyDecoys();
-      mirrorVolleyPostCooldown=MIRROR_VOLLEY_POST_COOLDOWN;
+  if(mirrorVolleyCooldownTimer>0){
+    mirrorVolleyCooldownTimer=Math.max(0,mirrorVolleyCooldownTimer-dt);
+  }
+
+  for(let i=mirrorVolleyPlacements.length-1;i>=0;i--){
+    const placement=mirrorVolleyPlacements[i];
+    placement.life-=dt;
+    if(placement.life<=0){
+      for(let d=mirrorVolleyDecoys.length-1;d>=0;d--){
+        const decoy=mirrorVolleyDecoys[d];
+        if(decoy.userData.mirrorVolleyPlacementId===placement.id){
+          if(decoy.parent){scene.remove(decoy);disposeGroup(decoy);}
+          mirrorVolleyDecoys.splice(d,1);
+        }
+      }
+      mirrorVolleyPlacements.splice(i,1);
     }
-  }else if(mirrorVolleyPostCooldown>0){
-    mirrorVolleyPostCooldown=Math.max(0,mirrorVolleyPostCooldown-dt);
   }
 
   for(const d of [...mirrorVolleyDecoys]){
     if(!d||!d.parent)continue;
     if(d.userData.kayMixer)d.userData.kayMixer.update(dt);
-    d.userData.life=Math.max(0,(d.userData.life||0)-dt);
     d.userData.attackCooldown=Math.max(0,(d.userData.attackCooldown||0)-dt);
     let target=null,best=18*18;
     for(const z of zombies){
@@ -12220,7 +12462,7 @@ function syncShadowClones(){
   clearShadowClones();
   clearArcaneEchoes(); arcaneEchoesCooldownTimer=0; arcaneEchoesCycleDuration=15; arcaneEchoesInitialChargePending=true;
   clearArcherMirrorClones(); archerMirrorCooldownTimer=0; archerMirrorCycleDuration=15; archerMirrorInitialChargePending=true;
-  clearMirrorVolleyDecoys(); mirrorVolleyActiveTimer=0; mirrorVolleyPostCooldown=0;
+  clearMirrorVolleyDecoys(); mirrorVolleyCooldownTimer=0;
   updateHoodedHud();
   const w=weaponForAvatar();
   if(state.avatarType!=='hooded' || !player) return;
@@ -12629,7 +12871,9 @@ function update(dt){
         const attackClip=type==='brute'?'2H_Melee_Attack_Spin':'1H_Melee_Attack_Chop';
         if(z.userData.playKayClip) z.userData.playKayClip(attackClip,true,true,type==='brute'?.55:.36);
         if(type==='brute'){spawnBurst(z.position.x,z.position.y+.2,z.position.z,16,FX_MAT_SPARK,4.5);triggerCombatShake(10,150);}
-        if(target.userData&&target.userData.isArcaneEcho) destroyArcaneEcho(target); else playerTakeHit();
+        if(target.userData&&target.userData.isArcaneEcho)destroyArcaneEcho(target);
+        else if(target.userData&&target.userData.isArcherMirror)damageArcherMirrorClone(target);
+        else playerTakeHit();
       }
     });
   }
