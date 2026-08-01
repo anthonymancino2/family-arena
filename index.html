@@ -7,6 +7,8 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Family Arena</title>
+<!-- V22.10.4 Meteor Descent & Damage Reliability Fix: Cataclysm Meteor now visibly descends from the sky as a translucent 10x fireball with a readable fiery shell and trail, uses a large persistent landing telegraph, and guarantees impact damage/stun/burn inside the marked zone. -->
+<!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.3 Blizzard Range + Meteor Impact + Main Play Button Fix: Blizzard now lasts 10 seconds and covers 70% of the arena radius; Cataclysm Meteor now has guaranteed visible impact feedback and reliable damage; the main Play button is isolated above decorative overlays. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
 <!-- V22.10.1 Pause Ability Shop + Mage Ultimates: adds Resume/Restart/Rerun/Abilities/Quit pause flow; keeps stat upgrades between rounds; replaces Arcane Nova with readable Blizzard Storm ice impacts; adds Cataclysm Meteor with 10x scale, stun, burn, and 20% boss impact damage; adds localized player visibility ring/outline with no full-screen tint. -->
@@ -689,7 +691,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.3 - Blizzard + Meteor Fix';
+const GAME_VERSION='22.10.5 - Blizzard Radius + Arena Boundary';
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
 document.title = `Family Arena — V${GAME_VERSION}`;
@@ -1446,7 +1448,7 @@ const WEAPONS = {
 // Mage abilities purchased and equipped through Pause → Abilities.
 // Stats (HP, Power, Speed) remain exclusively in the between-round shop.
 const BLIZZARD_STORM = {id:'blizzard_storm', name:'Blizzard Storm', price:640,
-  desc:'Ultimate-tier battlefield control. For 10 seconds, giant ice masses rain across roughly 70% of the arena, dealing moderate damage and freezing enemies for 3 seconds. Freeze-resistant enemies are heavily slowed instead. Effects stay localized and readable—no blinding white screen.'};
+  desc:'Ultimate-tier battlefield control. For 10 seconds, giant ice masses rain across almost the entire playable arena. Its gameplay radius is five times larger than before, while impacts are kept inside the real map boundary. Moderate damage; normal enemies freeze for 3 seconds and resistant enemies are heavily slowed. No blinding white screen.'};
 const CATACLYSM_METEOR = {id:'cataclysm_meteor', name:'Cataclysm Meteor', price:900,
   desc:'Ultimate-tier burst attack. One colossal meteor—about 10× Giant Fireball size—descends slowly, then deals huge area damage, stuns for 3 seconds, and burns for 5 seconds. Boss impact damage is capped at 20% of max HP.'};
 // Boss Killer: hold to channel a piercing beam of massive sustained
@@ -1466,6 +1468,7 @@ const CAM_LABELS = {1:'POV', 2:'Close', 3:'Far', 4:'Wide', 5:'Wider',
 let BULLET_GEO, BULLET_MAT, MUZZLE_GEO, MUZZLE_MAT, FX_GEO, FX_MAT_ZOMBIE, FX_MAT_DUST, FX_MAT_SPARK, FX_MAT_SHADOW, FX_MAT_ENEMY_SHOT;
 let fx = [];
 let groundMat = null;
+let arenaBoundaryGroup = null;
 let hemiLight = null, sunLight = null;
 let GROUND_TEX, OBSTACLE_TEX, TRUNK_TEX, ROCK_TEX, PAVER_TEX, skyTex = null;
 let AO_TEX, AO_GEO;
@@ -6935,6 +6938,49 @@ function buildSandstoneBuilding(){
   return g;
 }
 
+// Visible gameplay boundary. This sits at the exact same radius used by
+// player collision (arenaSize - 1), so the art never promises walkable
+// space that the movement system refuses to enter.
+function buildArenaBoundary(){
+  if(arenaBoundaryGroup){ scene.remove(arenaBoundaryGroup); }
+  const g=new THREE.Group();
+  const collisionR=arenaSize-1;
+  const curbMat=new THREE.MeshLambertMaterial({
+    color:0x4b5661, flatShading:true, transparent:true, opacity:.92
+  });
+  const edgeMat=new THREE.MeshBasicMaterial({
+    color:0xf4df93, transparent:true, opacity:.78, depthWrite:false,
+    side:THREE.DoubleSide, blending:THREE.NormalBlending
+  });
+  const shadowMat=new THREE.MeshBasicMaterial({
+    color:0x111820, transparent:true, opacity:.26, depthWrite:false,
+    side:THREE.DoubleSide
+  });
+
+  // A low physical-looking curb marks the exact stop line without blocking sight.
+  const curb=new THREE.Mesh(new THREE.TorusGeometry(collisionR,.18,6,128),curbMat);
+  curb.rotation.x=Math.PI/2; curb.position.y=.12; curb.receiveShadow=true; g.add(curb);
+
+  // Narrow inside stripe makes the boundary readable from bird's-eye view.
+  const stripe=new THREE.Mesh(new THREE.RingGeometry(collisionR-.34,collisionR-.10,128),edgeMat);
+  stripe.rotation.x=-Math.PI/2; stripe.position.y=.035; g.add(stripe);
+
+  // Slight dark lip outside the collision line visually closes the map edge.
+  const lip=new THREE.Mesh(new THREE.RingGeometry(collisionR+.10,collisionR+.72,128),shadowMat);
+  lip.rotation.x=-Math.PI/2; lip.position.y=.02; g.add(lip);
+
+  // Sparse boundary stones reinforce depth at low camera angles while keeping exits readable.
+  for(let i=0;i<32;i++){
+    const a=i*Math.PI*2/32;
+    const post=new THREE.Mesh(new THREE.CylinderGeometry(.11,.15,.42,6),curbMat);
+    post.position.set(Math.cos(a)*collisionR,.21,Math.sin(a)*collisionR);
+    post.rotation.y=-a; g.add(post);
+  }
+  arenaBoundaryGroup=g;
+  scene.add(g);
+  return g;
+}
+
 // Enclosing perimeter wall with crenellations and buttress pillars —
 // turns the open plain into a walled courtyard like the reference maps.
 function buildPerimeterWall(cfg){
@@ -7361,6 +7407,7 @@ function initEngine(){
   ground.rotation.x = -Math.PI/2;
   ground.receiveShadow = true;
   scene.add(ground);
+  buildArenaBoundary();
 
   buildObstacles(0xbfe8f5);
 
@@ -9513,10 +9560,14 @@ function setupControls(){
     if(e) e.preventDefault();
     if(equippedAbilityId==='arcane_laser') stopArcaneLaser();
   };
-  novaBtnEl.addEventListener('touchstart',beginEquippedAbility);
-  novaBtnEl.addEventListener('touchend',endEquippedAbility);
-  novaBtnEl.addEventListener('touchcancel',endEquippedAbility);
+  novaBtnEl.addEventListener('touchstart',beginEquippedAbility,{passive:false});
+  novaBtnEl.addEventListener('touchend',endEquippedAbility,{passive:false});
+  novaBtnEl.addEventListener('touchcancel',endEquippedAbility,{passive:false});
   novaBtnEl.addEventListener('mousedown',beginEquippedAbility);
+  novaBtnEl.addEventListener('click',e=>{
+    e.preventDefault();
+    if(equippedAbilityId==='cataclysm_meteor'&&!fallingCataclysm&&novaCooldownTimer<=0)triggerCataclysmMeteor();
+  });
   window.addEventListener('mouseup',endEquippedAbility);
   const laserBtnEl=document.getElementById('laserBtn');
   laserBtnEl.classList.add('hidden');
@@ -10532,7 +10583,7 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
 // ---------------------------------------------------------------------
 const MAGE_ULTIMATE_COOLDOWN=16;
 const BLIZZARD_DURATION=10, BLIZZARD_FREEZE=3, BLIZZARD_IMPACT_RADIUS=2.65;
-function blizzardRadius(){ return Math.max(23, arenaSize*.70); }
+function blizzardRadius(){ return Math.max(115, arenaSize*3.85); } // five-times-larger than the previous ~23-unit radius
 let novaCooldownTimer=0, novaSpeedBoostTimer=0;
 let blizzardActiveTimer=0, blizzardSpawnTimer=0, blizzardCenter=new THREE.Vector3();
 let fallingIce=[];
@@ -10549,8 +10600,10 @@ function makeIceMeteorMesh(radius=1.05){
   return mesh;
 }
 function spawnFallingIce(){
-  const a=Math.random()*Math.PI*2, r=Math.sqrt(Math.random())*blizzardRadius();
-  const x=blizzardCenter.x+Math.cos(a)*r, z=blizzardCenter.z+Math.sin(a)*r;
+  // The effect radius is intentionally huge, but impacts must land on the actual map.
+  // Sample the playable disk directly so none of the storm's spectacle is wasted off-map.
+  const a=Math.random()*Math.PI*2, r=Math.sqrt(Math.random())*(arenaSize-2.2);
+  const x=Math.cos(a)*r, z=Math.sin(a)*r;
   const mesh=makeIceMeteorMesh(.85+Math.random()*.45);
   mesh.position.set(x,10+Math.random()*4,z); mesh.rotation.set(Math.random()*2,Math.random()*2,Math.random()*2);
   scene.add(mesh);
@@ -10581,8 +10634,8 @@ function triggerBlizzardStorm(){
   novaCooldownTimer=MAGE_ULTIMATE_COOLDOWN; abilityButtonCooldown();
   blizzardActiveTimer=BLIZZARD_DURATION; blizzardSpawnTimer=0; blizzardCenter.copy(player.position);
   const radius=blizzardRadius();
-  spawnArcaneSigil(blizzardCenter.x,.03,blizzardCenter.z,radius);
-  spawnArcaneRuneBurst(blizzardCenter,radius*.55);
+  spawnArcaneSigil(0,.03,0,arenaSize-1.2);
+  spawnArcaneRuneBurst(new THREE.Vector3(0,0,0),(arenaSize-1.2)*.72);
   triggerCombatShake(5,180);navigator.vibrate&&navigator.vibrate([35,25,55]);toast('BLIZZARD STORM!');
 }
 function triggerCataclysmMeteor(){
@@ -10590,15 +10643,47 @@ function triggerCataclysmMeteor(){
   novaCooldownTimer=MAGE_ULTIMATE_COOLDOWN; abilityButtonCooldown();
   const target=nearestLivingZombie();
   const x=target?target.position.x:player.position.x, z=target?target.position.z:player.position.z;
-  const mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(5.2,2),new THREE.MeshStandardMaterial({color:0x5c1608,emissive:0xff4a12,roughness:.6,metalness:.05}));
-  mesh.position.set(x,25,z);mesh.castShadow=true;scene.add(mesh);
-  const ring=new THREE.Mesh(new THREE.RingGeometry(6.5,8.5,48),new THREE.MeshBasicMaterial({color:0xff5b22,transparent:true,opacity:.62,side:THREE.DoubleSide,depthWrite:false}));
-  ring.rotation.x=-Math.PI/2;ring.position.set(x,.04,z);scene.add(ring);
-  fallingCataclysm={mesh,ring,x,z,time:2.65,total:2.65};
-  toast('CATACLYSM METEOR!');navigator.vibrate&&navigator.vibrate(45);
+
+  // A readable 10x meteor: translucent enough to see the player/enemies through it,
+  // but with an opaque fiery shell so it still clearly reads as a meteor.
+  const mesh=new THREE.Group();
+  const body=new THREE.Mesh(
+    new THREE.IcosahedronGeometry(5.2,2),
+    new THREE.MeshBasicMaterial({color:0xff5a18,transparent:true,opacity:.66,depthWrite:false})
+  );
+  const shell=new THREE.Mesh(
+    new THREE.IcosahedronGeometry(5.45,1),
+    new THREE.MeshBasicMaterial({color:0xffc04a,wireframe:true,transparent:true,opacity:.82,depthWrite:false})
+  );
+  const core=new THREE.Mesh(
+    new THREE.SphereGeometry(3.15,18,12),
+    new THREE.MeshBasicMaterial({color:0x7a1608,transparent:true,opacity:.48,depthWrite:false})
+  );
+  mesh.add(body,core,shell);
+  for(let i=0;i<5;i++){
+    const tail=new THREE.Mesh(
+      new THREE.ConeGeometry(1.25+i*.24,5.5+i*1.25,12,1,true),
+      new THREE.MeshBasicMaterial({color:i%2?0xff7a20:0xffd05a,transparent:true,opacity:.34-i*.035,depthWrite:false,side:THREE.DoubleSide})
+    );
+    tail.rotation.x=Math.PI;
+    tail.position.set((Math.random()-.5)*2.2,5.8+i*2.4,(Math.random()-.5)*2.2);
+    mesh.add(tail);
+  }
+  mesh.position.set(x,21,z);mesh.scale.setScalar(.52);scene.add(mesh);
+
+  const telegraph=new THREE.Group();
+  const ring=new THREE.Mesh(new THREE.RingGeometry(10.6,12.2,64),new THREE.MeshBasicMaterial({color:0xff5b22,transparent:true,opacity:.78,side:THREE.DoubleSide,depthWrite:false}));
+  ring.rotation.x=-Math.PI/2;ring.position.y=.045;telegraph.add(ring);
+  const fill=new THREE.Mesh(new THREE.CircleGeometry(10.6,64),new THREE.MeshBasicMaterial({color:0xff7a20,transparent:true,opacity:.13,side:THREE.DoubleSide,depthWrite:false}));
+  fill.rotation.x=-Math.PI/2;fill.position.y=.035;telegraph.add(fill);
+  telegraph.position.set(x,0,z);scene.add(telegraph);
+
+  fallingCataclysm={mesh,ring:telegraph,x,z,time:3,total:3,startY:21,endY:.9};
+  spawnArcaneRuneBurst(new THREE.Vector3(x,.05,z),7.5);
+  toast('CATACLYSM METEOR INCOMING!');navigator.vibrate&&navigator.vibrate([45,30,45]);
 }
 function impactCataclysm(m){
-  const radius=12;
+  const radius=12.2;
   // Dedicated, readable impact spectacle: bright core, two expanding fire rings,
   // debris bursts, and a strong but brief shake. No full-screen tint.
   const impactGroup=new THREE.Group();
@@ -10645,7 +10730,31 @@ function updateMageUltimates(dt){
     if(blizzardSpawnTimer<=0){blizzardSpawnTimer=.52;spawnFallingIce();spawnFallingIce();}
   }
   for(let i=fallingIce.length-1;i>=0;i--){const m=fallingIce[i];m.life-=dt;m.mesh.position.y-=m.vy*dt;m.mesh.rotation.x+=dt*2.4;m.mesh.rotation.z+=dt*1.7;m.ring.material.opacity=Math.max(.15,m.life*.58);if(m.mesh.position.y<=.55||m.life<=0){impactIce(m);scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);fallingIce.splice(i,1);}}
-  if(fallingCataclysm){const m=fallingCataclysm;m.time-=dt;const p=1-Math.max(0,m.time)/m.total;m.mesh.position.y=25-(24.2*p);m.mesh.rotation.x+=dt*.7;m.mesh.rotation.z+=dt*.45;m.ring.material.opacity=.35+.3*Math.sin(p*Math.PI);if(m.time<=0){impactCataclysm(m);scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);fallingCataclysm=null;}}
+  if(fallingCataclysm){
+    const m=fallingCataclysm;
+    m.time-=dt;
+    const p=1-Math.max(0,m.time)/m.total;
+    const eased=p*p*(3-2*p);
+    m.mesh.position.y=m.startY+(m.endY-m.startY)*eased;
+    const scale=.52+eased*.48;
+    m.mesh.scale.setScalar(scale);
+    m.mesh.rotation.x+=dt*.42;
+    m.mesh.rotation.y+=dt*.55;
+    m.mesh.rotation.z+=dt*.26;
+    if(m.ring&&m.ring.children){
+      const pulse=.62+.25*Math.sin(p*Math.PI*6);
+      if(m.ring.children[0]&&m.ring.children[0].material)m.ring.children[0].material.opacity=pulse;
+      if(m.ring.children[1]&&m.ring.children[1].material)m.ring.children[1].material.opacity=.10+.09*p;
+      m.ring.scale.setScalar(.92+.08*p);
+    }
+    if(Math.random()<dt*20)spawnBurst(m.mesh.position.x,m.mesh.position.y-3,m.mesh.position.z,2,FX_MAT_SPARK,2.4);
+    if(m.time<=0){
+      impactCataclysm(m);
+      scene.remove(m.mesh);disposeGroup(m.mesh);
+      scene.remove(m.ring);disposeGroup(m.ring);
+      fallingCataclysm=null;
+    }
+  }
   for(const z of [...zombies]){
     if(z.userData.dead)continue;
     if((z.userData.slowTimer||0)>0){z.userData.slowTimer=Math.max(0,z.userData.slowTimer-dt);if(z.userData.slowTimer<=0)z.userData.slowMult=1;}
@@ -11455,8 +11564,9 @@ function update(dt){
 
   // clamp to arena
   const r = Math.hypot(player.position.x, player.position.z);
-  if(r > arenaSize-1){
-    const k = (arenaSize-1)/r;
+  const playableR = arenaSize-1.18; // stops just inside the visible curb instead of inside an invisible wall
+  if(r > playableR){
+    const k = playableR/r;
     player.position.x *= k; player.position.z *= k;
   }
 
