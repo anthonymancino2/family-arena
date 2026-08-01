@@ -1,4 +1,8 @@
 <!DOCTYPE html>
+<!-- V22.10.21 Tempest Archer Phase 7: stabilizes the Archer kit. Prevents pierced arrows from repeatedly hitting the same enemy, fixes Cyclone Snare power scaling, removes duplicate mobile Ability events, makes single-shot secondaries fire once per press, and adds live Tempest Domain active/cooldown HUD feedback. -->
+<!-- V22.10.20 Tempest Archer Phase 6: adds Tempest Domain as the Archer's first equipable ultimate-tier ability. For 8 seconds a large mobile wind field follows the Archer, repeatedly damages, pulls, and slows nearby enemies. It uses the shared Ability button, has a 22-second cooldown, remains readable, and clears at round end. -->
+<!-- V22.10.19 Tempest Archer Phase 5: adds Cyclone Snare Arrow, a crowd-control secondary that detonates into a readable wind trap, lightly damages nearby enemies, pulls them inward, heavily slows them for 4 seconds, and briefly stuns normal enemies. -->
+<!-- V22.10.18 Tempest Archer Phase 4: adds Gale Drill Arrow as the Archer's first new purchasable secondary attack. The oversized spinning wind arrow pierces a crowd, uses a wider swept hitbox, and delivers strong knockback with localized readable effects. -->
 <!-- V22.10.17 Tempest Archer Phase 3: improves forward target selection, adds swept arrow collision for fast targets and low frame rates, strengthens localized arrow-hit feedback, and tightens bow-facing/shot animation without changing other avatars. -->
 <!-- V22.10.16 Tempest Archer Phase 2: adds the Tailwind kill passive. Every fifth defeat grants 3 seconds of faster movement and firing, with HUD progress and localized wind feedback. Existing Archer weapons, Arrow Storm, and all other avatars remain intact. -->
 <!-- V22.10.15 Tempest Archer Phase 1: begins the next-avatar pass after Mage stabilization. Gives the Archer a clear speed-focused stat identity, keeps Eagle Eye projectile bonuses active, and updates roster/passive text without altering the completed Mage, Knight, Barbarian, or Shadow Rogue systems. -->
@@ -10,7 +14,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.10</title>
+<title>Family Arena V22.10.21</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -687,7 +691,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.17 - Tempest Archer Phase 3';
+const GAME_VERSION='22.10.21 - Tempest Archer Phase 7';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1362,6 +1366,10 @@ const CHARACTER_COMBAT = {
         desc:'Hold FIRE to launch arrows like an Uzi.'},
       multi_arrow:{name:'Fan of Arrows', price:330, kind:'multi_arrow', cooldown:0.31, damage:0.90, pierce:1, auto:true, fireRateCap:2,
         desc:'Fires four arrows in a wide arc. Hold FIRE to continue.'},
+      gale_drill_arrow:{name:'Gale Drill Arrow', price:430, kind:'gale_drill_arrow', cooldown:0.82, damage:2.45, pierce:6, auto:false,
+        desc:'Launches one oversized spinning wind arrow through a crowd. Wide hitbox, heavy knockback, and up to seven enemy hits.'},
+      cyclone_snare_arrow:{name:'Cyclone Snare Arrow', price:470, kind:'cyclone_snare_arrow', cooldown:3.8, damage:0.85, pierce:0, auto:false,
+        desc:'Detonates into a wide wind trap that pulls enemies inward, heavily slows them for 4 seconds, and briefly stuns normal enemies.'},
       rocket_arrow:{name:'Phoenix Arrows', price:500, kind:'rocket_arrow', cooldown:0.42, damage:2.2, splash:3.4, splashMult:2, pierce:0, auto:true,
         desc:'Explodes on impact. Nearby zombies take double splash damage.'}
     }
@@ -1475,6 +1483,8 @@ const BLIZZARD_STORM = {id:'blizzard_storm', name:'Blizzard Storm', price:640,
 // when idle — weak against crowds, built to melt one tough target.
 const ARCANE_LASER = {id:'arcane_laser', name:'Arcane Laser', price:760,
   desc:'Hold to channel a piercing beam of massive sustained damage into whatever you\'re aimed at — the dedicated way to burn down a Brute or Boss. Pierces the crowd behind your target for lighter damage. Drains a charge meter that refills when you let go.'};
+const TEMPEST_DOMAIN = {id:'tempest_domain', name:'Tempest Domain', price:720,
+  desc:'Ultimate-tier crowd control. For 8 seconds, a large wind field follows the Archer, repeatedly damaging, pulling, and heavily slowing enemies inside it. Uses a 22-second cooldown and never covers the screen.'};
 // Coins earned per kill — a flat rate that inches up in later rounds so
 // the pricier weapons stay reachable in a long run.
 function tokensPerKill(){ return 5 + Math.floor(round/5); }
@@ -9356,8 +9366,10 @@ function renderShopList(){
     const swatch = document.createElement('div');
     swatch.className = 'weaponSwatch';
     swatch.style.background = w.kind.includes('fire') ? '#ff7a3d'
+      : (w.kind==='gale_drill_arrow' ? '#67f0ff'
+      : (w.kind==='cyclone_snare_arrow' ? '#63ffd1'
       : (w.kind.includes('element') || w.kind==='arcane_lance' ? '#78d8ff'
-      : (w.kind.includes('arrow') ? '#d9b36c' : '#b88cff'));
+      : (w.kind.includes('arrow') ? '#d9b36c' : '#b88cff'))));
     const info = document.createElement('div');
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${w.name}</div><div class="wDesc">${w.desc}</div>`;
@@ -9385,7 +9397,7 @@ function renderShopList(){
 // Mage abilities use one mutually-exclusive loadout slot. The shared HUD
 // button remains in the approved position directly left of FIRE. Buying
 // an ability equips it immediately; owned abilities can be swapped here.
-const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER] };
+const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER], rogue:[TEMPEST_DOMAIN] };
 function renderAbilityShopList(list){
   const abilities = HERO_ABILITIES[state.avatarType];
   if(!abilities || !abilities.length) return;
@@ -9401,7 +9413,7 @@ function renderAbilityShopList(list){
     row.className = 'weaponRow' + (equipped ? ' equipped' : '');
     const swatch = document.createElement('div');
     swatch.className = 'weaponSwatch';
-    swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : '#75dfff';
+    swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : (a.id==='tempest_domain' ? '#63ffd1' : '#75dfff');
     const info = document.createElement('div');
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${a.name}</div><div class="wDesc">${a.desc}</div>`;
@@ -9527,41 +9539,55 @@ function setupControls(){
   });
 
   let autoFireInterval = null;
-  document.getElementById('actBtn').addEventListener('touchstart', e=>{
-    e.preventDefault();
+  const actBtnEl=document.getElementById('actBtn');
+  const beginPrimaryFire=e=>{
+    if(e){e.preventDefault();e.stopPropagation();}
     doShoot();
-    // Mage casting is always hold-to-attack, including the default spell.
-    // Existing automatic weapons keep their hold behavior too. The rapid
-    // retry only asks doShoot() to fire; the weapon cooldown remains the
-    // authority, so holding cannot exceed the intended attack speed.
-    if(true){
-      clearInterval(autoFireInterval);
-      autoFireInterval = setInterval(doShoot, 40);
-    }
-  });
-  document.getElementById('actBtn').addEventListener('touchend', e=>{
-    e.preventDefault();
     clearInterval(autoFireInterval);
-    autoFireInterval = null;
-  });
-  document.getElementById('actBtn').addEventListener('touchcancel', ()=>{
+    autoFireInterval=setInterval(doShoot,40);
+  };
+  const endPrimaryFire=e=>{
+    if(e)e.preventDefault();
     clearInterval(autoFireInterval);
-    autoFireInterval = null;
-  });
+    autoFireInterval=null;
+  };
+  if(window.PointerEvent){
+    actBtnEl.addEventListener('pointerdown',beginPrimaryFire,{passive:false});
+    actBtnEl.addEventListener('pointerup',endPrimaryFire,{passive:false});
+    actBtnEl.addEventListener('pointercancel',endPrimaryFire,{passive:false});
+    actBtnEl.addEventListener('pointerleave',endPrimaryFire,{passive:false});
+  }else{
+    actBtnEl.addEventListener('touchstart',beginPrimaryFire,{passive:false});
+    actBtnEl.addEventListener('touchend',endPrimaryFire,{passive:false});
+    actBtnEl.addEventListener('touchcancel',endPrimaryFire,{passive:false});
+  }
+
   let secondaryFireInterval=null;
-  document.getElementById('secondaryBtn').addEventListener('touchstart', e=>{
-    e.preventDefault();
-    if(!secondaryWeaponForAvatar()){ navigator.vibrate&&navigator.vibrate(12); return; }
+  const secondaryBtnEl=document.getElementById('secondaryBtn');
+  const beginSecondaryFire=e=>{
+    if(e){e.preventDefault();e.stopPropagation();}
+    const w=secondaryWeaponForAvatar();
+    if(!w){navigator.vibrate&&navigator.vibrate(12);return;}
     doSecondaryShoot();
     clearInterval(secondaryFireInterval);
-    secondaryFireInterval=setInterval(doSecondaryShoot,40);
-  });
-  document.getElementById('secondaryBtn').addEventListener('touchend', e=>{
-    e.preventDefault(); clearInterval(secondaryFireInterval); secondaryFireInterval=null;
-  });
-  document.getElementById('secondaryBtn').addEventListener('touchcancel', ()=>{
-    clearInterval(secondaryFireInterval); secondaryFireInterval=null;
-  });
+    // Heavy/special secondaries fire once per press. Automatic secondaries may be held.
+    if(w.auto)secondaryFireInterval=setInterval(doSecondaryShoot,40);
+  };
+  const endSecondaryFire=e=>{
+    if(e)e.preventDefault();
+    clearInterval(secondaryFireInterval);
+    secondaryFireInterval=null;
+  };
+  if(window.PointerEvent){
+    secondaryBtnEl.addEventListener('pointerdown',beginSecondaryFire,{passive:false});
+    secondaryBtnEl.addEventListener('pointerup',endSecondaryFire,{passive:false});
+    secondaryBtnEl.addEventListener('pointercancel',endSecondaryFire,{passive:false});
+    secondaryBtnEl.addEventListener('pointerleave',endSecondaryFire,{passive:false});
+  }else{
+    secondaryBtnEl.addEventListener('touchstart',beginSecondaryFire,{passive:false});
+    secondaryBtnEl.addEventListener('touchend',endSecondaryFire,{passive:false});
+    secondaryBtnEl.addEventListener('touchcancel',endSecondaryFire,{passive:false});
+  }
   const jumpBtnEl = document.getElementById('jumpBtn');
   jumpBtnEl.addEventListener('touchstart', e=>{ e.preventDefault(); doJump(); });
   document.getElementById('lookFwdBtn').addEventListener('touchstart', e=>{
@@ -9586,17 +9612,22 @@ function setupControls(){
     e.preventDefault();
     if(equippedAbilityId==='arcane_laser') startArcaneLaser();
     else if(equippedAbilityId==='blizzard_storm') triggerBlizzardStorm();
+    else if(equippedAbilityId==='tempest_domain') triggerTempestDomain();
   };
   const endEquippedAbility=e=>{
     if(e) e.preventDefault();
     if(equippedAbilityId==='arcane_laser') stopArcaneLaser();
   };
-  abilityBtnEl.addEventListener('pointerdown',beginEquippedAbility,{passive:false});
-  abilityBtnEl.addEventListener('pointerup',endEquippedAbility,{passive:false});
-  abilityBtnEl.addEventListener('pointercancel',endEquippedAbility,{passive:false});
-  abilityBtnEl.addEventListener('touchstart',beginEquippedAbility,{passive:false});
-  abilityBtnEl.addEventListener('touchend',endEquippedAbility,{passive:false});
-  abilityBtnEl.addEventListener('touchcancel',endEquippedAbility,{passive:false});
+  if(window.PointerEvent){
+    abilityBtnEl.addEventListener('pointerdown',beginEquippedAbility,{passive:false});
+    abilityBtnEl.addEventListener('pointerup',endEquippedAbility,{passive:false});
+    abilityBtnEl.addEventListener('pointercancel',endEquippedAbility,{passive:false});
+    abilityBtnEl.addEventListener('pointerleave',endEquippedAbility,{passive:false});
+  }else{
+    abilityBtnEl.addEventListener('touchstart',beginEquippedAbility,{passive:false});
+    abilityBtnEl.addEventListener('touchend',endEquippedAbility,{passive:false});
+    abilityBtnEl.addEventListener('touchcancel',endEquippedAbility,{passive:false});
+  }
   window.addEventListener('mouseup',endEquippedAbility);
   const laserBtnEl=document.getElementById('laserBtn');
   laserBtnEl.classList.add('hidden');
@@ -10078,7 +10109,8 @@ function fireBullet(dx, dy, dz, startX, startY, startZ, weapon){
     damage:dmg, splash:weapon.splash||0,
     pulse:Math.random()*Math.PI*2, ricochets:weapon.kind==='star'?1:0,
     prevX:startX, prevY:startY, prevZ:startZ,
-    isArcherArrow:state.avatarType==='rogue' && String(weapon.kind||'').includes('arrow')
+    isArcherArrow:state.avatarType==='rogue' && String(weapon.kind||'').includes('arrow'),
+    hitEnemies:new Set()
   });
 }
 
@@ -10152,15 +10184,26 @@ function updateHoodedHud(){
   }
   const abilityBtn=document.getElementById('abilityBtn');
   if(abilityBtn){
-    const equipped = isMage && equippedAbilityId && ownedAbilities[equippedAbilityId];
+    const supportsAbility = isMage || isArcher;
+    const equipped = supportsAbility && equippedAbilityId && ownedAbilities[equippedAbilityId];
     const laserMode = equippedAbilityId==='arcane_laser';
     abilityBtn.classList.toggle('hidden', !equipped);
     abilityBtn.classList.toggle('laserMode', !!equipped && laserMode);
     if(equipped){
-      abilityBtn.textContent = laserMode ? 'LASER' : 'BLIZZARD';
+      if(laserMode){
+        abilityBtn.textContent='LASER';
+      }else if(equippedAbilityId==='tempest_domain'){
+        abilityBtn.textContent=tempestDomainActiveTimer>0
+          ? `TEMPEST ${tempestDomainActiveTimer.toFixed(1)}`
+          : (tempestDomainCooldownTimer>0 ? `TEMPEST ${Math.ceil(tempestDomainCooldownTimer)}` : 'TEMPEST');
+        abilityBtn.classList.toggle('active',tempestDomainActiveTimer>0);
+        abilityBtn.classList.toggle('cooling',tempestDomainCooldownTimer>0&&tempestDomainActiveTimer<=0);
+      }else{
+        abilityBtn.textContent='BLIZZARD';
+      }
       if(!laserMode){
         abilityBtn.style.removeProperty('--charge');
-        abilityBtn.classList.remove('empty','active');
+        if(equippedAbilityId!=='tempest_domain')abilityBtn.classList.remove('empty','active');
       }
     }
   }
@@ -10587,6 +10630,102 @@ function spawnChainLightning(origin,maxTargets=7,damage=1.4){
 }
 
 // ---------------------------------------------------------------------
+// Tempest Archer equipable ultimate-tier ability.
+// A large mobile control field follows the Archer without using a screen tint.
+// ---------------------------------------------------------------------
+const TEMPEST_DOMAIN_COOLDOWN=22;
+const TEMPEST_DOMAIN_DURATION=8;
+function tempestDomainRadius(){ return Math.max(8.5,Math.min(13,arenaSize*.30)); }
+let tempestDomainCooldownTimer=0;
+let tempestDomainActiveTimer=0;
+let tempestDomainPulseTimer=0;
+let tempestDomainFx=null;
+
+function createTempestDomainFx(){
+  const radius=tempestDomainRadius();
+  const g=new THREE.Group();
+  const outerMat=new THREE.MeshBasicMaterial({color:0x63ffd1,transparent:true,opacity:.34,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const outer=new THREE.Mesh(new THREE.RingGeometry(radius*.90,radius,72),outerMat);
+  outer.rotation.x=-Math.PI/2;outer.position.y=.055;outer.userData.baseOpacity=.34;g.add(outer);
+  const innerMat=new THREE.MeshBasicMaterial({color:0x67dfff,transparent:true,opacity:.16,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  for(let i=0;i<3;i++){
+    const ring=new THREE.Mesh(new THREE.RingGeometry(radius*(.24+i*.20),radius*(.27+i*.20),64),innerMat.clone());
+    ring.rotation.x=-Math.PI/2;ring.position.y=.045+i*.012;ring.rotation.z=i*.7;ring.userData.baseOpacity=.16;g.add(ring);
+  }
+  for(let i=0;i<12;i++){
+    const streak=new THREE.Mesh(new THREE.PlaneGeometry(.07,1.65),outerMat.clone());
+    const a=i*Math.PI/6;
+    streak.rotation.x=-Math.PI/2;streak.rotation.z=a+.35;
+    streak.position.set(Math.sin(a)*radius*.72,.09,Math.cos(a)*radius*.72);
+    streak.userData.baseOpacity=.24;g.add(streak);
+  }
+  scene.add(g);
+  return g;
+}
+function triggerTempestDomain(){
+  if(!gameRunning||state.avatarType!=='rogue'||equippedAbilityId!=='tempest_domain'||!ownedAbilities.tempest_domain)return;
+  if(tempestDomainActiveTimer>0){navigator.vibrate&&navigator.vibrate(8);return;}
+  if(tempestDomainCooldownTimer>0){toast(`Tempest recharging · ${Math.ceil(tempestDomainCooldownTimer)}s`);return;}
+  tempestDomainCooldownTimer=TEMPEST_DOMAIN_COOLDOWN;
+  abilityButtonCooldown(TEMPEST_DOMAIN_COOLDOWN);
+  tempestDomainActiveTimer=TEMPEST_DOMAIN_DURATION;
+  tempestDomainPulseTimer=0;
+  if(tempestDomainFx){scene.remove(tempestDomainFx);disposeGroup(tempestDomainFx);}
+  tempestDomainFx=createTempestDomainFx();
+  tempestDomainFx.position.copy(player.position);
+  spawnArcherMuzzleFan(true);
+  spawnBurst(player.position.x,player.position.y+.4,player.position.z,26,FX_MAT_DUST,6);
+  triggerCombatShake(7,180);
+  navigator.vibrate&&navigator.vibrate([35,25,60]);
+  toast('TEMPEST DOMAIN!');
+}
+function clearTempestDomain(resetCooldown=true){
+  tempestDomainActiveTimer=0;tempestDomainPulseTimer=0;
+  if(tempestDomainFx){scene.remove(tempestDomainFx);disposeGroup(tempestDomainFx);tempestDomainFx=null;}
+  if(resetCooldown)tempestDomainCooldownTimer=0;
+  updateHoodedHud();
+}
+function updateTempestDomain(dt){
+  if(tempestDomainCooldownTimer>0)tempestDomainCooldownTimer=Math.max(0,tempestDomainCooldownTimer-dt);
+  if(state.avatarType==='rogue'&&equippedAbilityId==='tempest_domain')updateHoodedHud();
+  if(tempestDomainActiveTimer<=0)return;
+  tempestDomainActiveTimer=Math.max(0,tempestDomainActiveTimer-dt);
+  if(!player){clearTempestDomain(false);return;}
+  if(tempestDomainFx){
+    tempestDomainFx.position.copy(player.position);
+    tempestDomainFx.rotation.y+=dt*2.7;
+    const q=Math.max(0,tempestDomainActiveTimer/TEMPEST_DOMAIN_DURATION);
+    tempestDomainFx.traverse(o=>{if(o.material)o.material.opacity=(o.userData.baseOpacity||.2)*Math.min(1,q*3);});
+  }
+  tempestDomainPulseTimer-=dt;
+  if(tempestDomainPulseTimer<=0){
+    tempestDomainPulseTimer=.48;
+    const radius=tempestDomainRadius();
+    let affected=0;
+    for(const enemy of [...zombies]){
+      if(enemy.userData.dead)continue;
+      const dx=enemy.position.x-player.position.x,dz=enemy.position.z-player.position.z;
+      const dist=Math.hypot(dx,dz);
+      if(dist>radius)continue;
+      affected++;
+      const type=enemy.userData.archetype||'walker';
+      applyBulletDamage(enemy,.52*playerStats.power);
+      if(enemy.userData.dead)continue;
+      const dl=dist||1;
+      const pull=Math.max(.7,2.7*(1-dist/radius));
+      enemy.userData.knockbackX=(-dx/dl)*pull;
+      enemy.userData.knockbackZ=(-dz/dl)*pull;
+      enemy.userData.slowTimer=Math.max(enemy.userData.slowTimer||0,.85);
+      enemy.userData.slowMult=Math.min(enemy.userData.slowMult||1,type==='boss'?.62:(type==='brute'?.45:.32));
+      if(type!=='boss'&&type!=='brute')enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,.14);
+      if(Math.random()<.36)spawnArcherSpark(enemy.position.x,enemy.position.y+.65,enemy.position.z);
+    }
+    if(affected)spawnBurst(player.position.x,player.position.y+.15,player.position.z,7,FX_MAT_DUST,4.4);
+  }
+  if(tempestDomainActiveTimer<=0)clearTempestDomain(false);
+}
+
+// ---------------------------------------------------------------------
 // Mage ultimate-tier abilities. Both use the shared ability HUD slot.
 // Visual rule: local spectacle only—never apply a full-screen color tint.
 // ---------------------------------------------------------------------
@@ -10649,6 +10788,7 @@ function triggerBlizzardStorm(){
 }
 
 function clearMageRoundSpecials(resetCooldowns=true){
+  clearTempestDomain(resetCooldowns);
   blizzardActiveTimer=0;blizzardSpawnTimer=0;blizzardDamageTimer=0;
   for(const m of fallingIce){scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);} fallingIce=[];
   if(typeof stopArcaneLaser==='function')stopArcaneLaser();
@@ -10958,6 +11098,8 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
       w.kind==='primal_wave'?0xff5622:
       w.kind==='holy_wave'?0xffd04a:
       w.kind==='rocket_arrow'||w.kind==='giant_fireball'?0xff6b32:
+      w.kind==='gale_drill_arrow'?0x67f0ff:
+      w.kind==='cyclone_snare_arrow'?0x63ffd1:
       w.kind==='elemental'?(mageElementToggle?0x66d9ff:0xff723d):
       w.kind==='star'?0xcaa7ff:
       (state.avatarType==='rogue'?0x72e6ff:0xe8c078)})
@@ -10974,9 +11116,31 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
     if(w.kind==='arcane_lance'){ b.mesh.scale.set(1.7,1.7,5.2); b.pierces=2; spawnArcaneSigil(startX,0,startZ,1.55); spawnBurst(startX,startY,startZ,14,FX_MAT_DUST,4.0); }
     if(w.kind==='elemental'){ b.mesh.scale.setScalar(1.45); spawnBurst(startX,startY,startZ,10,mageElementToggle?FX_MAT_DUST:FX_MAT_SPARK,3.0); }
     if(w.kind==='rocket_arrow') b.mesh.scale.setScalar(1.55);
+    if(w.kind==='gale_drill_arrow'){
+      b.mesh.scale.set(2.4,2.4,5.8);
+      b.pierces=6;
+      b.hitRadius=1.65;
+      b.spinSpeed=15;
+      b.heavyKnockback=true;
+      b.isArcherArrow=true;
+      spawnArcherMuzzleFan(true);
+      spawnBurst(startX,startY,startZ,18,FX_MAT_DUST,4.8);
+      spawnArcaneSigil(startX,0,startZ,1.4);
+    }
+    if(w.kind==='cyclone_snare_arrow'){
+      b.mesh.scale.set(1.35,1.35,2.6);
+      b.hitRadius=1.15;
+      b.spinSpeed=20;
+      b.isArcherArrow=true;
+      b.cycloneRadius=5.5;
+      b.cycloneSlowDuration=4;
+      b.cycloneDetonated=false;
+      spawnArcherMuzzleFan(true);
+      spawnBurst(startX,startY,startZ,12,FX_MAT_DUST,3.8);
+    }
     if(w.kind==='holy_wave'){b.mesh.scale.set(3.4,1.8,.55);b.pierces=2;spawnKnightCleave({x:startX,y:startY-.9,z:startZ},player.rotation.y,0,1.25);}
     if(w.kind==='primal_wave'){b.mesh.scale.set(3.8,2.05,.7);b.pierces=3;spawnBarbarianArc({x:startX,y:startY-.9,z:startZ},player.rotation.y,2,1.3);}
-    if(state.avatarType==='rogue'&&w.kind!=='rocket_arrow') b.mesh.scale.set(0.82,0.82,1.45);
+    if(state.avatarType==='rogue'&&w.kind!=='rocket_arrow'&&w.kind!=='gale_drill_arrow'&&w.kind!=='cyclone_snare_arrow') b.mesh.scale.set(0.82,0.82,1.45);
   }
 }
 // Arcane Lance uses the shared visible projectile path and piercing logic.
@@ -11086,6 +11250,48 @@ function spawnArcherHitFeedback(x,y,z,heavy=false){
   if(heavy) spawnArcherMuzzleFan(false);
 }
 
+function triggerCycloneSnare(x,y,z,b){
+  if(!b || b.cycloneDetonated) return;
+  b.cycloneDetonated=true;
+  const radius=b.cycloneRadius||5.5;
+  const slowDuration=b.cycloneSlowDuration||4;
+  let affected=0;
+
+  spawnArcaneSigil(x,0,z,radius*.58);
+  spawnBurst(x,y,z,30,FX_MAT_DUST,6.2);
+  spawnBurst(x,y+.25,z,18,FX_MAT_SPARK,4.8);
+
+  zombies.forEach(enemy=>{
+    if(enemy.userData.dead) return;
+    const dx=enemy.position.x-x, dz=enemy.position.z-z;
+    const dist=Math.hypot(dx,dz);
+    if(dist>radius) return;
+    affected++;
+
+    const type=enemy.userData.archetype||'walker';
+    const damage=b.damage||(.85*playerStats.power);
+    applyBulletDamage(enemy,damage);
+
+    if(!enemy.userData.dead){
+      const pull=Math.max(1.8,6.2*(1-dist/radius));
+      const dl=dist||1;
+      enemy.userData.knockbackX=(-dx/dl)*pull;
+      enemy.userData.knockbackZ=(-dz/dl)*pull;
+      enemy.userData.slowTimer=Math.max(enemy.userData.slowTimer||0,slowDuration);
+      enemy.userData.slowMult=Math.min(enemy.userData.slowMult||1,type==='boss'?.55:.28);
+      if(type!=='boss' && type!=='brute'){
+        enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,.75);
+      }
+    }
+    spawnArcherSpark(enemy.position.x,enemy.position.y+.7,enemy.position.z);
+  });
+
+  if(affected>0){
+    triggerCombatShake(5.5,120);
+    navigator.vibrate&&navigator.vibrate([18,16,30]);
+  }
+}
+
 function updateBullets(dt){
   const speed = 18;
   for(let i=bullets.length-1;i>=0;i--){
@@ -11096,6 +11302,14 @@ function updateBullets(dt){
     b.mesh.position.y += b.dy*speed*(b.speedMult||1)*dt;
     b.mesh.position.z += b.dz*speed*(b.speedMult||1)*dt;
     b.pulse = (b.pulse || 0) + dt*18;
+    if(b.spinSpeed) b.mesh.rotation.z += b.spinSpeed*dt;
+    if(b.kind==='gale_drill_arrow' && Math.random()<Math.min(1,dt*28)){
+      spawnArcherSpark(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z);
+    }
+    if(b.kind==='cyclone_snare_arrow' && Math.random()<Math.min(1,dt*20)){
+      spawnArcherSpark(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z);
+      if(Math.random()<.35) spawnBurst(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,2,FX_MAT_DUST,1.7);
+    }
     if(b.mesh.children[1]){
       const pulseScale = 0.9 + Math.sin(b.pulse)*0.15;
       b.mesh.children[1].scale.setScalar(pulseScale);
@@ -11103,11 +11317,12 @@ function updateBullets(dt){
     b.life -= dt;
     let hit = false;
     if(bulletBlockedAt(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z)){
-      spawnBurst(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 4, FX_MAT_SPARK, 1.8);
+      if(b.kind==='cyclone_snare_arrow') triggerCycloneSnare(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,b);
+      else spawnBurst(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 4, FX_MAT_SPARK, 1.8);
       hit = true;
     }
     if(!hit) for(const z of zombies){
-      if(z.userData.dead) continue;
+      if(z.userData.dead || (b.hitEnemies&&b.hitEnemies.has(z))) continue;
       const torsoX=z.position.x, torsoY=z.position.y+0.8, torsoZ=z.position.z;
       const directDist=Math.hypot(torsoX-b.mesh.position.x,torsoY-b.mesh.position.y,torsoZ-b.mesh.position.z);
       const sweptDist=distancePointToBulletSegment(
@@ -11115,13 +11330,26 @@ function updateBullets(dt){
         b.prevX??b.mesh.position.x,b.prevY??b.mesh.position.y,b.prevZ??b.mesh.position.z,
         b.mesh.position.x,b.mesh.position.y,b.mesh.position.z
       );
-      const hitRadius=b.isArcherArrow?1.08:0.9;
+      const hitRadius=b.hitRadius||(b.isArcherArrow?1.08:0.9);
       if(Math.min(directDist,sweptDist) < hitRadius){
+        if(b.hitEnemies)b.hitEnemies.add(z);
+        if(b.kind==='cyclone_snare_arrow'){
+          triggerCycloneSnare(z.position.x,z.position.y+.45,z.position.z,b);
+          hit=true;
+          break;
+        }
         if(b.directInstakill){
           const type=z.userData.archetype||'walker';
           const directDamage=type==='boss' ? (z.userData.maxHp||z.userData.hp)*0.18 : (z.userData.hp+1);
           applyBulletDamage(z,directDamage);
         } else applyBulletDamage(z, b.damage);
+        if(b.heavyKnockback && !z.userData.dead){
+          let kx=z.position.x-(b.prevX??b.mesh.position.x), kz=z.position.z-(b.prevZ??b.mesh.position.z);
+          const kl=Math.hypot(kx,kz)||1;
+          z.userData.knockbackX=(kx/kl)*7.5;
+          z.userData.knockbackZ=(kz/kl)*7.5;
+          z.userData.hitStun=Math.max(z.userData.hitStun||0,.22);
+        }
         if(b.isArcherArrow) spawnArcherHitFeedback(z.position.x,z.position.y+.82,z.position.z,b.damage>=2.5);
         else spawnBurst(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 5, FX_MAT_SPARK, 2.5);
         if(b.splash > 0){
@@ -11144,6 +11372,9 @@ function updateBullets(dt){
       }
     }
     if(hit || b.life<=0){
+      if(b.life<=0 && b.kind==='cyclone_snare_arrow' && !b.cycloneDetonated){
+        triggerCycloneSnare(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,b);
+      }
       scene.remove(b.mesh); // BULLET_GEO/MAT are shared — never dispose them here
       bullets.splice(i,1);
     }
@@ -11393,6 +11624,7 @@ function update(dt){
   updateArcaneEchoes(dt);
   updateShadowEclipse(dt);
   updateArrowStorm(dt);
+  updateTempestDomain(dt);
   updateMageAbilityEffects(dt);
   updateArcaneLaser(dt);
   updateKingsJudgment(dt);
@@ -11749,6 +11981,9 @@ function startSurvival(){
   rerunEndsAfterRound=false;
   clearMageRoundSpecials(true);
   blizzardCooldownTimer = 0;
+  tempestDomainCooldownTimer = 0;
+  tempestDomainActiveTimer = 0;
+  tempestDomainPulseTimer = 0;
   stopArcaneLaser(); laserCharge = LASER_MAX_CHARGE; laserRegenDelayTimer = 0;
   resetCharacterLoadout();
   resetAbilityLoadout();
