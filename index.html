@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+<!-- V22.10.55 Arrow Storm Removal: removes Arrow Storm from the Archer's selectable abilities and runtime systems now that Mirror Clones occupy the signature slot and the Archer ultimate lineup is being consolidated. Existing Arrow Storm loadout state is cleared safely; other Archer abilities are unchanged. -->
+<!-- V22.10.54 Standalone Tempest Domain Removal: removes Tempest Domain from the Archer's selectable ultimate list now that its defensive frost behavior is integrated into Supernova Piercer. Existing Tempest Domain loadout state is treated as removed; Arrow Storm remains for the next separate increment. -->
+<!-- V22.10.53 Supernova Ice-Shatter Release: adds capped icy shatter bursts to enemies frozen or slowed by Supernova's Frost Domain immediately before the solar beam releases, plus a readable domain-collapse burst. Freeze durations, beam damage, cooldown, and targeting remain unchanged. -->
+<!-- V22.10.52 Supernova Frost Domain Phase 3: bosses that touch Supernova's icy domain freeze once for 0.5 seconds, then remain slowed to 50% movement until the beam releases. Normal and brute freeze behavior, beam damage, cooldown, and other abilities remain unchanged. -->
+<!-- V22.10.51 Supernova Frost Domain Phase 2: large/brute enemies that enter Supernova's icy domain are frozen once for 1.5 seconds per cast. Normal-enemy freeze behavior, bosses, beam damage, cooldown, and visuals remain unchanged. -->
 <!-- V22.10.50 Supernova Frost Domain Phase 1: adds an immediate icy defensive domain to Supernova's charge. Normal enemies touching the field are held frozen until beam release; elite and boss freeze rules remain unchanged for the next increment. -->
 <!-- V22.10.49 Version Label Synchronization: centralizes the visible build identity on the current GAME_VERSION value so the browser title, landing-page version line, and build badge all show V22.10.49 consistently. No gameplay, save data, cooldown, damage, or ability behavior is changed. -->
 <!-- V22.10.48 Phoenix Manual-Cast + Slower Chain Javelin: Phoenix Fireball now activates only once per fresh button press and cannot auto-recast when its volley expires while the control is still held. Chain-Lightning Javelin travel time is increased for a slower, more readable projectile while preserving its 1-second cooldown, damage, chaining, and stun. -->
@@ -41,7 +46,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.50</title>
+<title>Family Arena V22.10.55</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -731,7 +736,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.50 - Supernova Frost Domain P1';
+const GAME_VERSION='22.10.55 - Arrow Storm Removal';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1512,7 +1517,7 @@ function resetCharacterLoadout(){
 }
 function resetAbilityLoadout(){
   // Development cleanup: removed legacy abilities can never survive in runtime state.
-  const removedAbilityIds=['nova','arcane_nova','cataclysm_meteor','meteor_boulder','fire_meteor_boulder'];
+  const removedAbilityIds=['nova','arcane_nova','cataclysm_meteor','meteor_boulder','fire_meteor_boulder','tempest_domain'];
   if(removedAbilityIds.includes(equippedAbilityId)) equippedAbilityId=null;
   equippedAbilityId = null;
   ownedAbilities = {};
@@ -1541,8 +1546,6 @@ const ARCANE_LASER = {id:'arcane_laser', name:'Arcane Laser', price:760,
   desc:'Hold to channel a piercing beam of massive sustained damage into whatever you\'re aimed at — the dedicated way to burn down a Brute or Boss. Pierces the crowd behind your target for lighter damage. Drains a charge meter that refills when you let go.'};
 const TEMPEST_DOMAIN = {id:'tempest_domain', name:'Tempest Domain', price:720,
   desc:'Ultimate-tier crowd control. For 8 seconds, a large wind field follows the Archer, repeatedly damaging, pulling, and heavily slowing enemies inside it. Uses a 22-second cooldown and never covers the screen.'};
-const ARROW_STORM_ABILITY = {id:'arrow_storm', name:'Arrow Storm', price:680,
-  desc:'Unleashes the Archer’s charged battlefield barrage. Build Focus through combat, then activate it from the Ability button when Focus reaches 100%.'};
 const SKYFALL_BARRAGE = {id:'skyfall_barrage', name:'Skyfall Barrage', price:780,
   desc:'Ultimate-tier damage. For 7 seconds, giant translucent arrows rain onto enemy clusters with clear landing markers and strong area damage. Boss damage is capped at 25% per cast. Uses a 25-second cooldown.'};
 const SUPERNOVA_PIERCER = {id:'supernova_piercer', name:'Supernova Piercer', price:860,
@@ -9485,7 +9488,13 @@ function renderShopList(){
 // Mage abilities use one mutually-exclusive loadout slot. The shared HUD
 // button remains in the approved position directly left of FIRE. Buying
 // an ability equips it immediately; owned abilities can be swapped here.
-const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER], rogue:[ARROW_STORM_ABILITY, TEMPEST_DOMAIN, SKYFALL_BARRAGE, SUPERNOVA_PIERCER] };
+const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER] };
+function sanitizeRemovedAbilitySelection(){
+  if(equippedAbilityId==='tempest_domain'||equippedAbilityId==='arrow_storm') equippedAbilityId=null;
+  if(ownedAbilities&&ownedAbilities.tempest_domain) delete ownedAbilities.tempest_domain;
+  if(ownedAbilities&&ownedAbilities.arrow_storm) delete ownedAbilities.arrow_storm;
+}
+sanitizeRemovedAbilitySelection();
 function renderAbilityShopList(list){
   const abilities = HERO_ABILITIES[state.avatarType];
   if(!abilities || !abilities.length) return;
@@ -9501,7 +9510,7 @@ function renderAbilityShopList(list){
     row.className = 'weaponRow' + (equipped ? ' equipped' : '');
     const swatch = document.createElement('div');
     swatch.className = 'weaponSwatch';
-    swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : (a.id==='tempest_domain' ? '#63ffd1' : (a.id==='skyfall_barrage' ? '#f6d36b' : (a.id==='supernova_piercer' ? '#fff0a6' : (a.id==='arrow_storm' ? '#b95cff' : '#75dfff'))));
+    swatch.style.background = a.id==='arcane_laser' ? '#d16cff' : (a.id==='tempest_domain' ? '#63ffd1' : (a.id==='skyfall_barrage' ? '#f6d36b' : (a.id==='supernova_piercer' ? '#fff0a6' : '#75dfff')));
     const info = document.createElement('div');
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${a.name}</div><div class="wDesc">${a.desc}</div>`;
@@ -9726,7 +9735,6 @@ function setupControls(){
     else if(equippedAbilityId==='tempest_domain') triggerTempestDomain();
     else if(equippedAbilityId==='skyfall_barrage') triggerSkyfallBarrage();
     else if(equippedAbilityId==='supernova_piercer') triggerSupernovaPiercer();
-    else if(equippedAbilityId==='arrow_storm') triggerArrowStorm();
   };
   const beginEquippedAbility=e=>{
     e.preventDefault();
@@ -9944,9 +9952,6 @@ let hoodedComboStep = 0;
 let hoodedUltimateCharge = 0;
 let knightUltimateCharge = 0, knightUltimateActive = 0, knightUltimatePulse = 0, knightComboStep = 0;
 let barbarianUltimateCharge = 0, barbarianUltimateActive = 0, barbarianUltimatePulse = 0, barbarianComboStep = 0;
-let archerUltimateCharge = 0;
-let archerUltimateActive = 0;
-let archerUltimatePulse = 0;
 let archerVolleyStep = 0;
 let mageCastStep = 0;
 let hoodedUltimateActive = 0;
@@ -10345,18 +10350,12 @@ function updateHoodedHud(){
           : (supernovaCooldownTimer>0 ? `NOVA ${Math.ceil(supernovaCooldownTimer)}` : 'SUPERNOVA');
         abilityBtn.classList.toggle('active',supernovaChargeTimer>0);
         abilityBtn.classList.toggle('cooling',supernovaCooldownTimer>0&&supernovaChargeTimer<=0);
-      }else if(equippedAbilityId==='arrow_storm'){
-        abilityBtn.textContent=archerUltimateCharge>=100
-          ? 'ARROW STORM!'
-          : `STORM ${Math.round(archerUltimateCharge)}%`;
-        abilityBtn.classList.toggle('active',archerUltimateCharge>=100);
-        abilityBtn.classList.toggle('cooling',archerUltimateCharge<100);
       }else{
         abilityBtn.textContent='BLIZZARD';
       }
       if(!laserMode){
         abilityBtn.style.removeProperty('--charge');
-        if(equippedAbilityId!=='tempest_domain'&&equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='supernova_piercer'&&equippedAbilityId!=='arrow_storm'){
+        if(equippedAbilityId!=='tempest_domain'&&equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='supernova_piercer'){
           abilityBtn.classList.remove('empty','active','cooling');
         }
       }
@@ -10527,35 +10526,6 @@ function spawnArcherMuzzleFan(big=false){
   g.position.set(player.position.x+dx*.82,player.position.y+1.05,player.position.z+dz*.82);g.rotation.y=yaw;scene.add(g);
   fx.push({kind:'archerFan',mesh:g,vx:dx*5.5,vz:dz*5.5,life:big?.30:.20,maxLife:big?.30:.20});
 }
-function spawnArrowRainVolley(){
-  if(!player)return;
-  const live=zombies.filter(z=>!z.userData.dead).sort((a,b)=>a.position.distanceTo(player.position)-b.position.distanceTo(player.position)).slice(0,9);
-  if(!live.length){
-    for(let i=0;i<7;i++) live.push({position:new THREE.Vector3(player.position.x+(Math.random()-.5)*8,player.position.y,player.position.z+(Math.random()-.5)*8),userData:{dead:true}});
-  }
-  live.forEach((z,i)=>{
-    const x=z.position.x+(Math.random()-.5)*.7,zp=z.position.z+(Math.random()-.5)*.7;
-    const mat=new THREE.MeshBasicMaterial({color:i%3===0?0xffffff:0x62dfff,transparent:true,opacity:.68,depthWrite:false,blending:THREE.AdditiveBlending});
-    const arrow=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,3.8,6),mat);arrow.position.set(x,8+Math.random()*3,zp);arrow.rotation.z=.08;scene.add(arrow);
-    fx.push({kind:'arrowRain',mesh:arrow,targetY:z.position.y+.25,life:.48,maxLife:.48,vx:0,vz:0});
-    if(!z.userData.dead) applyBulletDamage(z,1.45*playerStats.power);
-  });
-  triggerCombatShake(7,120);navigator.vibrate&&navigator.vibrate(22);
-}
-function triggerArrowStorm(){
-  if(!gameRunning||state.avatarType!=='archer'||archerUltimateActive>0)return;
-  if(archerUltimateCharge<99.5){toast('Arrow Storm is still charging');return;}
-  archerUltimateCharge=0;archerUltimateActive=4.0;archerUltimatePulse=0;updateHoodedHud();
-  document.body.style.filter='brightness(.78) saturate(1.55) contrast(1.08)';
-  spawnArcherMuzzleFan(true);triggerCombatShake(12,300);navigator.vibrate&&navigator.vibrate([60,35,100]);toast('TEMPEST ARROW STORM!');
-}
-function updateArrowStorm(dt){
-  if(archerUltimateActive<=0)return;
-  archerUltimateActive-=dt;archerUltimatePulse-=dt;
-  if(archerUltimatePulse<=0){archerUltimatePulse=.20;spawnArrowRainVolley();}
-  if(archerUltimateActive<=0){document.body.style.filter='';triggerCombatShake(6,140);}
-}
-
 function spawnKnightCleave(origin,yaw,step=0,scale=1){
   const g=new THREE.Group();
   const gold=new THREE.MeshBasicMaterial({color:0xffc83d,transparent:true,opacity:.94,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
@@ -11215,6 +11185,8 @@ let supernovaBeamFx=null;
 let supernovaChargeFx=null;
 let supernovaFrostDomainFx=null;
 let supernovaShakeTick=0;
+let supernovaCastSerial=0;
+let supernovaIceShatterMat=null;
 const SUPERNOVA_FROST_RADIUS=6.4;
 
 function supernovaMapLength(){return Math.max(50,arenaSize*2.6);}
@@ -11314,9 +11286,26 @@ function pointDistanceToSupernovaLine(px,pz,ox,oz,angle){
   const fx=Math.sin(angle),fz=Math.cos(angle),dx=px-ox,dz=pz-oz;
   return {along:dx*fx+dz*fz,side:Math.abs(dx*fz-dz*fx)};
 }
+function spawnSupernovaIceShatter(){
+  if(!player)return;
+  if(!supernovaIceShatterMat)supernovaIceShatterMat=new THREE.MeshBasicMaterial({color:0xbff8ff});
+  let shown=0;
+  for(const enemy of zombies){
+    if(!enemy||enemy.userData.dead||shown>=18)continue;
+    const affected=enemy.userData.supernovaFrostTouchedCast===supernovaCastSerial||
+      enemy.userData.supernovaBruteFreezeCast===supernovaCastSerial||
+      enemy.userData.supernovaBossFreezeCast===supernovaCastSerial;
+    if(!affected)continue;
+    const type=enemy.userData.archetype||'walker';
+    spawnBurst(enemy.position.x,enemy.position.y+.72,enemy.position.z,type==='boss'?14:(type==='brute'?11:8),supernovaIceShatterMat,type==='boss'?4.4:3.4);
+    shown++;
+  }
+  spawnBurst(player.position.x,.18,player.position.z,24,supernovaIceShatterMat,6.2);
+}
 function fireSupernovaPiercer(){
   if(!player)return;
   const ox=player.position.x,oz=player.position.z,angle=supernovaAimAngle,maxLen=supernovaMapLength();
+  spawnSupernovaIceShatter();
   if(supernovaAimFx){scene.remove(supernovaAimFx);disposeGroup(supernovaAimFx);supernovaAimFx=null;}
   if(supernovaChargeFx){scene.remove(supernovaChargeFx);disposeGroup(supernovaChargeFx);supernovaChargeFx=null;}
   if(supernovaFrostDomainFx){scene.remove(supernovaFrostDomainFx);disposeGroup(supernovaFrostDomainFx);supernovaFrostDomainFx=null;}
@@ -11366,6 +11355,7 @@ function triggerSupernovaPiercer(){
   abilityButtonCooldown(SUPERNOVA_COOLDOWN);
   supernovaChargeTimer=SUPERNOVA_CHARGE_DURATION;
   supernovaShakeTick=0;
+  supernovaCastSerial+=1;
   player.userData.supernovaRooted=true;
 
   if(supernovaAimFx){scene.remove(supernovaAimFx);disposeGroup(supernovaAimFx);}
@@ -11445,11 +11435,33 @@ function updateSupernovaPiercer(dt){
       for(const enemy of zombies){
         if(!enemy||enemy.userData.dead)continue;
         const type=enemy.userData.archetype||'walker';
-        if(type==='boss'||type==='brute')continue;
         const dx=enemy.position.x-player.position.x,dz=enemy.position.z-player.position.z;
-        if(dx*dx+dz*dz<=SUPERNOVA_FROST_RADIUS*SUPERNOVA_FROST_RADIUS){
-          enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,.12);
-          enemy.userData.supernovaFrostTouched=true;
+        const insideFrostDomain=dx*dx+dz*dz<=SUPERNOVA_FROST_RADIUS*SUPERNOVA_FROST_RADIUS;
+        if(type==='boss'){
+          if(insideFrostDomain&&enemy.userData.supernovaBossFreezeCast!==supernovaCastSerial){
+            enemy.userData.supernovaBossFreezeCast=supernovaCastSerial;
+            enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,.5);
+            enemy.userData.supernovaBossSlowCast=supernovaCastSerial;
+            spawnBurst(enemy.position.x,enemy.position.y+.9,enemy.position.z,14,FX_MAT_SPARK,3.1);
+          }
+          if(enemy.userData.supernovaBossSlowCast===supernovaCastSerial){
+            enemy.userData.slowTimer=Math.max(enemy.userData.slowTimer||0,supernovaChargeTimer+.12);
+            enemy.userData.slowMult=Math.min(enemy.userData.slowMult||1,.5);
+          }
+          continue;
+        }
+        if(insideFrostDomain){
+          if(type==='brute'){
+            if(enemy.userData.supernovaBruteFreezeCast!==supernovaCastSerial){
+              enemy.userData.supernovaBruteFreezeCast=supernovaCastSerial;
+              enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,1.5);
+              spawnBurst(enemy.position.x,enemy.position.y+.7,enemy.position.z,10,FX_MAT_SPARK,2.4);
+            }
+          }else{
+            enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,.12);
+            enemy.userData.supernovaFrostTouched=true;
+            enemy.userData.supernovaFrostTouchedCast=supernovaCastSerial;
+          }
         }
       }
       supernovaShakeTick-=dt;
@@ -13089,7 +13101,6 @@ function killZombie(z){
   if(state.avatarType==='hooded'){spawnSoulOrb(z.position);hoodedUltimateCharge=Math.min(100,hoodedUltimateCharge+4);passiveState.shadowstepTimer=passiveForAvatar().killMoveDuration||0;updateHoodedHud();}
   if(state.avatarType==='rogue'){
     const p=HERO_PASSIVES.rogue;
-    archerUltimateCharge=Math.min(100,archerUltimateCharge+4);
     passiveState.archerKillCounter=(passiveState.archerKillCounter||0)+1;
     if(passiveState.archerKillCounter>=(p.tailwindKills||5)){
       passiveState.archerKillCounter=0;
@@ -13266,7 +13277,6 @@ function update(dt){
   updateMirrorVolley(dt);
   updateChainJavelinFlights(dt);
   updateShadowEclipse(dt);
-  updateArrowStorm(dt);
   updateSupernovaPiercer(dt);
   updateSkyfallBarrage(dt);
   updateTempestDomain(dt);
@@ -13615,7 +13625,7 @@ function startSurvival(){
   fx.forEach(f=>scene.remove(f.mesh));
   fx = [];
   reachedLevelUnlocks = new Set(); registerReachedLevelUnlocks(1);
-  hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerUltimateCharge=0;archerUltimateActive=0;archerVolleyStep=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;document.body.style.filter='';updateHoodedHud();
+  hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerVolleyStep=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;document.body.style.filter='';updateHoodedHud();
   playerStats = startingStatsForActiveHero();
   // Base survival health is three hearts. Hero HP bonuses are represented by
   // HP levels above 1, so +2 starting HP produces five full hearts.
