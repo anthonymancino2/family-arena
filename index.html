@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<!-- V22.10.47 Phoenix Manual-Cast + Slower Chain Javelin: Phoenix Fireball now activates only once per fresh button press and cannot auto-recast when its volley expires while the control is still held. Chain-Lightning Javelin travel time is increased for a slower, more readable projectile while preserving its 1-second cooldown, damage, chaining, and stun. -->
+<!-- V22.10.50 Supernova Frost Domain Phase 1: adds an immediate icy defensive domain to Supernova's charge. Normal enemies touching the field are held frozen until beam release; elite and boss freeze rules remain unchanged for the next increment. -->
+<!-- V22.10.49 Version Label Synchronization: centralizes the visible build identity on the current GAME_VERSION value so the browser title, landing-page version line, and build badge all show V22.10.49 consistently. No gameplay, save data, cooldown, damage, or ability behavior is changed. -->
+<!-- V22.10.48 Phoenix Manual-Cast + Slower Chain Javelin: Phoenix Fireball now activates only once per fresh button press and cannot auto-recast when its volley expires while the control is still held. Chain-Lightning Javelin travel time is increased for a slower, more readable projectile while preserving its 1-second cooldown, damage, chaining, and stun. -->
 <!-- V22.10.45 Phoenix Low-Enemy Pursuit: when only one or two enemies remain, the three Phoenix spheres use separated approach lanes around their targets instead of collapsing into one path. They continue moving, reacquire quickly, and converge close enough to deal contact damage without visibly stacking. -->
 <!-- V22.10.44 Triple Phoenix Shared Balance: caps the three spheres' combined gravity per enemy each frame and slightly reduces large-enemy/boss contact, burn, and expiration damage so the volley remains powerful without acting like three stacked ultimates. Normal enemies remain instant defeats. -->
 <!-- V22.10.43 Archer Secondary Cooldown Readability: adds live cooldown feedback directly on the Secondary button, including tenths-of-a-second countdown and a clear ready state. Chain-Lightning Javelin remains instant-cast with its fixed 1.0-second cooldown; damage and targeting are unchanged. -->
@@ -39,7 +41,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.47</title>
+<title>Family Arena V22.10.50</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -729,7 +731,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.41 - Always-Ready Chain Javelin';
+const GAME_VERSION='22.10.50 - Supernova Frost Domain P1';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -11211,7 +11213,9 @@ let supernovaAimAngle=0;
 let supernovaAimFx=null;
 let supernovaBeamFx=null;
 let supernovaChargeFx=null;
+let supernovaFrostDomainFx=null;
 let supernovaShakeTick=0;
+const SUPERNOVA_FROST_RADIUS=6.4;
 
 function supernovaMapLength(){return Math.max(50,arenaSize*2.6);}
 function createSupernovaAimFx(){
@@ -11253,6 +11257,32 @@ function createSupernovaChargeFx(){
   g.scale.setScalar(.35);
   scene.add(g);return g;
 }
+function createSupernovaFrostDomainFx(){
+  const g=new THREE.Group();
+  const additive={transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending};
+  const floor=new THREE.Mesh(
+    new THREE.CircleGeometry(SUPERNOVA_FROST_RADIUS,48),
+    new THREE.MeshBasicMaterial({color:0x77dfff,opacity:.10,...additive})
+  );
+  floor.rotation.x=-Math.PI/2;floor.position.y=.025;floor.userData.role='frostFloor';g.add(floor);
+  [SUPERNOVA_FROST_RADIUS*.82,SUPERNOVA_FROST_RADIUS].forEach((r,i)=>{
+    const ring=new THREE.Mesh(
+      new THREE.RingGeometry(r-.10,r+.10,64),
+      new THREE.MeshBasicMaterial({color:i?0xbff7ff:0x5fd8ff,opacity:i?.62:.34,...additive})
+    );
+    ring.rotation.x=-Math.PI/2;ring.position.y=.05+i*.012;ring.userData.role='frostRing';ring.userData.spin=i?-.75:.55;g.add(ring);
+  });
+  for(let i=0;i<18;i++){
+    const shard=new THREE.Mesh(
+      new THREE.PlaneGeometry(.05,.45+Math.random()*.5),
+      new THREE.MeshBasicMaterial({color:0xd9fbff,opacity:.5,...additive})
+    );
+    const a=(i/18)*Math.PI*2,r=SUPERNOVA_FROST_RADIUS*(.55+Math.random()*.38);
+    shard.position.set(Math.sin(a)*r,.08,Math.cos(a)*r);shard.rotation.x=-Math.PI/2;shard.rotation.z=-a;
+    shard.userData.role='frostShard';shard.userData.baseY=shard.position.y;shard.userData.phase=Math.random()*Math.PI*2;g.add(shard);
+  }
+  scene.add(g);return g;
+}
 function createSupernovaBeamFx(){
   const len=supernovaMapLength(),g=new THREE.Group();
   const layers=[
@@ -11289,6 +11319,7 @@ function fireSupernovaPiercer(){
   const ox=player.position.x,oz=player.position.z,angle=supernovaAimAngle,maxLen=supernovaMapLength();
   if(supernovaAimFx){scene.remove(supernovaAimFx);disposeGroup(supernovaAimFx);supernovaAimFx=null;}
   if(supernovaChargeFx){scene.remove(supernovaChargeFx);disposeGroup(supernovaChargeFx);supernovaChargeFx=null;}
+  if(supernovaFrostDomainFx){scene.remove(supernovaFrostDomainFx);disposeGroup(supernovaFrostDomainFx);supernovaFrostDomainFx=null;}
   supernovaBeamFx=createSupernovaBeamFx();
   supernovaBeamFx.position.set(ox,0,oz);supernovaBeamFx.rotation.y=angle;
   supernovaBeamTimer=SUPERNOVA_BEAM_LIFETIME;
@@ -11345,6 +11376,9 @@ function triggerSupernovaPiercer(){
   supernovaChargeFx=createSupernovaChargeFx();
   supernovaChargeFx.position.set(player.position.x,0,player.position.z);
   supernovaChargeFx.rotation.y=supernovaAimAngle;
+  if(supernovaFrostDomainFx){scene.remove(supernovaFrostDomainFx);disposeGroup(supernovaFrostDomainFx);}
+  supernovaFrostDomainFx=createSupernovaFrostDomainFx();
+  supernovaFrostDomainFx.position.set(player.position.x,0,player.position.z);
   spawnArcaneSigil(player.position.x,.02,player.position.z,2.2);
   spawnBurst(player.position.x,player.position.y+.65,player.position.z,22,FX_MAT_SPARK,5);
   navigator.vibrate&&navigator.vibrate([28,18,42]);
@@ -11355,6 +11389,7 @@ function clearSupernovaPiercer(resetCooldown=true){
   if(player&&player.userData)player.userData.supernovaRooted=false;
   if(supernovaAimFx){scene.remove(supernovaAimFx);disposeGroup(supernovaAimFx);supernovaAimFx=null;}
   if(supernovaChargeFx){scene.remove(supernovaChargeFx);disposeGroup(supernovaChargeFx);supernovaChargeFx=null;}
+  if(supernovaFrostDomainFx){scene.remove(supernovaFrostDomainFx);disposeGroup(supernovaFrostDomainFx);supernovaFrostDomainFx=null;}
   if(supernovaBeamFx){scene.remove(supernovaBeamFx);disposeGroup(supernovaBeamFx);supernovaBeamFx=null;}
   if(resetCooldown)supernovaCooldownTimer=0;
   updateHoodedHud();
@@ -11398,6 +11433,25 @@ function updateSupernovaPiercer(dt){
       }
       const sparkRate=10+progress*34;
       if(Math.random()<Math.min(1,dt*sparkRate))spawnArcherSpark(player.position.x+(Math.random()-.5)*1.7,player.position.y+.55+Math.random()*1.25,player.position.z+(Math.random()-.5)*1.7);
+      if(supernovaFrostDomainFx){
+        supernovaFrostDomainFx.position.set(player.position.x,0,player.position.z);
+        supernovaFrostDomainFx.rotation.y+=dt*.22;
+        supernovaFrostDomainFx.traverse(o=>{
+          if(o.userData.role==='frostRing')o.rotation.z+=dt*(o.userData.spin||.5);
+          else if(o.userData.role==='frostFloor'&&o.material)o.material.opacity=.08+Math.sin(now*.008)*.025;
+          else if(o.userData.role==='frostShard')o.position.y=o.userData.baseY+Math.sin(now*.004+o.userData.phase)*.035;
+        });
+      }
+      for(const enemy of zombies){
+        if(!enemy||enemy.userData.dead)continue;
+        const type=enemy.userData.archetype||'walker';
+        if(type==='boss'||type==='brute')continue;
+        const dx=enemy.position.x-player.position.x,dz=enemy.position.z-player.position.z;
+        if(dx*dx+dz*dz<=SUPERNOVA_FROST_RADIUS*SUPERNOVA_FROST_RADIUS){
+          enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,.12);
+          enemy.userData.supernovaFrostTouched=true;
+        }
+      }
       supernovaShakeTick-=dt;
       if(progress>.18&&supernovaShakeTick<=0){
         triggerCombatShake(1.5+progress*5.5,45+progress*35);
