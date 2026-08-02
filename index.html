@@ -1,3 +1,5 @@
+<!-- V22.11.23 Super Meteor Core: adds the Mage's third equipable ultimate. One enormous slow meteor targets the nearest enemy, falls from the sky, deals heavy area damage, deals 20% max HP to bosses, stuns survivors for 3 seconds, burns them for 5 seconds, and uses a 24-second cooldown. -->
+<!-- V22.11.22 Blizzard Readability Guard: caps simultaneous impact-effect groups at six, clears them between rounds, and brightens landing markers for easier tracking. Gameplay values are unchanged. -->
 <!-- V22.11.20 Blizzard Icy Mist Plume: adds six capped translucent mist plumes that rise, widen, drift slightly, and fade within 0.85 seconds at each Blizzard impact. Gameplay values are unchanged. -->
 <!-- V22.11.19 Traveling Blizzard Spawn Bias: falling ice now shifts modestly toward the Mage's recent movement direction while preserving random coverage across the storm. Damage, freeze, radius, duration, spawn rate, and cooldown are unchanged. -->
 <!-- V22.11.18 Moving Blizzard Boundary: adds a persistent cyan-violet Blizzard radius marker that follows the Mage, pulses subtly, and cleans up when the storm or round ends. Falling ice continues spawning around the moving storm center. -->
@@ -97,7 +99,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.11.21</title>
+<title>Family Arena V22.11.23</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -880,7 +882,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.11.21 - Blizzard Ice Shards';
+const GAME_VERSION='22.11.23 - Super Meteor Core';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1688,6 +1690,10 @@ const BLIZZARD_STORM = {id:'blizzard_storm', name:'Blizzard Storm', price:640,
 // when idle — weak against crowds, built to melt one tough target.
 const ARCANE_LASER = {id:'arcane_laser', name:'Arcane Laser', price:760,
   desc:'Hold to channel a piercing beam of massive sustained damage into whatever you\'re aimed at — the dedicated way to burn down a Brute or Boss. Pierces the crowd behind your target for lighter damage. Drains a charge meter that refills when you let go.'};
+
+const SUPER_METEOR = {id:'super_meteor', name:'Super Meteor', price:900,
+  desc:'Calls down one enormous slow meteor. The impact heavily damages nearby enemies, stuns survivors for 3 seconds, burns them for 5 seconds, and deals 20% max HP to bosses.'};
+
 const SKYFALL_BARRAGE = {id:'skyfall_barrage', name:'Skyfall Barrage', price:780,
   desc:'Ultimate-tier damage. For 7 seconds, giant translucent arrows rain onto enemy clusters with clear landing markers and strong area damage. Boss damage is capped at 25% per cast. Uses a 25-second cooldown.'};
 const SUPERNOVA_PIERCER = {id:'supernova_piercer', name:'Supernova Piercer', price:860,
@@ -9664,7 +9670,7 @@ function renderShopList(){
 // Mage abilities use one mutually-exclusive loadout slot. The shared HUD
 // button remains in the approved position directly left of FIRE. Buying
 // an ability equips it immediately; owned abilities can be swapped here.
-const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER] };
+const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER] };
 function sanitizeRemovedAbilitySelection(){
   if(equippedAbilityId==='tempest_domain'||equippedAbilityId==='arrow_storm') equippedAbilityId=null;
   if(ownedAbilities&&ownedAbilities.tempest_domain) delete ownedAbilities.tempest_domain;
@@ -9955,6 +9961,7 @@ function setupControls(){
   const activateEquippedAbilityNow=()=>{
     if(equippedAbilityId==='arcane_laser') startArcaneLaser();
     else if(equippedAbilityId==='blizzard_storm') triggerBlizzardStorm();
+    else if(equippedAbilityId==='super_meteor') triggerSuperMeteor();
     else if(equippedAbilityId==='skyfall_barrage') triggerSkyfallBarrage();
     else if(equippedAbilityId==='supernova_piercer') triggerSupernovaPiercer();
   };
@@ -10566,12 +10573,18 @@ function updateHoodedHud(){
           : (supernovaCooldownTimer>0 ? `NOVA ${Math.ceil(supernovaCooldownTimer)}` : 'SUPERNOVA');
         abilityBtn.classList.toggle('active',supernovaChargeTimer>0);
         abilityBtn.classList.toggle('cooling',supernovaCooldownTimer>0&&supernovaChargeTimer<=0);
+      }else if(equippedAbilityId==='super_meteor'){
+        abilityBtn.textContent=activeSuperMeteor
+          ? 'METEOR ↓'
+          : (superMeteorCooldownTimer>0 ? `METEOR ${Math.ceil(superMeteorCooldownTimer)}` : 'SUPER METEOR');
+        abilityBtn.classList.toggle('active',!!activeSuperMeteor);
+        abilityBtn.classList.toggle('cooling',superMeteorCooldownTimer>0&&!activeSuperMeteor);
       }else{
         abilityBtn.textContent='BLIZZARD';
       }
       if(!laserMode){
         abilityBtn.style.removeProperty('--charge');
-        if(equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='supernova_piercer'){
+        if(equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='supernova_piercer'&&equippedAbilityId!=='super_meteor'){
           abilityBtn.classList.remove('empty','active','cooling');
         }
       }
@@ -12120,6 +12133,8 @@ let blizzardFollowBoundary=null;
 let blizzardLastPlayerPos=new THREE.Vector3();
 let blizzardMoveDir=new THREE.Vector3();
 let fallingIce=[];
+let activeBlizzardImpactGroups=[];
+const BLIZZARD_IMPACT_EFFECT_CAP=6;
 
 function abilityButtonCooldown(seconds){
   const btn=document.getElementById('abilityBtn');
@@ -12202,7 +12217,7 @@ function spawnFallingIce(){
   const mesh=makeIceBallMesh(1.25+Math.random()*.75);
   mesh.position.set(bx,11+Math.random()*5,bz); mesh.rotation.set(Math.random()*2,Math.random()*2,Math.random()*2);
   mesh.renderOrder=18; scene.add(mesh);
-  const ring=new THREE.Mesh(new THREE.RingGeometry(BLIZZARD_IMPACT_RADIUS*.72,BLIZZARD_IMPACT_RADIUS,32),new THREE.MeshBasicMaterial({color:0x62d9ff,transparent:true,opacity:.46,side:THREE.DoubleSide,depthWrite:false}));
+  const ring=new THREE.Mesh(new THREE.RingGeometry(BLIZZARD_IMPACT_RADIUS*.72,BLIZZARD_IMPACT_RADIUS,32),new THREE.MeshBasicMaterial({color:0x62d9ff,transparent:true,opacity:.62,side:THREE.DoubleSide,depthWrite:false}));
   ring.rotation.x=-Math.PI/2; ring.position.set(bx,.035,bz);scene.add(ring);
   fallingIce.push({mesh,ring,x:bx,z:bz,vy:13+Math.random()*4,life:1.15});
 }
@@ -12294,12 +12309,22 @@ function impactIce(m){
     frostGroup.add(mist);
   }
 
+  while(activeBlizzardImpactGroups.length>=BLIZZARD_IMPACT_EFFECT_CAP){
+    const oldest=activeBlizzardImpactGroups.shift();
+    if(oldest&&oldest.parent){
+      oldest.parent.remove(oldest);
+      disposeGroup(oldest);
+    }
+  }
+  activeBlizzardImpactGroups.push(frostGroup);
   scene.add(frostGroup);
   const frostStarted=performance.now();
   (function animateBlizzardFrostMark(){
     if(!frostGroup.parent)return;
     const age=(performance.now()-frostStarted)/1000;
     if(age>=1.8){
+      const impactIndex=activeBlizzardImpactGroups.indexOf(frostGroup);
+      if(impactIndex>=0)activeBlizzardImpactGroups.splice(impactIndex,1);
       scene.remove(frostGroup);
       disposeGroup(frostGroup);
       return;
@@ -12392,6 +12417,153 @@ function triggerBlizzardStorm(){
   triggerCombatShake(5,180);navigator.vibrate&&navigator.vibrate([35,25,55]);toast('BLIZZARD STORM!');
 }
 
+
+const SUPER_METEOR_COOLDOWN=24;
+const SUPER_METEOR_STUN=3;
+const SUPER_METEOR_BURN=5;
+const SUPER_METEOR_RADIUS=7.5;
+let superMeteorCooldownTimer=0;
+let activeSuperMeteor=null;
+
+function makeSuperMeteorMesh(){
+  const group=new THREE.Group();
+
+  const core=new THREE.Mesh(
+    new THREE.IcosahedronGeometry(3.0,2),
+    new THREE.MeshStandardMaterial({
+      color:0x3a241f,
+      emissive:0xff4b16,
+      emissiveIntensity:1.25,
+      roughness:.72,
+      metalness:.08
+    })
+  );
+  group.add(core);
+
+  const lava=new THREE.Mesh(
+    new THREE.IcosahedronGeometry(3.18,1),
+    new THREE.MeshBasicMaterial({
+      color:0xff7a24,
+      transparent:true,
+      opacity:.30,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending,
+      wireframe:true
+    })
+  );
+  group.add(lava);
+
+  const aura=new THREE.Mesh(
+    new THREE.SphereGeometry(3.65,16,12),
+    new THREE.MeshBasicMaterial({
+      color:0xff4b18,
+      transparent:true,
+      opacity:.18,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending
+    })
+  );
+  group.add(aura);
+
+  group.userData.lava=lava;
+  group.userData.aura=aura;
+  return group;
+}
+
+function triggerSuperMeteor(){
+  if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='super_meteor'||!ownedAbilities.super_meteor||superMeteorCooldownTimer>0||activeSuperMeteor)return;
+
+  let targetX=player.position.x,targetZ=player.position.z;
+  let nearest=null,best=Infinity;
+  for(const enemy of zombies){
+    if(!enemy||enemy.userData.dead)continue;
+    const d=Math.hypot(enemy.position.x-player.position.x,enemy.position.z-player.position.z);
+    if(d<best){best=d;nearest=enemy;}
+  }
+
+  if(nearest){
+    targetX=nearest.position.x;
+    targetZ=nearest.position.z;
+  }else{
+    const forward=new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion);
+    targetX+=forward.x*8;
+    targetZ+=forward.z*8;
+  }
+
+  const radial=Math.hypot(targetX,targetZ);
+  if(radial>arenaSize-2.5){
+    const scale=(arenaSize-2.5)/radial;
+    targetX*=scale;
+    targetZ*=scale;
+  }
+
+  const mesh=makeSuperMeteorMesh();
+  mesh.position.set(targetX,22,targetZ);
+  scene.add(mesh);
+
+  const marker=new THREE.Mesh(
+    new THREE.RingGeometry(SUPER_METEOR_RADIUS*.72,SUPER_METEOR_RADIUS,64),
+    new THREE.MeshBasicMaterial({
+      color:0xff5c28,
+      transparent:true,
+      opacity:.62,
+      side:THREE.DoubleSide,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending
+    })
+  );
+  marker.rotation.x=-Math.PI/2;
+  marker.position.set(targetX,.04,targetZ);
+  scene.add(marker);
+
+  activeSuperMeteor={mesh,marker,x:targetX,z:targetZ,fallSpeed:6.2};
+  superMeteorCooldownTimer=SUPER_METEOR_COOLDOWN;
+  abilityButtonCooldown(SUPER_METEOR_COOLDOWN);
+  triggerCombatShake(5,180);
+  navigator.vibrate&&navigator.vibrate([45,30,70]);
+  toast('SUPER METEOR!');
+}
+
+function impactSuperMeteor(m){
+  spawnBurst(m.x,.7,m.z,42,FX_MAT_SPARK,8.5);
+  spawnArcaneImpact(m.x,.18,m.z,'fire');
+  spawnArcaneSigil(m.x,.04,m.z,SUPER_METEOR_RADIUS);
+  triggerCombatShake(18,420);
+  navigator.vibrate&&navigator.vibrate([80,35,120]);
+
+  for(const enemy of [...zombies]){
+    if(!enemy||enemy.userData.dead)continue;
+    if(Math.hypot(enemy.position.x-m.x,enemy.position.z-m.z)>SUPER_METEOR_RADIUS)continue;
+
+    const type=enemy.userData.archetype||'walker';
+    const damage=type==='boss'
+      ? (enemy.userData.maxHp||enemy.userData.hp)*.20
+      : 6.5*playerStats.power;
+
+    applyBulletDamage(enemy,damage);
+    if(enemy.userData.dead)continue;
+
+    enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,SUPER_METEOR_STUN);
+    enemy.userData.burnTimer=Math.max(enemy.userData.burnTimer||0,SUPER_METEOR_BURN);
+    enemy.userData.burnDps=Math.max(enemy.userData.burnDps||0,.55*playerStats.power);
+  }
+}
+
+function clearSuperMeteor(resetCooldown=true){
+  if(activeSuperMeteor){
+    if(activeSuperMeteor.mesh&&activeSuperMeteor.mesh.parent){
+      scene.remove(activeSuperMeteor.mesh);
+      disposeGroup(activeSuperMeteor.mesh);
+    }
+    if(activeSuperMeteor.marker&&activeSuperMeteor.marker.parent){
+      scene.remove(activeSuperMeteor.marker);
+      disposeGroup(activeSuperMeteor.marker);
+    }
+    activeSuperMeteor=null;
+  }
+  if(resetCooldown)superMeteorCooldownTimer=0;
+}
+
 function clearMageRoundSpecials(resetCooldowns=true,preserveMirrorCooldowns=false){
   clearPhoenixFireball(false);
   clearPhoenixAfterEffects();
@@ -12403,6 +12575,7 @@ function clearMageRoundSpecials(resetCooldowns=true,preserveMirrorCooldowns=fals
     if(f.mesh&&f.mesh.parent){scene.remove(f.mesh);disposeGroup(f.mesh);}
   }
   clearCycloneBeacons();
+  clearSuperMeteor(resetCooldowns);
   blizzardActiveTimer=0;blizzardSpawnTimer=0;blizzardDamageTimer=0;
   blizzardMoveDir.set(0,0,0);
   if(blizzardFollowBoundary){
@@ -12411,12 +12584,34 @@ function clearMageRoundSpecials(resetCooldowns=true,preserveMirrorCooldowns=fals
     blizzardFollowBoundary=null;
   }
   for(const m of fallingIce){scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);} fallingIce=[];
+  for(const group of activeBlizzardImpactGroups){
+    if(group&&group.parent)group.parent.remove(group);
+    if(group)disposeGroup(group);
+  }
+  activeBlizzardImpactGroups=[];
   if(typeof stopArcaneLaser==='function')stopArcaneLaser();
   // Clone-type companions intentionally persist between rounds. Do not clear
   // Arcane Echoes or avatar shadow clones as part of round-special cleanup.
   if(resetCooldowns){blizzardCooldownTimer=0;}
 }
 function updateMageUltimates(dt){
+  if(superMeteorCooldownTimer>0)superMeteorCooldownTimer=Math.max(0,superMeteorCooldownTimer-dt);
+  if(activeSuperMeteor){
+    const m=activeSuperMeteor;
+    m.mesh.position.y-=m.fallSpeed*dt;
+    m.mesh.rotation.x+=dt*.75;
+    m.mesh.rotation.y+=dt*1.05;
+    if(m.mesh.userData.lava)m.mesh.userData.lava.rotation.y-=dt*1.7;
+    const pulse=1+Math.sin(performance.now()*.012)*.06;
+    m.marker.scale.setScalar(pulse);
+    m.marker.material.opacity=.48+Math.sin(performance.now()*.015)*.14;
+    if(m.mesh.position.y<=1.5){
+      impactSuperMeteor(m);
+      scene.remove(m.mesh);disposeGroup(m.mesh);
+      scene.remove(m.marker);disposeGroup(m.marker);
+      activeSuperMeteor=null;
+    }
+  }
   if(blizzardCooldownTimer>0)blizzardCooldownTimer=Math.max(0,blizzardCooldownTimer-dt);
   if(blizzardActiveTimer>0){
     blizzardActiveTimer=Math.max(0,blizzardActiveTimer-dt);
