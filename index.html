@@ -1,3 +1,5 @@
+<!-- V22.11.00 Arcane Crystal Fragments: adds eight capped cyan/violet crystal fragments that burst outward, tumble, fall slightly, and fade on Arcane Lance enemy hits. Gameplay values are unchanged. -->
+<!-- V22.10.99 Arcane Crystal Crack: adds five brief blue-white crack lines across the visible Arcane Mark on enemies struck by Arcane Lance. Gameplay values are unchanged. -->
 <!-- V22.10.98 Visible Enemy Arcane Mark: replaces the hidden placeholder state with a visible dual-ring violet mark that expands, spins, and fades over struck enemies. Gameplay values are unchanged. -->
 <!-- V22.10.96 Arcane Lance Freeze Fix: stores the brief cast-charge timer directly on the bullet object instead of reading undefined bullet.userData. This restores firing without changing visuals or gameplay values. -->
 <!-- V22.10.94 Arcane Lance Impact Burst: adds a cyan-violet impact ring, compact ground sigil, and capped crystal spark burst on every Arcane Lance enemy hit. Damage and all gameplay values are unchanged. -->
@@ -769,7 +771,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.98 - Visible Enemy Arcane Mark';
+const GAME_VERSION='22.11.00 - Arcane Crystal Fragments';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -13393,6 +13395,53 @@ function updateBullets(dt){
           markRingA.rotation.x=Math.PI/2;
           markRingB.rotation.y=Math.PI/2;
           arcaneMark.add(markRingA,markRingB);
+
+          const crackMat=new THREE.LineBasicMaterial({
+            color:0x8fe9ff,
+            transparent:true,
+            opacity:0.95,
+            depthWrite:false,
+            blending:THREE.AdditiveBlending
+          });
+          const crackLines=[];
+          for(let i=0;i<5;i++){
+            const a=(i/5)*Math.PI*2;
+            const pts=[
+              new THREE.Vector3(0,0,0),
+              new THREE.Vector3(Math.cos(a)*0.12,Math.sin(a)*0.12,0),
+              new THREE.Vector3(Math.cos(a+0.18)*0.24,Math.sin(a+0.18)*0.24,0)
+            ];
+            const crack=new THREE.Line(
+              new THREE.BufferGeometry().setFromPoints(pts),
+              crackMat.clone()
+            );
+            crack.rotation.x=Math.PI/2;
+            crackLines.push(crack);
+            arcaneMark.add(crack);
+          }
+
+          const crystalFragments=[];
+          for(let i=0;i<8;i++){
+            const angle=(i/8)*Math.PI*2;
+            const fragment=new THREE.Mesh(
+              new THREE.OctahedronGeometry(0.035,0),
+              new THREE.MeshBasicMaterial({
+                color:(i%2===0?0x9eeeff:0xc490ff),
+                transparent:true,
+                opacity:0.9,
+                depthWrite:false,
+                blending:THREE.AdditiveBlending
+              })
+            );
+            fragment.position.set(0,0,0);
+            fragment.userData.velocity=new THREE.Vector3(
+              Math.cos(angle)*(0.75+(i%3)*0.12),
+              0.45+(i%2)*0.18,
+              Math.sin(angle)*(0.75+(i%3)*0.12)
+            );
+            crystalFragments.push(fragment);
+            arcaneMark.add(fragment);
+          }
           scene.add(arcaneMark);
           const markStart=performance.now();
           (function animateArcaneMark(){
@@ -13408,6 +13457,16 @@ function updateBullets(dt){
             const fade=1-age/0.38;
             markRingA.material.opacity=0.92*fade;
             markRingB.material.opacity=0.78*fade;
+            for(const crack of crackLines){
+              if(crack.material) crack.material.opacity=0.95*fade;
+            }
+            for(const fragment of crystalFragments){
+              fragment.position.addScaledVector(fragment.userData.velocity,0.016);
+              fragment.userData.velocity.y-=0.018;
+              fragment.rotation.x+=0.12;
+              fragment.rotation.y+=0.16;
+              if(fragment.material) fragment.material.opacity=0.9*fade;
+            }
             arcaneMark.scale.setScalar(1+age*1.6);
             requestAnimationFrame(animateArcaneMark);
           })();
