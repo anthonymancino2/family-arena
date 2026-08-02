@@ -1,3 +1,4 @@
+<!-- V22.11.06 Arcane Effect Performance Guard: removes a stray pre-HTML constant, caps active Reality Tears at four, cleans expired tears from the cap list, and removes duplicate Mana Rupture visual calls while preserving the effect. -->
 <!-- V22.11.04 Arcane Mana Rupture: enemies defeated while Arcane Resonance is active release a compact arcane explosion that damages nearby enemies. Boss splash is capped. -->
 <!-- V22.11.03 Arcane Reality Tear: Arcane Lance now leaves a 3-second cyan-violet rift when removed. Enemies inside take light repeated magic damage; boss ticks are capped. -->
 <!-- V22.11.02 Arcane Resonance Marker: adds a persistent pulsing violet dual-ring marker above enemies while the 5-second Arcane Resonance status is active. Re-hits refresh the same marker instead of stacking duplicates. Gameplay values are unchanged. -->
@@ -84,7 +85,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.84</title>
+<title>Family Arena V22.11.05</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -774,7 +775,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.11.04 - Arcane Mana Rupture';
+const GAME_VERSION='22.11.06 - Arcane Effect Performance Guard';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -13288,8 +13289,20 @@ function updateCycloneBeacons(dt){
 
 
 
+const activeArcaneRealityTears=[];
+const ARCANE_REALITY_TEAR_CAP=4;
+
 function spawnArcaneRealityTear(x,z,sourceDamage){
+  while(activeArcaneRealityTears.length>=ARCANE_REALITY_TEAR_CAP){
+    const oldest=activeArcaneRealityTears.shift();
+    if(oldest&&oldest.parent){
+      oldest.parent.remove(oldest);
+      disposeGroup(oldest);
+    }
+  }
+
   const group=new THREE.Group();
+  activeArcaneRealityTears.push(group);
   group.position.set(x,0.04,z);
 
   const outerMat=new THREE.MeshBasicMaterial({
@@ -13323,6 +13336,8 @@ function spawnArcaneRealityTear(x,z,sourceDamage){
     const age=(now-started)/1000;
 
     if(age>=3){
+      const tearIndex=activeArcaneRealityTears.indexOf(group);
+      if(tearIndex>=0) activeArcaneRealityTears.splice(tearIndex,1);
       scene.remove(group);
       disposeGroup(group);
       return;
@@ -13716,8 +13731,8 @@ function triggerArcaneManaRupture(sourceEnemy){
   const z=sourceEnemy.position.z;
 
   spawnArcaneImpact(x,y,z,'ice');
-  spawnArcaneSigil(x,0,z,0.95);
-  spawnBurst(x,y,z,16,FX_MAT_SPARK,4.2);
+  spawnArcaneSigil(x,0,z,1.15);
+  spawnBurst(x,y,z,14,FX_MAT_SPARK,4.0);
 
   const radius=2.4;
   for(const enemy of zombies){
