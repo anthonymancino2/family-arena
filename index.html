@@ -1,3 +1,4 @@
+<!-- V22.11.12 Blizzard Skill Freeze Fix: replaces the undefined FX_MAT_ICE particle reference with the existing FX_MAT_SPARK material so Blizzard impacts no longer stop the gameplay update loop. Visual size, damage, freeze, radius, duration, spawn rate, and cooldown are unchanged. -->
 <!-- V22.11.11 Blizzard Impact Shatter: strengthens each ice impact with a larger capped ice-shatter burst and a 1.8-second rotating frost mark with seven fading ground cracks. Damage, freeze, radius, duration, spawn rate, and cooldown are unchanged. -->
 <!-- V22.11.10 Blizzard Ice Mass Visual Pass: replaces each simple falling icosahedron with a layered glowing ice core, translucent faceted shell, and five jagged spikes. The shell and core counter-rotate while falling. Damage, radius, duration, freeze, spawn rate, and cooldown are unchanged. -->
 <!-- V22.11.09 Arcane Lance Final Regression Guard: Reality Tear now spawns only when Arcane Lance expires naturally, not when removed by hitting an enemy. Version labels synchronized. -->
@@ -90,7 +91,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.11.11</title>
+<title>Family Arena V22.11.12</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -780,7 +781,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.11.11 - Blizzard Impact Shatter';
+const GAME_VERSION='22.11.12 - Blizzard Skill Freeze Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12101,7 +12102,7 @@ function spawnFallingIce(){
   fallingIce.push({mesh,ring,x:bx,z:bz,vy:13+Math.random()*4,life:1.15});
 }
 function impactIce(m){
-  spawnBurst(m.x,.35,m.z,24,FX_MAT_ICE,5.8);
+  spawnBurst(m.x,.35,m.z,24,FX_MAT_SPARK,5.8);
   spawnArcaneSigil(m.x,.04,m.z,BLIZZARD_IMPACT_RADIUS);
 
   const frostGroup=new THREE.Group();
