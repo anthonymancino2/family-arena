@@ -766,7 +766,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.92 - Crystal Core Pass';
+const GAME_VERSION='22.10.93 - Arcane Lance Scale Tuning';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12391,7 +12391,7 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
       spawnBurst(startX,startY,startZ,18,FX_MAT_SPARK,4.6);
     }
     if(w.kind==='arcane_lance'){
-      b.mesh.scale.set(6.0,6.0,18.0);
+      b.mesh.scale.set(3.0,3.0,9.0);
       b.pierces=2;
       const arcaneCore=new THREE.Mesh(
         new THREE.CapsuleGeometry(0.036,0.27,3,6),
