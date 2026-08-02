@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- V22.10.72 Secondary Hold-State Reliability: moves held Secondary repeat attempts into the main game update loop instead of relying on a browser interval. Tap still casts once, holding continues to cast whenever the equipped move is ready, and releasing/canceling/focus loss immediately stops all attempts. This restores Giant Fireball hold-to-repeat while preserving its 1.85-second cooldown and all existing damage/visual behavior. -->
 <!-- V22.10.71 Mage Giant Fireball Phoenix-Scale Upgrade: replaces the Mage Giant Fireball's generic tracer silhouette with the full molten Phoenix sphere model at the same visual scale. Its firing cooldown is increased and projectile travel speed reduced so the much larger shot remains powerful without becoming a rapid-fire screen clearer. Damage, direct-hit rules, splash radius, targeting, and hold-to-fire behavior are unchanged. -->
 <!-- V22.10.70 Secondary Hold-to-Repeat Fix: restores intentional hold-to-repeat for every equipped secondary while preserving one cast on a quick tap. Repeated attempts respect each move's own cooldown or independent placement slots, and release, cancellation, focus loss, or page hiding immediately stops the shared hold loop. -->
 <!-- V22.10.69 Shared Secondary Input Fix: removes the repeating timer from the shared Secondary button so every secondary ability casts only once per fresh press. Pointer/touch release, cancellation, focus loss, and visibility changes now always clear the press state. Primary hold-to-fire is unchanged. -->
@@ -62,7 +63,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.71</title>
+<title>Family Arena V22.10.72</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -752,7 +753,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.71 - Mage Giant Fireball Phoenix-Scale Upgrade';
+const GAME_VERSION='22.10.72 - Secondary Hold-State Reliability';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -9612,6 +9613,7 @@ document.addEventListener('touchend',e=>{
 // ---- Touch controls ----
 let moveVec = {x:0,y:0};
 let lookActive = false, lookLast = {x:0,y:0};
+let secondaryInputHeld = false;
 
 function setupControls(){
   const moveZone = document.getElementById('moveZone');
@@ -9708,20 +9710,17 @@ function setupControls(){
   const secondaryBtnEl=document.getElementById('secondaryBtn');
   let secondaryPressed=false;
   let secondaryPointerId=null;
-  let secondaryHoldInterval=null;
   const releaseSecondaryInput=e=>{
     if(e && e.preventDefault) e.preventDefault();
     secondaryPressed=false;
+    secondaryInputHeld=false;
     secondaryPointerId=null;
-    if(secondaryHoldInterval!==null){
-      clearInterval(secondaryHoldInterval);
-      secondaryHoldInterval=null;
-    }
   };
   const beginSecondaryFire=e=>{
     if(e){e.preventDefault();e.stopPropagation();}
     if(secondaryPressed) return;
     secondaryPressed=true;
+    secondaryInputHeld=true;
     secondaryPointerId=e&&Number.isFinite(e.pointerId)?e.pointerId:null;
     const w=secondaryWeaponForAvatar();
     if(!w){
@@ -9732,14 +9731,9 @@ function setupControls(){
     if(e && e.currentTarget && e.currentTarget.setPointerCapture && Number.isFinite(e.pointerId)){
       try{e.currentTarget.setPointerCapture(e.pointerId);}catch(_err){}
     }
+    // Cast once immediately. Continued hold attempts are processed by the
+    // main game loop so mobile browsers cannot silently lose an interval.
     doSecondaryShoot();
-    secondaryHoldInterval=setInterval(()=>{
-      if(!secondaryPressed || !gameRunning){
-        releaseSecondaryInput();
-        return;
-      }
-      doSecondaryShoot();
-    },50);
   };
   if(window.PointerEvent){
     secondaryBtnEl.addEventListener('pointerdown',beginSecondaryFire,{passive:false});
@@ -13631,6 +13625,9 @@ function update(dt){
   if((player.userData.secondaryAttackCooldown||0)>0){
     player.userData.secondaryAttackCooldown=Math.max(0,player.userData.secondaryAttackCooldown-dt);
   }
+  // Tap casts once in beginSecondaryFire(); while the control remains held,
+  // retry here and let each move's own cooldown/slot rules decide readiness.
+  if(secondaryInputHeld && gameRunning) doSecondaryShoot();
   updateSecondaryButton();
   refreshPassiveState(dt);
   updatePassiveHud();
