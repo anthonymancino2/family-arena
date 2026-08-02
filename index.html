@@ -1,3 +1,7 @@
+<!-- V22.11.20 Blizzard Icy Mist Plume: adds six capped translucent mist plumes that rise, widen, drift slightly, and fade within 0.85 seconds at each Blizzard impact. Gameplay values are unchanged. -->
+<!-- V22.11.19 Traveling Blizzard Spawn Bias: falling ice now shifts modestly toward the Mage's recent movement direction while preserving random coverage across the storm. Damage, freeze, radius, duration, spawn rate, and cooldown are unchanged. -->
+<!-- V22.11.18 Moving Blizzard Boundary: adds a persistent cyan-violet Blizzard radius marker that follows the Mage, pulses subtly, and cleans up when the storm or round ends. Falling ice continues spawning around the moving storm center. -->
+<!-- V22.11.17 No Audio Audit: verified the project contains no audio tags, audio files, Web Audio API calls, HTML Audio objects, music systems, SFX functions, volume controls, or mute controls. Character animation .play() calls remain because they are visual animation, not sound. -->
 <!-- V22.11.16 Blizzard Follows Player: while active, Blizzard's center updates to the Mage's current position every frame, so the storm moves with the player. Damage, freeze, radius, duration, spawn rate, and cooldown are unchanged. -->
 <!-- V22.11.15 Sync Game Update Button: makes the home Sync Game control more obvious with a brighter animated blue treatment, larger icon, stacked Sync Game / Game Update label, and update badge. Functionality is unchanged. -->
 <!-- V22.11.12 Blizzard Skill Freeze Fix: replaces the undefined FX_MAT_ICE particle reference with the existing FX_MAT_SPARK material so Blizzard impacts no longer stop the gameplay update loop. Visual size, damage, freeze, radius, duration, spawn rate, and cooldown are unchanged. -->
@@ -93,7 +97,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.11.16</title>
+<title>Family Arena V22.11.20</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -110,7 +114,7 @@
 <!-- V22.9.19 Knight Phase 3 FINAL: final Knight cleanup. Whirlwind tuning is fully data-driven, armor/Whirlwind state is confirmed to reset per run, passive announcements remain disabled, and Knight HUD/effect behavior is finalized before Rogue development. -->
 <!-- V22.9.19 Knight Phase 2: adds the Knight's every-fifth-kill 3-second Whirlwind passive with repeating radial damage, stun, knockback, spinning hero feedback, and HUD progress. Passive activation uses effects only and never displays an announcement box. -->
 <!-- V22.9.15 Knight Phase 1: adds Knight-specific +2 starting HP and +2 HP upgrades, replaces the old every-fourth-hit guard with a two-charge regenerating Magical Armor system, adds a dedicated armor HUD meter, and standardizes nearest-enemy melee auto-facing. Passive activations remain free of repetitive announcement boxes. -->
-<!-- V22.9.14 Passive Announcement Fix: removes repetitive toast/text-box announcements from automatic hero passive triggers across current avatars. Passive gameplay effects, sounds, vibration, particles, HUD counters, and timers remain intact. Manual signature/ultimate announcements and important game-event notices remain unchanged. -->
+<!-- V22.9.14 Passive Announcement Fix: removes repetitive toast/text-box announcements from automatic hero passive triggers across current avatars. Passive gameplay effects, vibration, particles, HUD counters, and timers remain intact. Manual signature/ultimate announcements and important game-event notices remain unchanged. -->
 <!-- V22.9.14 Passive Announcement Fix: adds independent kill counters. Every third Barbarian defeat releases a damaging ground Shockwave with brief stun and knockback; every fifth defeat grants 3 seconds of Invincibility. The passive HUD shows both progress counters and active invincibility. -->
 <!-- V22.9.12 Barbarian Phase 1: adds Barbarian-specific +2 starting HP, +2 starting Power, +2 HP per between-round HP choice, roughly 25% longer default axe reach, and 360-degree nearest-enemy melee auto-aim. -->
 <!-- V22.9.19 Mage Secondary Combat Overhaul: replaces Chain Elements with the visible, balanced Arcane Lance piercing attack; turns Giant Fireball into a much larger direct-hit execution projectile with a wider explosion; and adds a universal locked secondary-attack slot beside FIRE. Purchased/equipped shop weapons now occupy the secondary slot while every hero keeps their default move on FIRE. -->
@@ -876,7 +880,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.11.16 - Blizzard Follows Player';
+const GAME_VERSION='22.11.20 - Blizzard Icy Mist Plume';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12112,6 +12116,9 @@ const BLIZZARD_DURATION=10, BLIZZARD_FREEZE=3, BLIZZARD_IMPACT_RADIUS=3.1;
 function blizzardRadius(){ return Math.max(12, arenaSize*.45); } // exactly 45% of playable map radius
 let blizzardCooldownTimer=0;
 let blizzardActiveTimer=0, blizzardSpawnTimer=0, blizzardDamageTimer=0, blizzardCenter=new THREE.Vector3();
+let blizzardFollowBoundary=null;
+let blizzardLastPlayerPos=new THREE.Vector3();
+let blizzardMoveDir=new THREE.Vector3();
 let fallingIce=[];
 
 function abilityButtonCooldown(seconds){
@@ -12185,7 +12192,10 @@ function makeIceBallMesh(radius=1.05){
 function spawnFallingIce(){
   const stormR=Math.min(blizzardRadius(),arenaSize-2.4);
   const a=Math.random()*Math.PI*2, r=Math.sqrt(Math.random())*stormR;
-  const x=blizzardCenter.x+Math.cos(a)*r, z=blizzardCenter.z+Math.sin(a)*r;
+  const movementStrength=Math.min(1,blizzardMoveDir.length());
+  const forwardBias=stormR*.28*movementStrength;
+  const x=blizzardCenter.x+Math.cos(a)*r+blizzardMoveDir.x*forwardBias;
+  const z=blizzardCenter.z+Math.sin(a)*r+blizzardMoveDir.z*forwardBias;
   const boundedR=Math.hypot(x,z);
   const clamp=boundedR>arenaSize-2.2?(arenaSize-2.2)/boundedR:1;
   const bx=x*clamp,bz=z*clamp;
@@ -12240,6 +12250,29 @@ function impactIce(m){
     frostGroup.add(crack);
   }
 
+  const mistPlumes=[];
+  for(let i=0;i<6;i++){
+    const mist=new THREE.Mesh(
+      new THREE.SphereGeometry(.20+Math.random()*.10,8,6),
+      new THREE.MeshBasicMaterial({
+        color:0xcdf8ff,
+        transparent:true,
+        opacity:.22,
+        depthWrite:false,
+        blending:THREE.AdditiveBlending
+      })
+    );
+    const a=Math.random()*Math.PI*2;
+    const r=Math.random()*.45;
+    mist.position.set(Math.cos(a)*r,.08+Math.random()*.10,Math.sin(a)*r);
+    mist.scale.set(1.2,1.8,1.2);
+    mist.userData.rise=.55+Math.random()*.45;
+    mist.userData.driftX=(Math.random()-.5)*.18;
+    mist.userData.driftZ=(Math.random()-.5)*.18;
+    mistPlumes.push(mist);
+    frostGroup.add(mist);
+  }
+
   scene.add(frostGroup);
   const frostStarted=performance.now();
   (function animateBlizzardFrostMark(){
@@ -12254,6 +12287,14 @@ function impactIce(m){
     frostDisc.material.opacity=.44*fade;
     for(const crack of frostCracks){
       if(crack.material)crack.material.opacity=.78*fade;
+    }
+    for(const mist of mistPlumes){
+      mist.position.y+=mist.userData.rise*.016;
+      mist.position.x+=mist.userData.driftX*.016;
+      mist.position.z+=mist.userData.driftZ*.016;
+      const mistScale=1+age*1.8;
+      mist.scale.set(1.2*mistScale,1.8*mistScale,1.2*mistScale);
+      if(mist.material)mist.material.opacity=.22*Math.max(0,1-age/.85);
     }
     frostGroup.rotation.y+=.007;
     requestAnimationFrame(animateBlizzardFrostMark);
@@ -12278,8 +12319,49 @@ function triggerBlizzardStorm(){
   if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='blizzard_storm'||!ownedAbilities.blizzard_storm||blizzardCooldownTimer>0)return;
   blizzardCooldownTimer=BLIZZARD_COOLDOWN; abilityButtonCooldown(BLIZZARD_COOLDOWN);
   blizzardActiveTimer=BLIZZARD_DURATION; blizzardSpawnTimer=0; blizzardDamageTimer=0; blizzardCenter.copy(player.position);
-  spawnArcaneSigil(blizzardCenter.x,.03,blizzardCenter.z,blizzardRadius());
-  spawnArcaneRuneBurst(blizzardCenter,blizzardRadius()*.72);
+  blizzardLastPlayerPos.copy(player.position);
+  blizzardMoveDir.set(0,0,0);
+
+  if(blizzardFollowBoundary&&blizzardFollowBoundary.parent){
+    scene.remove(blizzardFollowBoundary);
+    disposeGroup(blizzardFollowBoundary);
+  }
+
+  blizzardFollowBoundary=new THREE.Group();
+
+  const boundaryRadius=blizzardRadius();
+  const outerBoundary=new THREE.Mesh(
+    new THREE.RingGeometry(boundaryRadius*.97,boundaryRadius,64),
+    new THREE.MeshBasicMaterial({
+      color:0x7fe9ff,
+      transparent:true,
+      opacity:.42,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending,
+      side:THREE.DoubleSide
+    })
+  );
+  outerBoundary.rotation.x=-Math.PI/2;
+
+  const innerBoundary=new THREE.Mesh(
+    new THREE.RingGeometry(boundaryRadius*.72,boundaryRadius*.735,64),
+    new THREE.MeshBasicMaterial({
+      color:0xc39bff,
+      transparent:true,
+      opacity:.24,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending,
+      side:THREE.DoubleSide
+    })
+  );
+  innerBoundary.rotation.x=-Math.PI/2;
+
+  blizzardFollowBoundary.add(outerBoundary,innerBoundary);
+  blizzardFollowBoundary.position.set(blizzardCenter.x,.035,blizzardCenter.z);
+  scene.add(blizzardFollowBoundary);
+
+  spawnArcaneSigil(blizzardCenter.x,.03,blizzardCenter.z,boundaryRadius);
+  spawnArcaneRuneBurst(blizzardCenter,boundaryRadius*.72);
   triggerCombatShake(5,180);navigator.vibrate&&navigator.vibrate([35,25,55]);toast('BLIZZARD STORM!');
 }
 
@@ -12295,6 +12377,12 @@ function clearMageRoundSpecials(resetCooldowns=true,preserveMirrorCooldowns=fals
   }
   clearCycloneBeacons();
   blizzardActiveTimer=0;blizzardSpawnTimer=0;blizzardDamageTimer=0;
+  blizzardMoveDir.set(0,0,0);
+  if(blizzardFollowBoundary){
+    if(blizzardFollowBoundary.parent)scene.remove(blizzardFollowBoundary);
+    disposeGroup(blizzardFollowBoundary);
+    blizzardFollowBoundary=null;
+  }
   for(const m of fallingIce){scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);} fallingIce=[];
   if(typeof stopArcaneLaser==='function')stopArcaneLaser();
   // Clone-type companions intentionally persist between rounds. Do not clear
@@ -12305,7 +12393,26 @@ function updateMageUltimates(dt){
   if(blizzardCooldownTimer>0)blizzardCooldownTimer=Math.max(0,blizzardCooldownTimer-dt);
   if(blizzardActiveTimer>0){
     blizzardActiveTimer=Math.max(0,blizzardActiveTimer-dt);
-    if(player) blizzardCenter.copy(player.position);
+    if(player){
+      const moveDelta=new THREE.Vector3().subVectors(player.position,blizzardLastPlayerPos);
+      moveDelta.y=0;
+      if(moveDelta.lengthSq()>.000001){
+        moveDelta.normalize();
+        blizzardMoveDir.lerp(moveDelta,.18);
+      }else{
+        blizzardMoveDir.multiplyScalar(.92);
+      }
+      blizzardLastPlayerPos.copy(player.position);
+      blizzardCenter.copy(player.position);
+    }
+
+    if(blizzardFollowBoundary){
+      blizzardFollowBoundary.position.set(blizzardCenter.x,.035,blizzardCenter.z);
+      blizzardFollowBoundary.rotation.y+=dt*.18;
+      const boundaryPulse=1+Math.sin(performance.now()*.006)*.012;
+      blizzardFollowBoundary.scale.setScalar(boundaryPulse);
+    }
+
     blizzardSpawnTimer-=dt;blizzardDamageTimer-=dt;
     // Many more giant ice balls, while keeping a hard cap for mobile stability.
     if(blizzardSpawnTimer<=0){blizzardSpawnTimer=.24;if(fallingIce.length<18)spawnFallingIce();}
@@ -12324,6 +12431,12 @@ function updateMageUltimates(dt){
       if(affected&&blizzardActiveTimer>BLIZZARD_DURATION-1.0)toast(`BLIZZARD · ${affected} AFFECTED${defeated?` · ${defeated} DEFEATED`:''}`);
     }
   }
+  if(blizzardActiveTimer<=0 && blizzardFollowBoundary){
+    if(blizzardFollowBoundary.parent) scene.remove(blizzardFollowBoundary);
+    disposeGroup(blizzardFollowBoundary);
+    blizzardFollowBoundary=null;
+  }
+
   for(let i=fallingIce.length-1;i>=0;i--){
     const m=fallingIce[i];
     m.life-=dt;
