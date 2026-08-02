@@ -1,3 +1,4 @@
+<!-- V22.10.90 Arcane Lance 3x Full Scale: triples the complete Arcane Lance visual hierarchy, including spearhead, core, rings, rune shards, ribbon, and trail, while leaving damage, cooldown, speed, piercing, and collision unchanged. -->
 <!-- V22.10.89 Arcane Lance Energy Trail: adds a short pulsing blue additive trail behind the live projectile. No gameplay values changed. -->
 <!-- V22.10.87 Arcane Lance Rune Shards: adds eight capped cyan/violet arcane fragments that orbit and tumble around the live projectile. No gameplay values changed. -->
 <!-- V22.10.86 Arcane Lance Spiral Ribbon: verified the live Arcane Lance creation/update path and added one rotating cyan spiral energy ribbon around the projectile. No gameplay values changed. -->
@@ -765,7 +766,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.89 - Arcane Lance Spearhead Pass';
+const GAME_VERSION='22.10.90 - Arcane Lance 3x Full Scale';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12390,7 +12391,7 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
       spawnBurst(startX,startY,startZ,18,FX_MAT_SPARK,4.6);
     }
     if(w.kind==='arcane_lance'){
-      b.mesh.scale.set(2.0,2.0,6.0);
+      b.mesh.scale.set(6.0,6.0,18.0);
       b.pierces=2;
       const arcaneCore=new THREE.Mesh(
         new THREE.CapsuleGeometry(0.036,0.27,3,6),
