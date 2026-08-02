@@ -1,4 +1,5 @@
-<!-- V22.10.86 Arcane Lance Rune Shards: adds eight capped cyan/violet arcane fragments that orbit and tumble around the live projectile. No gameplay values changed. -->
+<!-- V22.10.87 Arcane Lance Energy Trail: adds a short pulsing blue additive trail behind the live projectile. No gameplay values changed. -->
+<!-- V22.10.87 Arcane Lance Rune Shards: adds eight capped cyan/violet arcane fragments that orbit and tumble around the live projectile. No gameplay values changed. -->
 <!-- V22.10.86 Arcane Lance Spiral Ribbon: verified the live Arcane Lance creation/update path and added one rotating cyan spiral energy ribbon around the projectile. No gameplay values changed. -->
 <!-- V22.10.84 Arcane Lance Dual Rings: adds a second smaller inner rune ring rotating in the opposite direction. No gameplay values changed. -->
 <!-- V22.10.83 Arcane Lance Rune Ring: adds one visible cyan additive rune ring to the Arcane Lance and rotates it during flight. Damage, cooldown, speed, piercing, collision, and other abilities are unchanged. -->
@@ -764,7 +765,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.86 - Arcane Lance Rune Shards';
+const GAME_VERSION='22.10.87 - Arcane Lance Energy Trail';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12489,6 +12490,23 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
       }
       b.mesh.add(arcaneShardGroup);
 
+      const arcaneTrailMat=new THREE.MeshBasicMaterial({
+        color:0x53b8ff,
+        transparent:true,
+        opacity:0.58,
+        depthWrite:false,
+        blending:THREE.AdditiveBlending
+      });
+      const arcaneTrail=new THREE.Mesh(
+        new THREE.CylinderGeometry(0.02,0.10,1.25,8,1,true),
+        arcaneTrailMat
+      );
+      arcaneTrail.rotation.x=Math.PI/2;
+      arcaneTrail.position.z=-0.72;
+      arcaneTrail.userData.role='arcaneLanceTrail';
+      arcaneTrail.userData.baseOpacity=0.58;
+      b.mesh.add(arcaneTrail);
+
       spawnArcaneSigil(startX,0,startZ,1.55);
       spawnBurst(startX,startY,startZ,14,FX_MAT_DUST,4.0);
     }
@@ -13287,6 +13305,12 @@ function updateBullets(dt){
             shard.rotation.y += (shard.userData.spinY||2.4)*dt;
             shard.rotation.z += (shard.userData.spinZ||1.6)*dt;
           }
+        }
+        if(child.userData&&child.userData.role==='arcaneLanceTrail'){
+          const pulse=0.86+Math.sin(performance.now()*0.018)*0.12;
+          child.scale.x=pulse;
+          child.scale.z=pulse;
+          if(child.material) child.material.opacity=child.userData.baseOpacity*(0.82+Math.sin(performance.now()*0.024)*0.12);
         }
       }
     }
