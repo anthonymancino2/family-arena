@@ -1,3 +1,4 @@
+<!-- V22.10.79 Giant Fireball Map-Persistence + Active Cap: Mage Giant Fireballs repeat every 1.5 seconds while Secondary is held, remain independently active after hitting enemies, and are removed only after fully passing beyond the playable arena boundary. A maximum of 10 may exist at once; held firing resumes automatically when the count drops below 10. No-touch input never fires. -->
 <!DOCTYPE html>
 <!-- V22.10.78 Secondary Hold Pointer Reliability: keeps the Secondary held state active for the full matching touch/pointer contact instead of clearing it on Safari pointer-capture loss. Tap still casts once; hold repeats through the move cooldown; release/cancel/focus loss stops immediately. -->
 <!-- V22.10.77 Primary Hold Scope Crash Fix: moves primaryInputHeld into shared runtime scope so update() can read it without throwing. This restores normal world rendering and movement while running; pause remains fully frozen. -->
@@ -67,7 +68,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.78</title>
+<title>Family Arena V22.10.79</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -757,7 +758,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.78 - Secondary Hold Pointer Reliability';
+const GAME_VERSION='22.10.79 - Giant Fireball Boundary Persistence + Cap';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1490,7 +1491,7 @@ const CHARACTER_COMBAT = {
         desc:'Hold FIRE for Uzi-speed alternating fire and ice.'},
       arcane_lance:{name:'Arcane Lance', price:390, kind:'arcane_lance', cooldown:0.58, damage:2.15, pierce:2, auto:true,
         desc:'A large elemental spear that pierces up to three enemies in a straight line.'},
-      giant_fireball:{name:'Giant Fireball', price:560, kind:'giant_fireball', cooldown:1.85, damage:999, splash:5.4, splashDamage:4.5, directInstakill:true, auto:true,
+      giant_fireball:{name:'Giant Fireball', price:560, kind:'giant_fireball', cooldown:1.5, damage:999, splash:5.4, splashDamage:4.5, directInstakill:true, auto:true,
         desc:'A Phoenix-scale molten fireball with a slower firing cadence. Direct hits execute any non-boss and the impact damages a wide surrounding area.'}
     }
   }
@@ -12375,6 +12376,9 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
       disposeGroup(oldMesh);
       b.mesh=moltenMesh;
       b.speedMult=(b.speedMult||1)*0.58;
+      b.boundaryPersistent=true;
+      b.hitRadius=2.35;
+      b.life=Infinity;
       spawnArcaneSigil(startX,0,startZ,2.65);
       spawnBurst(startX,startY,startZ,18,FX_MAT_SPARK,4.6);
     }
@@ -12469,6 +12473,10 @@ function doSecondaryShoot(){
     return;
   }
   if((player.userData.secondaryAttackCooldown||0)>0)return;
+  if(w.kind==='giant_fireball'){
+    const activeGiantFireballs=bullets.reduce((count,b)=>count+(b.kind==='giant_fireball'?1:0),0);
+    if(activeGiantFireballs>=10)return;
+  }
   if(w.kind==='rocket_arrow'){
     triggerPhoenixFireball();
     return;
@@ -13165,7 +13173,7 @@ function updateBullets(dt){
     }
     b.life -= dt;
     let hit = false;
-    if(bulletBlockedAt(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z)){
+    if(b.kind!=='giant_fireball' && bulletBlockedAt(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z)){
       if(b.kind==='cyclone_snare_arrow') triggerCycloneSnare(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,b);
       else spawnBurst(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 4, FX_MAT_SPARK, 1.8);
       hit = true;
@@ -13214,13 +13222,19 @@ function updateBullets(dt){
           }
           spawnBurst(b.mesh.position.x, b.mesh.position.y+0.3, b.mesh.position.z, 14, FX_MAT_SPARK, 4.5);
         }
+        if(b.kind==='giant_fireball'){
+          // The molten sphere survives every impact and can damage each enemy once
+          // while continuing toward the far arena boundary.
+          continue;
+        }
         if(b.kind==='star'&&b.ricochets>0){const next=zombies.filter(n=>!n.userData.dead&&n!==z).sort((a,c)=>a.position.distanceTo(b.mesh.position)-c.position.distanceTo(b.mesh.position))[0];if(next){const tx=next.position.x-b.mesh.position.x,ty=(next.position.y+.8)-b.mesh.position.y,tz=next.position.z-b.mesh.position.z,l=Math.hypot(tx,ty,tz)||1;b.dx=tx/l;b.dy=ty/l;b.dz=tz/l;b.mesh.lookAt(next.position.x,next.position.y+.8,next.position.z);b.ricochets--;spawnShadowSmoke(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,6);continue;}}
         if((b.pierces||0)>0){b.pierces--;b.mesh.position.x+=b.dx*.65;b.mesh.position.z+=b.dz*.65;spawnArcherSpark(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z);continue;}
         hit = true;
         break;
       }
     }
-    if(hit || b.life<=0){
+    const giantPastBoundary=b.kind==='giant_fireball' && Math.hypot(b.mesh.position.x,b.mesh.position.z)>(arenaSize+3.2);
+    if(hit || giantPastBoundary || (!b.boundaryPersistent && b.life<=0)){
       if(b.life<=0 && b.kind==='cyclone_snare_arrow' && !b.cycloneDetonated){
         triggerCycloneSnare(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,b);
       }
