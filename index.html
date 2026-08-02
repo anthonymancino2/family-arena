@@ -766,7 +766,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.90 - Arcane Lance 3x Full Scale';
+const GAME_VERSION='22.10.91 - Arcane Rune Gate';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12408,7 +12408,7 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
       b.mesh.add(arcaneCore);
 
       const arcaneRing=new THREE.Mesh(
-        new THREE.TorusGeometry(0.24,0.02,8,32),
+        new THREE.TorusGeometry(0.42,0.026,10,40),
         new THREE.MeshBasicMaterial({
           color:0x4de8ff,
           transparent:true,
@@ -12418,12 +12418,12 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
         })
       );
       arcaneRing.rotation.x=Math.PI/3;
-      arcaneRing.position.z=-0.12;
+      arcaneRing.position.z=-0.40;
       arcaneRing.userData.role='arcaneLanceRing';
       b.mesh.add(arcaneRing);
 
       const arcaneInnerRing=new THREE.Mesh(
-        new THREE.TorusGeometry(0.16,0.016,8,28),
+        new THREE.TorusGeometry(0.28,0.020,10,36),
         new THREE.MeshBasicMaterial({
           color:0xa86cff,
           transparent:true,
@@ -12433,7 +12433,7 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
         })
       );
       arcaneInnerRing.rotation.x=-Math.PI/4;
-      arcaneInnerRing.position.z=-0.22;
+      arcaneInnerRing.position.z=-0.55;
       arcaneInnerRing.userData.role='arcaneLanceInnerRing';
       b.mesh.add(arcaneInnerRing);
 
