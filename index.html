@@ -1,3 +1,5 @@
+<!-- V22.11.31 Four Meteor Stability Guard: caps overlapping giant meteor impact groups at two, clears all tracked impact effects during cleanup, and adds a sequence failsafe if an active meteor object is unexpectedly lost. Gameplay values and four-quadrant timing are unchanged. -->
+<!-- V22.11.30 Meteor Quadrant Guide: adds a subtle temporary cross that divides the circular arena into four equal quadrants and softly highlights the quadrant receiving the current meteor. The guide disappears after the fourth impact or during cleanup. Gameplay values are unchanged. -->
 <!-- V22.11.29 Four Quadrant Meteor Sequence: one cast now drops four Super Meteors in order across map quadrants 1, 2, 3, and 4. Each next meteor begins falling 1.5 seconds after the previous meteor impacts. Existing meteor size, impact radius, damage, boss cap, stun, burn, and cooldown are preserved. -->
 <!-- V22.11.26 Super Meteor Cleanup Guard: caps active scorched craters at three and clears meteor craters plus surviving enemy burn auras during round/reset cleanup. Damage and all gameplay values are unchanged. -->
 <!-- V22.11.25 Super Meteor Debris Crater Burn FX: adds fourteen capped molten debris fragments, a four-second scorched crater with pulsing lava ring, and a visible orange burn aura on surviving enemies. Gameplay values are unchanged. -->
@@ -103,7 +105,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.11.29</title>
+<title>Family Arena V22.11.31</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -886,7 +888,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.11.29 - Four Quadrant Meteor Sequence';
+const GAME_VERSION='22.11.31 - Four Meteor Stability Guard';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12433,6 +12435,9 @@ let activeSuperMeteor=null;
 let superMeteorSequenceActive=false;
 let superMeteorNextDropTimer=0;
 let superMeteorNextQuadrant=0;
+let superMeteorQuadrantGuide=null;
+let activeSuperMeteorImpacts=[];
+const SUPER_METEOR_IMPACT_CAP=2;
 let activeSuperMeteorCraters=[];
 const SUPER_METEOR_CRATER_CAP=3;
 
@@ -12510,6 +12515,83 @@ function makeSuperMeteorMesh(){
   return group;
 }
 
+
+function createSuperMeteorQuadrantGuide(){
+  if(superMeteorQuadrantGuide&&superMeteorQuadrantGuide.parent){
+    scene.remove(superMeteorQuadrantGuide);
+    disposeGroup(superMeteorQuadrantGuide);
+  }
+
+  const guide=new THREE.Group();
+  guide.position.y=.03;
+
+  const lineMat=new THREE.LineBasicMaterial({
+    color:0xff8a3a,
+    transparent:true,
+    opacity:.28,
+    depthWrite:false,
+    blending:THREE.AdditiveBlending
+  });
+
+  const extent=Math.max(8,arenaSize*.92);
+  const horizontal=new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-extent,0,0),
+      new THREE.Vector3(extent,0,0)
+    ]),
+    lineMat
+  );
+  const vertical=new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0,0,-extent),
+      new THREE.Vector3(0,0,extent)
+    ]),
+    lineMat.clone()
+  );
+
+  guide.add(horizontal,vertical);
+
+  const sectorMat=new THREE.MeshBasicMaterial({
+    color:0xff5c28,
+    transparent:true,
+    opacity:.12,
+    side:THREE.DoubleSide,
+    depthWrite:false,
+    blending:THREE.AdditiveBlending
+  });
+
+  for(let i=0;i<4;i++){
+    const sector=new THREE.Mesh(
+      new THREE.RingGeometry(
+        Math.max(1.5,arenaSize*.14),
+        Math.max(6,arenaSize*.82),
+        48,
+        1,
+        i*Math.PI/2,
+        Math.PI/2
+      ),
+      sectorMat.clone()
+    );
+    sector.rotation.x=-Math.PI/2;
+    sector.userData.quadrantIndex=i;
+    sector.material.opacity=.04;
+    guide.add(sector);
+  }
+
+  scene.add(guide);
+  superMeteorQuadrantGuide=guide;
+  return guide;
+}
+
+function highlightSuperMeteorQuadrant(quadrantIndex){
+  if(!superMeteorQuadrantGuide)createSuperMeteorQuadrantGuide();
+  for(const child of superMeteorQuadrantGuide.children){
+    if(child.userData&&Number.isInteger(child.userData.quadrantIndex)){
+      child.material.opacity=child.userData.quadrantIndex===quadrantIndex?.18:.035;
+    }
+  }
+}
+
 function superMeteorQuadrantTarget(quadrantIndex){
   const safeRadius=Math.max(4,Math.min(arenaSize*.46,arenaSize-SUPER_METEOR_RADIUS*.55));
   const diagonal=safeRadius/Math.sqrt(2);
@@ -12523,6 +12605,7 @@ function superMeteorQuadrantTarget(quadrantIndex){
 }
 
 function spawnSuperMeteorForQuadrant(quadrantIndex){
+  highlightSuperMeteorQuadrant(quadrantIndex);
   const target=superMeteorQuadrantTarget(quadrantIndex);
   const targetX=target.x,targetZ=target.z;
 
@@ -12586,6 +12669,7 @@ function triggerSuperMeteor(){
   superMeteorSequenceActive=true;
   superMeteorNextQuadrant=1;
   superMeteorNextDropTimer=0;
+  createSuperMeteorQuadrantGuide();
   spawnSuperMeteorForQuadrant(0);
 
   superMeteorCooldownTimer=SUPER_METEOR_COOLDOWN;
@@ -12614,6 +12698,15 @@ function impactSuperMeteor(m){
   const shockB=new THREE.Mesh(new THREE.RingGeometry(2.8,3.8,64),shockMat.clone());
   shockB.rotation.x=-Math.PI/2;
   impactFx.add(shockA,shockB);
+
+  while(activeSuperMeteorImpacts.length>=SUPER_METEOR_IMPACT_CAP){
+    const oldest=activeSuperMeteorImpacts.shift();
+    if(oldest&&oldest.parent){
+      oldest.parent.remove(oldest);
+      disposeGroup(oldest);
+    }
+  }
+  activeSuperMeteorImpacts.push(impactFx);
   scene.add(impactFx);
 
   const moltenDebris=[];
@@ -12645,6 +12738,8 @@ function impactSuperMeteor(m){
     if(!impactFx.parent)return;
     const age=(performance.now()-impactStarted)/1000;
     if(age>=.9){
+      const impactIndex=activeSuperMeteorImpacts.indexOf(impactFx);
+      if(impactIndex>=0)activeSuperMeteorImpacts.splice(impactIndex,1);
       scene.remove(impactFx);
       disposeGroup(impactFx);
       return;
@@ -12788,6 +12883,12 @@ function clearSuperMeteor(resetCooldown=true){
     activeSuperMeteor=null;
   }
 
+  for(const impact of activeSuperMeteorImpacts){
+    if(impact&&impact.parent)impact.parent.remove(impact);
+    if(impact)disposeGroup(impact);
+  }
+  activeSuperMeteorImpacts=[];
+
   for(const crater of activeSuperMeteorCraters){
     if(crater&&crater.parent)crater.parent.remove(crater);
     if(crater)disposeGroup(crater);
@@ -12807,6 +12908,12 @@ function clearSuperMeteor(resetCooldown=true){
   superMeteorSequenceActive=false;
   superMeteorNextDropTimer=0;
   superMeteorNextQuadrant=0;
+
+  if(superMeteorQuadrantGuide){
+    if(superMeteorQuadrantGuide.parent)scene.remove(superMeteorQuadrantGuide);
+    disposeGroup(superMeteorQuadrantGuide);
+    superMeteorQuadrantGuide=null;
+  }
 
   if(resetCooldown)superMeteorCooldownTimer=0;
 }
@@ -12843,6 +12950,16 @@ function clearMageRoundSpecials(resetCooldowns=true,preserveMirrorCooldowns=fals
 }
 function updateMageUltimates(dt){
   if(superMeteorCooldownTimer>0)superMeteorCooldownTimer=Math.max(0,superMeteorCooldownTimer-dt);
+
+  if(activeSuperMeteor&&(!activeSuperMeteor.mesh||!activeSuperMeteor.marker)){
+    activeSuperMeteor=null;
+    if(superMeteorSequenceActive&&superMeteorNextQuadrant<4){
+      superMeteorNextDropTimer=Math.max(superMeteorNextDropTimer,1.5);
+    }else{
+      superMeteorSequenceActive=false;
+    }
+  }
+
   if(activeSuperMeteor){
     const m=activeSuperMeteor;
     m.mesh.position.y-=m.fallSpeed*dt;
@@ -12874,6 +12991,11 @@ function updateMageUltimates(dt){
       }else{
         superMeteorSequenceActive=false;
         superMeteorNextDropTimer=0;
+        if(superMeteorQuadrantGuide){
+          if(superMeteorQuadrantGuide.parent)scene.remove(superMeteorQuadrantGuide);
+          disposeGroup(superMeteorQuadrantGuide);
+          superMeteorQuadrantGuide=null;
+        }
       }
     }
   }else if(superMeteorSequenceActive&&superMeteorNextDropTimer>0){
