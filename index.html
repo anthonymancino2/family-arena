@@ -1,3 +1,4 @@
+<!-- V22.13.04 Passive Whirlwind Clarity: the Knight passive HUD now labels fifth-kill progress as WHIRLWIND x/5, glows when one kill away, and clearly displays PASSIVE WHIRLWIND during an automatic proc. Equipable Defensive Whirlwind remains separately labeled and keeps its own cooldown. Gameplay, damage, trigger count, and Primary input behavior are unchanged. -->
 <!-- V22.13.03 Primary Hold Reliability Fix: Primary auto-attack now keeps ownership of the exact finger/pointer that started the hold, ignores unrelated pointer releases, and no longer stops when iOS Safari emits lostpointercapture while the finger is still down. Tap behavior, attack cooldowns, damage, VFX, and Whirlwind logic are unchanged. -->
 <!-- V22.13.02 Cloud Sync Merge: brings the Round Records cloud sync layer
      (Firebase Firestore round-best board, background/foreground refresh,
@@ -119,7 +120,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.03</title>
+<title>Family Arena V22.13.04</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -428,6 +429,10 @@
   .passivePill.mageReady{box-shadow:0 0 0 1px rgba(111,232,255,.75),0 0 14px rgba(111,232,255,.7);animation:magePassivePulse .72s ease-in-out infinite alternate;}
   .passivePill.mageHaste{color:#effcff;background:linear-gradient(90deg,rgba(39,87,151,.94),rgba(116,53,176,.94));box-shadow:0 0 18px rgba(184,104,255,.85);}
   @keyframes magePassivePulse{from{transform:scale(1);filter:brightness(1)}to{transform:scale(1.025);filter:brightness(1.3)}}
+  .passivePill.knightWhirlwindReady{box-shadow:0 0 0 1px rgba(255,228,135,.82),0 0 14px rgba(255,190,70,.62);animation:knightWhirlwindReadyPulse .72s ease-in-out infinite alternate;}
+  .passivePill.knightWhirlwindProc{color:#fff9db;background:linear-gradient(90deg,rgba(87,104,126,.96),rgba(168,111,25,.96));box-shadow:0 0 20px rgba(255,203,82,.95);animation:knightWhirlwindProcFlash .22s ease-in-out infinite alternate;}
+  @keyframes knightWhirlwindReadyPulse{from{transform:scale(1);filter:brightness(1)}to{transform:scale(1.025);filter:brightness(1.28)}}
+  @keyframes knightWhirlwindProcFlash{from{transform:scale(1);filter:brightness(1.05)}to{transform:scale(1.045);filter:brightness(1.6)}}
   .enemyCountPill{position:absolute;top:calc(166px + env(safe-area-inset-top));left:14px;
     background:rgba(44,18,64,0.78);border:1.5px solid rgba(205,126,255,0.78);
     border-radius:12px;padding:6px 11px;font-weight:900;font-size:12px;color:#f0d5ff;
@@ -950,7 +955,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.03 - Primary Hold Reliability Fix';
+const GAME_VERSION='22.13.04 - Passive Whirlwind Clarity';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1914,7 +1919,7 @@ function upgradeAmountForActiveHero(stat){
 let playerStats = {power:1, speed:1, hp:1};
 function createFreshPassiveState(){
   return {
-    shadowstepTimer:0, archerKillCounter:0, archerTailwindTimer:0, archerTailwindFxCooldown:0, knightArmor:0, knightArmorRegenDelay:0, knightArmorRegenTimer:0, knightWhirlwindCounter:0, knightWhirlwindTimer:0, knightWhirlwindPulse:0, battleFuryActive:false,
+    shadowstepTimer:0, archerKillCounter:0, archerTailwindTimer:0, archerTailwindFxCooldown:0, knightArmor:0, knightArmorRegenDelay:0, knightArmorRegenTimer:0, knightWhirlwindCounter:0, knightWhirlwindTimer:0, knightWhirlwindPulse:0, knightWhirlwindHudFlash:0, battleFuryActive:false,
     barbarianShockwaveCounter:0, barbarianInvincibleCounter:0,
     mageAttackCounter:0, mageKillCounter:0, mageSpeedBoostTimer:0,
     mageHasteFxCooldown:0, mageHastePulseStage:0
@@ -9888,6 +9893,7 @@ function refreshPassiveState(dt=0){
   }
   if(state.avatarType==='knight'){
     const p=HERO_PASSIVES.knight;
+    passiveState.knightWhirlwindHudFlash=Math.max(0,(passiveState.knightWhirlwindHudFlash||0)-dt);
     // Whirlwind timing, pulses and spin visuals live in updateKnightSystems so the
     // passive proc and the equipable ability can never double-trigger.
     const max=knightArmorMax();
@@ -9944,8 +9950,10 @@ function updatePassiveHud(){
     : ` · KILLS ${passiveState.archerKillCounter||0}/${p.tailwindKills||5}`;
   else if(state.avatarType==='knight'){
     const wwActive=(knightRuntime.whirlwindTimer||0)>0;
-    suffix=(wwActive?` · 🌀 WHIRLWIND ${knightRuntime.whirlwindTimer.toFixed(1)}s`:'')
-      +` · KILLS ${passiveState.knightWhirlwindCounter||0}/${p.whirlwindKills||5}`
+    const wwSource=knightRuntime.whirlwindSource;
+    const wwLabel=wwSource==='passive'?'PASSIVE WHIRLWIND':'DEFENSIVE WHIRLWIND';
+    suffix=(wwActive?` · 🌀 ${wwLabel} ${knightRuntime.whirlwindTimer.toFixed(1)}s`:'')
+      +` · WHIRLWIND ${passiveState.knightWhirlwindCounter||0}/${p.whirlwindKills||5}`
       +` · ARMOR ${passiveState.knightArmor||0}/${knightArmorMax()}`
       +` · DISC ${knightRuntime.discipline||0}/${KNIGHT_CFG.discipline.max}`
       +(knightRuntime.fortActive?' · 🏰 HELD':'')
@@ -9959,6 +9967,8 @@ function updatePassiveHud(){
     : ` · CAST ${passiveState.mageAttackCounter||0}/3 · KILLS ${passiveState.mageKillCounter||0}/3`;
   el.classList.toggle('mageHaste',state.avatarType==='mage' && (passiveState.mageSpeedBoostTimer||0)>0);
   el.classList.toggle('mageReady',state.avatarType==='mage' && (passiveState.mageSpeedBoostTimer||0)<=0 && ((passiveState.mageAttackCounter||0)===2 || (passiveState.mageKillCounter||0)===2));
+  el.classList.toggle('knightWhirlwindReady',state.avatarType==='knight' && (passiveState.knightWhirlwindCounter||0)===(p.whirlwindKills||5)-1 && (knightRuntime.whirlwindTimer||0)<=0);
+  el.classList.toggle('knightWhirlwindProc',state.avatarType==='knight' && (passiveState.knightWhirlwindHudFlash||0)>0);
   el.textContent=`${p.icon} ${p.name}${suffix}`;
 }
 
@@ -11887,6 +11897,7 @@ function startKnightWhirlwind(source){
   if(!knightRuntime.whirlwindSource||source==='ability') knightRuntime.whirlwindSource=source;
   knightRuntime.whirlwindPulse=0;
   passiveState.knightWhirlwindTimer=knightRuntime.whirlwindTimer;
+  if(source==='passive') passiveState.knightWhirlwindHudFlash=1.35;
   player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,duration);
   player.userData.spinVisualSpeed=c.spinSpeed;
   spawnKnightGuardBurst(player.position,c.radius);
