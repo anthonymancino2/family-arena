@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<!-- V22.10.70 Secondary Hold-to-Repeat Fix: restores intentional hold-to-repeat for every equipped secondary while preserving one cast on a quick tap. Repeated attempts respect each move's own cooldown or independent placement slots, and release, cancellation, focus loss, or page hiding immediately stops the shared hold loop. -->
+<!-- V22.10.69 Shared Secondary Input Fix: removes the repeating timer from the shared Secondary button so every secondary ability casts only once per fresh press. Pointer/touch release, cancellation, focus loss, and visibility changes now always clear the press state. Primary hold-to-fire is unchanged. -->
+<!-- V22.10.68 Chain Javelin Manual-Tap Fix: Chain-Lightning Javelin now fires exactly once per fresh Secondary-button press and can no longer continue casting from a stale hold interval after release. Its 1-second cooldown, projectile speed, damage, chaining, and stun remain unchanged. -->
 <!-- V22.10.67 Mirror Volley Strategic Single-Placement Fix: each fresh tap now creates exactly one Mirror Volley decoy instead of spawning a paired set. Players can rapidly place up to three mirrors one at a time at separate map positions; independent slot cooldowns, seven-second lifetime, damage, Storm Beacon behavior, and manual tap-only casting remain unchanged. -->
 <!-- V22.10.66 Mirror Volley Manual-Cast Fix: Mirror Volley now fires exactly once per fresh button press. Holding the Secondary control no longer consumes multiple ready placement slots or creates an automatic double cast; independent slot cooldowns and the three-placement cap are unchanged. -->
 <!-- V22.10.65 Standalone Tempest Cleanup: removes the retired standalone Tempest Domain definition, activation routing, HUD branch, update loop, and round-cleanup call now that Frost Domain is permanently integrated into Supernova Piercer. Supernova's defensive freeze domain is unchanged. -->
@@ -58,7 +61,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.67</title>
+<title>Family Arena V22.10.70</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -748,7 +751,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.67 - Mirror Volley Strategic Single Placement';
+const GAME_VERSION='22.10.70 - Secondary Hold-to-Repeat Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -9698,34 +9701,63 @@ function setupControls(){
     actBtnEl.addEventListener('touchcancel',endPrimaryFire,{passive:false});
   }
 
-  let secondaryFireInterval=null;
+  // Secondary input: a quick tap casts once; holding repeatedly attempts a cast.
+  // doSecondaryShoot() remains the single source of truth for cooldowns and Mirror
+  // Volley slot availability, so the shared loop can never bypass move-specific rules.
   const secondaryBtnEl=document.getElementById('secondaryBtn');
+  let secondaryPressed=false;
+  let secondaryPointerId=null;
+  let secondaryHoldInterval=null;
+  const releaseSecondaryInput=e=>{
+    if(e && e.preventDefault) e.preventDefault();
+    secondaryPressed=false;
+    secondaryPointerId=null;
+    if(secondaryHoldInterval!==null){
+      clearInterval(secondaryHoldInterval);
+      secondaryHoldInterval=null;
+    }
+  };
   const beginSecondaryFire=e=>{
     if(e){e.preventDefault();e.stopPropagation();}
+    if(secondaryPressed) return;
+    secondaryPressed=true;
+    secondaryPointerId=e&&Number.isFinite(e.pointerId)?e.pointerId:null;
     const w=secondaryWeaponForAvatar();
-    if(!w){navigator.vibrate&&navigator.vibrate(12);return;}
+    if(!w){
+      navigator.vibrate&&navigator.vibrate(12);
+      releaseSecondaryInput();
+      return;
+    }
+    if(e && e.currentTarget && e.currentTarget.setPointerCapture && Number.isFinite(e.pointerId)){
+      try{e.currentTarget.setPointerCapture(e.pointerId);}catch(_err){}
+    }
     doSecondaryShoot();
-    clearInterval(secondaryFireInterval);
-    // Phoenix is a manual one-volley ability: holding the button must never
-    // launch a new volley when the current three spheres expire. Other secondary
-    // attacks keep hold-to-fire behavior and remain limited by their cooldowns.
-    if(w.kind!=='rocket_arrow'&&w.kind!=='mirror_volley')secondaryFireInterval=setInterval(doSecondaryShoot,40);
-  };
-  const endSecondaryFire=e=>{
-    if(e)e.preventDefault();
-    clearInterval(secondaryFireInterval);
-    secondaryFireInterval=null;
+    secondaryHoldInterval=setInterval(()=>{
+      if(!secondaryPressed || !gameRunning){
+        releaseSecondaryInput();
+        return;
+      }
+      doSecondaryShoot();
+    },50);
   };
   if(window.PointerEvent){
     secondaryBtnEl.addEventListener('pointerdown',beginSecondaryFire,{passive:false});
-    secondaryBtnEl.addEventListener('pointerup',endSecondaryFire,{passive:false});
-    secondaryBtnEl.addEventListener('pointercancel',endSecondaryFire,{passive:false});
-    secondaryBtnEl.addEventListener('pointerleave',endSecondaryFire,{passive:false});
+    secondaryBtnEl.addEventListener('pointerup',releaseSecondaryInput,{passive:false});
+    secondaryBtnEl.addEventListener('pointercancel',releaseSecondaryInput,{passive:false});
+    secondaryBtnEl.addEventListener('lostpointercapture',releaseSecondaryInput,{passive:false});
+    window.addEventListener('pointerup',releaseSecondaryInput,{passive:false});
+    window.addEventListener('pointercancel',releaseSecondaryInput,{passive:false});
   }else{
     secondaryBtnEl.addEventListener('touchstart',beginSecondaryFire,{passive:false});
-    secondaryBtnEl.addEventListener('touchend',endSecondaryFire,{passive:false});
-    secondaryBtnEl.addEventListener('touchcancel',endSecondaryFire,{passive:false});
+    secondaryBtnEl.addEventListener('touchend',releaseSecondaryInput,{passive:false});
+    secondaryBtnEl.addEventListener('touchcancel',releaseSecondaryInput,{passive:false});
+    window.addEventListener('touchend',releaseSecondaryInput,{passive:false});
+    window.addEventListener('touchcancel',releaseSecondaryInput,{passive:false});
   }
+  window.addEventListener('blur',releaseSecondaryInput);
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden) releaseSecondaryInput();
+  });
   const jumpBtnEl = document.getElementById('jumpBtn');
   jumpBtnEl.addEventListener('touchstart', e=>{ e.preventDefault(); doJump(); });
   document.getElementById('lookFwdBtn').addEventListener('touchstart', e=>{
