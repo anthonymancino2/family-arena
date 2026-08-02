@@ -1,3 +1,4 @@
+<!-- V22.11.25 Super Meteor Debris Crater Burn FX: adds fourteen capped molten debris fragments, a four-second scorched crater with pulsing lava ring, and a visible orange burn aura on surviving enemies. Gameplay values are unchanged. -->
 <!-- V22.11.24 Super Meteor Visual Upgrade: adds a fiery tail, rotating flame ring, pulsing inner landing warning, and dual expanding impact shockwaves. Damage, boss cap, stun, burn, radius, fall speed, and cooldown are unchanged. -->
 <!-- V22.11.23 Super Meteor Core: adds the Mage's third equipable ultimate. One enormous slow meteor targets the nearest enemy, falls from the sky, deals heavy area damage, deals 20% max HP to bosses, stuns survivors for 3 seconds, burns them for 5 seconds, and uses a 24-second cooldown. -->
 <!-- V22.11.22 Blizzard Readability Guard: caps simultaneous impact-effect groups at six, clears them between rounds, and brightens landing markers for easier tracking. Gameplay values are unchanged. -->
@@ -100,7 +101,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.11.24</title>
+<title>Family Arena V22.11.25</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -883,7 +884,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.11.24 - Super Meteor Visual Upgrade';
+const GAME_VERSION='22.11.25 - Super Meteor Debris Crater Burn FX';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12597,21 +12598,100 @@ function impactSuperMeteor(m){
   impactFx.add(shockA,shockB);
   scene.add(impactFx);
 
+  const moltenDebris=[];
+  for(let i=0;i<14;i++){
+    const debris=new THREE.Mesh(
+      new THREE.IcosahedronGeometry(.11+Math.random()*.12,0),
+      new THREE.MeshBasicMaterial({
+        color:i%3===0?0xffd06b:0xff5a1f,
+        transparent:true,
+        opacity:.95,
+        depthWrite:false,
+        blending:THREE.AdditiveBlending
+      })
+    );
+    const a=Math.random()*Math.PI*2;
+    const speed=2.2+Math.random()*2.3;
+    debris.position.set(0,.15,0);
+    debris.userData.velocity=new THREE.Vector3(
+      Math.cos(a)*speed,
+      1.8+Math.random()*2.2,
+      Math.sin(a)*speed
+    );
+    moltenDebris.push(debris);
+    impactFx.add(debris);
+  }
+
   const impactStarted=performance.now();
   (function animateSuperMeteorImpact(){
     if(!impactFx.parent)return;
     const age=(performance.now()-impactStarted)/1000;
-    if(age>=.65){
+    if(age>=.9){
       scene.remove(impactFx);
       disposeGroup(impactFx);
       return;
     }
-    const t=age/.65;
+    const t=Math.min(1,age/.65);
     shockA.scale.setScalar(1+t*4.8);
     shockB.scale.setScalar(1+t*3.6);
     shockA.material.opacity=.72*(1-t);
     shockB.material.opacity=.54*(1-t);
+
+    for(const debris of moltenDebris){
+      debris.position.addScaledVector(debris.userData.velocity,.016);
+      debris.userData.velocity.y-=.075;
+      debris.rotation.x+=.18;
+      debris.rotation.y+=.22;
+      if(debris.material)debris.material.opacity=.95*Math.max(0,1-age/.9);
+    }
+
     requestAnimationFrame(animateSuperMeteorImpact);
+  })();
+
+  const craterGroup=new THREE.Group();
+  craterGroup.position.set(m.x,.026,m.z);
+
+  const craterDisc=new THREE.Mesh(
+    new THREE.CircleGeometry(SUPER_METEOR_RADIUS*.58,48),
+    new THREE.MeshBasicMaterial({
+      color:0x1f0b07,
+      transparent:true,
+      opacity:.78,
+      depthWrite:false
+    })
+  );
+  craterDisc.rotation.x=-Math.PI/2;
+  craterGroup.add(craterDisc);
+
+  const moltenRing=new THREE.Mesh(
+    new THREE.RingGeometry(SUPER_METEOR_RADIUS*.38,SUPER_METEOR_RADIUS*.54,48),
+    new THREE.MeshBasicMaterial({
+      color:0xff4c18,
+      transparent:true,
+      opacity:.48,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending,
+      side:THREE.DoubleSide
+    })
+  );
+  moltenRing.rotation.x=-Math.PI/2;
+  moltenRing.position.y=.004;
+  craterGroup.add(moltenRing);
+
+  scene.add(craterGroup);
+  const craterStarted=performance.now();
+  (function animateSuperMeteorCrater(){
+    if(!craterGroup.parent)return;
+    const age=(performance.now()-craterStarted)/1000;
+    if(age>=4){
+      scene.remove(craterGroup);
+      disposeGroup(craterGroup);
+      return;
+    }
+    const fade=Math.min(1,(4-age)/.8);
+    craterDisc.material.opacity=.78*fade;
+    moltenRing.material.opacity=(.34+Math.sin(performance.now()*.012)*.14)*fade;
+    requestAnimationFrame(animateSuperMeteorCrater);
   })();
 
   triggerCombatShake(18,420);
@@ -12632,6 +12712,38 @@ function impactSuperMeteor(m){
     enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,SUPER_METEOR_STUN);
     enemy.userData.burnTimer=Math.max(enemy.userData.burnTimer||0,SUPER_METEOR_BURN);
     enemy.userData.burnDps=Math.max(enemy.userData.burnDps||0,.55*playerStats.power);
+
+    if(!enemy.userData.superMeteorBurnFx){
+      const burnAura=new THREE.Mesh(
+        new THREE.SphereGeometry(.72,10,8),
+        new THREE.MeshBasicMaterial({
+          color:0xff5b1f,
+          transparent:true,
+          opacity:.22,
+          depthWrite:false,
+          blending:THREE.AdditiveBlending
+        })
+      );
+      burnAura.position.y=.72;
+      burnAura.name='superMeteorBurnFx';
+      enemy.add(burnAura);
+      enemy.userData.superMeteorBurnFx=burnAura;
+
+      (function animateSuperMeteorBurnFx(){
+        if(!burnAura.parent)return;
+        const remaining=enemy.userData.burnTimer||0;
+        if(remaining<=0||enemy.userData.dead){
+          burnAura.parent.remove(burnAura);
+          disposeGroup(burnAura);
+          delete enemy.userData.superMeteorBurnFx;
+          return;
+        }
+        const pulse=1+Math.sin(performance.now()*.018)*.12;
+        burnAura.scale.setScalar(pulse);
+        burnAura.material.opacity=.16+Math.sin(performance.now()*.021)*.08;
+        requestAnimationFrame(animateSuperMeteorBurnFx);
+      })();
+    }
   }
 }
 
