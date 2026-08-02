@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- V22.10.78 Secondary Hold Pointer Reliability: keeps the Secondary held state active for the full matching touch/pointer contact instead of clearing it on Safari pointer-capture loss. Tap still casts once; hold repeats through the move cooldown; release/cancel/focus loss stops immediately. -->
 <!-- V22.10.77 Primary Hold Scope Crash Fix: moves primaryInputHeld into shared runtime scope so update() can read it without throwing. This restores normal world rendering and movement while running; pause remains fully frozen. -->
 <!-- V22.10.76 Persistent Arena Render Loop: prevents the Three.js render loop from terminating when gameRunning briefly becomes false during startup, pause, resume, or round transitions. Rendering continues safely while gameplay updates remain paused. -->
 <!-- V22.10.75 Giant Fireball Restoration + Render Recovery: restores the approved Phoenix-scale molten sphere and 1.85-second hold-to-repeat cadence from V22.10.73, while preserving the black-screen canvas/render recovery safeguard. -->
@@ -66,7 +67,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.77</title>
+<title>Family Arena V22.10.78</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -756,7 +757,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.77 - Primary Hold Scope Crash Fix';
+const GAME_VERSION='22.10.78 - Secondary Hold Pointer Reliability';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -9731,6 +9732,9 @@ function setupControls(){
   let secondaryPointerId=null;
   const releaseSecondaryInput=e=>{
     if(e && e.preventDefault) e.preventDefault();
+    // Ignore unrelated fingers/pointers. On mobile Safari, another control's
+    // pointerup must not cancel a Secondary button that is still being held.
+    if(e && secondaryPointerId!==null && Number.isFinite(e.pointerId) && e.pointerId!==secondaryPointerId) return;
     secondaryPressed=false;
     secondaryInputHeld=false;
     secondaryPointerId=null;
@@ -9740,7 +9744,7 @@ function setupControls(){
     if(secondaryPressed) return;
     secondaryPressed=true;
     secondaryInputHeld=true;
-    secondaryPointerId=e&&Number.isFinite(e.pointerId)?e.pointerId:null;
+    secondaryPointerId=e&&Number.isFinite(e.pointerId)?e.pointerId:(e&&e.changedTouches&&e.changedTouches[0]?e.changedTouches[0].identifier:null);
     const w=secondaryWeaponForAvatar();
     if(!w){
       navigator.vibrate&&navigator.vibrate(12);
@@ -9758,15 +9762,21 @@ function setupControls(){
     secondaryBtnEl.addEventListener('pointerdown',beginSecondaryFire,{passive:false});
     secondaryBtnEl.addEventListener('pointerup',releaseSecondaryInput,{passive:false});
     secondaryBtnEl.addEventListener('pointercancel',releaseSecondaryInput,{passive:false});
-    secondaryBtnEl.addEventListener('lostpointercapture',releaseSecondaryInput,{passive:false});
+    // Do not clear hold on lostpointercapture: iOS Safari may emit it while the
+    // finger is still down. Window pointerup/pointercancel remain authoritative.
     window.addEventListener('pointerup',releaseSecondaryInput,{passive:false});
     window.addEventListener('pointercancel',releaseSecondaryInput,{passive:false});
   }else{
     secondaryBtnEl.addEventListener('touchstart',beginSecondaryFire,{passive:false});
-    secondaryBtnEl.addEventListener('touchend',releaseSecondaryInput,{passive:false});
-    secondaryBtnEl.addEventListener('touchcancel',releaseSecondaryInput,{passive:false});
-    window.addEventListener('touchend',releaseSecondaryInput,{passive:false});
-    window.addEventListener('touchcancel',releaseSecondaryInput,{passive:false});
+    const releaseSecondaryTouch=e=>{
+      const changed=[...(e.changedTouches||[])];
+      if(secondaryPointerId!==null && !changed.some(t=>t.identifier===secondaryPointerId)) return;
+      releaseSecondaryInput(e);
+    };
+    secondaryBtnEl.addEventListener('touchend',releaseSecondaryTouch,{passive:false});
+    secondaryBtnEl.addEventListener('touchcancel',releaseSecondaryTouch,{passive:false});
+    window.addEventListener('touchend',releaseSecondaryTouch,{passive:false});
+    window.addEventListener('touchcancel',releaseSecondaryTouch,{passive:false});
   }
   window.addEventListener('blur',releaseSecondaryInput);
   document.addEventListener('visibilitychange',()=>{
