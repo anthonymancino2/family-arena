@@ -1,3 +1,4 @@
+<!-- V22.10.94 Arcane Lance Impact Burst: adds a cyan-violet impact ring, compact ground sigil, and capped crystal spark burst on every Arcane Lance enemy hit. Damage and all gameplay values are unchanged. -->
 <!-- V22.10.90 Arcane Lance 3x Full Scale: triples the complete Arcane Lance visual hierarchy, including spearhead, core, rings, rune shards, ribbon, and trail, while leaving damage, cooldown, speed, piercing, and collision unchanged. -->
 <!-- V22.10.89 Arcane Lance Energy Trail: adds a short pulsing blue additive trail behind the live projectile. No gameplay values changed. -->
 <!-- V22.10.87 Arcane Lance Rune Shards: adds eight capped cyan/violet arcane fragments that orbit and tumble around the live projectile. No gameplay values changed. -->
@@ -766,7 +767,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.93 - Arcane Lance Scale Tuning';
+const GAME_VERSION='22.10.94 - Arcane Lance Impact Burst';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -13364,8 +13365,15 @@ function updateBullets(dt){
           z.userData.knockbackZ=(kz/kl)*7.5;
           z.userData.hitStun=Math.max(z.userData.hitStun||0,.22);
         }
-        if(b.isArcherArrow) spawnArcherHitFeedback(z.position.x,z.position.y+.82,z.position.z,b.damage>=2.5);
-        else spawnBurst(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 5, FX_MAT_SPARK, 2.5);
+        if(b.isArcherArrow){
+          spawnArcherHitFeedback(z.position.x,z.position.y+.82,z.position.z,b.damage>=2.5);
+        } else if(b.kind==='arcane_lance'){
+          spawnArcaneImpact(z.position.x,z.position.y+.08,z.position.z,'ice');
+          spawnArcaneSigil(z.position.x,0,z.position.z,1.15);
+          spawnBurst(z.position.x,z.position.y+.72,z.position.z,10,FX_MAT_SPARK,3.4);
+        } else {
+          spawnBurst(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 5, FX_MAT_SPARK, 2.5);
+        }
         if(b.splash > 0){
           // Rocket launcher: every zombie within the splash radius takes
           // the same hit, so a cluster dies together in one shot.
