@@ -1,3 +1,5 @@
+<!-- V22.13.10 Shield Bash Polish: upgrades Shield Bash with a two-stage controlled lunge, layered shield trail, dual impact rings, stronger localized metal sparks and dust, clearer stun crest feedback, improved hit-stop, smoother recovery timing, and brief guard resistance. Damage values and other moves are unchanged. -->
+<!-- V22.13.09 Browser Pause Placement: moves Pause to the top of Safari/browser landscape's far-right utility rail so it no longer crowds or overlaps Jump and the combat grid. Home-screen-app layout, movement zones, combat controls, and gameplay are unchanged. -->
 <!-- V22.13.08 Browser Landscape Layout V2: detects normal Safari/browser tabs separately from the installed home-screen app and gives browser landscape a dedicated two-column combat grid. Fire/Dash occupy the bottom row, Jump/Look Fwd the row above, Shield sits centered above them, Judgment moves farther left and higher, and camera/pause controls stay in a slim far-right utility rail. Movement-zone rules and standalone layout are unchanged. -->
 <!-- V22.13.07 Responsive Landscape UI Fix: makes the between-round shop vertically scrollable in landscape/Safari, adds a compressed browser-height control layout without Jump/Look Fwd overlap, restricts movement start to the left 50% in landscape and left two-thirds in portrait, and preserves separate right-side look/combat input space. Gameplay values are unchanged. -->
 <!-- V22.13.06 Landscape HUD Polish: reorganizes short-screen landscape controls into clear right-thumb columns. Shield/Secondary now matches Jump's compact size and no longer overlaps Look Fwd, Dash sits closer to Fire, utility controls are smaller, Judgment is slightly larger, and right-edge safe spacing is increased. Gameplay and input behavior are unchanged. -->
@@ -124,7 +126,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.08</title>
+<title>Family Arena V22.13.10</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1009,6 +1011,20 @@
     }
   }
 
+
+  /* V22.13.09 Browser Pause Button Placement
+     Keep Pause at the top of the far-right utility rail so it cannot crowd
+     Jump or the combat grid below. */
+  @media (orientation:landscape){
+    body.browserMode .pauseBtn{
+      order:-1;
+      width:42px;
+      height:34px;
+      flex:0 0 auto;
+      margin-bottom:1px;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -1255,7 +1271,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.08 - Browser Landscape Layout V2';
+const GAME_VERSION='22.13.10 - Shield Bash Polish';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -11814,6 +11830,64 @@ function knightSwordTrail(origin,yaw,step,scale=1){
   spawnBurst(origin.x+dx*1.1,origin.y+1.0,origin.z+dz*1.1,step===2?12:8,FX_MAT_SPARK,step===2?3.8:2.9);
 }
 
+
+function knightShieldBashImpact(origin,yaw,hits){
+  if(!hits || !knightFxBudget(3)) return;
+  const fx=Math.sin(yaw),fz=Math.cos(yaw);
+  const g=new THREE.Group();
+
+  const disc=new THREE.Mesh(
+    new THREE.CircleGeometry(.82,28),
+    knightMat(KNIGHT_IVORY,.90)
+  );
+  disc.position.set(0,1.0,0);
+  disc.rotation.y=yaw;
+  g.add(disc);
+
+  const ring=new THREE.Mesh(
+    new THREE.RingGeometry(.42,.76,30),
+    knightMat(KNIGHT_GOLD,.92)
+  );
+  ring.position.set(0,1.0,.02);
+  ring.rotation.y=yaw;
+  g.add(ring);
+
+  for(let i=0;i<10;i++){
+    const shard=new THREE.Mesh(
+      new THREE.PlaneGeometry(.08,.42),
+      knightMat(i%2?KNIGHT_GOLD:KNIGHT_STEEL,.82)
+    );
+    const a=(i/10)*Math.PI*2;
+    shard.position.set(Math.cos(a)*.48,1+Math.sin(a)*.2,Math.sin(a)*.48);
+    shard.rotation.set(0,-a,Math.sin(a)*.28);
+    g.add(shard);
+  }
+
+  g.position.set(origin.x+fx*.92,origin.y,origin.z+fz*.92);
+  knightBaseOpacity(g);
+  pushKnightFx(g,{life:.30,grow:1.05,from:.5,spin:5.5});
+
+  // Brief stun-readability crest above the impact area.
+  const crest=new THREE.Group();
+  const halo=new THREE.Mesh(
+    new THREE.RingGeometry(.22,.42,24),
+    knightMat(KNIGHT_GOLD,.86)
+  );
+  halo.rotation.x=-Math.PI/2;
+  crest.add(halo);
+  for(let i=0;i<4;i++){
+    const ray=new THREE.Mesh(
+      new THREE.PlaneGeometry(.06,.48),
+      knightMat(KNIGHT_IVORY,.78)
+    );
+    ray.rotation.z=i*Math.PI/2;
+    crest.add(ray);
+  }
+  crest.position.set(origin.x+fx*1.0,origin.y+1.65,origin.z+fz*1.0);
+  knightBaseOpacity(crest);
+  pushKnightFx(crest,{life:.38,grow:.38,from:.8,spin:-3.5});
+}
+
 function knightComboImpact(origin,yaw,step,hits){
   if(!hits||!knightFxBudget(2)) return;
   const fx1=Math.sin(yaw),fz1=Math.cos(yaw);
@@ -12121,41 +12195,118 @@ function knightCleavingGuard(w){
 function knightShieldBash(w){
   knightAutoFace(6);
   const yaw=player.rotation.y;
-  knightPlayClip(['shield'],'1H_Melee_Attack_Chop',.20,.15);
-  // A short disciplined step, not a reckless charge.
-  const step=1.15;
-  const r=resolveCollision(player.position.x+Math.sin(yaw)*step,player.position.z+Math.cos(yaw)*step,player.position.y);
-  player.position.x=r.x; player.position.z=r.z;
+  const fx=Math.sin(yaw),fz=Math.cos(yaw);
+
+  // Faster, more controlled anticipation and recovery.
+  knightPlayClip(['shield'],'1H_Melee_Attack_Chop',.18,.14);
+
+  // Two-stage disciplined lunge: quick set, then shield-first commitment.
+  const first=resolveCollision(
+    player.position.x+fx*.38,
+    player.position.z+fz*.38,
+    player.position.y
+  );
+  player.position.x=first.x;
+  player.position.z=first.z;
+
+  const second=resolveCollision(
+    player.position.x+fx*.92,
+    player.position.z+fz*.92,
+    player.position.y
+  );
+  player.position.x=second.x;
+  player.position.z=second.z;
+
   const pos={x:player.position.x,y:player.position.y,z:player.position.z};
-  if(knightFxBudget(2)){
+
+  // Layered shield trail and guard flare.
+  if(knightFxBudget(3)){
     const g=new THREE.Group();
-    const face=new THREE.Mesh(new THREE.CircleGeometry(1.0,26),knightMat(KNIGHT_STEEL,.55));
-    face.position.set(0,1.0,.9); g.add(face);
-    const crest=new THREE.Mesh(new THREE.RingGeometry(.42,.62,22),knightMat(KNIGHT_GOLD,.9));
-    crest.position.set(0,1.0,.94); g.add(crest);
-    g.position.set(pos.x,pos.y,pos.z); g.rotation.y=yaw;
+
+    const face=new THREE.Mesh(
+      new THREE.CircleGeometry(1.08,30),
+      knightMat(KNIGHT_STEEL,.58)
+    );
+    face.position.set(0,1.0,.84);
+    g.add(face);
+
+    const inner=new THREE.Mesh(
+      new THREE.CircleGeometry(.68,28),
+      knightMat(KNIGHT_IVORY,.44)
+    );
+    inner.position.set(0,1.0,.88);
+    g.add(inner);
+
+    const crest=new THREE.Mesh(
+      new THREE.RingGeometry(.40,.68,24),
+      knightMat(KNIGHT_GOLD,.96)
+    );
+    crest.position.set(0,1.0,.92);
+    g.add(crest);
+
+    const trail=new THREE.Mesh(
+      new THREE.PlaneGeometry(1.55,2.6),
+      knightMat(KNIGHT_STEEL,.30)
+    );
+    trail.position.set(0,1.0,-.45);
+    trail.rotation.x=-Math.PI/2;
+    g.add(trail);
+
+    g.position.set(pos.x,pos.y,pos.z);
+    g.rotation.y=yaw;
     knightBaseOpacity(g);
-    pushKnightFx(g,{life:.28,grow:.6,from:.8});
+    pushKnightFx(g,{life:.32,grow:.62,from:.76});
   }
-  knightShockRing(pos,w.radius||2.3,KNIGHT_IVORY,.30);
-  spawnBurst(pos.x+Math.sin(yaw),pos.y+1,pos.z+Math.cos(yaw),12,FX_MAT_SPARK,3.6);
-  spawnBurst(pos.x,pos.y+.2,pos.z,10,FX_MAT_DUST,3.0);
-  const hits=knightMeleeArc(pos,yaw,w.radius||2.3,w.arc||1.9,w.damage,
-    {knock:6.5,stun:1.9,bruteMult:.9,bossMult:.32,bossCapFraction:.02});
-  if(hits){ knightHitStop(.05); knightAddDiscipline(); }
-  triggerCombatShake(hits?12:5,180);
-  if(navigator.vibrate) navigator.vibrate(hits?[32,18,50]:16);
-}
-function knightBuildShieldMesh(){
-  const g=new THREE.Group();
-  const body=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.10,20),
-    new THREE.MeshStandardMaterial({color:0xb9d8f2,emissive:0x2b4a6b,metalness:.7,roughness:.35}));
-  body.rotation.x=Math.PI/2; g.add(body);
-  const crest=new THREE.Mesh(new THREE.RingGeometry(.22,.36,20),knightMat(KNIGHT_GOLD,.95));
-  crest.position.z=.07; g.add(crest);
-  const rim=new THREE.Mesh(new THREE.RingGeometry(.52,.60,24),knightMat(KNIGHT_IVORY,.9));
-  rim.position.z=.07; g.add(rim);
-  return g;
+
+  const hits=knightMeleeArc(
+    pos,
+    yaw,
+    w.radius||2.3,
+    1.75,
+    w.damage,
+    {knock:7.0,stun:1.15,bruteMult:.75,bossMult:.28}
+  );
+
+  knightShockRing(pos,(w.radius||2.3)*1.12,KNIGHT_IVORY,.34);
+  knightShockRing(pos,(w.radius||2.3)*.78,KNIGHT_GOLD,.24);
+  knightShieldBashImpact(pos,yaw,hits);
+
+  // Localized metal sparks and ground dust at the shield face.
+  spawnBurst(
+    pos.x+fx*1.0,
+    pos.y+1.0,
+    pos.z+fz*1.0,
+    hits?18:10,
+    FX_MAT_SPARK,
+    hits?4.8:3.0
+  );
+  if(knightFxBudget(1)){
+    const dust=new THREE.Group();
+    for(let i=0;i<6;i++){
+      const puff=new THREE.Mesh(
+        new THREE.CircleGeometry(.22+Math.random()*.16,12),
+        knightMat(0xb9aa8c,.26)
+      );
+      const a=(-.9+i*(1.8/5))+yaw;
+      puff.rotation.x=-Math.PI/2;
+      puff.position.set(Math.sin(a)*(.55+Math.random()*.35),.04,Math.cos(a)*(.55+Math.random()*.35));
+      dust.add(puff);
+    }
+    dust.position.set(pos.x,pos.y,pos.z);
+    knightBaseOpacity(dust);
+    pushKnightFx(dust,{life:.42,grow:.95,from:.72});
+  }
+
+  if(hits){
+    knightHitStop(.060);
+    knightAddDiscipline();
+    knightRuntime.resistTimer=Math.max(knightRuntime.resistTimer,.34);
+    triggerCombatShake(12,175);
+  }else{
+    triggerCombatShake(4,90);
+  }
+
+  if(navigator.vibrate) navigator.vibrate(hits?[26,12,38]:10);
 }
 function knightShieldToss(w){
   if(knightRuntime.shieldToss) return;
