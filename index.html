@@ -766,7 +766,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.91 - Arcane Rune Gate';
+const GAME_VERSION='22.10.92 - Crystal Core Pass';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1226,7 +1226,7 @@ function spawnEnemyShot(z){
   // materials (not the shared FX_MAT_ENEMY_SHOT) because disposeGroup()
   // below unconditionally disposes whatever material it finds, and a
   // shared material can't survive that.
-  const core=new THREE.Mesh(new THREE.SphereGeometry(.22,12,10),new THREE.MeshBasicMaterial({color:0xffffff}));
+  const core=new THREE.Mesh(new THREE.SphereGeometry(.22,12,10),new THREE.MeshBasicMaterial({color:0xe8ffff}));
   const midGlow=new THREE.Mesh(new THREE.SphereGeometry(.38,12,10),new THREE.MeshBasicMaterial({color:0xff2fd6,transparent:true,opacity:.9,depthWrite:false,blending:THREE.AdditiveBlending}));
   const outerHalo=new THREE.Mesh(new THREE.SphereGeometry(.66,12,10),new THREE.MeshBasicMaterial({color:0xff2fd6,transparent:true,opacity:.32,depthWrite:false,blending:THREE.AdditiveBlending}));
   g.add(outerHalo,midGlow,core);
@@ -12230,7 +12230,7 @@ function spawnShadowSlash(origin, yaw, comboStep=0){
 function spawnWhirlwindBurst(origin, isClone=false, damageRadius=2.8){
   const group=new THREE.Group();
   const purple=new THREE.MeshBasicMaterial({color:0x8d32ff,transparent:true,opacity:0.92,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
-  const hot=new THREE.MeshBasicMaterial({color:0xd978ff,transparent:true,opacity:0.78,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const hot=new THREE.MeshBasicMaterial({color:0xd978ff,transparent:true,opacity:0.92,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
   const white=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.98,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
   const field=new THREE.MeshBasicMaterial({color:0x8d32ff,transparent:true,opacity:isClone?0.08:0.15,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
 
@@ -12471,7 +12471,7 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
           new THREE.MeshBasicMaterial({
             color:(i%2===0?0x7feaff:0xb784ff),
             transparent:true,
-            opacity:0.78,
+            opacity:0.92,
             depthWrite:false,
             blending:THREE.AdditiveBlending
           })
