@@ -1,3 +1,6 @@
+<!-- V22.11.04 Arcane Mana Rupture: enemies defeated while Arcane Resonance is active release a compact arcane explosion that damages nearby enemies. Boss splash is capped. -->
+<!-- V22.11.03 Arcane Reality Tear: Arcane Lance now leaves a 3-second cyan-violet rift when removed. Enemies inside take light repeated magic damage; boss ticks are capped. -->
+<!-- V22.11.02 Arcane Resonance Marker: adds a persistent pulsing violet dual-ring marker above enemies while the 5-second Arcane Resonance status is active. Re-hits refresh the same marker instead of stacking duplicates. Gameplay values are unchanged. -->
 <!-- V22.11.00 Arcane Crystal Fragments: adds eight capped cyan/violet crystal fragments that burst outward, tumble, fall slightly, and fade on Arcane Lance enemy hits. Gameplay values are unchanged. -->
 <!-- V22.10.99 Arcane Crystal Crack: adds five brief blue-white crack lines across the visible Arcane Mark on enemies struck by Arcane Lance. Gameplay values are unchanged. -->
 <!-- V22.10.98 Visible Enemy Arcane Mark: replaces the hidden placeholder state with a visible dual-ring violet mark that expands, spins, and fades over struck enemies. Gameplay values are unchanged. -->
@@ -771,7 +774,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.11.00 - Arcane Crystal Fragments';
+const GAME_VERSION='22.11.04 - Arcane Mana Rupture';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -13284,6 +13287,74 @@ function updateCycloneBeacons(dt){
 }
 
 
+
+function spawnArcaneRealityTear(x,z,sourceDamage){
+  const group=new THREE.Group();
+  group.position.set(x,0.04,z);
+
+  const outerMat=new THREE.MeshBasicMaterial({
+    color:0x6fdcff,
+    transparent:true,
+    opacity:0.62,
+    depthWrite:false,
+    blending:THREE.AdditiveBlending
+  });
+  const innerMat=new THREE.MeshBasicMaterial({
+    color:0xb779ff,
+    transparent:true,
+    opacity:0.52,
+    depthWrite:false,
+    blending:THREE.AdditiveBlending
+  });
+
+  const outer=new THREE.Mesh(new THREE.TorusGeometry(2.6,0.10,10,48),outerMat);
+  outer.rotation.x=Math.PI/2;
+  const inner=new THREE.Mesh(new THREE.RingGeometry(0.55,2.15,48),innerMat);
+  inner.rotation.x=-Math.PI/2;
+  group.add(outer,inner);
+  scene.add(group);
+
+  const started=performance.now();
+  let lastTick=started;
+
+  (function animateRealityTear(){
+    if(!group.parent) return;
+    const now=performance.now();
+    const age=(now-started)/1000;
+
+    if(age>=3){
+      scene.remove(group);
+      disposeGroup(group);
+      return;
+    }
+
+    outer.rotation.z+=0.045;
+    inner.rotation.z-=0.028;
+    const pulse=1+Math.sin(now*0.012)*0.08;
+    group.scale.setScalar(pulse);
+
+    const fade=Math.min(1,(3-age)/0.45);
+    outer.material.opacity=0.62*fade;
+    inner.material.opacity=(0.42+Math.sin(now*0.018)*0.10)*fade;
+
+    if(now-lastTick>=350){
+      lastTick=now;
+      for(const enemy of zombies){
+        if(!enemy||enemy.userData.dead) continue;
+        if(Math.hypot(enemy.position.x-x,enemy.position.z-z)<=2.6){
+          const type=enemy.userData.archetype||'walker';
+          const tickDamage=type==='boss'
+            ? Math.min((enemy.userData.maxHp||enemy.userData.hp)*0.01,sourceDamage*0.18)
+            : sourceDamage*0.22;
+          applyBulletDamage(enemy,tickDamage);
+        }
+      }
+    }
+
+    requestAnimationFrame(animateRealityTear);
+  })();
+}
+
 function updateBullets(dt){
   const speed = 18;
   for(let i=bullets.length-1;i>=0;i--){
@@ -13378,6 +13449,74 @@ function updateBullets(dt){
           spawnArcherHitFeedback(z.position.x,z.position.y+.82,z.position.z,b.damage>=2.5);
         } else if(b.kind==='arcane_lance'){
           spawnArcaneImpact(z.position.x,z.position.y+.08,z.position.z,'ice');
+          z.arcaneResonanceUntil=performance.now()+5000;
+          if(z.mesh){
+            let resonanceMark=z.mesh.getObjectByName('arcaneResonanceMark');
+            if(!resonanceMark){
+              resonanceMark=new THREE.Group();
+              resonanceMark.name='arcaneResonanceMark';
+
+              const resonanceMat=new THREE.MeshBasicMaterial({
+                color:0xb779ff,
+                transparent:true,
+                opacity:0.72,
+                depthWrite:false,
+                blending:THREE.AdditiveBlending
+              });
+
+              const resonanceRing=new THREE.Mesh(
+                new THREE.TorusGeometry(0.42,0.024,8,36),
+                resonanceMat
+              );
+              resonanceRing.rotation.x=Math.PI/2;
+              resonanceRing.position.y=0.95;
+              resonanceRing.userData.role='arcaneResonanceRing';
+
+              const resonanceRune=new THREE.Mesh(
+                new THREE.TorusGeometry(0.24,0.014,8,28),
+                resonanceMat.clone()
+              );
+              resonanceRune.rotation.y=Math.PI/2;
+              resonanceRune.position.y=0.95;
+              resonanceRune.userData.role='arcaneResonanceRune';
+
+              resonanceMark.add(resonanceRing,resonanceRune);
+              z.mesh.add(resonanceMark);
+            }
+
+            resonanceMark.userData.expiresAt=z.arcaneResonanceUntil;
+
+            if(!resonanceMark.userData.animating){
+              resonanceMark.userData.animating=true;
+              (function animateResonance(){
+                if(!resonanceMark.parent) return;
+                const now=performance.now();
+                const expiresAt=resonanceMark.userData.expiresAt||0;
+
+                if(now>=expiresAt){
+                  resonanceMark.parent.remove(resonanceMark);
+                  disposeGroup(resonanceMark);
+                  return;
+                }
+
+                const pulse=1+Math.sin(now*0.012)*0.12;
+                resonanceMark.scale.setScalar(pulse);
+
+                for(const child of resonanceMark.children){
+                  if(child.userData.role==='arcaneResonanceRing'){
+                    child.rotation.z+=0.035;
+                  }else if(child.userData.role==='arcaneResonanceRune'){
+                    child.rotation.x-=0.045;
+                  }
+                  if(child.material){
+                    child.material.opacity=0.55+Math.sin(now*0.016)*0.14;
+                  }
+                }
+
+                requestAnimationFrame(animateResonance);
+              })();
+            }
+          }
           spawnArcaneSigil(z.position.x,0,z.position.z,1.15);
           spawnArcaneSigil(z.position.x,0,z.position.z,0.55);
           spawnBurst(z.position.x,z.position.y+.72,z.position.z,14,FX_MAT_SPARK,3.8);
@@ -13502,6 +13641,10 @@ function updateBullets(dt){
       if(b.life<=0 && b.kind==='cyclone_snare_arrow' && !b.cycloneDetonated){
         triggerCycloneSnare(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,b);
       }
+      if(b.kind==='arcane_lance' && !b.realityTearSpawned){
+        b.realityTearSpawned=true;
+        spawnArcaneRealityTear(b.mesh.position.x,b.mesh.position.z,b.damage||1);
+      }
       scene.remove(b.mesh); // BULLET_GEO/MAT are shared — never dispose them here
       bullets.splice(i,1);
     }
@@ -13565,7 +13708,35 @@ function enforceRoundCompletionFailsafe(){
   }
 }
 
+
+function triggerArcaneManaRupture(sourceEnemy){
+  if(!sourceEnemy) return;
+  const x=sourceEnemy.position.x;
+  const y=sourceEnemy.position.y+0.65;
+  const z=sourceEnemy.position.z;
+
+  spawnArcaneImpact(x,y,z,'ice');
+  spawnArcaneSigil(x,0,z,0.95);
+  spawnBurst(x,y,z,16,FX_MAT_SPARK,4.2);
+
+  const radius=2.4;
+  for(const enemy of zombies){
+    if(!enemy || enemy===sourceEnemy || enemy.userData.dead) continue;
+    const d=Math.hypot(enemy.position.x-x,enemy.position.z-z);
+    if(d<=radius){
+      const type=enemy.userData.archetype||'walker';
+      const ruptureDamage=type==='boss'
+        ? Math.min((enemy.userData.maxHp||enemy.userData.hp)*0.03,2.5)
+        : 2.5;
+      applyBulletDamage(enemy,ruptureDamage);
+    }
+  }
+}
+
 function killZombie(z){
+  if(z.arcaneResonanceUntil && performance.now()<z.arcaneResonanceUntil){
+    triggerArcaneManaRupture(z);
+  }
   z.userData.dead = true;
   const deathCount=z.userData.archetype==='brute'?22:z.userData.archetype==='shadow'?16:9;
   spawnBurst(z.position.x, z.position.y+0.7, z.position.z, deathCount, z.userData.archetype==='shadow'?FX_MAT_SHADOW:FX_MAT_ZOMBIE, z.userData.archetype==='brute'?5:3);
