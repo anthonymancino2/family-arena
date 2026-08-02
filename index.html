@@ -1,3 +1,4 @@
+<!-- V22.11.33 Four Warning Circles: all four Super Meteor landing circles now appear immediately. The current quadrant keeps its existing bright pulsing marker, completed quadrant warnings disappear on impact, and all remaining markers clear after meteor four or during reset cleanup. Gameplay values are unchanged. -->
 <!-- V22.11.31 Four Meteor Stability Guard: caps overlapping giant meteor impact groups at two, clears all tracked impact effects during cleanup, and adds a sequence failsafe if an active meteor object is unexpectedly lost. Gameplay values and four-quadrant timing are unchanged. -->
 <!-- V22.11.30 Meteor Quadrant Guide: adds a subtle temporary cross that divides the circular arena into four equal quadrants and softly highlights the quadrant receiving the current meteor. The guide disappears after the fourth impact or during cleanup. Gameplay values are unchanged. -->
 <!-- V22.11.29 Four Quadrant Meteor Sequence: one cast now drops four Super Meteors in order across map quadrants 1, 2, 3, and 4. Each next meteor begins falling 1.5 seconds after the previous meteor impacts. Existing meteor size, impact radius, damage, boss cap, stun, burn, and cooldown are preserved. -->
@@ -105,7 +106,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.11.31</title>
+<title>Family Arena V22.11.33</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -888,7 +889,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.11.31 - Four Meteor Stability Guard';
+const GAME_VERSION='22.11.33 - Four Warning Circles';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12436,6 +12437,7 @@ let superMeteorSequenceActive=false;
 let superMeteorNextDropTimer=0;
 let superMeteorNextQuadrant=0;
 let superMeteorQuadrantGuide=null;
+let superMeteorWarningMarkers=[];
 let activeSuperMeteorImpacts=[];
 const SUPER_METEOR_IMPACT_CAP=2;
 let activeSuperMeteorCraters=[];
@@ -12515,6 +12517,82 @@ function makeSuperMeteorMesh(){
   return group;
 }
 
+
+
+function clearSuperMeteorWarningMarkers(){
+  for(const warning of superMeteorWarningMarkers){
+    if(warning&&warning.group&&warning.group.parent){
+      warning.group.parent.remove(warning.group);
+      disposeGroup(warning.group);
+    }
+  }
+  superMeteorWarningMarkers=[];
+}
+
+function createSuperMeteorWarningMarkers(){
+  clearSuperMeteorWarningMarkers();
+
+  for(let quadrantIndex=0;quadrantIndex<4;quadrantIndex++){
+    const target=superMeteorQuadrantTarget(quadrantIndex);
+    const group=new THREE.Group();
+    group.position.set(target.x,.045,target.z);
+
+    const ring=new THREE.Mesh(
+      new THREE.RingGeometry(
+        SUPER_METEOR_RADIUS*.72,
+        SUPER_METEOR_RADIUS,
+        64
+      ),
+      new THREE.MeshBasicMaterial({
+        color:0xff6b2a,
+        transparent:true,
+        opacity:.16,
+        side:THREE.DoubleSide,
+        depthWrite:false,
+        blending:THREE.AdditiveBlending
+      })
+    );
+    ring.rotation.x=-Math.PI/2;
+    group.add(ring);
+
+    const disc=new THREE.Mesh(
+      new THREE.CircleGeometry(SUPER_METEOR_RADIUS*.66,48),
+      new THREE.MeshBasicMaterial({
+        color:0xff7b2b,
+        transparent:true,
+        opacity:.055,
+        side:THREE.DoubleSide,
+        depthWrite:false,
+        blending:THREE.AdditiveBlending
+      })
+    );
+    disc.rotation.x=-Math.PI/2;
+    disc.position.y=.002;
+    group.add(disc);
+
+    scene.add(group);
+    superMeteorWarningMarkers.push({
+      quadrantIndex,
+      group,
+      ring,
+      disc
+    });
+  }
+}
+
+function removeSuperMeteorWarningMarker(quadrantIndex){
+  const markerIndex=superMeteorWarningMarkers.findIndex(
+    warning=>warning.quadrantIndex===quadrantIndex
+  );
+  if(markerIndex<0)return;
+
+  const warning=superMeteorWarningMarkers[markerIndex];
+  if(warning.group&&warning.group.parent){
+    warning.group.parent.remove(warning.group);
+    disposeGroup(warning.group);
+  }
+  superMeteorWarningMarkers.splice(markerIndex,1);
+}
 
 function createSuperMeteorQuadrantGuide(){
   if(superMeteorQuadrantGuide&&superMeteorQuadrantGuide.parent){
@@ -12670,6 +12748,7 @@ function triggerSuperMeteor(){
   superMeteorNextQuadrant=1;
   superMeteorNextDropTimer=0;
   createSuperMeteorQuadrantGuide();
+  createSuperMeteorWarningMarkers();
   spawnSuperMeteorForQuadrant(0);
 
   superMeteorCooldownTimer=SUPER_METEOR_COOLDOWN;
@@ -12908,6 +12987,7 @@ function clearSuperMeteor(resetCooldown=true){
   superMeteorSequenceActive=false;
   superMeteorNextDropTimer=0;
   superMeteorNextQuadrant=0;
+  clearSuperMeteorWarningMarkers();
 
   if(superMeteorQuadrantGuide){
     if(superMeteorQuadrantGuide.parent)scene.remove(superMeteorQuadrantGuide);
@@ -12984,6 +13064,7 @@ function updateMageUltimates(dt){
       impactSuperMeteor(m);
       scene.remove(m.mesh);disposeGroup(m.mesh);
       scene.remove(m.marker);disposeGroup(m.marker);
+      removeSuperMeteorWarningMarker((m.quadrant||1)-1);
       activeSuperMeteor=null;
 
       if(superMeteorNextQuadrant<4){
@@ -12991,6 +13072,7 @@ function updateMageUltimates(dt){
       }else{
         superMeteorSequenceActive=false;
         superMeteorNextDropTimer=0;
+        clearSuperMeteorWarningMarkers();
         if(superMeteorQuadrantGuide){
           if(superMeteorQuadrantGuide.parent)scene.remove(superMeteorQuadrantGuide);
           disposeGroup(superMeteorQuadrantGuide);
