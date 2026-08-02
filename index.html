@@ -768,7 +768,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.96 - Arcane Lance Freeze Fix';
+const GAME_VERSION='22.10.97 - Enemy Arcane Mark';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -13376,7 +13376,12 @@ function updateBullets(dt){
         } else if(b.kind==='arcane_lance'){
           spawnArcaneImpact(z.position.x,z.position.y+.08,z.position.z,'ice');
           spawnArcaneSigil(z.position.x,0,z.position.z,1.15);
-          spawnBurst(z.position.x,z.position.y+.72,z.position.z,10,FX_MAT_SPARK,3.4);
+          spawnArcaneSigil(z.position.x,0,z.position.z,0.55);
+          spawnBurst(z.position.x,z.position.y+.72,z.position.z,14,FX_MAT_SPARK,3.8);
+          if(z.mesh){
+            z.mesh.userData=z.mesh.userData||{};
+            z.mesh.userData.arcaneMarkUntil=performance.now()+220;
+          }
         } else {
           spawnBurst(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 5, FX_MAT_SPARK, 2.5);
         }
