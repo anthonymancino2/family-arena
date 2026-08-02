@@ -1,3 +1,4 @@
+<!-- V22.12.00 Round Select & Round Records: adds a Start Round screen after avatar selection (Rounds 1-50, all unlocked during build/test), rebuilds the round kill target as a pure function so any round can be entered directly, anchors the chosen starting theme to the round the run actually begins on, grants a catch-up stat/coin loadout proportional to the skipped rounds, and adds per-round personal-best and world-best records with a cloud-sync-ready Store API. Runs started above Round 1 are practice runs: round records still count, crystals and the main leaderboard do not. -->
 <!-- V22.11.33 Four Warning Circles: all four Super Meteor landing circles now appear immediately. The current quadrant keeps its existing bright pulsing marker, completed quadrant warnings disappear on impact, and all remaining markers clear after meteor four or during reset cleanup. Gameplay values are unchanged. -->
 <!-- V22.11.31 Four Meteor Stability Guard: caps overlapping giant meteor impact groups at two, clears all tracked impact effects during cleanup, and adds a sequence failsafe if an active meteor object is unexpectedly lost. Gameplay values and four-quadrant timing are unchanged. -->
 <!-- V22.11.30 Meteor Quadrant Guide: adds a subtle temporary cross that divides the circular arena into four equal quadrants and softly highlights the quadrant receiving the current meteor. The guide disappears after the fourth impact or during cleanup. Gameplay values are unchanged. -->
@@ -171,7 +172,7 @@
   /* Mobile-safe scrolling for long selection screens. The original centered
      the entire avatar page inside a fixed-height viewport, which pushed the
      Continue button below Safari's visible area on smaller phones. */
-  #screenCustomize.active, #screenTheme.active, #screenShop.active{
+  #screenCustomize.active, #screenTheme.active, #screenShop.active, #screenRoundSelect.active{
     justify-content:flex-start;
     overflow-y:auto;
     overflow-x:hidden;
@@ -179,13 +180,13 @@
     padding-top:calc(82px + env(safe-area-inset-top));
     padding-bottom:calc(110px + env(safe-area-inset-bottom));
   }
-  #screenCustomize .backRow, #screenTheme .backRow, #screenShop .backRow{
+  #screenCustomize .backRow, #screenTheme .backRow, #screenShop .backRow, #screenRoundSelect .backRow{
     position:fixed;
     top:calc(12px + env(safe-area-inset-top));
     left:14px;
     z-index:30;
   }
-  #screenCustomize #btnStartGame, #screenTheme #btnBeginSurvival{
+  #screenCustomize #btnStartGame, #screenTheme #btnBeginSurvival, #screenRoundSelect #btnRoundToTheme{
     position:sticky;
     bottom:calc(12px + env(safe-area-inset-bottom));
     z-index:25;
@@ -258,7 +259,11 @@
   .hitFlash.show{opacity:1;transition:opacity 0.02s;}
   .heartsWrap{position:absolute;top:calc(14px + env(safe-area-inset-top));left:14px;
     background:var(--panel);border-radius:14px;padding:8px 10px;}
-  .heartsRow{display:flex;gap:5px;}
+  .heartsRow{display:flex;flex-wrap:wrap;gap:5px;max-width:min(58vw,300px);}
+  .heartsRow.dense .heart{width:17px;height:17px;}
+  .heartsRow.dense{gap:4px;}
+  .heartsRow.ultra .heart{width:12px;height:12px;}
+  .heartsRow.ultra{gap:3px;}
   .heart{width:26px;height:26px;background:var(--danger);clip-path:polygon(50% 15%,61% 0,78% 0,100% 22%,100% 45%,50% 100%,0 45%,0 22%,22% 0,39% 0);
     filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5));}
   .heart.dead{background:rgba(255,255,255,0.15);}
@@ -516,6 +521,28 @@
   .themeCard .swatch3{height:36px;border-radius:8px;margin-bottom:6px;}
   .themeCard h4{margin:0;font-size:12px;font-weight:700;}
   .themeCard .themeLm{margin-top:2px;font-size:10px;font-weight:600;opacity:0.62;letter-spacing:0.2px;}
+  /* ---- Start Round selector ---- */
+  .roundGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:400px;margin:4px auto 0;}
+  .roundCard{background:var(--panel);border-radius:12px;padding:8px 4px 7px;text-align:center;
+    border:2px solid transparent;cursor:pointer;}
+  .roundCard.sel{border-color:var(--ice);}
+  .roundCard.locked{opacity:.3;cursor:default;}
+  .roundCard .rNum{font-size:18px;font-weight:900;line-height:1.02;}
+  .roundCard .rLbl{font-size:8px;font-weight:800;letter-spacing:.09em;opacity:.55;}
+  .roundCard .rBest{margin-top:3px;font-size:10px;font-weight:800;color:#ffd64a;}
+  .roundCard .rWorld{font-size:10px;font-weight:800;color:#9fdfff;}
+  .roundCard .rNone{font-size:10px;font-weight:700;opacity:.32;}
+  .roundSelectHint{max-width:400px;margin:2px auto 9px;font-size:11.5px;line-height:1.4;
+    color:#8fdcff;text-align:center;font-weight:700;}
+  .roundBestPanel{width:100%;max-width:400px;margin:12px auto 0;padding:11px 13px;
+    border:1px solid rgba(159,223,255,.28);border-radius:14px;background:rgba(8,18,29,.72);
+    text-align:left;font-size:12.5px;line-height:1.42;}
+  .roundBestPanel .rbTitle{font-weight:900;color:#dff7ff;font-size:15px;margin-bottom:6px;}
+  .roundBestPanel .rbRow{display:flex;justify-content:space-between;gap:10px;color:#d3e1ec;margin-top:3px;}
+  .roundBestPanel .rbRow span{opacity:.74;font-weight:700;}
+  .roundBestPanel .rbRow strong{font-weight:900;color:#ffd64a;text-align:right;}
+  .roundBestPanel .rbNote{margin-top:8px;padding-top:7px;border-top:1px solid rgba(159,223,255,.18);
+    color:#f5dc8a;font-size:11.5px;font-weight:700;line-height:1.35;}
 
   .backRow{position:absolute;top:calc(14px + env(safe-area-inset-top));left:14px;}
 
@@ -752,11 +779,22 @@
     <button class="bigBtn" id="btnStartGame">Choose Theme →</button>
   </div>
 
+  <!-- START ROUND SELECT -->
+  <div class="screen" id="screenRoundSelect">
+    <div class="backRow"><button class="ghostBtn" id="backCustomize2">&larr; Back</button></div>
+    <h1 class="title" style="font-size:22px;">Pick a starting round</h1>
+    <div class="subtitle">Jump straight into the round you want to practice.</div>
+    <div class="roundSelectHint" id="roundSelectHint"></div>
+    <div class="roundGrid" id="roundGrid"></div>
+    <div class="roundBestPanel" id="roundBestPanel"></div>
+    <button class="bigBtn" id="btnRoundToTheme">Choose Theme &rarr;</button>
+  </div>
+
   <!-- THEME SELECT -->
   <div class="screen" id="screenTheme">
     <div class="backRow"><button class="ghostBtn" id="backCustomize">← Back</button></div>
     <h1 class="title" style="font-size:22px;">Pick a starting theme</h1>
-    <div class="subtitle">The world changes theme every round, cycling forward from here.</div>
+    <div class="subtitle" id="themeSubtitle">The world changes theme every round, cycling forward from here.</div>
     <div class="themeGrid" id="themeGrid"></div>
     <button class="bigBtn" id="btnBeginSurvival">Begin</button>
   </div>
@@ -889,7 +927,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.11.33 - Four Warning Circles';
+const GAME_VERSION='22.12.00 - Round Select & Round Records';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -929,6 +967,59 @@ const Store = {
   getLeaderboard(mode){
     try{ return JSON.parse(localStorage.getItem(this._key('lb:'+mode))||'[]'); }
     catch(e){ return []; }
+  },
+
+  // ---- PER-ROUND RECORD BOOK ----------------------------------------
+  // Two boards, both keyed by round number:
+  //   * the player's own personal best  -> profile.roundBests[round]
+  //   * the best of everyone who plays  -> famarena:lbround:<round>
+  // Right now "everyone" means every profile on this device. SYNC POINT:
+  // when cloud sync lands, only getRoundWorldBest() and the world half of
+  // submitRoundRecord() become Firestore calls -- every caller in the game
+  // already goes through these three functions and needs no changes.
+  getRoundBest(name, roundNo){
+    if(!name) return null;
+    const rec = (this.getProfile(name).roundBests||{})[String(roundNo)];
+    return rec && Number.isFinite(rec.score) ? rec : null;
+  },
+  getRoundWorldBest(roundNo){
+    try{
+      const rec = JSON.parse(localStorage.getItem(this._key('lbround:'+roundNo))||'null');
+      return rec && Number.isFinite(rec.score) ? rec : null;
+    }catch(e){ return null; }
+  },
+  getHighestRoundCleared(name){
+    if(!name) return 0;
+    const v = Number(this.getProfile(name).highestRoundCleared||0);
+    return Number.isFinite(v) && v>0 ? v : 0;
+  },
+  markRoundCleared(name, roundNo){
+    if(!name) return;
+    const prof = this.getProfile(name);
+    if((prof.highestRoundCleared||0) < roundNo){
+      prof.highestRoundCleared = roundNo;
+      this.saveProfile(prof);
+    }
+  },
+  // Records one cleared round against both boards. Higher score wins.
+  // Returns which boards were beaten so the game can celebrate it.
+  submitRoundRecord(name, roundNo, score, seconds, flawless){
+    if(!name) return {newPersonal:false, newWorld:false, personalBest:null, worldBest:null};
+    const entry = { name, score, seconds, flawless: !!flawless, at: Date.now() };
+    const key = String(roundNo);
+    const prof = this.getProfile(name);
+    prof.roundBests = prof.roundBests || {};
+    const prevMine = prof.roundBests[key] || null;
+    const newPersonal = !prevMine || score > prevMine.score;
+    if(newPersonal){ prof.roundBests[key] = entry; this.saveProfile(prof); }
+    const prevWorld = this.getRoundWorldBest(roundNo);
+    const newWorld = !prevWorld || score > prevWorld.score;
+    if(newWorld) localStorage.setItem(this._key('lbround:'+roundNo), JSON.stringify(entry));
+    return {
+      newPersonal, newWorld,
+      personalBest: newPersonal ? entry : prevMine,
+      worldBest: newWorld ? entry : prevWorld
+    };
   },
   getHighestScore(mode, name){
     if(!name) return null;
@@ -1002,8 +1093,63 @@ let state = {
   hairStyle: 'short',
   avatarType: 'rogue',
   mode: null,
-  themeIndex: 0
+  themeIndex: 0,
+  startRound: 1
 };
+
+// ---------------------------------------------------------------------
+// START ROUND SELECTION
+// The survival mode itself is endless -- nothing caps the round number.
+// The *selector* is what stops at 50, so this is the only number to move
+// if the practice range should reach further later.
+// ---------------------------------------------------------------------
+const START_ROUND_MAX = 50;
+// Development switch, matching UNLOCK_ALL_AVATARS_FOR_TESTING above.
+// While true every round is selectable. Set it to false and players can
+// only pick up to one past the highest round they have actually cleared.
+const UNLOCK_ALL_ROUNDS_FOR_TESTING = true;
+let runStartRound = 1; // the round the current run actually began on
+
+function highestUnlockedStartRound(){
+  if(UNLOCK_ALL_ROUNDS_FOR_TESTING) return START_ROUND_MAX;
+  const cleared = Store.getHighestRoundCleared(state.currentName);
+  return Math.min(START_ROUND_MAX, Math.max(1, cleared + 1));
+}
+function clampStartRound(r){
+  const n = Math.floor(Number(r)) || 1;
+  return Math.min(highestUnlockedStartRound(), Math.max(1, n));
+}
+
+// How many enemies a round is worth, as a pure function of the round
+// number. This used to be accumulated one round at a time (+1, +1, +10...),
+// which meant round 25's target only existed if you had actually played
+// rounds 1-24. Expressed this way, dropping straight into round 25 gets
+// round 25's real crowd -- 226 enemies, not 4.
+//   R1 = 4, R2 = 5, R3 = 6, then +10 every round after that.
+function killTargetForRound(r){
+  const n = Math.max(1, Math.floor(Number(r)) || 1);
+  if(n === 1) return 4;
+  if(n <= 3) return 3 + n;
+  return 6 + (n - 3) * 10;
+}
+
+// Per-round score. Higher is better, so it reads like a high score, and it
+// rewards exactly what the mode is about: clear the round fast, and clear
+// it without getting hit. The pace budget is the same 3-seconds-per-enemy
+// figure the in-round coin speed bonus already uses.
+const ROUND_FLAWLESS_BONUS = 2500;
+function roundScoreFor(roundNo, seconds, flawless){
+  const budget = killTargetForRound(roundNo) * 3;
+  const pace = Math.max(0, budget - Math.max(0, seconds));
+  return Math.round(pace * 100) + (flawless ? ROUND_FLAWLESS_BONUS : 0);
+}
+function formatRoundScore(n){ return Math.round(Number(n)||0).toLocaleString(); }
+// Player names are free text and record holders get rendered into HTML.
+function escapeHtmlText(v){
+  return String(v==null?'':v).replace(/[&<>"']/g, ch=>(
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function formatRoundTime(s){ return (Math.max(0, Number(s)||0)).toFixed(1)+'s'; }
 
 function show(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -1207,12 +1353,84 @@ function buildCustomizeUI(){
 }
 
 document.getElementById('btnStartGame').onclick = ()=>{
+  renderRoundGrid();
+  show('screenRoundSelect');
+};
+document.getElementById('backCustomize2').onclick = ()=>show('screenCustomize');
+document.getElementById('btnRoundToTheme').onclick = ()=>{
   renderThemeGrid();
   show('screenTheme');
 };
-document.getElementById('backCustomize').onclick = ()=>show('screenCustomize');
+document.getElementById('backCustomize').onclick = ()=>{
+  renderRoundGrid();
+  show('screenRoundSelect');
+};
+
+// ---------------------------------------------------------------------
+// Start Round selector. Every card shows the round number, the player's
+// own best score for that round, and the best score anyone has posted for
+// it. Tapping a card selects it; the panel underneath expands the detail.
+// ---------------------------------------------------------------------
+function renderRoundGrid(){
+  const grid = document.getElementById('roundGrid');
+  if(!grid) return;
+  const hint = document.getElementById('roundSelectHint');
+  const maxUnlocked = highestUnlockedStartRound();
+  state.startRound = clampStartRound(state.startRound);
+  if(hint){
+    hint.innerHTML = UNLOCK_ALL_ROUNDS_FOR_TESTING
+      ? '\u2B50 your best &nbsp;\u00B7&nbsp; \uD83C\uDFC6 everyone\u2019s best<br>All rounds are open during build &amp; test.'
+      : '\u2B50 your best &nbsp;\u00B7&nbsp; \uD83C\uDFC6 everyone\u2019s best<br>Rounds unlock as you clear them.';
+  }
+  grid.innerHTML = '';
+  for(let r=1; r<=START_ROUND_MAX; r++){
+    const locked = r > maxUnlocked;
+    const card = document.createElement('div');
+    card.className = 'roundCard' + (state.startRound===r ? ' sel':'') + (locked ? ' locked':'');
+    const mine = Store.getRoundBest(state.currentName, r);
+    const world = Store.getRoundWorldBest(r);
+    card.innerHTML = '<div class="rNum">'+r+'</div><div class="rLbl">ROUND</div>'
+      + (mine  ? '<div class="rBest">\u2B50 '+formatRoundScore(mine.score)+'</div>'  : '<div class="rNone">\u2B50 \u2014</div>')
+      + (world ? '<div class="rWorld">\uD83C\uDFC6 '+formatRoundScore(world.score)+'</div>' : '<div class="rNone">\uD83C\uDFC6 \u2014</div>');
+    if(!locked) card.onclick = ()=>{ state.startRound = r; renderRoundGrid(); };
+    grid.appendChild(card);
+  }
+  renderRoundBestPanel();
+}
+
+function renderRoundBestPanel(){
+  const box = document.getElementById('roundBestPanel');
+  if(!box) return;
+  const r = state.startRound;
+  const mine = Store.getRoundBest(state.currentName, r);
+  const world = Store.getRoundWorldBest(r);
+  const rows = [];
+  rows.push('<div class="rbTitle">Round '+r+' \u00B7 '+killTargetForRound(r)+' enemies</div>');
+  rows.push('<div class="rbRow"><span>\u2B50 Your best</span><strong>'
+    + (mine ? formatRoundScore(mine.score)+' \u00B7 '+formatRoundTime(mine.seconds)+(mine.flawless?' \u00B7 flawless':'') : '\u2014')
+    + '</strong></div>');
+  rows.push('<div class="rbRow"><span>\uD83C\uDFC6 Everyone\u2019s best</span><strong>'
+    + (world ? formatRoundScore(world.score)+' \u00B7 '+formatRoundTime(world.seconds)+'<br>'+escapeHtmlText(world.name) : '\u2014')
+    + '</strong></div>');
+  if(r > 1){
+    const c = catchUpPlanForStartRound(r);
+    rows.push('<div class="rbRow"><span>Catch-up loadout</span><strong>'
+      + c.total+' stat levels \u00B7 '+c.coins.toLocaleString()+'\uD83E\uDE99</strong></div>');
+    rows.push('<div class="rbNote">Starting above Round 1 is a practice run. Round records still count, '
+      + 'but crystals and the main Family Leaderboard do not.</div>');
+  }else{
+    rows.push('<div class="rbNote">Round 1 is a full run \u2014 crystals and the Family Leaderboard count normally.</div>');
+  }
+  box.innerHTML = rows.join('');
+}
 
 function renderThemeGrid(){
+  const sub = document.getElementById('themeSubtitle');
+  if(sub){
+    sub.textContent = state.startRound > 1
+      ? 'This is the map you start Round '+state.startRound+' on. The world changes theme every round, cycling forward from here.'
+      : 'The world changes theme every round, cycling forward from here.';
+  }
   const grid = document.getElementById('themeGrid');
   grid.innerHTML = '';
   THEMES.forEach((t,i)=>{
@@ -2207,9 +2425,15 @@ const THEMES = [
 // Which theme applies to a given round, given the player's chosen
 // starting theme. The map now changes every single round, wrapping
 // around through however many themes are implemented.
+// The theme picker promises "the world cycles forward from here", so the
+// cycle is anchored to the round the run actually began on, not to round 1.
+// Start on round 25 and your chosen theme is still the first map you see,
+// then it advances one theme per round exactly as before. When a run starts
+// on round 1 (runStartRound === 1) this is identical to the old behavior.
 function themeForRound(round, startIndex){
-  const stage = round - 1;
-  return THEMES[(startIndex + stage) % THEMES.length];
+  const stage = round - (runStartRound || 1);
+  const len = THEMES.length;
+  return THEMES[((startIndex + stage) % len + len) % len];
 }
 
 function applyTheme(round){
@@ -9084,10 +9308,13 @@ function startRound(){
   // Rounds 1-3 add one zombie at a time (4, 5, 6). From round 4 on, the
   // target jumps by 10 every round — but see MAX_CONCURRENT_ZOMBIES
   // below for why they don't all appear on screen simultaneously.
-  if(round === 1) roundKillTarget = 4;
-  else if(round <= 3) roundKillTarget += 1;
-  else roundKillTarget += 10;
+  // This is now computed from the round number rather than accumulated,
+  // so entering a run directly at round 25 gets round 25's real target.
+  roundKillTarget = killTargetForRound(round);
   roundKillsDone = 0;
+  // Cached so the round timer pill can show the personal best without
+  // touching storage every frame.
+  currentRoundPersonalBest = state.currentName ? Store.getRoundBest(state.currentName, round) : null;
   // Spawning the full target at once would mean 200+ zombies (and,
   // at ~35 meshes each, 7000+ mesh objects) appearing in a single frame
   // by round 20 — spawn up to the cap immediately, and killZombie() below
@@ -9203,6 +9430,56 @@ let roundStatPurchases = {power:0,speed:0,hp:0};
 const ROUND_STAT_BASE_PRICE = {power:20,speed:20,hp:25};
 function roundStatPrice(stat){
   return ROUND_STAT_BASE_PRICE[stat] + roundStatPurchases[stat]*10;
+}
+
+// ---------------------------------------------------------------------
+// START ROUND CATCH-UP
+// Dropping into Round 25 with a Round-1 loadout isn't practice, it's a
+// wall: 226 enemies against three hearts and base power. So a run that
+// starts above Round 1 is handed roughly what a player who fought their
+// way there would be carrying -- stat levels bought out of the between-
+// round shop, plus pocket coins to keep shopping mid-run.
+//
+// The purchases run through the real per-hero upgrade amounts and bump
+// the real price ladder, so a Barbarian still gets +2 HP per level and
+// the in-run shop prices stay continuous. Nothing here can drift out of
+// sync with the shop, because it *is* the shop's own math.
+//
+// All tuning is these three numbers.
+const CATCH_UP_STAT_LEVELS_PER_ROUND = 0.6;                  // stat purchases per skipped round
+const CATCH_UP_STAT_SPLIT = {power:0.4, hp:0.3, speed:0.3};  // how those purchases are spread
+const CATCH_UP_COINS_PER_ROUND = 60;                         // spending money per skipped round
+
+// Pure planning half, so the Start Round screen can preview the grant
+// without touching any live run state.
+function catchUpPlanForStartRound(startRound){
+  const skipped = Math.max(0, (Math.floor(Number(startRound))||1) - 1);
+  if(!skipped) return {skipped:0, total:0, power:0, hp:0, speed:0, coins:0};
+  const total = Math.max(1, Math.floor(skipped * CATCH_UP_STAT_LEVELS_PER_ROUND));
+  const power = Math.round(total * CATCH_UP_STAT_SPLIT.power);
+  const hp    = Math.round(total * CATCH_UP_STAT_SPLIT.hp);
+  const speed = Math.max(0, total - power - hp);
+  return {skipped, total, power, hp, speed, coins: skipped * CATCH_UP_COINS_PER_ROUND};
+}
+
+// Applying half. Must run after startSurvival() has reset playerStats,
+// roundStatPurchases, maxHearts and runTokens, or it gets wiped.
+function applyStartRoundCatchUp(startRound){
+  const plan = catchUpPlanForStartRound(startRound);
+  if(!plan.skipped) return null;
+  for(const stat of ['power','hp','speed']){
+    for(let i=0; i<plan[stat]; i++){
+      const amount = upgradeAmountForActiveHero(stat);
+      roundStatPurchases[stat]++;   // keeps the in-run shop's price ladder honest
+      playerStats[stat] += amount;
+      if(stat === 'hp') maxHearts += amount;
+    }
+  }
+  hearts = maxHearts;
+  renderHearts();
+  runTokens += plan.coins;
+  updateRunTokensHud();
+  return plan;
 }
 function refreshRoundStatShop(){
   const tokenEl=document.getElementById('roundShopTokensCount');
@@ -9543,11 +9820,14 @@ function updateInvincibleHud(){
     pill.classList.remove('show');
   }
 }
+let currentRoundPersonalBest = null; // cached record for the live round
 function updateRoundTimerHud(){
   const elapsed = roundTimerFrozenElapsed === null
     ? (performance.now() - roundStartTime) / 1000
     : roundTimerFrozenElapsed;
-  document.getElementById('roundTimerPill').textContent = '⏱ ' + Math.max(0,elapsed).toFixed(1) + 's';
+  let txt = '⏱ ' + Math.max(0,elapsed).toFixed(1) + 's';
+  if(currentRoundPersonalBest) txt += ' · PB ' + formatRoundTime(currentRoundPersonalBest.seconds);
+  document.getElementById('roundTimerPill').textContent = txt;
 }
 
 function updateEnemyCountHud(){
@@ -9728,6 +10008,9 @@ function renderAbilityShopList(list){
 
 function renderHearts(){
   const row = document.getElementById('heartsRow');
+  // Keep the pip row roughly one line tall no matter how much HP the run
+  // is carrying, so it never grows down into the Knight armor bar.
+  row.className = 'heartsRow' + (maxHearts > 14 ? ' ultra' : maxHearts > 8 ? ' dense' : '');
   row.innerHTML = '';
   for(let i=0;i<maxHearts;i++){
     const h = document.createElement('div');
@@ -14779,6 +15062,18 @@ function completeCurrentRound(force=false){
     crystalsEarned += 10;
     bonusMsg += ' Flawless! +10💎';
   }
+  // Per-round record book. This is what the Start Round screen shows, and
+  // it is deliberately kept separate from the run leaderboard: a practice
+  // run that starts on round 25 still earns round 25's record.
+  const flawlessRound = heartsLostThisRound === 0;
+  const roundScore = roundScoreFor(round, clearTime, flawlessRound);
+  if(state.currentName){
+    Store.markRoundCleared(state.currentName, round);
+    const rec = Store.submitRoundRecord(state.currentName, round, roundScore, clearTime, flawlessRound);
+    bonusMsg += ' \u00B7 ' + formatRoundScore(roundScore) + ' pts';
+    if(rec.newWorld) bonusMsg += ' \uD83C\uDFC6 NEW BEST EVER!';
+    else if(rec.newPersonal) bonusMsg += ' \u2B50 New personal best!';
+  }
   toast(bonusMsg);
   round++;
   crystalsEarned += crystalsPerRound();
@@ -15383,8 +15678,9 @@ function startSurvival(){
   enemyProjectiles.forEach(p=>{scene.remove(p.mesh);disposeGroup(p.mesh);if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}});enemyProjectiles=[];
   fx.forEach(f=>scene.remove(f.mesh));
   fx = [];
-  reachedLevelUnlocks = new Set(); registerReachedLevelUnlocks(1);
-  hearts=3;maxHearts=3;round=1;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerVolleyStep=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;document.body.style.filter='';updateHoodedHud();
+  reachedLevelUnlocks = new Set();
+  runStartRound = clampStartRound(state.startRound);
+  hearts=3;maxHearts=3;round=runStartRound;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerVolleyStep=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;document.body.style.filter='';updateHoodedHud();
   playerStats = startingStatsForActiveHero();
   // Base survival health is three hearts. Hero HP bonuses are represented by
   // HP levels above 1, so +2 starting HP produces five full hearts.
@@ -15399,6 +15695,10 @@ function startSurvival(){
   roundStatPurchases = {power:0,speed:0,hp:0};
   runTokens = 0;
   crystalsEarned = 0;
+  // Level milestones are registered for the round the run starts on, so a
+  // run entered at round 25 already counts every unlock up to level 25.
+  registerReachedLevelUnlocks(round);
+  const catchUpGrant = applyStartRoundCatchUp(runStartRound);
   ownedWeapons = {pistol:true};
   ownedAbilities = {};
   equippedAbilityId = null;
@@ -15438,6 +15738,12 @@ function startSurvival(){
   roundTimerFrozenElapsed = null;
   roundCompletionStartedAt = 0;
   startRound();
+  if(catchUpGrant){
+    // Announced after startRound()'s own banner so both are readable.
+    setTimeout(()=>toast('Catch-up loadout: \uD83D\uDCAA+'+catchUpGrant.power
+      +' \u2764\uFE0F+'+catchUpGrant.hp+' \u26A1+'+catchUpGrant.speed
+      +' \u00B7 '+catchUpGrant.coins.toLocaleString()+'\uD83E\uDE99 \u00B7 practice run'), 2600);
+  }
   gameRunning = true;
   onResize();
   clock.getDelta();
@@ -15452,7 +15758,12 @@ function endSurvival(){
   // round are ranked by whoever got there faster, which is the actual
   // goal: clear each round without dying, as fast as possible.
   const elapsedSec = (performance.now() - runStartTime) / 1000;
-  const score = Math.max(0, (round-1)*100000 - Math.floor(elapsedSec));
+  // Rounds *cleared during this run* -- not the round number reached. A
+  // practice run that starts on round 25 and clears one round scored one
+  // round, so it can never inflate the board. For a normal round-1 run
+  // (runStartRound === 1) this is exactly the old (round-1).
+  const roundsCleared = Math.max(0, round - runStartRound);
+  const score = Math.max(0, roundsCleared*100000 - Math.floor(elapsedSec));
   const mins = Math.floor(elapsedSec/60), secs = Math.floor(elapsedSec%60);
   const timeStr = mins+':'+String(secs).padStart(2,'0');
 
@@ -15460,15 +15771,18 @@ function endSurvival(){
   // longer determines the crystal payout, which now comes from the
   // per-round total earned as you played (crystalsEarned).
   let rank;
-  if(round-1 >= 15) rank='platinum';
-  else if(round-1 >= 8) rank='gold';
-  else if(round-1 >= 4) rank='silver';
+  if(roundsCleared >= 15) rank='platinum';
+  else if(roundsCleared >= 8) rank='gold';
+  else if(roundsCleared >= 4) rank='silver';
   else rank='bronze';
 
   // A run where free roam (invincible) was used is practice only — it
   // must not award crystals or post to the shared family leaderboard,
   // or the whole competition is meaningless.
-  const practice = runUsedFreeMode;
+  // A run that skipped ahead is practice too: it arrives with a granted
+  // catch-up loadout instead of an earned one, so it must not pay crystals
+  // or post to the shared family board. Its per-round records still count.
+  const practice = runUsedFreeMode || runStartRound > 1;
   const crystalsAwarded = practice ? 0 : crystalsEarned;
   const p = Store.getProfile(state.currentName);
   if(!practice){
@@ -15482,7 +15796,7 @@ function endSurvival(){
   document.getElementById('rankBadge').className = 'rankBadge '+rank;
   document.getElementById('rankBadge').textContent = rank[0].toUpperCase();
   document.getElementById('rankName').textContent = rank.toUpperCase()+' RANK';
-  document.getElementById('statRounds').textContent = round-1;
+  document.getElementById('statRounds').textContent = roundsCleared;
   document.getElementById('statTime').textContent = timeStr;
   document.getElementById('statKills').textContent = kills;
   document.getElementById('statScore').textContent = score;
@@ -15491,8 +15805,11 @@ function endSurvival(){
     ? 'PRACTICE RUN' : rank.toUpperCase()+' RANK';
 
   const lbList = document.getElementById('lbList');
+  const practiceReason = runUsedFreeMode
+    ? 'free roam was used'
+    : 'the run started on Round '+runStartRound;
   lbList.innerHTML = practice
-    ? '<div class="subtitle" style="margin:10px 0 4px;">Practice run — free roam was used, so this score wasn\'t submitted.</div>'
+    ? '<div class="subtitle" style="margin:10px 0 4px;">Practice run — '+practiceReason+', so this score wasn\'t submitted. Round records were still saved.</div>'
     : '<div class="subtitle" style="margin:10px 0 4px;">Family Leaderboard</div>';
   lb.slice(0,5).forEach(row=>{
     const div = document.createElement('div');
