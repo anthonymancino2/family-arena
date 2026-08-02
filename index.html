@@ -1,3 +1,4 @@
+<!-- V22.13.03 Primary Hold Reliability Fix: Primary auto-attack now keeps ownership of the exact finger/pointer that started the hold, ignores unrelated pointer releases, and no longer stops when iOS Safari emits lostpointercapture while the finger is still down. Tap behavior, attack cooldowns, damage, VFX, and Whirlwind logic are unchanged. -->
 <!-- V22.13.02 Cloud Sync Merge: brings the Round Records cloud sync layer
      (Firebase Firestore round-best board, background/foreground refresh,
      offline-safe local-first writes) into the Knight Responsiveness /
@@ -118,7 +119,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.01</title>
+<title>Family Arena V22.13.03</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -949,7 +950,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.02 - Cloud Sync Merge';
+const GAME_VERSION='22.13.03 - Primary Hold Reliability Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10336,16 +10337,24 @@ function setupControls(){
   // browsers cannot lose a timer while the finger is still down.
   const actBtnEl=document.getElementById('actBtn');
   let primaryPressed=false;
+  let primaryPointerId=null;
   const releasePrimaryInput=e=>{
     if(e && e.preventDefault) e.preventDefault();
+    // Only the finger/pointer that began the Primary hold may release it.
+    // This prevents another control's pointerup from stopping auto-attack.
+    if(e && primaryPointerId!==null && Number.isFinite(e.pointerId) && e.pointerId!==primaryPointerId) return;
     primaryPressed=false;
     primaryInputHeld=false;
+    primaryPointerId=null;
   };
   const beginPrimaryFire=e=>{
     if(e){e.preventDefault();e.stopPropagation();}
     if(primaryPressed) return;
     primaryPressed=true;
     primaryInputHeld=true;
+    primaryPointerId=e&&Number.isFinite(e.pointerId)
+      ? e.pointerId
+      : (e&&e.changedTouches&&e.changedTouches[0]?e.changedTouches[0].identifier:null);
     if(e && e.currentTarget && e.currentTarget.setPointerCapture && Number.isFinite(e.pointerId)){
       try{e.currentTarget.setPointerCapture(e.pointerId);}catch(_err){}
     }
@@ -10355,17 +10364,24 @@ function setupControls(){
     actBtnEl.addEventListener('pointerdown',beginPrimaryFire,{passive:false});
     actBtnEl.addEventListener('pointerup',releasePrimaryInput,{passive:false});
     actBtnEl.addEventListener('pointercancel',releasePrimaryInput,{passive:false});
-    actBtnEl.addEventListener('lostpointercapture',releasePrimaryInput,{passive:false});
+    // Do not clear Primary hold on lostpointercapture. iOS Safari can emit it
+    // while the finger is still physically down. The matching pointerup or
+    // pointercancel event remains authoritative.
     window.addEventListener('pointerup',releasePrimaryInput,{passive:false});
     window.addEventListener('pointercancel',releasePrimaryInput,{passive:false});
   }else{
     actBtnEl.addEventListener('touchstart',beginPrimaryFire,{passive:false});
-    actBtnEl.addEventListener('touchend',releasePrimaryInput,{passive:false});
-    actBtnEl.addEventListener('touchcancel',releasePrimaryInput,{passive:false});
-    window.addEventListener('touchend',releasePrimaryInput,{passive:false});
-    window.addEventListener('touchcancel',releasePrimaryInput,{passive:false});
+    const releasePrimaryTouch=e=>{
+      const changed=[...(e.changedTouches||[])];
+      if(primaryPointerId!==null && !changed.some(t=>t.identifier===primaryPointerId)) return;
+      releasePrimaryInput(e);
+    };
+    actBtnEl.addEventListener('touchend',releasePrimaryTouch,{passive:false});
+    actBtnEl.addEventListener('touchcancel',releasePrimaryTouch,{passive:false});
+    window.addEventListener('touchend',releasePrimaryTouch,{passive:false});
+    window.addEventListener('touchcancel',releasePrimaryTouch,{passive:false});
   }
-  window.addEventListener('blur',releasePrimaryInput);
+  window.addEventListener('blur',()=>releasePrimaryInput());
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden) releasePrimaryInput();
   });
