@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- V22.10.77 Primary Hold Scope Crash Fix: moves primaryInputHeld into shared runtime scope so update() can read it without throwing. This restores normal world rendering and movement while running; pause remains fully frozen. -->
 <!-- V22.10.76 Persistent Arena Render Loop: prevents the Three.js render loop from terminating when gameRunning briefly becomes false during startup, pause, resume, or round transitions. Rendering continues safely while gameplay updates remain paused. -->
 <!-- V22.10.75 Giant Fireball Restoration + Render Recovery: restores the approved Phoenix-scale molten sphere and 1.85-second hold-to-repeat cadence from V22.10.73, while preserving the black-screen canvas/render recovery safeguard. -->
 <!-- V22.10.72 Secondary Hold-State Reliability: moves held Secondary repeat attempts into the main game update loop instead of relying on a browser interval. Tap still casts once, holding continues to cast whenever the equipped move is ready, and releasing/canceling/focus loss immediately stops all attempts. This restores Giant Fireball hold-to-repeat while preserving its 1.85-second cooldown and all existing damage/visual behavior. -->
@@ -65,7 +66,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.76</title>
+<title>Family Arena V22.10.77</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -755,7 +756,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.76 - Persistent Arena Render Loop';
+const GAME_VERSION='22.10.77 - Primary Hold Scope Crash Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -9616,6 +9617,7 @@ document.addEventListener('touchend',e=>{
 let moveVec = {x:0,y:0};
 let lookActive = false, lookLast = {x:0,y:0};
 let secondaryInputHeld = false;
+let primaryInputHeld = false;
 
 function setupControls(){
   const moveZone = document.getElementById('moveZone');
@@ -9687,7 +9689,6 @@ function setupControls(){
   // browsers cannot lose a timer while the finger is still down.
   const actBtnEl=document.getElementById('actBtn');
   let primaryPressed=false;
-  let primaryInputHeld=false;
   const releasePrimaryInput=e=>{
     if(e && e.preventDefault) e.preventDefault();
     primaryPressed=false;
