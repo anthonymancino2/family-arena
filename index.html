@@ -1,3 +1,4 @@
+<!-- V22.13.07 Responsive Landscape UI Fix: makes the between-round shop vertically scrollable in landscape/Safari, adds a compressed browser-height control layout without Jump/Look Fwd overlap, restricts movement start to the left 50% in landscape and left two-thirds in portrait, and preserves separate right-side look/combat input space. Gameplay values are unchanged. -->
 <!-- V22.13.06 Landscape HUD Polish: reorganizes short-screen landscape controls into clear right-thumb columns. Shield/Secondary now matches Jump's compact size and no longer overlaps Look Fwd, Dash sits closer to Fire, utility controls are smaller, Judgment is slightly larger, and right-edge safe spacing is increased. Gameplay and input behavior are unchanged. -->
 <!-- V22.13.05 Royal Sword Combo Polish: upgrades the Knight's three-hit primary combo with larger layered slash trails, distinct impact flashes, stronger steel/gold sparks, improved hit-stop, controlled forward/lateral body commitment, and a heavier third-hit shockwave with localized cracks. Damage, hit radius, combo multipliers, and other moves are unchanged. -->
 <!-- V22.13.04 Passive Whirlwind Clarity: the Knight passive HUD now labels fifth-kill progress as WHIRLWIND x/5, glows when one kill away, and clearly displays PASSIVE WHIRLWIND during an automatic proc. Equipable Defensive Whirlwind remains separately labeled and keeps its own cooldown. Gameplay, damage, trigger count, and Primary input behavior are unchanged. -->
@@ -122,7 +123,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.06</title>
+<title>Family Arena V22.13.07</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -799,6 +800,105 @@
     .lookFwdBtn{font-size:7px;}
   }
 
+
+  /* V22.13.07 Responsive Landscape + Movement Zone Fix */
+  .moveZone{width:66.6667%;}
+  .lookZone{width:33.3333%;}
+
+  .levelUpOverlay{
+    overflow-y:auto;
+    overflow-x:hidden;
+    align-items:flex-start;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;
+    touch-action:pan-y;
+    padding:
+      calc(12px + env(safe-area-inset-top))
+      calc(12px + env(safe-area-inset-right))
+      calc(18px + env(safe-area-inset-bottom))
+      calc(12px + env(safe-area-inset-left));
+  }
+  .levelUpPanel{
+    flex:0 0 auto;
+    margin:auto;
+    max-height:none;
+    touch-action:pan-y;
+  }
+
+  @media (orientation:landscape){
+    .moveZone{width:50%;}
+    .lookZone{width:50%;}
+
+    .levelUpOverlay{
+      display:none;
+      justify-content:center;
+      align-items:flex-start;
+    }
+    .levelUpOverlay.show{display:flex;}
+    .levelUpPanel{
+      width:min(94vw,620px);
+      margin:0 auto;
+      padding:16px 18px 24px;
+    }
+  }
+
+  @media (orientation:landscape) and (max-height:430px){
+    .actBtn{
+      right:calc(18px + env(safe-area-inset-right));
+      bottom:calc(14px + env(safe-area-inset-bottom));
+      width:66px;height:66px;
+    }
+    .dashBtn{
+      right:calc(92px + env(safe-area-inset-right));
+      bottom:calc(18px + env(safe-area-inset-bottom));
+      width:58px;height:58px;
+    }
+    .secondaryBtn{
+      right:calc(94px + env(safe-area-inset-right));
+      bottom:calc(86px + env(safe-area-inset-bottom));
+      width:50px;height:44px;
+    }
+    .abilityBtn{
+      right:calc(18px + env(safe-area-inset-right));
+      bottom:calc(87px + env(safe-area-inset-bottom));
+      width:58px;height:58px;
+    }
+    .ultimateBtn{
+      right:calc(86px + env(safe-area-inset-right));
+      bottom:calc(140px + env(safe-area-inset-bottom));
+      width:76px;height:76px;
+    }
+    .camCluster{
+      top:calc(7px + env(safe-area-inset-top));
+      right:calc(18px + env(safe-area-inset-right));
+      gap:3px;
+    }
+    .camZoomBtn{width:42px;height:25px;font-size:14px;}
+    .camLabelBox{width:42px;height:30px;font-size:7px;}
+    .camLabelBox span{font-size:12px;}
+    .pauseBtn{width:44px;height:34px;font-size:13px;}
+    .jumpBtn{width:46px;height:36px;font-size:8px;}
+    .lookFwdBtn{width:46px;height:36px;font-size:6.5px;}
+
+    .levelUpPanel{
+      width:min(92vw,600px);
+      padding:12px 16px 22px;
+    }
+    .levelUpPanel h2{font-size:18px!important;margin-bottom:3px!important;}
+    .levelUpPanel .subtitle{font-size:11px!important;margin-bottom:6px!important;}
+    .levelUnlockNotice{padding:9px 11px!important;margin-bottom:8px!important;}
+    .levelUnlockTitle{font-size:13px!important;}
+    .levelUnlockDesc{font-size:10px!important;}
+    .statChoiceBtn{
+      min-height:62px;
+      padding:10px 12px;
+      margin-bottom:8px;
+    }
+    .statChoiceBtn .scLabel{font-size:14px;}
+    .statChoiceBtn .scDesc{font-size:10px;}
+    .statChoiceBtn .scLevel{font-size:10px;}
+  }
+
 </style>
 </head>
 <body>
@@ -1045,7 +1145,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.06 - Landscape HUD Polish';
+const GAME_VERSION='22.13.07 - Responsive Landscape UI Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10368,6 +10468,12 @@ let secondaryInputHeld = false;
 let primaryInputHeld = false;
 
 function setupControls(){
+  const levelUpOverlayEl=document.getElementById('levelUpOverlay');
+  if(levelUpOverlayEl){
+    levelUpOverlayEl.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});
+    levelUpOverlayEl.addEventListener('touchmove',e=>e.stopPropagation(),{passive:true});
+    levelUpOverlayEl.addEventListener('touchend',e=>e.stopPropagation(),{passive:true});
+  }
   const moveZone = document.getElementById('moveZone');
   const knob = document.getElementById('moveKnob');
   const knobDot = document.getElementById('moveKnobDot');
@@ -10375,8 +10481,11 @@ function setupControls(){
   const maxRadius = 48;
 
   moveZone.addEventListener('touchstart', e=>{
-    e.preventDefault();
     const t = e.changedTouches[0];
+    const landscape=window.innerWidth>window.innerHeight;
+    const movementBoundary=window.innerWidth*(landscape?0.5:(2/3));
+    if(!t || t.clientX>movementBoundary) return;
+    e.preventDefault();
     stickActive = true; stickId = t.identifier;
     center = {x:t.clientX, y:t.clientY};
     // Knob appears wherever you actually touched down — no fixed
