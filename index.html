@@ -1,5 +1,7 @@
-<!-- V22.10.74 Black Screen Safeguard: force renderer clear color and recover from hidden canvas on resume. -->
 <!DOCTYPE html>
+<!-- V22.10.75 Giant Fireball Restoration + Render Recovery: restores the approved Phoenix-scale molten sphere and 1.85-second hold-to-repeat cadence from V22.10.73, while preserving the black-screen canvas/render recovery safeguard. -->
+<!-- V22.10.72 Secondary Hold-State Reliability: moves held Secondary repeat attempts into the main game update loop instead of relying on a browser interval. Tap still casts once, holding continues to cast whenever the equipped move is ready, and releasing/canceling/focus loss immediately stops all attempts. This restores Giant Fireball hold-to-repeat while preserving its 1.85-second cooldown and all existing damage/visual behavior. -->
+<!-- V22.10.71 Mage Giant Fireball Phoenix-Scale Upgrade: replaces the Mage Giant Fireball's generic tracer silhouette with the full molten Phoenix sphere model at the same visual scale. Its firing cooldown is increased and projectile travel speed reduced so the much larger shot remains powerful without becoming a rapid-fire screen clearer. Damage, direct-hit rules, splash radius, targeting, and hold-to-fire behavior are unchanged. -->
 <!-- V22.10.70 Secondary Hold-to-Repeat Fix: restores intentional hold-to-repeat for every equipped secondary while preserving one cast on a quick tap. Repeated attempts respect each move's own cooldown or independent placement slots, and release, cancellation, focus loss, or page hiding immediately stops the shared hold loop. -->
 <!-- V22.10.69 Shared Secondary Input Fix: removes the repeating timer from the shared Secondary button so every secondary ability casts only once per fresh press. Pointer/touch release, cancellation, focus loss, and visibility changes now always clear the press state. Primary hold-to-fire is unchanged. -->
 <!-- V22.10.68 Chain Javelin Manual-Tap Fix: Chain-Lightning Javelin now fires exactly once per fresh Secondary-button press and can no longer continue casting from a stale hold interval after release. Its 1-second cooldown, projectile speed, damage, chaining, and stun remain unchanged. -->
@@ -62,7 +64,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.74</title>
+<title>Family Arena V22.10.75</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -752,7 +754,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.70 - Secondary Hold-to-Repeat Fix';
+const GAME_VERSION='22.10.75 - Giant Fireball Restoration + Render Recovery';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1485,8 +1487,8 @@ const CHARACTER_COMBAT = {
         desc:'Hold FIRE for Uzi-speed alternating fire and ice.'},
       arcane_lance:{name:'Arcane Lance', price:390, kind:'arcane_lance', cooldown:0.58, damage:2.15, pierce:2, auto:true,
         desc:'A large elemental spear that pierces up to three enemies in a straight line.'},
-      giant_fireball:{name:'Giant Fireball', price:560, kind:'giant_fireball', cooldown:1.15, damage:999, splash:5.4, splashDamage:4.5, directInstakill:true, auto:true,
-        desc:'A colossal fireball. Direct hits execute any non-boss and the impact damages a wide surrounding area.'}
+      giant_fireball:{name:'Giant Fireball', price:560, kind:'giant_fireball', cooldown:1.85, damage:999, splash:5.4, splashDamage:4.5, directInstakill:true, auto:true,
+        desc:'A Phoenix-scale molten fireball with a slower firing cadence. Direct hits execute any non-boss and the impact damages a wide surrounding area.'}
     }
   }
 };
@@ -9612,6 +9614,7 @@ document.addEventListener('touchend',e=>{
 // ---- Touch controls ----
 let moveVec = {x:0,y:0};
 let lookActive = false, lookLast = {x:0,y:0};
+let secondaryInputHeld = false;
 
 function setupControls(){
   const moveZone = document.getElementById('moveZone');
@@ -9678,29 +9681,45 @@ function setupControls(){
     }
   });
 
-  let autoFireInterval = null;
+  // Primary input: tap once, or hold to repeat whenever the equipped move's
+  // own cooldown becomes ready. The game loop owns repeat attempts so mobile
+  // browsers cannot lose a timer while the finger is still down.
   const actBtnEl=document.getElementById('actBtn');
+  let primaryPressed=false;
+  let primaryInputHeld=false;
+  const releasePrimaryInput=e=>{
+    if(e && e.preventDefault) e.preventDefault();
+    primaryPressed=false;
+    primaryInputHeld=false;
+  };
   const beginPrimaryFire=e=>{
     if(e){e.preventDefault();e.stopPropagation();}
+    if(primaryPressed) return;
+    primaryPressed=true;
+    primaryInputHeld=true;
+    if(e && e.currentTarget && e.currentTarget.setPointerCapture && Number.isFinite(e.pointerId)){
+      try{e.currentTarget.setPointerCapture(e.pointerId);}catch(_err){}
+    }
     doShoot();
-    clearInterval(autoFireInterval);
-    autoFireInterval=setInterval(doShoot,40);
-  };
-  const endPrimaryFire=e=>{
-    if(e)e.preventDefault();
-    clearInterval(autoFireInterval);
-    autoFireInterval=null;
   };
   if(window.PointerEvent){
     actBtnEl.addEventListener('pointerdown',beginPrimaryFire,{passive:false});
-    actBtnEl.addEventListener('pointerup',endPrimaryFire,{passive:false});
-    actBtnEl.addEventListener('pointercancel',endPrimaryFire,{passive:false});
-    actBtnEl.addEventListener('pointerleave',endPrimaryFire,{passive:false});
+    actBtnEl.addEventListener('pointerup',releasePrimaryInput,{passive:false});
+    actBtnEl.addEventListener('pointercancel',releasePrimaryInput,{passive:false});
+    actBtnEl.addEventListener('lostpointercapture',releasePrimaryInput,{passive:false});
+    window.addEventListener('pointerup',releasePrimaryInput,{passive:false});
+    window.addEventListener('pointercancel',releasePrimaryInput,{passive:false});
   }else{
     actBtnEl.addEventListener('touchstart',beginPrimaryFire,{passive:false});
-    actBtnEl.addEventListener('touchend',endPrimaryFire,{passive:false});
-    actBtnEl.addEventListener('touchcancel',endPrimaryFire,{passive:false});
+    actBtnEl.addEventListener('touchend',releasePrimaryInput,{passive:false});
+    actBtnEl.addEventListener('touchcancel',releasePrimaryInput,{passive:false});
+    window.addEventListener('touchend',releasePrimaryInput,{passive:false});
+    window.addEventListener('touchcancel',releasePrimaryInput,{passive:false});
   }
+  window.addEventListener('blur',releasePrimaryInput);
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden) releasePrimaryInput();
+  });
 
   // Secondary input: a quick tap casts once; holding repeatedly attempts a cast.
   // doSecondaryShoot() remains the single source of truth for cooldowns and Mirror
@@ -9708,20 +9727,17 @@ function setupControls(){
   const secondaryBtnEl=document.getElementById('secondaryBtn');
   let secondaryPressed=false;
   let secondaryPointerId=null;
-  let secondaryHoldInterval=null;
   const releaseSecondaryInput=e=>{
     if(e && e.preventDefault) e.preventDefault();
     secondaryPressed=false;
+    secondaryInputHeld=false;
     secondaryPointerId=null;
-    if(secondaryHoldInterval!==null){
-      clearInterval(secondaryHoldInterval);
-      secondaryHoldInterval=null;
-    }
   };
   const beginSecondaryFire=e=>{
     if(e){e.preventDefault();e.stopPropagation();}
     if(secondaryPressed) return;
     secondaryPressed=true;
+    secondaryInputHeld=true;
     secondaryPointerId=e&&Number.isFinite(e.pointerId)?e.pointerId:null;
     const w=secondaryWeaponForAvatar();
     if(!w){
@@ -9732,14 +9748,9 @@ function setupControls(){
     if(e && e.currentTarget && e.currentTarget.setPointerCapture && Number.isFinite(e.pointerId)){
       try{e.currentTarget.setPointerCapture(e.pointerId);}catch(_err){}
     }
+    // Cast once immediately. Continued hold attempts are processed by the
+    // main game loop so mobile browsers cannot silently lose an interval.
     doSecondaryShoot();
-    secondaryHoldInterval=setInterval(()=>{
-      if(!secondaryPressed || !gameRunning){
-        releaseSecondaryInput();
-        return;
-      }
-      doSecondaryShoot();
-    },50);
   };
   if(window.PointerEvent){
     secondaryBtnEl.addEventListener('pointerdown',beginSecondaryFire,{passive:false});
@@ -12339,7 +12350,22 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
     b.splashDamage=w.splashDamage||0;
     b.directInstakill=!!w.directInstakill;
     b.pierces=w.pierce||0;
-    if(w.kind==='giant_fireball'){ b.mesh.scale.setScalar(9.0); spawnArcaneSigil(startX,0,startZ,2.15); }
+    if(w.kind==='giant_fireball'){
+      // Reuse the full Phoenix molten-sphere construction so the Mage projectile
+      // has the same readable silhouette and world-space size, without inheriting
+      // Phoenix seeking, gravity, burn, or lifetime behavior.
+      const oldMesh=b.mesh;
+      const moltenMesh=createPhoenixFireballMesh();
+      moltenMesh.position.copy(oldMesh.position);
+      moltenMesh.quaternion.copy(oldMesh.quaternion);
+      scene.add(moltenMesh);
+      scene.remove(oldMesh);
+      disposeGroup(oldMesh);
+      b.mesh=moltenMesh;
+      b.speedMult=(b.speedMult||1)*0.58;
+      spawnArcaneSigil(startX,0,startZ,2.65);
+      spawnBurst(startX,startY,startZ,18,FX_MAT_SPARK,4.6);
+    }
     if(w.kind==='arcane_lance'){ b.mesh.scale.set(1.7,1.7,5.2); b.pierces=2; spawnArcaneSigil(startX,0,startZ,1.55); spawnBurst(startX,startY,startZ,14,FX_MAT_DUST,4.0); }
     if(w.kind==='elemental'){ b.mesh.scale.setScalar(1.45); spawnBurst(startX,startY,startZ,10,mageElementToggle?FX_MAT_DUST:FX_MAT_SPARK,3.0); }
     if(w.kind==='rocket_arrow') b.mesh.scale.setScalar(1.55);
@@ -13613,9 +13639,15 @@ function update(dt){
   }
 
   if(player.userData.attackCooldown>0) player.userData.attackCooldown -= dt;
+  // Tap casts once in beginPrimaryFire(); while FIRE remains held, retry here
+  // and let the equipped primary's own cooldown decide when another shot fires.
+  if(primaryInputHeld && gameRunning) doShoot();
   if((player.userData.secondaryAttackCooldown||0)>0){
     player.userData.secondaryAttackCooldown=Math.max(0,player.userData.secondaryAttackCooldown-dt);
   }
+  // Tap casts once in beginSecondaryFire(); while the control remains held,
+  // retry here and let each move's own cooldown/slot rules decide readiness.
+  if(secondaryInputHeld && gameRunning) doSecondaryShoot();
   updateSecondaryButton();
   refreshPassiveState(dt);
   updatePassiveHud();
@@ -13923,33 +13955,29 @@ document.getElementById('btnResultsHome').onclick = ()=>{
 })();
 </script>
 <div id="buildStamp" style="position:fixed;right:8px;bottom:8px;z-index:99999;font:700 11px/1.2 system-ui;color:#7dd3fc;background:#07111dcc;border:1px solid #38bdf8;border-radius:8px;padding:5px 7px;pointer-events:none"></div>
-
 <script>
 (function(){
-function recover(){
- try{
-  if(window.renderer){
-    renderer.setClearColor(0x87ceeb,1);
-    if(renderer.domElement){
-      renderer.domElement.style.display='block';
-      renderer.domElement.style.visibility='visible';
-      renderer.domElement.style.opacity='1';
-    }
-    if(window.camera&&window.scene){ renderer.render(scene,camera); }
+  function recoverArenaRender(){
+    try{
+      if(window.renderer){
+        if(renderer.domElement){
+          renderer.domElement.style.display='block';
+          renderer.domElement.style.visibility='visible';
+          renderer.domElement.style.opacity='1';
+        }
+        if(window.scene&&window.camera) renderer.render(scene,camera);
+      }
+      document.querySelectorAll('canvas').forEach(function(canvas){
+        canvas.style.display='block';
+        canvas.style.visibility='visible';
+        canvas.style.opacity='1';
+      });
+    }catch(_err){}
   }
-  document.querySelectorAll('canvas').forEach(c=>{
-    c.style.display='block';
-    c.style.visibility='visible';
-    c.style.opacity='1';
-    c.width=c.clientWidth||c.width;
-    c.height=c.clientHeight||c.height;
-  });
- }catch(e){}
-}
-window.addEventListener('pageshow',recover);
-window.addEventListener('focus',recover);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)recover();});
-setTimeout(recover,100);
+  window.addEventListener('pageshow',recoverArenaRender);
+  window.addEventListener('focus',recoverArenaRender);
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) recoverArenaRender(); });
+  setTimeout(recoverArenaRender,100);
 })();
 </script>
 
