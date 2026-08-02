@@ -1,4 +1,5 @@
-<!-- V22.10.85 Arcane Lance Spiral Ribbon: verified the live Arcane Lance creation/update path and added one rotating cyan spiral energy ribbon around the projectile. No gameplay values changed. -->
+<!-- V22.10.86 Arcane Lance Rune Shards: adds eight capped cyan/violet arcane fragments that orbit and tumble around the live projectile. No gameplay values changed. -->
+<!-- V22.10.86 Arcane Lance Spiral Ribbon: verified the live Arcane Lance creation/update path and added one rotating cyan spiral energy ribbon around the projectile. No gameplay values changed. -->
 <!-- V22.10.84 Arcane Lance Dual Rings: adds a second smaller inner rune ring rotating in the opposite direction. No gameplay values changed. -->
 <!-- V22.10.83 Arcane Lance Rune Ring: adds one visible cyan additive rune ring to the Arcane Lance and rotates it during flight. Damage, cooldown, speed, piercing, collision, and other abilities are unchanged. -->
 <!-- V22.10.82 Arcane Lance Core Pass: adds a bright white-blue additive core directly inside the Arcane Lance projectile. Damage, cooldown, speed, piercing, collision, and other abilities are unchanged. -->
@@ -763,7 +764,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.85 - Arcane Lance Readability Pass';
+const GAME_VERSION='22.10.86 - Arcane Lance Rune Shards';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12460,6 +12461,34 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
       arcaneRibbon.userData.role='arcaneLanceRibbon';
       b.mesh.add(arcaneRibbon);
 
+      const arcaneShardGroup=new THREE.Group();
+      arcaneShardGroup.userData.role='arcaneLanceShardGroup';
+      for(let i=0;i<8;i++){
+        const shard=new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.024,0),
+          new THREE.MeshBasicMaterial({
+            color:(i%2===0?0x7feaff:0xb784ff),
+            transparent:true,
+            opacity:0.78,
+            depthWrite:false,
+            blending:THREE.AdditiveBlending
+          })
+        );
+        const angle=(i/8)*Math.PI*2;
+        const radius=0.19+(i%3)*0.025;
+        shard.position.set(
+          Math.cos(angle)*radius,
+          Math.sin(angle)*radius,
+          -0.08-(i%4)*0.08
+        );
+        shard.rotation.set(angle*0.7,angle*0.35,angle);
+        shard.userData.spinX=1.8+(i%3)*0.35;
+        shard.userData.spinY=2.2+(i%2)*0.45;
+        shard.userData.spinZ=1.4+(i%4)*0.25;
+        arcaneShardGroup.add(shard);
+      }
+      b.mesh.add(arcaneShardGroup);
+
       spawnArcaneSigil(startX,0,startZ,1.55);
       spawnBurst(startX,startY,startZ,14,FX_MAT_DUST,4.0);
     }
@@ -13250,6 +13279,14 @@ function updateBullets(dt){
         }
         if(child.userData&&child.userData.role==='arcaneLanceRibbon'){
           child.rotation.z += 3.2*dt;
+        }
+        if(child.userData&&child.userData.role==='arcaneLanceShardGroup'){
+          child.rotation.z -= 2.4*dt;
+          for(const shard of child.children){
+            shard.rotation.x += (shard.userData.spinX||2.0)*dt;
+            shard.rotation.y += (shard.userData.spinY||2.4)*dt;
+            shard.rotation.z += (shard.userData.spinZ||1.6)*dt;
+          }
         }
       }
     }
