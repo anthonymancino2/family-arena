@@ -1,3 +1,4 @@
+<!-- V22.13.08 Browser Landscape Layout V2: detects normal Safari/browser tabs separately from the installed home-screen app and gives browser landscape a dedicated two-column combat grid. Fire/Dash occupy the bottom row, Jump/Look Fwd the row above, Shield sits centered above them, Judgment moves farther left and higher, and camera/pause controls stay in a slim far-right utility rail. Movement-zone rules and standalone layout are unchanged. -->
 <!-- V22.13.07 Responsive Landscape UI Fix: makes the between-round shop vertically scrollable in landscape/Safari, adds a compressed browser-height control layout without Jump/Look Fwd overlap, restricts movement start to the left 50% in landscape and left two-thirds in portrait, and preserves separate right-side look/combat input space. Gameplay values are unchanged. -->
 <!-- V22.13.06 Landscape HUD Polish: reorganizes short-screen landscape controls into clear right-thumb columns. Shield/Secondary now matches Jump's compact size and no longer overlaps Look Fwd, Dash sits closer to Fire, utility controls are smaller, Judgment is slightly larger, and right-edge safe spacing is increased. Gameplay and input behavior are unchanged. -->
 <!-- V22.13.05 Royal Sword Combo Polish: upgrades the Knight's three-hit primary combo with larger layered slash trails, distinct impact flashes, stronger steel/gold sparks, improved hit-stop, controlled forward/lateral body commitment, and a heavier third-hit shockwave with localized cracks. Damage, hit radius, combo multipliers, and other moves are unchanged. -->
@@ -123,7 +124,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.07</title>
+<title>Family Arena V22.13.08</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -899,6 +900,115 @@
     .statChoiceBtn .scLevel{font-size:10px;}
   }
 
+
+  /* V22.13.08 Safari Browser Landscape Layout V2
+     Applies only when running inside a normal browser tab, not the installed
+     home-screen app. The controls use a clear two-column combat grid. */
+  @media (orientation:landscape){
+    body.browserMode .actBtn{
+      right:calc(20px + env(safe-area-inset-right));
+      bottom:calc(14px + env(safe-area-inset-bottom));
+      width:66px;
+      height:66px;
+    }
+    body.browserMode .dashBtn{
+      right:calc(96px + env(safe-area-inset-right));
+      bottom:calc(18px + env(safe-area-inset-bottom));
+      width:58px;
+      height:58px;
+    }
+    body.browserMode .jumpBtn{
+      position:fixed;
+      right:calc(28px + env(safe-area-inset-right));
+      bottom:calc(91px + env(safe-area-inset-bottom));
+      width:48px;
+      height:42px;
+      border-radius:11px;
+      z-index:39;
+    }
+    body.browserMode .lookFwdBtn{
+      position:fixed;
+      right:calc(102px + env(safe-area-inset-right));
+      bottom:calc(91px + env(safe-area-inset-bottom));
+      width:48px;
+      height:42px;
+      border-radius:11px;
+      z-index:39;
+    }
+    body.browserMode .secondaryBtn{
+      right:calc(63px + env(safe-area-inset-right));
+      bottom:calc(145px + env(safe-area-inset-bottom));
+      width:52px;
+      height:46px;
+      border-radius:12px;
+      z-index:39;
+    }
+    body.browserMode .abilityBtn{
+      right:calc(20px + env(safe-area-inset-right));
+      bottom:calc(145px + env(safe-area-inset-bottom));
+      width:58px;
+      height:58px;
+      z-index:38;
+    }
+    body.browserMode .ultimateBtn{
+      right:calc(108px + env(safe-area-inset-right));
+      bottom:calc(202px + env(safe-area-inset-bottom));
+      width:78px;
+      height:78px;
+      z-index:38;
+    }
+
+    /* Keep camera and pause controls in one narrow utility rail. */
+    body.browserMode .camCluster{
+      top:calc(8px + env(safe-area-inset-top));
+      right:calc(14px + env(safe-area-inset-right));
+      gap:4px;
+      z-index:40;
+    }
+    body.browserMode .camZoomBtn{
+      width:42px;
+      height:26px;
+      border-radius:9px;
+      font-size:14px;
+    }
+    body.browserMode .camLabelBox{
+      width:42px;
+      height:31px;
+      border-radius:9px;
+      font-size:7px;
+    }
+    body.browserMode .camLabelBox span{font-size:12px;}
+    body.browserMode .pauseBtn{
+      width:42px;
+      height:34px;
+      border-radius:9px;
+      font-size:13px;
+    }
+
+    /* The utility versions inside camCluster are not used for Jump/Look Fwd
+       in browser mode because those controls are positioned in the combat grid. */
+    body.browserMode .camCluster .jumpBtn,
+    body.browserMode .camCluster .lookFwdBtn{
+      position:fixed;
+    }
+  }
+
+  /* Extra-tight Safari height: reduce slightly without collapsing the grid. */
+  @media (orientation:landscape) and (max-height:520px){
+    body.browserMode .actBtn{width:62px;height:62px;}
+    body.browserMode .dashBtn{width:54px;height:54px;right:calc(91px + env(safe-area-inset-right));}
+    body.browserMode .jumpBtn{bottom:calc(82px + env(safe-area-inset-bottom));}
+    body.browserMode .lookFwdBtn{bottom:calc(82px + env(safe-area-inset-bottom));right:calc(96px + env(safe-area-inset-right));}
+    body.browserMode .secondaryBtn{bottom:calc(132px + env(safe-area-inset-bottom));}
+    body.browserMode .abilityBtn{bottom:calc(132px + env(safe-area-inset-bottom));}
+    body.browserMode .ultimateBtn{
+      right:calc(102px + env(safe-area-inset-right));
+      bottom:calc(183px + env(safe-area-inset-bottom));
+      width:72px;
+      height:72px;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -1145,7 +1255,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.07 - Responsive Landscape UI Fix';
+const GAME_VERSION='22.13.08 - Browser Landscape Layout V2';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10466,6 +10576,19 @@ let moveVec = {x:0,y:0};
 let lookActive = false, lookLast = {x:0,y:0};
 let secondaryInputHeld = false;
 let primaryInputHeld = false;
+
+
+function updateDisplayModeClass(){
+  const installed=window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone===true;
+  document.body.classList.toggle('browserMode',!installed);
+  document.body.classList.toggle('standaloneMode',installed);
+}
+updateDisplayModeClass();
+window.addEventListener('resize',updateDisplayModeClass);
+window.addEventListener('orientationchange',()=>{
+  setTimeout(updateDisplayModeClass,80);
+});
 
 function setupControls(){
   const levelUpOverlayEl=document.getElementById('levelUpOverlay');
