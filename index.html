@@ -1,3 +1,4 @@
+<!-- V22.12.01 Meteor Apocalypse Atmosphere: the four-meteor Super Meteor sequence now dims arena lighting over 0.75s, lays an ember red-orange ambient glow over the arena, pulses only the current quadrant's warning bright and fast while the other three stay dim and steady, flashes the arena orange on each impact, rumbles the camera subtly while a meteor falls, and smoothly restores the original lighting after meteor four. Quadrant order, 1.5s inter-meteor delay, meteor size, damage radius, 20% boss damage, 3s stun, 5s burn, and 24s cooldown are all unchanged. -->
 <!-- V22.12.00 Round Select & Round Records: adds a Start Round screen after avatar selection (Rounds 1-50, all unlocked during build/test), rebuilds the round kill target as a pure function so any round can be entered directly, anchors the chosen starting theme to the round the run actually begins on, grants a catch-up stat/coin loadout proportional to the skipped rounds, and adds per-round personal-best and world-best records with a cloud-sync-ready Store API. Runs started above Round 1 are practice runs: round records still count, crystals and the main leaderboard do not. -->
 <!-- V22.11.33 Four Warning Circles: all four Super Meteor landing circles now appear immediately. The current quadrant keeps its existing bright pulsing marker, completed quadrant warnings disappear on impact, and all remaining markers clear after meteor four or during reset cleanup. Gameplay values are unchanged. -->
 <!-- V22.11.31 Four Meteor Stability Guard: caps overlapping giant meteor impact groups at two, clears all tracked impact effects during cleanup, and adds a sequence failsafe if an active meteor object is unexpectedly lost. Gameplay values and four-quadrant timing are unchanged. -->
@@ -257,6 +258,15 @@
   .hitFlash{position:absolute;inset:0;background:radial-gradient(ellipse at center, rgba(255,30,30,0) 40%, rgba(255,20,20,0.55) 100%);
     opacity:0;transition:opacity 0.12s;pointer-events:none;}
   .hitFlash.show{opacity:1;transition:opacity 0.02s;}
+  /* Super Meteor apocalypse atmosphere. Two flat alpha overlays -- no
+     blend modes and no filters, so the cost on a phone is a single
+     composited layer each and readability never drops. */
+  .meteorAtmo{position:absolute;inset:0;pointer-events:none;opacity:0;
+    background:radial-gradient(ellipse at 50% 30%,
+      rgba(255,126,44,0.16) 0%, rgba(176,48,14,0.26) 52%, rgba(74,14,4,0.40) 100%);}
+  .meteorFlash{position:absolute;inset:0;pointer-events:none;opacity:0;
+    background:radial-gradient(circle at 50% 52%,
+      rgba(255,196,104,0.72) 0%, rgba(255,118,34,0.44) 42%, rgba(255,80,20,0) 76%);}
   .heartsWrap{position:absolute;top:calc(14px + env(safe-area-inset-top));left:14px;
     background:var(--panel);border-radius:14px;padding:8px 10px;}
   .heartsRow{display:flex;flex-wrap:wrap;gap:5px;max-width:min(58vw,300px);}
@@ -808,6 +818,8 @@
       <div class="lookZone" id="lookZone"></div>
       <div id="hudChrome">
         <div class="hitFlash" id="hitFlash"></div>
+        <div class="meteorAtmo" id="meteorAtmo"></div>
+        <div class="meteorFlash" id="meteorFlash"></div>
         <div class="heartsWrap"><div class="heartsRow" id="heartsRow"></div></div>
         <div class="knightArmorHud" id="knightArmorHud"><div class="knightArmorLabel" id="knightArmorLabel">MAGICAL ARMOR 2/2</div><div class="knightArmorTrack"><div class="knightArmorFill" id="knightArmorFill"></div></div></div>
         <div class="roundPill" id="roundPill">Round 1 · Lv 1</div>
@@ -927,7 +939,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.12.00 - Round Select & Round Records';
+const GAME_VERSION='22.12.01 - Meteor Apocalypse Atmosphere';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1935,7 +1947,7 @@ let BULLET_GEO, BULLET_MAT, MUZZLE_GEO, MUZZLE_MAT, FX_GEO, FX_MAT_ZOMBIE, FX_MA
 let fx = [];
 let groundMat = null;
 let arenaBoundaryGroup = null;
-let hemiLight = null, sunLight = null;
+let hemiLight = null, sunLight = null, fillLight = null, frontFillLight = null;
 let GROUND_TEX, OBSTACLE_TEX, TRUNK_TEX, ROCK_TEX, PAVER_TEX, skyTex = null;
 let AO_TEX, AO_GEO;
 
@@ -2474,6 +2486,9 @@ function applyTheme(round){
   // scenery become hard to see.
   hemiLight.intensity = dim ? 0.62 : 0.9;
   sunLight.intensity = dim ? 0.48 : 0.8;
+  // A Super Meteor fade running across a theme change would otherwise
+  // restore the previous round's intensities. Re-baseline it here.
+  if(typeof rebaseMeteorAtmosphere === 'function') rebaseMeteorAtmosphere();
 
   // Reserve the hero landmark's footprint first, so obstacles and
   // scatter props route around it instead of growing through it.
@@ -7863,7 +7878,7 @@ function initEngine(){
   const frontFill = new THREE.DirectionalLight(0xffffff, 1.15);
   frontFill.position.set(0, 6, 10);
   scene.add(frontFill);
-  hemiLight = hemi; sunLight = sun;
+  hemiLight = hemi; sunLight = sun; fillLight = fill; frontFillLight = frontFill;
   // Created once and retargeted per round by placeLandmark().
   landmarkLight = new THREE.PointLight(0xffffff, 0, 16, 1.6);
   landmarkLight.position.set(0, 3, 0);
@@ -12710,6 +12725,185 @@ function triggerBlizzardStorm(){
 }
 
 
+// =====================================================================
+// METEOR APOCALYPSE ATMOSPHERE
+// Purely presentational layer for the four-meteor Super Meteor sequence.
+// It touches lighting, two flat DOM overlays, and the camera transform --
+// it never reads or writes damage, radius, timing, quadrant order, or
+// cooldown, so none of the locked gameplay values can drift from here.
+//
+// Cost on a phone: no new per-frame geometry, no post-processing, no
+// blend modes. One AmbientLight (unshaded, effectively free), two
+// composited DOM layers, and four already-existing material opacities.
+// =====================================================================
+const METEOR_ATMO_FADE = 0.75;   // seconds to darken, and to restore
+const METEOR_ATMO_DIM = 0.42;    // arena lights fall to 42% at full darkness
+const METEOR_ATMO_GLOW = 0.62;   // peak ember ambient light intensity
+const METEOR_ATMO_TINT = 0.34;   // peak opacity of the red/orange overlay
+const METEOR_RUMBLE_STRENGTH = 1.5; // px of subtle camera rumble while falling
+
+let meteorAtmo = {
+  active:false,      // true while the sequence should be dark
+  level:0,           // current 0..1 darkness, eased toward the target
+  target:0,
+  baseHemi:null, baseSun:null, baseFill:null, baseFront:null,
+  glowLight:null
+};
+let meteorRumbleActive = false;
+let meteorRumbleRaf = 0;
+
+// Snapshot whatever the theme currently wants the lights to be. Every
+// later write is computed from this snapshot, and restoring means simply
+// writing it back -- so the arena always returns to exactly its original
+// lighting, never to an approximation.
+function captureMeteorAtmoBase(){
+  meteorAtmo.baseHemi  = hemiLight ? hemiLight.intensity : null;
+  meteorAtmo.baseSun   = sunLight ? sunLight.intensity : null;
+  meteorAtmo.baseFill  = fillLight ? fillLight.intensity : null;
+  meteorAtmo.baseFront = frontFillLight ? frontFillLight.intensity : null;
+}
+
+// Called by applyTheme() when a round changes underneath an active fade.
+function rebaseMeteorAtmosphere(){
+  if(meteorAtmo.baseHemi === null && meteorAtmo.baseSun === null) return;
+  // applyTheme() rewrites only the hemisphere and sun intensities, and it
+  // writes raw theme values -- so only those two get re-snapshotted. The two
+  // fill lights are never touched by the theme and must keep their original
+  // snapshot, or every theme change mid-sequence would ratchet them darker.
+  if(hemiLight) meteorAtmo.baseHemi = hemiLight.intensity;
+  if(sunLight) meteorAtmo.baseSun = sunLight.intensity;
+  applyMeteorAtmoLevel(meteorAtmo.level);
+}
+
+function applyMeteorAtmoLevel(level){
+  const a = meteorAtmo;
+  const mult = 1 - (1 - METEOR_ATMO_DIM) * level;
+  if(hemiLight && a.baseHemi !== null) hemiLight.intensity = a.baseHemi * mult;
+  if(sunLight && a.baseSun !== null) sunLight.intensity = a.baseSun * mult;
+  if(fillLight && a.baseFill !== null) fillLight.intensity = a.baseFill * mult;
+  if(frontFillLight && a.baseFront !== null) frontFillLight.intensity = a.baseFront * mult;
+  if(a.glowLight) a.glowLight.intensity = METEOR_ATMO_GLOW * level;
+  const overlay = document.getElementById('meteorAtmo');
+  if(overlay) overlay.style.opacity = (METEOR_ATMO_TINT * level).toFixed(3);
+}
+
+function beginMeteorAtmosphere(){
+  if(!scene) return;
+  if(meteorAtmo.baseHemi === null) captureMeteorAtmoBase();
+  meteorAtmo.active = true;
+  meteorAtmo.target = 1;
+  if(!meteorAtmo.glowLight){
+    // Ambient rather than a point light: no falloff math, no shadow pass,
+    // and it reaches the whole arena evenly at any camera distance.
+    meteorAtmo.glowLight = new THREE.AmbientLight(0xff5a1e, 0);
+    scene.add(meteorAtmo.glowLight);
+  }
+  applyMeteorAtmoLevel(meteorAtmo.level);
+}
+
+// Smooth restore -- used after meteor four. The fade keeps running from
+// updateMeteorAtmosphere() until level reaches 0, then hard-restores.
+function endMeteorAtmosphere(){
+  meteorAtmo.active = false;
+  meteorAtmo.target = 0;
+}
+
+// Immediate restore -- used by cleanup/reset paths, which must leave no
+// trace behind regardless of where the fade had got to.
+function resetMeteorAtmosphere(){
+  meteorAtmo.active = false;
+  meteorAtmo.target = 0;
+  meteorAtmo.level = 0;
+  applyMeteorAtmoLevel(0);
+  if(hemiLight && meteorAtmo.baseHemi !== null) hemiLight.intensity = meteorAtmo.baseHemi;
+  if(sunLight && meteorAtmo.baseSun !== null) sunLight.intensity = meteorAtmo.baseSun;
+  if(fillLight && meteorAtmo.baseFill !== null) fillLight.intensity = meteorAtmo.baseFill;
+  if(frontFillLight && meteorAtmo.baseFront !== null) frontFillLight.intensity = meteorAtmo.baseFront;
+  if(meteorAtmo.glowLight){
+    if(meteorAtmo.glowLight.parent) meteorAtmo.glowLight.parent.remove(meteorAtmo.glowLight);
+    if(meteorAtmo.glowLight.dispose) meteorAtmo.glowLight.dispose();
+    meteorAtmo.glowLight = null;
+  }
+  meteorAtmo.baseHemi = meteorAtmo.baseSun = meteorAtmo.baseFill = meteorAtmo.baseFront = null;
+  setMeteorRumble(false);
+  const flash = document.getElementById('meteorFlash');
+  if(flash){ flash.style.transition = 'none'; flash.style.opacity = '0'; }
+}
+
+function updateMeteorAtmosphere(dt){
+  const a = meteorAtmo;
+  if(a.level === a.target && !a.glowLight) return;
+  if(a.level !== a.target){
+    const step = dt / METEOR_ATMO_FADE;
+    a.level = a.target > a.level
+      ? Math.min(a.target, a.level + step)
+      : Math.max(a.target, a.level - step);
+    applyMeteorAtmoLevel(a.level);
+    // Fully restored: drop the temporary light and the snapshot.
+    if(a.level === 0 && a.target === 0 && !a.active) resetMeteorAtmosphere();
+  }
+}
+
+// Brief orange arena flash on impact. Driven by one forced reflow and a
+// CSS transition instead of a JS timer, so it can never leave a stuck
+// overlay behind if the tab is backgrounded mid-flash.
+function flashMeteorImpact(){
+  const el = document.getElementById('meteorFlash');
+  if(!el) return;
+  el.style.transition = 'none';
+  el.style.opacity = '1';
+  void el.offsetWidth;
+  el.style.transition = 'opacity .34s ease-out';
+  el.style.opacity = '0';
+}
+
+// Subtle continuous camera rumble while a meteor is falling. Deliberately
+// a single self-terminating loop rather than repeated triggerCombatShake()
+// calls, so it cannot stack loops that fight over the canvas transform.
+// The strong impact shake still comes from the existing triggerCombatShake.
+function setMeteorRumble(on){
+  if(on === meteorRumbleActive) return;
+  meteorRumbleActive = on;
+  if(!on){
+    if(meteorRumbleRaf) cancelAnimationFrame(meteorRumbleRaf);
+    meteorRumbleRaf = 0;
+    if(renderer && renderer.domElement) renderer.domElement.style.transform = '';
+    return;
+  }
+  const tick = ()=>{
+    if(!meteorRumbleActive || !renderer || !renderer.domElement){ meteorRumbleRaf = 0; return; }
+    const x = (Math.random()*2-1) * METEOR_RUMBLE_STRENGTH;
+    const y = (Math.random()*2-1) * METEOR_RUMBLE_STRENGTH * 0.7;
+    renderer.domElement.style.transform = `translate(${x.toFixed(2)}px,${y.toFixed(2)}px)`;
+    meteorRumbleRaf = requestAnimationFrame(tick);
+  };
+  meteorRumbleRaf = requestAnimationFrame(tick);
+}
+
+// All four circles stay on screen for the whole sequence. Only the one
+// receiving the current meteor pulses bright and fast; the rest hold a
+// dim, steady value so the player can read the order at a glance.
+function updateSuperMeteorWarningMarkers(){
+  if(!superMeteorWarningMarkers.length) return;
+  const activeQuadrant = activeSuperMeteor ? (activeSuperMeteor.quadrant||1)-1 : -1;
+  const now = performance.now();
+  const fast = 0.5 + Math.sin(now*0.021)*0.5; // ~3.3Hz bright pulse
+  for(const warning of superMeteorWarningMarkers){
+    const isCurrent = warning.quadrantIndex === activeQuadrant;
+    // The falling meteor's own marker is additively blended on top of the
+    // current quadrant's circle, so the pulse here is kept deliberately
+    // modest -- the two together must read as "bright and fast" without
+    // washing out enemies standing inside the ring.
+    if(warning.ring && warning.ring.material){
+      warning.ring.material.opacity = isCurrent ? 0.24 + fast*0.24 : 0.14;
+    }
+    if(warning.disc && warning.disc.material){
+      warning.disc.material.opacity = isCurrent ? 0.07 + fast*0.08 : 0.05;
+    }
+    if(warning.group) warning.group.scale.setScalar(isCurrent ? 1 + fast*0.035 : 1);
+  }
+}
+
 const SUPER_METEOR_COOLDOWN=24;
 const SUPER_METEOR_STUN=3;
 const SUPER_METEOR_BURN=5;
@@ -13030,6 +13224,7 @@ function triggerSuperMeteor(){
   superMeteorSequenceActive=true;
   superMeteorNextQuadrant=1;
   superMeteorNextDropTimer=0;
+  beginMeteorAtmosphere();
   createSuperMeteorQuadrantGuide();
   createSuperMeteorWarningMarkers();
   spawnSuperMeteorForQuadrant(0);
@@ -13179,6 +13374,8 @@ function impactSuperMeteor(m){
     requestAnimationFrame(animateSuperMeteorCrater);
   })();
 
+  setMeteorRumble(false);
+  flashMeteorImpact();
   triggerCombatShake(18,420);
   navigator.vibrate&&navigator.vibrate([80,35,120]);
 
@@ -13270,6 +13467,7 @@ function clearSuperMeteor(resetCooldown=true){
   superMeteorSequenceActive=false;
   superMeteorNextDropTimer=0;
   superMeteorNextQuadrant=0;
+  resetMeteorAtmosphere();
   clearSuperMeteorWarningMarkers();
 
   if(superMeteorQuadrantGuide){
@@ -13314,12 +13512,19 @@ function clearMageRoundSpecials(resetCooldowns=true,preserveMirrorCooldowns=fals
 function updateMageUltimates(dt){
   if(superMeteorCooldownTimer>0)superMeteorCooldownTimer=Math.max(0,superMeteorCooldownTimer-dt);
 
+  // Apocalypse atmosphere. Runs every frame so the 0.75s restore after
+  // meteor four completes smoothly even once the sequence itself is over.
+  updateMeteorAtmosphere(dt);
+  updateSuperMeteorWarningMarkers();
+  setMeteorRumble(!!activeSuperMeteor);
+
   if(activeSuperMeteor&&(!activeSuperMeteor.mesh||!activeSuperMeteor.marker)){
     activeSuperMeteor=null;
     if(superMeteorSequenceActive&&superMeteorNextQuadrant<4){
       superMeteorNextDropTimer=Math.max(superMeteorNextDropTimer,1.5);
     }else{
       superMeteorSequenceActive=false;
+      endMeteorAtmosphere();
     }
   }
 
@@ -13355,6 +13560,7 @@ function updateMageUltimates(dt){
       }else{
         superMeteorSequenceActive=false;
         superMeteorNextDropTimer=0;
+        endMeteorAtmosphere();
         clearSuperMeteorWarningMarkers();
         if(superMeteorQuadrantGuide){
           if(superMeteorQuadrantGuide.parent)scene.remove(superMeteorQuadrantGuide);
