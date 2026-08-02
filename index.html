@@ -1,3 +1,4 @@
+<!-- V22.10.98 Visible Enemy Arcane Mark: replaces the hidden placeholder state with a visible dual-ring violet mark that expands, spins, and fades over struck enemies. Gameplay values are unchanged. -->
 <!-- V22.10.96 Arcane Lance Freeze Fix: stores the brief cast-charge timer directly on the bullet object instead of reading undefined bullet.userData. This restores firing without changing visuals or gameplay values. -->
 <!-- V22.10.94 Arcane Lance Impact Burst: adds a cyan-violet impact ring, compact ground sigil, and capped crystal spark burst on every Arcane Lance enemy hit. Damage and all gameplay values are unchanged. -->
 <!-- V22.10.90 Arcane Lance 3x Full Scale: triples the complete Arcane Lance visual hierarchy, including spearhead, core, rings, rune shards, ribbon, and trail, while leaving damage, cooldown, speed, piercing, and collision unchanged. -->
@@ -768,7 +769,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.97 - Enemy Arcane Mark';
+const GAME_VERSION='22.10.98 - Visible Enemy Arcane Mark';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -13378,10 +13379,38 @@ function updateBullets(dt){
           spawnArcaneSigil(z.position.x,0,z.position.z,1.15);
           spawnArcaneSigil(z.position.x,0,z.position.z,0.55);
           spawnBurst(z.position.x,z.position.y+.72,z.position.z,14,FX_MAT_SPARK,3.8);
-          if(z.mesh){
-            z.mesh.userData=z.mesh.userData||{};
-            z.mesh.userData.arcaneMarkUntil=performance.now()+220;
-          }
+          const arcaneMark=new THREE.Group();
+          arcaneMark.position.set(z.position.x,z.position.y+0.78,z.position.z);
+          const markMat=new THREE.MeshBasicMaterial({
+            color:0xb779ff,
+            transparent:true,
+            opacity:0.92,
+            depthWrite:false,
+            blending:THREE.AdditiveBlending
+          });
+          const markRingA=new THREE.Mesh(new THREE.TorusGeometry(0.34,0.025,8,32),markMat);
+          const markRingB=new THREE.Mesh(new THREE.TorusGeometry(0.22,0.018,8,28),markMat.clone());
+          markRingA.rotation.x=Math.PI/2;
+          markRingB.rotation.y=Math.PI/2;
+          arcaneMark.add(markRingA,markRingB);
+          scene.add(arcaneMark);
+          const markStart=performance.now();
+          (function animateArcaneMark(){
+            if(!arcaneMark.parent) return;
+            const age=(performance.now()-markStart)/1000;
+            if(age>=0.38){
+              scene.remove(arcaneMark);
+              disposeGroup(arcaneMark);
+              return;
+            }
+            markRingA.rotation.z+=0.18;
+            markRingB.rotation.x-=0.22;
+            const fade=1-age/0.38;
+            markRingA.material.opacity=0.92*fade;
+            markRingB.material.opacity=0.78*fade;
+            arcaneMark.scale.setScalar(1+age*1.6);
+            requestAnimationFrame(animateArcaneMark);
+          })();
         } else {
           spawnBurst(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 5, FX_MAT_SPARK, 2.5);
         }
