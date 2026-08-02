@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- V22.10.76 Persistent Arena Render Loop: prevents the Three.js render loop from terminating when gameRunning briefly becomes false during startup, pause, resume, or round transitions. Rendering continues safely while gameplay updates remain paused. -->
 <!-- V22.10.75 Giant Fireball Restoration + Render Recovery: restores the approved Phoenix-scale molten sphere and 1.85-second hold-to-repeat cadence from V22.10.73, while preserving the black-screen canvas/render recovery safeguard. -->
 <!-- V22.10.72 Secondary Hold-State Reliability: moves held Secondary repeat attempts into the main game update loop instead of relying on a browser interval. Tap still casts once, holding continues to cast whenever the equipped move is ready, and releasing/canceling/focus loss immediately stops all attempts. This restores Giant Fireball hold-to-repeat while preserving its 1.85-second cooldown and all existing damage/visual behavior. -->
 <!-- V22.10.71 Mage Giant Fireball Phoenix-Scale Upgrade: replaces the Mage Giant Fireball's generic tracer silhouette with the full molten Phoenix sphere model at the same visual scale. Its firing cooldown is increased and projectile travel speed reduced so the much larger shot remains powerful without becoming a rapid-fire screen clearer. Damage, direct-hit rules, splash radius, targeting, and hold-to-fire behavior are unchanged. -->
@@ -64,7 +65,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.75</title>
+<title>Family Arena V22.10.76</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -754,7 +755,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.75 - Giant Fireball Restoration + Render Recovery';
+const GAME_VERSION='22.10.76 - Persistent Arena Render Loop';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -13796,12 +13797,18 @@ function update(dt){
   }
 }
 
+let arenaRenderLoopStarted = false;
 function animate(){
-  if(!gameRunning) return;
-  requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.05);
-  update(dt);
-  renderer.render(scene, camera);
+  if(arenaRenderLoopStarted) return;
+  arenaRenderLoopStarted = true;
+  function arenaFrame(){
+    requestAnimationFrame(arenaFrame);
+    if(!renderer || !scene || !camera || !clock) return;
+    const dt = Math.min(clock.getDelta(), 0.05);
+    if(gameRunning) update(dt);
+    renderer.render(scene, camera);
+  }
+  requestAnimationFrame(arenaFrame);
 }
 
 // ---- Survival lifecycle ----
@@ -13959,13 +13966,13 @@ document.getElementById('btnResultsHome').onclick = ()=>{
 (function(){
   function recoverArenaRender(){
     try{
-      if(window.renderer){
+      if(renderer){
         if(renderer.domElement){
           renderer.domElement.style.display='block';
           renderer.domElement.style.visibility='visible';
           renderer.domElement.style.opacity='1';
         }
-        if(window.scene&&window.camera) renderer.render(scene,camera);
+        if(scene&&camera) renderer.render(scene,camera);
       }
       document.querySelectorAll('canvas').forEach(function(canvas){
         canvas.style.display='block';
