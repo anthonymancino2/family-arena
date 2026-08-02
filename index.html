@@ -1,3 +1,4 @@
+<!-- V22.11.24 Super Meteor Visual Upgrade: adds a fiery tail, rotating flame ring, pulsing inner landing warning, and dual expanding impact shockwaves. Damage, boss cap, stun, burn, radius, fall speed, and cooldown are unchanged. -->
 <!-- V22.11.23 Super Meteor Core: adds the Mage's third equipable ultimate. One enormous slow meteor targets the nearest enemy, falls from the sky, deals heavy area damage, deals 20% max HP to bosses, stuns survivors for 3 seconds, burns them for 5 seconds, and uses a 24-second cooldown. -->
 <!-- V22.11.22 Blizzard Readability Guard: caps simultaneous impact-effect groups at six, clears them between rounds, and brightens landing markers for easier tracking. Gameplay values are unchanged. -->
 <!-- V22.11.20 Blizzard Icy Mist Plume: adds six capped translucent mist plumes that rise, widen, drift slightly, and fade within 0.85 seconds at each Blizzard impact. Gameplay values are unchanged. -->
@@ -99,7 +100,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.11.23</title>
+<title>Family Arena V22.11.24</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -882,7 +883,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.11.23 - Super Meteor Core';
+const GAME_VERSION='22.11.24 - Super Meteor Visual Upgrade';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12465,8 +12466,37 @@ function makeSuperMeteorMesh(){
   );
   group.add(aura);
 
+  const flameRing=new THREE.Mesh(
+    new THREE.TorusGeometry(3.55,.18,10,40),
+    new THREE.MeshBasicMaterial({
+      color:0xff9a32,
+      transparent:true,
+      opacity:.52,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending
+    })
+  );
+  flameRing.rotation.x=Math.PI/2;
+  group.add(flameRing);
+
+  const trail=new THREE.Mesh(
+    new THREE.ConeGeometry(2.1,8.5,16,1,true),
+    new THREE.MeshBasicMaterial({
+      color:0xff6a21,
+      transparent:true,
+      opacity:.30,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending
+    })
+  );
+  trail.position.y=5.2;
+  trail.rotation.z=Math.PI;
+  group.add(trail);
+
   group.userData.lava=lava;
   group.userData.aura=aura;
+  group.userData.flameRing=flameRing;
+  group.userData.trail=trail;
   return group;
 }
 
@@ -12501,6 +12531,9 @@ function triggerSuperMeteor(){
   mesh.position.set(targetX,22,targetZ);
   scene.add(mesh);
 
+  const markerGroup=new THREE.Group();
+  markerGroup.position.set(targetX,.04,targetZ);
+
   const marker=new THREE.Mesh(
     new THREE.RingGeometry(SUPER_METEOR_RADIUS*.72,SUPER_METEOR_RADIUS,64),
     new THREE.MeshBasicMaterial({
@@ -12513,10 +12546,26 @@ function triggerSuperMeteor(){
     })
   );
   marker.rotation.x=-Math.PI/2;
-  marker.position.set(targetX,.04,targetZ);
-  scene.add(marker);
+  markerGroup.add(marker);
 
-  activeSuperMeteor={mesh,marker,x:targetX,z:targetZ,fallSpeed:6.2};
+  const warningDisc=new THREE.Mesh(
+    new THREE.CircleGeometry(SUPER_METEOR_RADIUS*.66,48),
+    new THREE.MeshBasicMaterial({
+      color:0xff7b2b,
+      transparent:true,
+      opacity:.18,
+      side:THREE.DoubleSide,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending
+    })
+  );
+  warningDisc.rotation.x=-Math.PI/2;
+  warningDisc.position.y=.002;
+  markerGroup.add(warningDisc);
+
+  scene.add(markerGroup);
+
+  activeSuperMeteor={mesh,marker:markerGroup,markerRing:marker,warningDisc,x:targetX,z:targetZ,fallSpeed:6.2};
   superMeteorCooldownTimer=SUPER_METEOR_COOLDOWN;
   abilityButtonCooldown(SUPER_METEOR_COOLDOWN);
   triggerCombatShake(5,180);
@@ -12528,6 +12577,43 @@ function impactSuperMeteor(m){
   spawnBurst(m.x,.7,m.z,42,FX_MAT_SPARK,8.5);
   spawnArcaneImpact(m.x,.18,m.z,'fire');
   spawnArcaneSigil(m.x,.04,m.z,SUPER_METEOR_RADIUS);
+
+  const impactFx=new THREE.Group();
+  impactFx.position.set(m.x,.05,m.z);
+
+  const shockMat=new THREE.MeshBasicMaterial({
+    color:0xff8a2b,
+    transparent:true,
+    opacity:.72,
+    depthWrite:false,
+    blending:THREE.AdditiveBlending,
+    side:THREE.DoubleSide
+  });
+
+  const shockA=new THREE.Mesh(new THREE.RingGeometry(1.2,1.55,48),shockMat);
+  shockA.rotation.x=-Math.PI/2;
+  const shockB=new THREE.Mesh(new THREE.RingGeometry(.7,.95,48),shockMat.clone());
+  shockB.rotation.x=-Math.PI/2;
+  impactFx.add(shockA,shockB);
+  scene.add(impactFx);
+
+  const impactStarted=performance.now();
+  (function animateSuperMeteorImpact(){
+    if(!impactFx.parent)return;
+    const age=(performance.now()-impactStarted)/1000;
+    if(age>=.65){
+      scene.remove(impactFx);
+      disposeGroup(impactFx);
+      return;
+    }
+    const t=age/.65;
+    shockA.scale.setScalar(1+t*4.8);
+    shockB.scale.setScalar(1+t*3.6);
+    shockA.material.opacity=.72*(1-t);
+    shockB.material.opacity=.54*(1-t);
+    requestAnimationFrame(animateSuperMeteorImpact);
+  })();
+
   triggerCombatShake(18,420);
   navigator.vibrate&&navigator.vibrate([80,35,120]);
 
@@ -12602,9 +12688,20 @@ function updateMageUltimates(dt){
     m.mesh.rotation.x+=dt*.75;
     m.mesh.rotation.y+=dt*1.05;
     if(m.mesh.userData.lava)m.mesh.userData.lava.rotation.y-=dt*1.7;
+    if(m.mesh.userData.flameRing){
+      m.mesh.userData.flameRing.rotation.z+=dt*2.4;
+      m.mesh.userData.flameRing.material.opacity=.42+Math.sin(performance.now()*.018)*.12;
+    }
+    if(m.mesh.userData.trail){
+      const trailPulse=1+Math.sin(performance.now()*.015)*.08;
+      m.mesh.userData.trail.scale.set(trailPulse,1,trailPulse);
+      m.mesh.userData.trail.material.opacity=.24+Math.sin(performance.now()*.02)*.08;
+    }
     const pulse=1+Math.sin(performance.now()*.012)*.06;
     m.marker.scale.setScalar(pulse);
-    m.marker.material.opacity=.48+Math.sin(performance.now()*.015)*.14;
+    if(m.markerRing)m.markerRing.material.opacity=.48+Math.sin(performance.now()*.015)*.14;
+    if(m.warningDisc)m.warningDisc.material.opacity=.14+Math.sin(performance.now()*.013)*.06;
+    m.marker.rotation.y+=dt*.22;
     if(m.mesh.position.y<=1.5){
       impactSuperMeteor(m);
       scene.remove(m.mesh);disposeGroup(m.mesh);
