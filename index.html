@@ -97,7 +97,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.11.20</title>
+<title>Family Arena V22.11.21</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -880,7 +880,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.11.20 - Blizzard Icy Mist Plume';
+const GAME_VERSION='22.11.21 - Blizzard Ice Shards';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12250,6 +12250,27 @@ function impactIce(m){
     frostGroup.add(crack);
   }
 
+  const iceShards=[];
+  for(let i=0;i<10;i++){
+    const shard=new THREE.Mesh(
+      new THREE.ConeGeometry(.05,.24,4),
+      new THREE.MeshBasicMaterial({
+        color:0xdffcff,
+        transparent:true,
+        opacity:.9,
+        depthWrite:false,
+        blending:THREE.AdditiveBlending
+      })
+    );
+    const a=Math.random()*Math.PI*2;
+    const s=.9+Math.random()*1.2;
+    shard.position.set(0,.08,0);
+    shard.rotation.z=Math.PI/2;
+    shard.userData.vel=new THREE.Vector3(Math.cos(a)*s,.35+Math.random()*.35,Math.sin(a)*s);
+    iceShards.push(shard);
+    frostGroup.add(shard);
+  }
+
   const mistPlumes=[];
   for(let i=0;i<6;i++){
     const mist=new THREE.Mesh(
@@ -12295,6 +12316,12 @@ function impactIce(m){
       const mistScale=1+age*1.8;
       mist.scale.set(1.2*mistScale,1.8*mistScale,1.2*mistScale);
       if(mist.material)mist.material.opacity=.22*Math.max(0,1-age/.85);
+    }
+    for(const shard of iceShards){
+      shard.position.addScaledVector(shard.userData.vel,.016);
+      shard.userData.vel.y-=.02;
+      shard.rotation.y+=.22;
+      if(shard.material) shard.material.opacity=.9*Math.max(0,1-age/.55);
     }
     frostGroup.rotation.y+=.007;
     requestAnimationFrame(animateBlizzardFrostMark);
