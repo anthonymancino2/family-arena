@@ -1,3 +1,7 @@
+<!-- V22.11.10 Blizzard Ice Mass Visual Pass: replaces each simple falling icosahedron with a layered glowing ice core, translucent faceted shell, and five jagged spikes. The shell and core counter-rotate while falling. Damage, radius, duration, freeze, spawn rate, and cooldown are unchanged. -->
+<!-- V22.11.09 Arcane Lance Final Regression Guard: Reality Tear now spawns only when Arcane Lance expires naturally, not when removed by hitting an enemy. Version labels synchronized. -->
+<!-- V22.11.08 Arcane Resonance Stability Fix: applies the approved +10% brute and +5% boss Arcane Lance bonus on marked targets, attaches the persistent marker to the live enemy group, and cleans it correctly between rounds. -->
+<!-- V22.11.07 Arcane Cleanup Pass: clears active Reality Tears, resonance markers, and resonance timers during enemy/round cleanup so Arcane Lance effects cannot leak into later rounds. -->
 <!-- V22.11.06 Arcane Effect Performance Guard: removes a stray pre-HTML constant, caps active Reality Tears at four, cleans expired tears from the cap list, and removes duplicate Mana Rupture visual calls while preserving the effect. -->
 <!-- V22.11.04 Arcane Mana Rupture: enemies defeated while Arcane Resonance is active release a compact arcane explosion that damages nearby enemies. Boss splash is capped. -->
 <!-- V22.11.03 Arcane Reality Tear: Arcane Lance now leaves a 3-second cyan-violet rift when removed. Enemies inside take light repeated magic damage; boss ticks are capped. -->
@@ -85,7 +89,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.11.05</title>
+<title>Family Arena V22.11.10</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -775,7 +779,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.11.06 - Arcane Effect Performance Guard';
+const GAME_VERSION='22.11.10 - Blizzard Ice Mass Visual Pass';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -8922,7 +8926,33 @@ function spawnZombie(){
   if(archetype!=='walker') spawnBurst(z.position.x,z.position.y+.5,z.position.z,8,FX_MAT_ZOMBIE,2.5);
   return true;
 }
+
+function clearArcaneLanceTemporaryEffects(){
+  if(typeof activeArcaneRealityTears!=='undefined'){
+    for(const tear of [...activeArcaneRealityTears]){
+      if(tear&&tear.parent){
+        tear.parent.remove(tear);
+        disposeGroup(tear);
+      }
+    }
+    activeArcaneRealityTears.length=0;
+  }
+
+  if(typeof zombies!=='undefined'){
+    for(const enemy of zombies){
+      if(!enemy) continue;
+      const mark=enemy.getObjectByName('arcaneResonanceMark');
+      if(mark&&mark.parent){
+        mark.parent.remove(mark);
+        disposeGroup(mark);
+      }
+      delete enemy.arcaneResonanceUntil;
+    }
+  }
+}
+
 function clearZombies(){
+  clearArcaneLanceTemporaryEffects();
   if(enemySpawnRetryTimer){clearTimeout(enemySpawnRetryTimer);enemySpawnRetryTimer=null;}
   zombies.forEach(z=>{ scene.remove(z); disposeGroup(z); });
   zombies = [];
@@ -11992,10 +12022,68 @@ function abilityButtonCooldown(seconds){
   if(btn){btn.classList.add('cooling');setTimeout(()=>btn.classList.remove('cooling'),seconds*1000);}
 }
 function makeIceBallMesh(radius=1.05){
-  const mat=new THREE.MeshStandardMaterial({color:0x75dfff,emissive:0x143f66,roughness:.34,metalness:.08,transparent:true,opacity:.58,depthWrite:true});
-  const mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(radius,1),mat);
-  mesh.castShadow=true;
-  return mesh;
+  const group=new THREE.Group();
+
+  const core=new THREE.Mesh(
+    new THREE.IcosahedronGeometry(radius*.82,1),
+    new THREE.MeshStandardMaterial({
+      color:0xc8f7ff,
+      emissive:0x2379aa,
+      emissiveIntensity:.8,
+      roughness:.24,
+      metalness:.12,
+      transparent:true,
+      opacity:.92,
+      depthWrite:true
+    })
+  );
+  core.castShadow=true;
+  group.add(core);
+
+  const shell=new THREE.Mesh(
+    new THREE.IcosahedronGeometry(radius,1),
+    new THREE.MeshStandardMaterial({
+      color:0x66dfff,
+      emissive:0x123f66,
+      emissiveIntensity:.5,
+      roughness:.18,
+      metalness:.18,
+      transparent:true,
+      opacity:.38,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending
+    })
+  );
+  shell.scale.set(1.08,.94,1.03);
+  group.add(shell);
+
+  const spikeMat=new THREE.MeshStandardMaterial({
+    color:0x9eeeff,
+    emissive:0x1d6f9c,
+    emissiveIntensity:.65,
+    roughness:.28,
+    transparent:true,
+    opacity:.82
+  });
+  for(let i=0;i<5;i++){
+    const angle=(i/5)*Math.PI*2;
+    const spike=new THREE.Mesh(
+      new THREE.ConeGeometry(radius*.18,radius*.72,5),
+      spikeMat.clone()
+    );
+    spike.position.set(
+      Math.cos(angle)*radius*.72,
+      (i%2===0?1:-1)*radius*.18,
+      Math.sin(angle)*radius*.72
+    );
+    spike.rotation.z=Math.PI/2;
+    spike.rotation.y=-angle;
+    group.add(spike);
+  }
+
+  group.userData.iceCore=core;
+  group.userData.iceShell=shell;
+  return group;
 }
 function spawnFallingIce(){
   const stormR=Math.min(blizzardRadius(),arenaSize-2.4);
@@ -12078,7 +12166,28 @@ function updateMageUltimates(dt){
       if(affected&&blizzardActiveTimer>BLIZZARD_DURATION-1.0)toast(`BLIZZARD · ${affected} AFFECTED${defeated?` · ${defeated} DEFEATED`:''}`);
     }
   }
-  for(let i=fallingIce.length-1;i>=0;i--){const m=fallingIce[i];m.life-=dt;m.mesh.position.y-=m.vy*dt;m.mesh.rotation.x+=dt*2.8;m.mesh.rotation.z+=dt*2.1;m.ring.material.opacity=Math.max(.10,m.life*.42);if(m.mesh.position.y<=.65||m.life<=0){impactIce(m);scene.remove(m.mesh);disposeGroup(m.mesh);scene.remove(m.ring);disposeGroup(m.ring);fallingIce.splice(i,1);}}
+  for(let i=fallingIce.length-1;i>=0;i--){
+    const m=fallingIce[i];
+    m.life-=dt;
+    m.mesh.position.y-=m.vy*dt;
+    m.mesh.rotation.x+=dt*2.8;
+    m.mesh.rotation.z+=dt*2.1;
+    if(m.mesh.userData.iceCore) m.mesh.userData.iceCore.rotation.y+=dt*2.4;
+    if(m.mesh.userData.iceShell){
+      m.mesh.userData.iceShell.rotation.y-=dt*1.8;
+      const icePulse=1+Math.sin(performance.now()*.012+i)*.045;
+      m.mesh.userData.iceShell.scale.set(1.08*icePulse,.94*icePulse,1.03*icePulse);
+    }
+    m.ring.material.opacity=Math.max(.10,m.life*.42);
+    if(m.mesh.position.y<=.65||m.life<=0){
+      impactIce(m);
+      scene.remove(m.mesh);
+      disposeGroup(m.mesh);
+      scene.remove(m.ring);
+      disposeGroup(m.ring);
+      fallingIce.splice(i,1);
+    }
+  }
   for(const z of [...zombies]){
     if(z.userData.dead)continue;
     if((z.userData.slowTimer||0)>0){z.userData.slowTimer=Math.max(0,z.userData.slowTimer-dt);if(z.userData.slowTimer<=0)z.userData.slowMult=1;}
@@ -13452,7 +13561,15 @@ function updateBullets(dt){
           const type=z.userData.archetype||'walker';
           const directDamage=type==='boss' ? (z.userData.maxHp||z.userData.hp)*0.18 : (z.userData.hp+1);
           applyBulletDamage(z,directDamage);
-        } else applyBulletDamage(z, b.damage);
+        } else {
+          let resolvedDamage=b.damage;
+          if(b.kind==='arcane_lance' && z.arcaneResonanceUntil && performance.now()<z.arcaneResonanceUntil){
+            const type=z.userData.archetype||'walker';
+            if(type==='boss') resolvedDamage*=1.05;
+            else if(type==='brute') resolvedDamage*=1.10;
+          }
+          applyBulletDamage(z,resolvedDamage);
+        }
         if(b.heavyKnockback && !z.userData.dead){
           let kx=z.position.x-(b.prevX??b.mesh.position.x), kz=z.position.z-(b.prevZ??b.mesh.position.z);
           const kl=Math.hypot(kx,kz)||1;
@@ -13465,8 +13582,8 @@ function updateBullets(dt){
         } else if(b.kind==='arcane_lance'){
           spawnArcaneImpact(z.position.x,z.position.y+.08,z.position.z,'ice');
           z.arcaneResonanceUntil=performance.now()+5000;
-          if(z.mesh){
-            let resonanceMark=z.mesh.getObjectByName('arcaneResonanceMark');
+          if(z){
+            let resonanceMark=z.getObjectByName('arcaneResonanceMark');
             if(!resonanceMark){
               resonanceMark=new THREE.Group();
               resonanceMark.name='arcaneResonanceMark';
@@ -13496,7 +13613,7 @@ function updateBullets(dt){
               resonanceRune.userData.role='arcaneResonanceRune';
 
               resonanceMark.add(resonanceRing,resonanceRune);
-              z.mesh.add(resonanceMark);
+              z.add(resonanceMark);
             }
 
             resonanceMark.userData.expiresAt=z.arcaneResonanceUntil;
@@ -13656,7 +13773,7 @@ function updateBullets(dt){
       if(b.life<=0 && b.kind==='cyclone_snare_arrow' && !b.cycloneDetonated){
         triggerCycloneSnare(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,b);
       }
-      if(b.kind==='arcane_lance' && !b.realityTearSpawned){
+      if(b.kind==='arcane_lance' && !hit && !b.realityTearSpawned){
         b.realityTearSpawned=true;
         spawnArcaneRealityTear(b.mesh.position.x,b.mesh.position.z,b.damage||1);
       }
