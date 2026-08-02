@@ -1,3 +1,5 @@
+<!-- V22.13.12 Cleaving Guard Polish: upgrades Cleaving Guard with a layered gold/ivory/steel sweep, brighter crowd-separation impact arcs, stronger sparks and dust across the sweep lane, improved hit-stop, a planted shield-forward recovery, and clearer defensive follow-through. Damage, arc, knockback, and other moves are unchanged. -->
+<!-- V22.13.11 Guarded Thrust Polish: upgrades Guarded Thrust with a brief guard anticipation, layered ivory/gold/steel spear projection, a brighter tip, localized piercing impact effects, stronger sparks and hit-stop, controlled forward commitment, and guarded recovery. Damage, range, boss caps, and other moves are unchanged. -->
 <!-- V22.13.10 Shield Bash Polish: upgrades Shield Bash with a two-stage controlled lunge, layered shield trail, dual impact rings, stronger localized metal sparks and dust, clearer stun crest feedback, improved hit-stop, smoother recovery timing, and brief guard resistance. Damage values and other moves are unchanged. -->
 <!-- V22.13.09 Browser Pause Placement: moves Pause to the top of Safari/browser landscape's far-right utility rail so it no longer crowds or overlaps Jump and the combat grid. Home-screen-app layout, movement zones, combat controls, and gameplay are unchanged. -->
 <!-- V22.13.08 Browser Landscape Layout V2: detects normal Safari/browser tabs separately from the installed home-screen app and gives browser landscape a dedicated two-column combat grid. Fire/Dash occupy the bottom row, Jump/Look Fwd the row above, Shield sits centered above them, Judgment moves farther left and higher, and camera/pause controls stay in a slim far-right utility rail. Movement-zone rules and standalone layout are unchanged. -->
@@ -126,7 +128,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.10</title>
+<title>Family Arena V22.13.12</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1271,7 +1273,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.10 - Shield Bash Polish';
+const GAME_VERSION='22.13.12 - Cleaving Guard Polish';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -11831,6 +11833,113 @@ function knightSwordTrail(origin,yaw,step,scale=1){
 }
 
 
+
+
+function knightCleavingGuardImpact(origin,yaw,hits,radius){
+  if(!hits || !knightFxBudget(3)) return;
+  const g=new THREE.Group();
+
+  const arcOuter=new THREE.Mesh(
+    new THREE.RingGeometry(
+      Math.max(.8,(radius||3.2)*.55),
+      Math.max(1.0,(radius||3.2)*.96),
+      44,1,-1.48,2.96
+    ),
+    knightMat(KNIGHT_GOLD,.78)
+  );
+  arcOuter.rotation.x=-Math.PI/2;
+  arcOuter.rotation.z=-yaw;
+  g.add(arcOuter);
+
+  const arcCore=new THREE.Mesh(
+    new THREE.RingGeometry(
+      Math.max(.7,(radius||3.2)*.48),
+      Math.max(.82,(radius||3.2)*.72),
+      40,1,-1.48,2.96
+    ),
+    knightMat(KNIGHT_IVORY,.62)
+  );
+  arcCore.rotation.x=-Math.PI/2;
+  arcCore.rotation.z=-yaw;
+  arcCore.position.y=.025;
+  g.add(arcCore);
+
+  for(let i=0;i<10;i++){
+    const a=-1.35+(i/9)*2.7+yaw;
+    const shard=new THREE.Mesh(
+      new THREE.PlaneGeometry(.08,.44),
+      knightMat(i%2?KNIGHT_GOLD:KNIGHT_STEEL,.8)
+    );
+    const rr=(radius||3.2)*(.62+Math.random()*.18);
+    shard.position.set(Math.sin(a)*rr,.72+Math.random()*.32,Math.cos(a)*rr);
+    shard.rotation.set(-Math.PI/2,0,-a);
+    g.add(shard);
+  }
+
+  g.position.set(origin.x,origin.y,origin.z);
+  knightBaseOpacity(g);
+  pushKnightFx(g,{life:.34,grow:.42,from:.88,spin:2.8});
+
+  knightShockRing(origin,(radius||3.2)*.92,KNIGHT_STEEL,.28);
+  knightShockRing(origin,(radius||3.2)*.68,KNIGHT_IVORY,.22);
+}
+
+function knightGuardedThrustImpact(origin,yaw,hits,range){
+  if(!hits || !knightFxBudget(3)) return;
+  const fx=Math.sin(yaw),fz=Math.cos(yaw);
+
+  const g=new THREE.Group();
+
+  const core=new THREE.Mesh(
+    new THREE.PlaneGeometry(.18,Math.max(1.8,(range||4.4)*.72)),
+    knightMat(KNIGHT_IVORY,.96)
+  );
+  core.rotation.x=-Math.PI/2;
+  core.position.set(0,.98,Math.max(.9,(range||4.4)*.36));
+  g.add(core);
+
+  const outer=new THREE.Mesh(
+    new THREE.PlaneGeometry(.72,Math.max(1.7,(range||4.4)*.68)),
+    knightMat(KNIGHT_GOLD,.36)
+  );
+  outer.rotation.x=-Math.PI/2;
+  outer.position.set(0,.95,Math.max(.9,(range||4.4)*.34));
+  g.add(outer);
+
+  const ring=new THREE.Mesh(
+    new THREE.RingGeometry(.28,.58,28),
+    knightMat(KNIGHT_STEEL,.82)
+  );
+  ring.rotation.x=-Math.PI/2;
+  ring.position.set(0,.06,Math.max(1.2,(range||4.4)*.72));
+  g.add(ring);
+
+  for(let i=0;i<8;i++){
+    const shard=new THREE.Mesh(
+      new THREE.PlaneGeometry(.06,.42),
+      knightMat(i%2?KNIGHT_GOLD:KNIGHT_IVORY,.8)
+    );
+    const side=(i%2===0?-1:1);
+    const lane=Math.floor(i/2);
+    shard.position.set(side*(.16+lane*.09),.82+lane*.08,1.15+lane*.42);
+    shard.rotation.set(-Math.PI/2,0,side*.18);
+    g.add(shard);
+  }
+
+  g.position.set(origin.x,origin.y,origin.z);
+  g.rotation.y=yaw;
+  knightBaseOpacity(g);
+  pushKnightFx(g,{life:.30,grow:.48,from:.8});
+
+  const endPos={
+    x:origin.x+fx*Math.max(2.2,(range||4.4)*.78),
+    y:origin.y,
+    z:origin.z+fz*Math.max(2.2,(range||4.4)*.78)
+  };
+  knightShockRing(endPos,1.55,KNIGHT_IVORY,.24);
+  knightShockRing(endPos,1.12,KNIGHT_GOLD,.20);
+}
+
 function knightShieldBashImpact(origin,yaw,hits){
   if(!hits || !knightFxBudget(3)) return;
   const fx=Math.sin(yaw),fz=Math.cos(yaw);
@@ -12144,54 +12253,232 @@ function knightRoyalCombo(w){
 function knightGuardedThrust(w){
   knightAutoFace(9);
   const yaw=player.rotation.y;
+  const fx=Math.sin(yaw),fz=Math.cos(yaw);
   const pos={x:player.position.x,y:player.position.y,z:player.position.z};
-  knightPlayClip(['melee','attack'],'1H_Melee_Attack_Stab',.24,.18);
-  // Anticipation: guarded stance, then a committed straight thrust.
+  const range=w.range||4.4;
+
+  // Brief guarded anticipation, then a sharp committed release.
+  knightPlayClip(['melee','attack'],'1H_Melee_Attack_Stab',.20,.16);
+
+  // Compact guard flare at the Knight before the thrust launches.
   if(knightFxBudget(2)){
-    const g=new THREE.Group();
-    const lance=new THREE.Mesh(new THREE.PlaneGeometry(.28,w.range||4.4),knightMat(KNIGHT_IVORY,.9));
-    lance.rotation.x=-Math.PI/2; lance.position.set(0,.95,(w.range||4.4)*.5); g.add(lance);
-    const glow=new THREE.Mesh(new THREE.PlaneGeometry(.9,(w.range||4.4)*.9),knightMat(KNIGHT_GOLD,.35));
-    glow.rotation.x=-Math.PI/2; glow.position.set(0,.92,(w.range||4.4)*.45); g.add(glow);
-    g.position.set(pos.x,pos.y,pos.z); g.rotation.y=yaw;
-    knightBaseOpacity(g);
-    pushKnightFx(g,{life:.30,grow:.12,from:1});
+    const guard=new THREE.Group();
+
+    const shieldArc=new THREE.Mesh(
+      new THREE.RingGeometry(.42,.92,26,1,-1.15,2.3),
+      knightMat(KNIGHT_STEEL,.62)
+    );
+    shieldArc.position.set(0,1.0,.5);
+    shieldArc.rotation.y=yaw;
+    guard.add(shieldArc);
+
+    const center=new THREE.Mesh(
+      new THREE.CircleGeometry(.34,22),
+      knightMat(KNIGHT_GOLD,.72)
+    );
+    center.position.set(0,1.0,.54);
+    center.rotation.y=yaw;
+    guard.add(center);
+
+    guard.position.set(pos.x,pos.y,pos.z);
+    knightBaseOpacity(guard);
+    pushKnightFx(guard,{life:.20,grow:.34,from:.7});
   }
-  const hits=knightLineDamage(pos,yaw,w.range||4.4,1.05,w.damage,
-    {knock:3.2,stun:1.05,bruteMult:1.25,bossMult:.30,bossCapFraction:.035});
-  knightShockRing({x:pos.x+Math.sin(yaw)*2.2,y:pos.y,z:pos.z+Math.cos(yaw)*2.2},1.9,KNIGHT_STEEL,.28);
-  if(hits){ knightHitStop(.045); knightAddDiscipline(); }
-  // Knight stays partially guarded through the commitment.
-  knightRuntime.resistTimer=Math.max(knightRuntime.resistTimer,.28);
-  triggerCombatShake(hits?9:4,150);
-  if(navigator.vibrate) navigator.vibrate(hits?[20,14,28]:9);
+
+  // The live thrust now reads as a layered spear-line instead of a flat strip.
+  if(knightFxBudget(3)){
+    const g=new THREE.Group();
+
+    const core=new THREE.Mesh(
+      new THREE.PlaneGeometry(.20,range),
+      knightMat(KNIGHT_IVORY,.96)
+    );
+    core.rotation.x=-Math.PI/2;
+    core.position.set(0,.96,range*.5);
+    g.add(core);
+
+    const mid=new THREE.Mesh(
+      new THREE.PlaneGeometry(.54,range*.94),
+      knightMat(KNIGHT_GOLD,.50)
+    );
+    mid.rotation.x=-Math.PI/2;
+    mid.position.set(0,.94,range*.47);
+    g.add(mid);
+
+    const aura=new THREE.Mesh(
+      new THREE.PlaneGeometry(1.05,range*.84),
+      knightMat(KNIGHT_STEEL,.20)
+    );
+    aura.rotation.x=-Math.PI/2;
+    aura.position.set(0,.92,range*.42);
+    g.add(aura);
+
+    const tip=new THREE.Mesh(
+      new THREE.CircleGeometry(.34,20),
+      knightMat(KNIGHT_IVORY,.9)
+    );
+    tip.position.set(0,.98,range*.92);
+    tip.rotation.x=-Math.PI/2;
+    g.add(tip);
+
+    g.position.set(pos.x,pos.y,pos.z);
+    g.rotation.y=yaw;
+    knightBaseOpacity(g);
+    pushKnightFx(g,{life:.28,grow:.16,from:.9});
+  }
+
+  const hits=knightLineDamage(
+    pos,
+    yaw,
+    range,
+    1.05,
+    w.damage,
+    {knock:3.2,stun:1.05,bruteMult:1.25,bossMult:.30,bossCapFraction:.035}
+  );
+
+  knightGuardedThrustImpact(pos,yaw,hits,range);
+
+  if(hits){
+    knightHitStop(.055);
+    knightAddDiscipline();
+    spawnBurst(
+      pos.x+fx*range*.76,
+      pos.y+1.0,
+      pos.z+fz*range*.76,
+      14,
+      FX_MAT_SPARK,
+      4.2
+    );
+    triggerCombatShake(10,155);
+  }else{
+    triggerCombatShake(4,95);
+  }
+
+  // Partial guard persists through recovery.
+  knightRuntime.resistTimer=Math.max(knightRuntime.resistTimer,.30);
+
+  // Controlled forward commitment improves feel without turning it into a charge.
+  const advance=hits?.34:.24;
+  const r=resolveCollision(
+    player.position.x+fx*advance,
+    player.position.z+fz*advance,
+    player.position.y
+  );
+  player.position.x=r.x;
+  player.position.z=r.z;
+
+  if(navigator.vibrate) navigator.vibrate(hits?[22,10,30]:9);
 }
 function knightCleavingGuard(w){
   knightAutoFace(7);
   const yaw=player.rotation.y;
   const pos={x:player.position.x,y:player.position.y,z:player.position.z};
-  knightPlayClip(['melee','slash'],'1H_Melee_Attack_Slice_Horizontal',.22,.17);
-  if(knightFxBudget(2)){
-    const g=new THREE.Group();
-    const sweep=new THREE.Mesh(new THREE.RingGeometry(1.0,w.radius||3.2,44,1,-1.5,3.0),knightMat(KNIGHT_GOLD,.72));
-    sweep.rotation.x=-Math.PI/2; sweep.rotation.z=-yaw; g.add(sweep);
-    const guard=new THREE.Mesh(new THREE.RingGeometry((w.radius||3.2)*.92,(w.radius||3.2),40,1,-1.5,3.0),knightMat(KNIGHT_IVORY,.8));
-    guard.rotation.x=-Math.PI/2; guard.rotation.z=-yaw; guard.position.y=.03; g.add(guard);
-    g.position.set(pos.x,pos.y+.35,pos.z);
-    knightBaseOpacity(g);
-    pushKnightFx(g,{life:.32,grow:.30,from:.9});
-  }
-  const hits=knightMeleeArc(pos,yaw,w.radius||3.2,w.arc||3.0,w.damage,
-    {knock:6.2,stun:.55,bruteMult:.7,bossMult:.28});
-  if(hits){ knightHitStop(.03); knightAddDiscipline(); }
-  // Shield stays between the Knight and the crowd during recovery.
-  knightRuntime.resistTimer=Math.max(knightRuntime.resistTimer,.45);
-  spawnKnightGuardBurst(player.position,1.9,KNIGHT_STEEL);
-  triggerCombatShake(hits?8:3,130);
-  if(navigator.vibrate) navigator.vibrate(hits?[16,12,24]:8);
-}
+  const radius=w.radius||3.2;
+  const arc=w.arc||3.0;
 
-/* ---------------------------------------------------------- SECONDARY MOVES */
+  // Faster anticipation with a controlled shield-forward recovery.
+  knightPlayClip(['melee','slash'],'1H_Melee_Attack_Slice_Horizontal',.19,.15);
+
+  // Layered wide sweep: bright cutting edge, steel body, and a trailing guard arc.
+  if(knightFxBudget(3)){
+    const g=new THREE.Group();
+
+    const sweepOuter=new THREE.Mesh(
+      new THREE.RingGeometry(1.0,radius,48,1,-1.5,arc),
+      knightMat(KNIGHT_GOLD,.78)
+    );
+    sweepOuter.rotation.x=-Math.PI/2;
+    sweepOuter.rotation.z=-yaw;
+    g.add(sweepOuter);
+
+    const sweepCore=new THREE.Mesh(
+      new THREE.RingGeometry(.88,radius*.84,46,1,-1.5,arc),
+      knightMat(KNIGHT_IVORY,.58)
+    );
+    sweepCore.rotation.x=-Math.PI/2;
+    sweepCore.rotation.z=-yaw;
+    sweepCore.position.y=.025;
+    g.add(sweepCore);
+
+    const guardArc=new THREE.Mesh(
+      new THREE.RingGeometry(radius*.72,radius*.98,42,1,-1.46,arc*.82),
+      knightMat(KNIGHT_STEEL,.36)
+    );
+    guardArc.rotation.x=-Math.PI/2;
+    guardArc.rotation.z=-yaw+.10;
+    guardArc.position.y=.05;
+    g.add(guardArc);
+
+    g.position.set(pos.x,pos.y+.32,pos.z);
+    knightBaseOpacity(g);
+    pushKnightFx(g,{life:.34,grow:.34,from:.90,spin:3.2});
+  }
+
+  const hits=knightMeleeArc(
+    pos,
+    yaw,
+    radius,
+    arc,
+    w.damage,
+    {knock:6.2,stun:.55,bruteMult:.7,bossMult:.28}
+  );
+
+  knightCleavingGuardImpact(pos,yaw,hits,radius);
+
+  if(hits){
+    knightHitStop(.042);
+    knightAddDiscipline();
+
+    // Stronger readable crowd-separation feedback across the sweep lane.
+    const fx=Math.sin(yaw),fz=Math.cos(yaw);
+    spawnBurst(
+      pos.x+fx*1.2,
+      pos.y+1.0,
+      pos.z+fz*1.2,
+      16,
+      FX_MAT_SPARK,
+      4.2
+    );
+
+    if(knightFxBudget(1)){
+      const dust=new THREE.Group();
+      for(let i=0;i<8;i++){
+        const a=-1.25+(i/7)*2.5+yaw;
+        const puff=new THREE.Mesh(
+          new THREE.CircleGeometry(.20+Math.random()*.18,12),
+          knightMat(0xb9aa8c,.24)
+        );
+        const rr=1.0+Math.random()*(radius*.55);
+        puff.rotation.x=-Math.PI/2;
+        puff.position.set(Math.sin(a)*rr,.035,Math.cos(a)*rr);
+        dust.add(puff);
+      }
+      dust.position.set(pos.x,pos.y,pos.z);
+      knightBaseOpacity(dust);
+      pushKnightFx(dust,{life:.44,grow:.92,from:.74});
+    }
+
+    triggerCombatShake(10,155);
+  }else{
+    triggerCombatShake(4,90);
+  }
+
+  // Shield remains between the Knight and the crowd during recovery.
+  knightRuntime.resistTimer=Math.max(knightRuntime.resistTimer,.46);
+  spawnKnightGuardBurst(player.position,2.05,KNIGHT_STEEL);
+
+  // Small planted pivot instead of a forward slide.
+  const side=.10;
+  const r=resolveCollision(
+    player.position.x+Math.cos(yaw)*side,
+    player.position.z-Math.sin(yaw)*side,
+    player.position.y
+  );
+  player.position.x=r.x;
+  player.position.z=r.z;
+
+  if(navigator.vibrate) navigator.vibrate(hits?[18,10,28]:8);
+}
 function knightShieldBash(w){
   knightAutoFace(6);
   const yaw=player.rotation.y;
