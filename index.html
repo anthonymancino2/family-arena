@@ -1,3 +1,4 @@
+<!-- V22.11.29 Four Quadrant Meteor Sequence: one cast now drops four Super Meteors in order across map quadrants 1, 2, 3, and 4. Each next meteor begins falling 1.5 seconds after the previous meteor impacts. Existing meteor size, impact radius, damage, boss cap, stun, burn, and cooldown are preserved. -->
 <!-- V22.11.26 Super Meteor Cleanup Guard: caps active scorched craters at three and clears meteor craters plus surviving enemy burn auras during round/reset cleanup. Damage and all gameplay values are unchanged. -->
 <!-- V22.11.25 Super Meteor Debris Crater Burn FX: adds fourteen capped molten debris fragments, a four-second scorched crater with pulsing lava ring, and a visible orange burn aura on surviving enemies. Gameplay values are unchanged. -->
 <!-- V22.11.24 Super Meteor Visual Upgrade: adds a fiery tail, rotating flame ring, pulsing inner landing warning, and dual expanding impact shockwaves. Damage, boss cap, stun, burn, radius, fall speed, and cooldown are unchanged. -->
@@ -102,7 +103,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.11.27</title>
+<title>Family Arena V22.11.29</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -885,7 +886,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.11.27 - 4X Super Meteor Size';
+const GAME_VERSION='22.11.29 - Four Quadrant Meteor Sequence';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10578,10 +10579,12 @@ function updateHoodedHud(){
         abilityBtn.classList.toggle('cooling',supernovaCooldownTimer>0&&supernovaChargeTimer<=0);
       }else if(equippedAbilityId==='super_meteor'){
         abilityBtn.textContent=activeSuperMeteor
-          ? 'METEOR ↓'
-          : (superMeteorCooldownTimer>0 ? `METEOR ${Math.ceil(superMeteorCooldownTimer)}` : 'SUPER METEOR');
-        abilityBtn.classList.toggle('active',!!activeSuperMeteor);
-        abilityBtn.classList.toggle('cooling',superMeteorCooldownTimer>0&&!activeSuperMeteor);
+          ? `METEOR Q${activeSuperMeteor.quadrant} ↓`
+          : (superMeteorSequenceActive
+              ? `NEXT Q${Math.min(4,superMeteorNextQuadrant+1)} ${superMeteorNextDropTimer.toFixed(1)}`
+              : (superMeteorCooldownTimer>0 ? `METEOR ${Math.ceil(superMeteorCooldownTimer)}` : 'SUPER METEOR'));
+        abilityBtn.classList.toggle('active',!!activeSuperMeteor||superMeteorSequenceActive);
+        abilityBtn.classList.toggle('cooling',superMeteorCooldownTimer>0&&!superMeteorSequenceActive);
       }else{
         abilityBtn.textContent='BLIZZARD';
       }
@@ -12424,9 +12427,12 @@ function triggerBlizzardStorm(){
 const SUPER_METEOR_COOLDOWN=24;
 const SUPER_METEOR_STUN=3;
 const SUPER_METEOR_BURN=5;
-const SUPER_METEOR_RADIUS=7.5;
+const SUPER_METEOR_RADIUS=30.0;
 let superMeteorCooldownTimer=0;
 let activeSuperMeteor=null;
+let superMeteorSequenceActive=false;
+let superMeteorNextDropTimer=0;
+let superMeteorNextQuadrant=0;
 let activeSuperMeteorCraters=[];
 const SUPER_METEOR_CRATER_CAP=3;
 
@@ -12504,32 +12510,21 @@ function makeSuperMeteorMesh(){
   return group;
 }
 
-function triggerSuperMeteor(){
-  if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='super_meteor'||!ownedAbilities.super_meteor||superMeteorCooldownTimer>0||activeSuperMeteor)return;
+function superMeteorQuadrantTarget(quadrantIndex){
+  const safeRadius=Math.max(4,Math.min(arenaSize*.46,arenaSize-SUPER_METEOR_RADIUS*.55));
+  const diagonal=safeRadius/Math.sqrt(2);
+  const quadrantTargets=[
+    {x: diagonal,z: diagonal},
+    {x:-diagonal,z: diagonal},
+    {x:-diagonal,z:-diagonal},
+    {x: diagonal,z:-diagonal}
+  ];
+  return quadrantTargets[quadrantIndex]||quadrantTargets[0];
+}
 
-  let targetX=player.position.x,targetZ=player.position.z;
-  let nearest=null,best=Infinity;
-  for(const enemy of zombies){
-    if(!enemy||enemy.userData.dead)continue;
-    const d=Math.hypot(enemy.position.x-player.position.x,enemy.position.z-player.position.z);
-    if(d<best){best=d;nearest=enemy;}
-  }
-
-  if(nearest){
-    targetX=nearest.position.x;
-    targetZ=nearest.position.z;
-  }else{
-    const forward=new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion);
-    targetX+=forward.x*8;
-    targetZ+=forward.z*8;
-  }
-
-  const radial=Math.hypot(targetX,targetZ);
-  if(radial>arenaSize-2.5){
-    const scale=(arenaSize-2.5)/radial;
-    targetX*=scale;
-    targetZ*=scale;
-  }
+function spawnSuperMeteorForQuadrant(quadrantIndex){
+  const target=superMeteorQuadrantTarget(quadrantIndex);
+  const targetX=target.x,targetZ=target.z;
 
   const mesh=makeSuperMeteorMesh();
   mesh.position.set(targetX,22,targetZ);
@@ -12569,16 +12564,36 @@ function triggerSuperMeteor(){
 
   scene.add(markerGroup);
 
-  activeSuperMeteor={mesh,marker:markerGroup,markerRing:marker,warningDisc,x:targetX,z:targetZ,fallSpeed:6.2};
-  superMeteorCooldownTimer=SUPER_METEOR_COOLDOWN;
-  abilityButtonCooldown(SUPER_METEOR_COOLDOWN);
+  activeSuperMeteor={
+    mesh,
+    marker:markerGroup,
+    markerRing:marker,
+    warningDisc,
+    x:targetX,
+    z:targetZ,
+    fallSpeed:6.2,
+    quadrant:quadrantIndex+1
+  };
+
   triggerCombatShake(5,180);
   navigator.vibrate&&navigator.vibrate([45,30,70]);
-  toast('SUPER METEOR!');
+  toast(`SUPER METEOR · QUADRANT ${quadrantIndex+1}`);
+}
+
+function triggerSuperMeteor(){
+  if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='super_meteor'||!ownedAbilities.super_meteor||superMeteorCooldownTimer>0||activeSuperMeteor||superMeteorSequenceActive)return;
+
+  superMeteorSequenceActive=true;
+  superMeteorNextQuadrant=1;
+  superMeteorNextDropTimer=0;
+  spawnSuperMeteorForQuadrant(0);
+
+  superMeteorCooldownTimer=SUPER_METEOR_COOLDOWN;
+  abilityButtonCooldown(SUPER_METEOR_COOLDOWN);
 }
 
 function impactSuperMeteor(m){
-  spawnBurst(m.x,.7,m.z,42,FX_MAT_SPARK,8.5);
+  spawnBurst(m.x,.7,m.z,120,FX_MAT_SPARK,34.0);
   spawnArcaneImpact(m.x,.18,m.z,'fire');
   spawnArcaneSigil(m.x,.04,m.z,SUPER_METEOR_RADIUS);
 
@@ -12594,9 +12609,9 @@ function impactSuperMeteor(m){
     side:THREE.DoubleSide
   });
 
-  const shockA=new THREE.Mesh(new THREE.RingGeometry(1.2,1.55,48),shockMat);
+  const shockA=new THREE.Mesh(new THREE.RingGeometry(4.8,6.2,64),shockMat);
   shockA.rotation.x=-Math.PI/2;
-  const shockB=new THREE.Mesh(new THREE.RingGeometry(.7,.95,48),shockMat.clone());
+  const shockB=new THREE.Mesh(new THREE.RingGeometry(2.8,3.8,64),shockMat.clone());
   shockB.rotation.x=-Math.PI/2;
   impactFx.add(shockA,shockB);
   scene.add(impactFx);
@@ -12635,8 +12650,8 @@ function impactSuperMeteor(m){
       return;
     }
     const t=Math.min(1,age/.65);
-    shockA.scale.setScalar(1+t*4.8);
-    shockB.scale.setScalar(1+t*3.6);
+    shockA.scale.setScalar(1+t*19.2);
+    shockB.scale.setScalar(1+t*14.4);
     shockA.material.opacity=.72*(1-t);
     shockB.material.opacity=.54*(1-t);
 
@@ -12655,7 +12670,7 @@ function impactSuperMeteor(m){
   craterGroup.position.set(m.x,.026,m.z);
 
   const craterDisc=new THREE.Mesh(
-    new THREE.CircleGeometry(SUPER_METEOR_RADIUS*.58,48),
+    new THREE.CircleGeometry(SUPER_METEOR_RADIUS*.70,64),
     new THREE.MeshBasicMaterial({
       color:0x1f0b07,
       transparent:true,
@@ -12667,7 +12682,7 @@ function impactSuperMeteor(m){
   craterGroup.add(craterDisc);
 
   const moltenRing=new THREE.Mesh(
-    new THREE.RingGeometry(SUPER_METEOR_RADIUS*.38,SUPER_METEOR_RADIUS*.54,48),
+    new THREE.RingGeometry(SUPER_METEOR_RADIUS*.52,SUPER_METEOR_RADIUS*.72,64),
     new THREE.MeshBasicMaterial({
       color:0xff4c18,
       transparent:true,
@@ -12789,6 +12804,10 @@ function clearSuperMeteor(resetCooldown=true){
     if(enemy.userData)delete enemy.userData.superMeteorBurnFx;
   }
 
+  superMeteorSequenceActive=false;
+  superMeteorNextDropTimer=0;
+  superMeteorNextQuadrant=0;
+
   if(resetCooldown)superMeteorCooldownTimer=0;
 }
 
@@ -12849,6 +12868,19 @@ function updateMageUltimates(dt){
       scene.remove(m.mesh);disposeGroup(m.mesh);
       scene.remove(m.marker);disposeGroup(m.marker);
       activeSuperMeteor=null;
+
+      if(superMeteorNextQuadrant<4){
+        superMeteorNextDropTimer=1.5;
+      }else{
+        superMeteorSequenceActive=false;
+        superMeteorNextDropTimer=0;
+      }
+    }
+  }else if(superMeteorSequenceActive&&superMeteorNextDropTimer>0){
+    superMeteorNextDropTimer=Math.max(0,superMeteorNextDropTimer-dt);
+    if(superMeteorNextDropTimer<=0&&superMeteorNextQuadrant<4){
+      spawnSuperMeteorForQuadrant(superMeteorNextQuadrant);
+      superMeteorNextQuadrant++;
     }
   }
   if(blizzardCooldownTimer>0)blizzardCooldownTimer=Math.max(0,blizzardCooldownTimer-dt);
