@@ -1,3 +1,4 @@
+<!-- V22.11.11 Blizzard Impact Shatter: strengthens each ice impact with a larger capped ice-shatter burst and a 1.8-second rotating frost mark with seven fading ground cracks. Damage, freeze, radius, duration, spawn rate, and cooldown are unchanged. -->
 <!-- V22.11.10 Blizzard Ice Mass Visual Pass: replaces each simple falling icosahedron with a layered glowing ice core, translucent faceted shell, and five jagged spikes. The shell and core counter-rotate while falling. Damage, radius, duration, freeze, spawn rate, and cooldown are unchanged. -->
 <!-- V22.11.09 Arcane Lance Final Regression Guard: Reality Tear now spawns only when Arcane Lance expires naturally, not when removed by hitting an enemy. Version labels synchronized. -->
 <!-- V22.11.08 Arcane Resonance Stability Fix: applies the approved +10% brute and +5% boss Arcane Lance bonus on marked targets, attaches the persistent marker to the live enemy group, and cleans it correctly between rounds. -->
@@ -89,7 +90,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.11.10</title>
+<title>Family Arena V22.11.11</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -779,7 +780,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.11.10 - Blizzard Ice Mass Visual Pass';
+const GAME_VERSION='22.11.11 - Blizzard Impact Shatter';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12100,8 +12101,68 @@ function spawnFallingIce(){
   fallingIce.push({mesh,ring,x:bx,z:bz,vy:13+Math.random()*4,life:1.15});
 }
 function impactIce(m){
-  spawnBurst(m.x,.35,m.z,7,FX_MAT_SPARK,2.7);
+  spawnBurst(m.x,.35,m.z,24,FX_MAT_ICE,5.8);
   spawnArcaneSigil(m.x,.04,m.z,BLIZZARD_IMPACT_RADIUS);
+
+  const frostGroup=new THREE.Group();
+  frostGroup.position.set(m.x,.028,m.z);
+
+  const frostDisc=new THREE.Mesh(
+    new THREE.CircleGeometry(BLIZZARD_IMPACT_RADIUS*.82,32),
+    new THREE.MeshBasicMaterial({
+      color:0x9defff,
+      transparent:true,
+      opacity:.44,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending
+    })
+  );
+  frostDisc.rotation.x=-Math.PI/2;
+  frostGroup.add(frostDisc);
+
+  const crackMat=new THREE.LineBasicMaterial({
+    color:0xe5fcff,
+    transparent:true,
+    opacity:.78,
+    depthWrite:false,
+    blending:THREE.AdditiveBlending
+  });
+
+  const frostCracks=[];
+  for(let i=0;i<7;i++){
+    const a=(i/7)*Math.PI*2;
+    const reach=BLIZZARD_IMPACT_RADIUS*.76;
+    const crack=new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0,.01,0),
+        new THREE.Vector3(Math.cos(a)*reach*.48,.01,Math.sin(a)*reach*.48),
+        new THREE.Vector3(Math.cos(a+.13)*reach,.01,Math.sin(a+.13)*reach)
+      ]),
+      crackMat.clone()
+    );
+    frostCracks.push(crack);
+    frostGroup.add(crack);
+  }
+
+  scene.add(frostGroup);
+  const frostStarted=performance.now();
+  (function animateBlizzardFrostMark(){
+    if(!frostGroup.parent)return;
+    const age=(performance.now()-frostStarted)/1000;
+    if(age>=1.8){
+      scene.remove(frostGroup);
+      disposeGroup(frostGroup);
+      return;
+    }
+    const fade=Math.max(0,1-age/1.8);
+    frostDisc.material.opacity=.44*fade;
+    for(const crack of frostCracks){
+      if(crack.material)crack.material.opacity=.78*fade;
+    }
+    frostGroup.rotation.y+=.007;
+    requestAnimationFrame(animateBlizzardFrostMark);
+  })();
+
   for(const z of [...zombies]){
     if(z.userData.dead)continue;
     if(Math.hypot(z.position.x-m.x,z.position.z-m.z)>BLIZZARD_IMPACT_RADIUS)continue;
