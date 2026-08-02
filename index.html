@@ -1,4 +1,4 @@
-<!-- V22.10.84 Arcane Lance Spiral Ribbon: verified the live Arcane Lance creation/update path and added one rotating cyan spiral energy ribbon around the projectile. No gameplay values changed. -->
+<!-- V22.10.85 Arcane Lance Spiral Ribbon: verified the live Arcane Lance creation/update path and added one rotating cyan spiral energy ribbon around the projectile. No gameplay values changed. -->
 <!-- V22.10.84 Arcane Lance Dual Rings: adds a second smaller inner rune ring rotating in the opposite direction. No gameplay values changed. -->
 <!-- V22.10.83 Arcane Lance Rune Ring: adds one visible cyan additive rune ring to the Arcane Lance and rotates it during flight. Damage, cooldown, speed, piercing, collision, and other abilities are unchanged. -->
 <!-- V22.10.82 Arcane Lance Core Pass: adds a bright white-blue additive core directly inside the Arcane Lance projectile. Damage, cooldown, speed, piercing, collision, and other abilities are unchanged. -->
@@ -763,7 +763,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.79 - Giant Fireball Boundary Persistence + Cap';
+const GAME_VERSION='22.10.85 - Arcane Lance Readability Pass';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12405,32 +12405,32 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
       b.mesh.add(arcaneCore);
 
       const arcaneRing=new THREE.Mesh(
-        new THREE.TorusGeometry(0.18,0.018,6,28),
+        new THREE.TorusGeometry(0.24,0.02,8,32),
         new THREE.MeshBasicMaterial({
-          color:0x8fe9ff,
+          color:0x4de8ff,
           transparent:true,
           opacity:0.9,
           depthWrite:false,
           blending:THREE.AdditiveBlending
         })
       );
-      arcaneRing.rotation.x=Math.PI/2;
-      arcaneRing.position.z=0.02;
+      arcaneRing.rotation.x=Math.PI/3;
+      arcaneRing.position.z=0.08;
       arcaneRing.userData.role='arcaneLanceRing';
       b.mesh.add(arcaneRing);
 
       const arcaneInnerRing=new THREE.Mesh(
-        new THREE.TorusGeometry(0.12,0.014,6,24),
+        new THREE.TorusGeometry(0.16,0.016,8,28),
         new THREE.MeshBasicMaterial({
-          color:0xc8f7ff,
+          color:0xa86cff,
           transparent:true,
           opacity:0.88,
           depthWrite:false,
           blending:THREE.AdditiveBlending
         })
       );
-      arcaneInnerRing.rotation.x=Math.PI/2;
-      arcaneInnerRing.position.z=-0.02;
+      arcaneInnerRing.rotation.x=-Math.PI/4;
+      arcaneInnerRing.position.z=-0.08;
       arcaneInnerRing.userData.role='arcaneLanceInnerRing';
       b.mesh.add(arcaneInnerRing);
 
@@ -12450,7 +12450,7 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
       const arcaneRibbon=new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(ribbonPoints),
         new THREE.LineBasicMaterial({
-          color:0x78d8ff,
+          color:0x4aa3ff,
           transparent:true,
           opacity:0.82,
           depthWrite:false,
