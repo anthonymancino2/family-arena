@@ -767,7 +767,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.10.94 - Arcane Lance Impact Burst';
+const GAME_VERSION='22.10.95 - Arcane Cast Charge';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12510,6 +12510,8 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
       b.mesh.add(arcaneTrail);
 
       spawnArcaneSigil(startX,0,startZ,1.55);
+      spawnArcaneSigil(startX,0,startZ,0.85);
+      b.userData.castRunesUntil=performance.now()+180;
       spawnBurst(startX,startY,startZ,14,FX_MAT_DUST,4.0);
     }
     if(w.kind==='elemental'){ b.mesh.scale.setScalar(1.45); spawnBurst(startX,startY,startZ,10,mageElementToggle?FX_MAT_DUST:FX_MAT_SPARK,3.0); }
@@ -13290,6 +13292,9 @@ function updateBullets(dt){
     b.pulse = (b.pulse || 0) + dt*18;
     if(b.spinSpeed) b.mesh.rotation.z += b.spinSpeed*dt;
     if(b.kind==='arcane_lance'){
+      if(b.userData.castRunesUntil && performance.now()<b.userData.castRunesUntil){
+        b.mesh.rotation.z += 0.18;
+      }
       for(const child of b.mesh.children){
         if(child.userData&&child.userData.role==='arcaneLanceRing'){
           child.rotation.z += 5.5*dt;
