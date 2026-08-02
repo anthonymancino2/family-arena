@@ -1,4 +1,9 @@
-<!-- V22.10.79 Giant Fireball Map-Persistence + Active Cap: Mage Giant Fireballs repeat every 1.5 seconds while Secondary is held, remain independently active after hitting enemies, and are removed only after fully passing beyond the playable arena boundary. A maximum of 10 may exist at once; held firing resumes automatically when the count drops below 10. No-touch input never fires. -->
+<!-- V22.10.84 Arcane Lance Spiral Ribbon: verified the live Arcane Lance creation/update path and added one rotating cyan spiral energy ribbon around the projectile. No gameplay values changed. -->
+<!-- V22.10.84 Arcane Lance Dual Rings: adds a second smaller inner rune ring rotating in the opposite direction. No gameplay values changed. -->
+<!-- V22.10.83 Arcane Lance Rune Ring: adds one visible cyan additive rune ring to the Arcane Lance and rotates it during flight. Damage, cooldown, speed, piercing, collision, and other abilities are unchanged. -->
+<!-- V22.10.82 Arcane Lance Core Pass: adds a bright white-blue additive core directly inside the Arcane Lance projectile. Damage, cooldown, speed, piercing, collision, and other abilities are unchanged. -->
+<!-- V22.10.81 Arcane Lance Size Pass: increases only the Arcane Lance projectile visual scale from 1.7×1.7×5.2 to 2.0×2.0×6.0. Damage, cooldown, speed, piercing, collision, and all other abilities are unchanged. -->
+<!-- V22.10.80 Giant Fireball Map-Persistence + Active Cap: Mage Giant Fireballs repeat every 1.5 seconds while Secondary is held, remain independently active after hitting enemies, and are removed only after fully passing beyond the playable arena boundary. A maximum of 10 may exist at once; held firing resumes automatically when the count drops below 10. No-touch input never fires. -->
 <!DOCTYPE html>
 <!-- V22.10.78 Secondary Hold Pointer Reliability: keeps the Secondary held state active for the full matching touch/pointer contact instead of clearing it on Safari pointer-capture loss. Tap still casts once; hold repeats through the move cooldown; release/cancel/focus loss stops immediately. -->
 <!-- V22.10.77 Primary Hold Scope Crash Fix: moves primaryInputHeld into shared runtime scope so update() can read it without throwing. This restores normal world rendering and movement while running; pause remains fully frozen. -->
@@ -68,7 +73,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.10.79</title>
+<title>Family Arena V22.10.84</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -12382,7 +12387,82 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
       spawnArcaneSigil(startX,0,startZ,2.65);
       spawnBurst(startX,startY,startZ,18,FX_MAT_SPARK,4.6);
     }
-    if(w.kind==='arcane_lance'){ b.mesh.scale.set(1.7,1.7,5.2); b.pierces=2; spawnArcaneSigil(startX,0,startZ,1.55); spawnBurst(startX,startY,startZ,14,FX_MAT_DUST,4.0); }
+    if(w.kind==='arcane_lance'){
+      b.mesh.scale.set(2.0,2.0,6.0);
+      b.pierces=2;
+      const arcaneCore=new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.036,0.27,3,6),
+        new THREE.MeshBasicMaterial({
+          color:0xeafcff,
+          transparent:true,
+          opacity:0.98,
+          depthWrite:false,
+          blending:THREE.AdditiveBlending
+        })
+      );
+      arcaneCore.rotation.x=Math.PI/2;
+      arcaneCore.userData.role='arcaneLanceCore';
+      b.mesh.add(arcaneCore);
+
+      const arcaneRing=new THREE.Mesh(
+        new THREE.TorusGeometry(0.18,0.018,6,28),
+        new THREE.MeshBasicMaterial({
+          color:0x8fe9ff,
+          transparent:true,
+          opacity:0.9,
+          depthWrite:false,
+          blending:THREE.AdditiveBlending
+        })
+      );
+      arcaneRing.rotation.x=Math.PI/2;
+      arcaneRing.position.z=0.02;
+      arcaneRing.userData.role='arcaneLanceRing';
+      b.mesh.add(arcaneRing);
+
+      const arcaneInnerRing=new THREE.Mesh(
+        new THREE.TorusGeometry(0.12,0.014,6,24),
+        new THREE.MeshBasicMaterial({
+          color:0xc8f7ff,
+          transparent:true,
+          opacity:0.88,
+          depthWrite:false,
+          blending:THREE.AdditiveBlending
+        })
+      );
+      arcaneInnerRing.rotation.x=Math.PI/2;
+      arcaneInnerRing.position.z=-0.02;
+      arcaneInnerRing.userData.role='arcaneLanceInnerRing';
+      b.mesh.add(arcaneInnerRing);
+
+      const ribbonPoints=[];
+      const ribbonTurns=2.5;
+      const ribbonSegments=42;
+      for(let i=0;i<=ribbonSegments;i++){
+        const t=i/ribbonSegments;
+        const angle=t*Math.PI*2*ribbonTurns;
+        const radius=0.11;
+        ribbonPoints.push(new THREE.Vector3(
+          Math.cos(angle)*radius,
+          Math.sin(angle)*radius,
+          (t-0.5)*0.62
+        ));
+      }
+      const arcaneRibbon=new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(ribbonPoints),
+        new THREE.LineBasicMaterial({
+          color:0x78d8ff,
+          transparent:true,
+          opacity:0.82,
+          depthWrite:false,
+          blending:THREE.AdditiveBlending
+        })
+      );
+      arcaneRibbon.userData.role='arcaneLanceRibbon';
+      b.mesh.add(arcaneRibbon);
+
+      spawnArcaneSigil(startX,0,startZ,1.55);
+      spawnBurst(startX,startY,startZ,14,FX_MAT_DUST,4.0);
+    }
     if(w.kind==='elemental'){ b.mesh.scale.setScalar(1.45); spawnBurst(startX,startY,startZ,10,mageElementToggle?FX_MAT_DUST:FX_MAT_SPARK,3.0); }
     if(w.kind==='rocket_arrow') b.mesh.scale.setScalar(1.55);
     if(w.kind==='gale_drill_arrow'){
@@ -13160,6 +13240,19 @@ function updateBullets(dt){
     b.mesh.position.z += b.dz*speed*(b.speedMult||1)*dt;
     b.pulse = (b.pulse || 0) + dt*18;
     if(b.spinSpeed) b.mesh.rotation.z += b.spinSpeed*dt;
+    if(b.kind==='arcane_lance'){
+      for(const child of b.mesh.children){
+        if(child.userData&&child.userData.role==='arcaneLanceRing'){
+          child.rotation.z += 5.5*dt;
+        }
+        if(child.userData&&child.userData.role==='arcaneLanceInnerRing'){
+          child.rotation.z -= 8.0*dt;
+        }
+        if(child.userData&&child.userData.role==='arcaneLanceRibbon'){
+          child.rotation.z += 3.2*dt;
+        }
+      }
+    }
     if(b.kind==='gale_drill_arrow' && Math.random()<Math.min(1,dt*28)){
       spawnArcherSpark(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z);
     }
