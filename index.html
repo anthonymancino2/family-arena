@@ -1,4 +1,4 @@
-<!-- V22.13.39 Starter Global Top Three: replaces the empty home leaderboard state with a compact three-rank Challenge Board. The starter candidates are Iron Crown (Round 25 · 8:42), Storm Knight (Round 20 · 6:18), and Nova Guard (Round 15 · 4:55). They are clearly labeled starter targets and are shown only while there are zero valid real global scores. As soon as any score arrives from Firestore—regardless of device or username—the entire starter list is removed and the board displays up to the top three real global entries. -->
+<!-- V22.13.39 Overall Score System: replaces the old rounds-minus-time survival score with a full point system. Every cleared round awards escalating survival points, speed points based on its enemy-count pace budget, the existing flawless bonus, and bonuses for clearing without Secondary or Ultimate/Ability activation. Clearing with Primary attacks only earns an additional bonus. The combined clear time of all completed rounds produces a capped run-wide pace bonus. Results now show a complete score breakdown, and local/cloud leaderboards display total points. New scores use a versioned numeric encoding while legacy scores remain readable through conservative conversion. -->
 <!-- V22.13.38 Knight Special Slot Fix: Knights of the Round now occupies the large Knight signature button formerly used by Judgment. Its button displays readiness, cooldown, active clone count, and remaining duration. Judgment of the King is moved into the equipable ultimate-tier Ability list at Level 18 and uses the Ability button while retaining its 100% Valor requirement and existing attack sequence. Enemy melee and projectile hits on Knight clones are fully absorbed by the invincible clone and never call playerTakeHit; clone health is independent and infinite. -->
 <!-- V22.13.37 Knights of the Round: renames the Knight clone Ability from Royal Guard Clones to Knights of the Round across the shop, HUD, unlock notice, toast, and build labels. Clone count, duration, cooldown, invincibility, aggro, move inheritance, damage, movement, and cleanup are unchanged. -->
 <!-- V22.13.36 Knights of the Round: adds a Level-10 Knight clone Ability. Rounds 10-15 summon 2 invincible clones for 8 seconds with a 10-second cooldown; Rounds 16-20 summon 5 for 15 seconds with a 5-second cooldown; Round 21 onward summons 10 for 30 seconds with a 1.5-second cooldown. Clones deal 10% of player damage, take aggro before the player, seek enemies within 12 units, and return after remaining more than 11 units from the player for 10 seconds. Their attack rotation expands with Knight unlock levels. -->
@@ -630,7 +630,7 @@
 .homePrompt{font-size:12px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;color:#dff7ff;margin:0 0 8px 3px;}
 #screenHome .nameRow{margin:0 0 10px;max-height:82px;overflow-y:auto;}
 #screenHome #newName{margin:0 0 12px;background:rgba(255,255,255,.94);color:#18283a;border:none;box-shadow:inset 0 0 0 2px rgba(17,64,94,.12);}
-.homePlayerShowcase{display:grid;grid-template-columns:72px 1fr;gap:12px;align-items:center;margin:0 0 12px;padding:10px 12px;border-radius:18px;background:linear-gradient(135deg,rgba(70,176,229,.20),rgba(132,81,201,.18));border:1px solid rgba(198,235,255,.38);box-shadow:inset 0 1px 0 rgba(255,255,255,.12);min-height:112px;}
+.homePlayerShowcase{display:grid;grid-template-columns:72px 1fr;gap:12px;align-items:center;margin:0 0 12px;padding:10px 12px;border-radius:18px;background:linear-gradient(135deg,rgba(70,176,229,.20),rgba(132,81,201,.18));border:1px solid rgba(198,235,255,.38);box-shadow:inset 0 1px 0 rgba(255,255,255,.12);}
 .homeHeroPortrait{width:72px;height:72px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:42px;background:radial-gradient(circle at 45% 30%,rgba(255,255,255,.30),rgba(33,57,82,.82) 70%);border:2px solid rgba(255,255,255,.42);filter:drop-shadow(0 5px 8px rgba(0,0,0,.28));}
 .homeHeroDetails{min-width:0;text-align:left;}
 .homeHeroLabel{font-size:9px;font-weight:900;letter-spacing:1.35px;color:#9fddff;text-transform:uppercase;}
@@ -638,14 +638,6 @@
 .homeBestScore{display:flex;align-items:baseline;gap:7px;margin-top:5px;}
 .homeBestScore span:first-child{font-size:10px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;color:#f5dc8a;}
 .homeBestScore strong{font-size:21px;color:#ffe36e;text-shadow:0 2px 6px rgba(0,0,0,.35);}
-.homeLeaderboard{display:flex;flex-direction:column;gap:4px;margin-top:5px;}
-.homeLbRow{display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:center;gap:6px;min-height:21px;padding:2px 5px;border-radius:7px;background:rgba(5,14,25,.25);font-size:10px;font-weight:850;}
-.homeLbRank{color:#ffe36e;text-align:center;font-size:11px;}
-.homeLbName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;}
-.homeLbScore{white-space:nowrap;color:#bcecff;font-variant-numeric:tabular-nums;}
-.homeLbRow:first-child{background:rgba(255,211,90,.13);box-shadow:inset 0 0 0 1px rgba(255,224,118,.24);}
-.homeLbStarter{font-size:8px;color:#b8cbd8;letter-spacing:.45px;text-transform:uppercase;margin-top:2px;opacity:.86;}
-
 .homeActions{display:grid;grid-template-columns:1fr .42fr;gap:10px;}
 .homeUtilityRow{display:grid;grid-template-columns:1fr;gap:7px;margin-top:10px;}
 #screenHome #btnRefreshSync{width:100%;min-height:39px;margin:0;padding:8px 12px;border-radius:13px;background:rgba(8,22,36,.62);border:1px solid rgba(159,223,255,.42);color:#dff7ff;font-size:12px;font-weight:850;letter-spacing:.25px;}
@@ -1158,11 +1150,9 @@
         <div class="homePlayerShowcase" id="homePlayerShowcase">
           <div class="homeHeroPortrait" id="homeHeroPortrait" aria-hidden="true">⚔️</div>
           <div class="homeHeroDetails">
-            <div class="homeHeroLabel" id="homeHeroLabel">Global Top 3</div>
-            <div class="homeLeaderboard" id="homeLeaderboard"></div>
-            <div class="homeLbStarter" id="homeLeaderboardStatus"></div>
-            <div class="homeHeroName" id="homeHeroName" style="display:none;"></div>
-            <strong id="homeHighestScore" style="display:none;"></strong>
+            <div class="homeHeroLabel" id="homeHeroLabel">Select a player</div>
+            <div class="homeHeroName" id="homeHeroName">Your Hero</div>
+            <div class="homeBestScore"><span>Global High Score</span><strong id="homeHighestScore">—</strong></div>
           </div>
         </div>
         <div class="homeActions">
@@ -1350,7 +1340,12 @@
       <div class="statLine"><span>Rounds survived</span><span id="statRounds">0</span></div>
       <div class="statLine"><span>Time</span><span id="statTime">0:00</span></div>
       <div class="statLine"><span>Zombies defeated</span><span id="statKills">0</span></div>
-      <div class="statLine"><span>Score</span><span id="statScore">0</span></div>
+      <div class="statLine"><span>Overall score</span><span id="statScore">0</span></div>
+      <div class="statLine"><span>Round points</span><span id="statRoundPoints">0</span></div>
+      <div class="statLine"><span>Total-time bonus</span><span id="statPaceBonus">0</span></div>
+      <div class="statLine"><span>No Secondary rounds</span><span id="statNoSecondary">0</span></div>
+      <div class="statLine"><span>No Ultimate rounds</span><span id="statNoUltimate">0</span></div>
+      <div class="statLine"><span>Primary-only rounds</span><span id="statPrimaryOnly">0</span></div>
       <div class="statLine" style="color:var(--gold);font-weight:800;">
         <span>Crystals earned</span><span id="statCrystals">+0</span></div>
       <div style="height:14px"></div>
@@ -1547,10 +1542,7 @@ function saveCloudSurvivalLeaderboardCache(){
   catch(e){}
 }
 function formatSurvivalScore(score){
-  const n=Number(score)||0;
-  const rounds=Math.floor(n/100000);
-  const seconds=Math.max(0,rounds*100000-n);
-  return 'Round '+rounds+' · '+Math.floor(seconds/60)+':'+String(Math.floor(seconds%60)).padStart(2,'0');
+  return decodeOverallScore(score).toLocaleString()+' pts';
 }
 function getCloudPersonalRank(name){
   if(!name) return null;
@@ -1815,11 +1807,50 @@ function killTargetForRound(r){
   return 6 + (n - 3) * 10;
 }
 
-// Per-round score. Higher is better, so it reads like a high score, and it
-// rewards exactly what the mode is about: clear the round fast, and clear
-// it without getting hit. The pace budget is the same 3-seconds-per-enemy
-// figure the in-round coin speed bonus already uses.
+// Overall score system. Every completed round contributes survival points,
+// clear-speed points, and optional clean-loadout bonuses. A separate full-run
+// pace bonus rewards a fast combined time across every round cleared.
 const ROUND_FLAWLESS_BONUS = 2500;
+const OVERALL_SCORE_SCHEMA = 1000000000;
+function markSecondaryUsed(){ secondaryUsedThisRound=true; }
+function markUltimateUsed(){ ultimateUsedThisRound=true; }
+function overallRoundScoreFor(roundNo,seconds,flawless,noSecondary,noUltimate){
+  const r=Math.max(1,Math.floor(Number(roundNo)||1));
+  const sec=Math.max(0,Number(seconds)||0);
+  const budget=Math.max(1,killTargetForRound(r)*3);
+  const speedRatio=Math.max(0,Math.min(1,(budget-sec)/budget));
+  const survival=10000+r*2500;
+  const speed=Math.round(10000*speedRatio);
+  const flawlessBonus=flawless?ROUND_FLAWLESS_BONUS:0;
+  const noSecondaryBonus=noSecondary?(2500+r*250):0;
+  const noUltimateBonus=noUltimate?(3500+r*350):0;
+  const primaryOnlyBonus=(noSecondary&&noUltimate)?2000:0;
+  return {
+    total:survival+speed+flawlessBonus+noSecondaryBonus+noUltimateBonus+primaryOnlyBonus,
+    survival,speed,flawlessBonus,noSecondaryBonus,noUltimateBonus,primaryOnlyBonus,budget,seconds:sec
+  };
+}
+function totalRunPaceBonus(){
+  const saved=Math.max(0,runExpectedRoundSeconds-runClearedRoundSeconds);
+  return Math.round(Math.min(50000,saved*40));
+}
+function encodeOverallScore(points){return OVERALL_SCORE_SCHEMA+Math.max(0,Math.round(Number(points)||0));}
+function decodeOverallScore(score){
+  const n=Math.max(0,Number(score)||0);
+  if(n>=OVERALL_SCORE_SCHEMA)return Math.max(0,n-OVERALL_SCORE_SCHEMA);
+  // Legacy leaderboard values used rounds*100000-seconds. Give them a
+  // conservative estimated point value so old records remain readable.
+  const rounds=Math.floor(n/100000);
+  const seconds=Math.max(0,rounds*100000-n);
+  if(rounds>0&&rounds<=100&&seconds<86400){
+    let estimate=0;
+    for(let r=1;r<=rounds;r++)estimate+=10000+r*2500;
+    estimate+=Math.max(0,Math.round((rounds*90-seconds)*25));
+    return estimate;
+  }
+  return n;
+}
+// Existing per-round records continue rewarding speed and flawless clears.
 function roundScoreFor(roundNo, seconds, flawless){
   const budget = killTargetForRound(roundNo) * 3;
   const pace = Math.max(0, budget - Math.max(0, seconds));
@@ -1849,39 +1880,19 @@ function refreshCrystalPills(){
 
 // ---- HOME: selected hero + local high score ----
 const HOME_HERO_ICONS = {rogue:'🏹',hooded:'🥷',mage:'🔮',knight:'🛡️',barbarian:'🪓'};
-const HOME_STARTER_LEADERBOARD=[
-  {name:'Iron Crown',score:25*100000-(8*60+42)},
-  {name:'Storm Knight',score:20*100000-(6*60+18)},
-  {name:'Nova Guard',score:15*100000-(4*60+55)}
-];
 function updateHomePlayerShowcase(){
   const label=document.getElementById('homeHeroLabel');
+  const heroName=document.getElementById('homeHeroName');
   const portrait=document.getElementById('homeHeroPortrait');
-  const board=document.getElementById('homeLeaderboard');
-  const status=document.getElementById('homeLeaderboardStatus');
-  if(!label||!portrait||!board||!status) return;
-
-  const realRows=(cloudSurvivalLeaderboardCache||[])
+  const scoreEl=document.getElementById('homeHighestScore');
+  if(!label||!heroName||!portrait||!scoreEl) return;
+  const champion=(cloudSurvivalLeaderboardCache||[])
     .filter(r=>r&&r.name&&Number.isFinite(Number(r.score)))
-    .sort((a,b)=>Number(b.score)-Number(a.score));
-  const usingStarter=realRows.length===0;
-  const rows=(usingStarter?HOME_STARTER_LEADERBOARD:realRows).slice(0,3);
-
+    .sort((a,b)=>Number(b.score)-Number(a.score))[0]||null;
   portrait.textContent='🏆';
-  label.textContent=usingStarter?'CHALLENGE BOARD · TOP 3':'LIVE GLOBAL BOARD · TOP 3';
-  board.innerHTML='';
-  rows.forEach((row,index)=>{
-    const item=document.createElement('div');
-    item.className='homeLbRow';
-    const medal=index===0?'🥇':(index===1?'🥈':'🥉');
-    item.innerHTML=`<span class="homeLbRank">${medal}</span><span class="homeLbName"></span><span class="homeLbScore"></span>`;
-    item.querySelector('.homeLbName').textContent=row.name;
-    item.querySelector('.homeLbScore').textContent=formatSurvivalScore(row.score);
-    board.appendChild(item);
-  });
-  status.textContent=usingStarter
-    ? 'Starter targets · replaced when the first real global score arrives'
-    : (realRows.length===1?'1 verified global score':`${Math.min(3,realRows.length)} live global leaders`);
+  label.textContent=champion?'LIVE WORLD CHAMPION':'LIVE GLOBAL BOARD';
+  heroName.textContent=champion?champion.name:'No score registered yet';
+  scoreEl.textContent=champion?formatSurvivalScore(champion.score):'—';
 }
 async function refreshAndSyncGame(){
   const btn=document.getElementById('btnRefreshSync');
@@ -2469,7 +2480,16 @@ let runStartTime = 0;
 let roundStartTime = 0;      // when the current round began — the whole point of this mode
 let roundTimerFrozenElapsed = null; // locked clear time while the between-round upgrade menu is visible
 let roundCompletionStartedAt = 0;   // watchdog timestamp for guaranteed round-end transition
-let heartsLostThisRound = 0; // tracks whether this round was "flawless" (no damage taken)
+let heartsLostThisRound = 0; secondaryUsedThisRound=false; ultimateUsedThisRound=false; // tracks whether this round was "flawless" (no damage taken)
+let secondaryUsedThisRound = false;
+let ultimateUsedThisRound = false;
+let runOverallRoundPoints = 0;
+let runClearedRoundSeconds = 0;
+let runExpectedRoundSeconds = 0;
+let runNoSecondaryRounds = 0;
+let runNoUltimateRounds = 0;
+let runPrimaryOnlyRounds = 0;
+let runRoundScoreBreakdown = [];
 let gameRunning = false;
 let camYaw = 0, camPitch = 0.35, camDist = 7;
 const fogBase = {near:20, far:55}; // theme's own fog, before zoom scaling
@@ -10079,7 +10099,7 @@ function startRound(){
   fillEnemySlotsFromQueue();
   spawnPowerUps();
   roundStartTime = performance.now();
-  heartsLostThisRound = 0;
+  heartsLostThisRound = 0; secondaryUsedThisRound=false; ultimateUsedThisRound=false;
   updateRoundTimerHud();
   updateEnemyCountHud();
   updateEnemyRadar();
@@ -11192,7 +11212,7 @@ function rerunCurrentRound(){
   zombiesRemainingToSpawn=roundKillTarget;
   fillEnemySlotsFromQueue();
   roundStartTime=performance.now();
-  heartsLostThisRound=0;
+  heartsLostThisRound=0; secondaryUsedThisRound=false; ultimateUsedThisRound=false;
   updateRoundTimerHud(); updateEnemyCountHud(); updateEnemyRadar();
   gameRunning=true; clock.getDelta(); animate();
   toast('Rerun Round '+round+' — this run ends after the round!');
@@ -14235,6 +14255,7 @@ function triggerKnightGuardianQuake(){
   if(knightMovementLocked()) return false;
 
   const c=KNIGHT_CFG.guardianCharge;
+  markUltimateUsed();
   knightRuntime.chargeCooldown=Math.max(c.cooldown,KNIGHT_CFG.earthShatter.cooldown);
   knightRuntime.shatterCooldown=knightRuntime.chargeCooldown;
   knightRuntime.chargeTimer=knightGuardianQuakeChargeDuration();
@@ -14448,6 +14469,7 @@ function triggerKnightAegisCounter(){
   if(!gameRunning||!knightIsActive()) return;
   if(knightRuntime.aegisCooldown>0||knightRuntime.aegisWindow>0||knightRuntime.aegisRecovery>0) return;
   const c=KNIGHT_CFG.aegis;
+  markUltimateUsed();
   knightRuntime.aegisCooldown=c.cooldown;
   knightRuntime.aegisWindow=c.window;
   knightPlayClip(['block'],'1H_Melee_Attack_Chop',.16,.14);
@@ -14655,6 +14677,7 @@ function triggerKingsJudgment(){
   if(!gameRunning||!knightIsActive()||knightRuntime.ultPhase>0) return;
   if(knightUltimateCharge<99.5){ toast('Judgment of the King is still charging'); return; }
   const c=KNIGHT_CFG.ultimate;
+  markUltimateUsed();
   knightUltimateCharge=0;
   knightRuntime.ultPhase=1;
   knightRuntime.ultTimer=c.phasePlant;
@@ -14976,6 +14999,7 @@ function triggerKnightRoyalGuardClones(){
   if(!gameRunning||!knightRoyalCloneUnlocked()||knightRoyalCloneCooldown>0)return false;
   const cfg=knightRoyalCloneConfig();
   if(cfg.count<=0)return false;
+  markUltimateUsed();
   clearKnightRoyalClones();
   knightRoyalCloneCooldown=cfg.cooldown;knightRoyalCloneCycleDuration=cfg.cooldown;
   getKayKitAssetPromise('knight').then(({gltf,THREEAsset,cloneSkinned})=>{
@@ -15312,6 +15336,7 @@ function doBarbarianAttack(w){
 function triggerPrimalRage(){
   if(!gameRunning||state.avatarType!=='barbarian'||barbarianUltimateActive>0)return;
   if(barbarianUltimateCharge<99.5){toast('Primal Rage is still charging');return;}
+  markUltimateUsed();
   barbarianUltimateCharge=0;barbarianUltimateActive=4.4;barbarianUltimatePulse=0;updateHoodedHud();document.body.style.filter='brightness(.72) saturate(1.8) contrast(1.12)';spawnEarthbreaker(player.position,5.5);damageNearby(player.position,5.5,1.8);triggerCombatShake(18,380);navigator.vibrate&&navigator.vibrate([80,35,160]);toast('PRIMAL RAGE!');
 }
 function updatePrimalRage(dt){
@@ -16035,6 +16060,7 @@ function triggerSupernovaPiercer(){
     player.rotation.y=supernovaAimAngle;
   }else supernovaAimAngle=player.rotation.y;
 
+  markUltimateUsed();
   supernovaCooldownTimer=SUPERNOVA_COOLDOWN;
   abilityButtonCooldown(SUPERNOVA_COOLDOWN);
   supernovaChargeTimer=SUPERNOVA_CHARGE_DURATION;
@@ -16463,6 +16489,7 @@ function triggerSkyfallBarrage(){
   if(!gameRunning||state.avatarType!=='rogue'||equippedAbilityId!=='skyfall_barrage'||!ownedAbilities.skyfall_barrage)return;
   if(skyfallActiveTimer>0){navigator.vibrate&&navigator.vibrate(8);return;}
   if(skyfallCooldownTimer>0){toast(`Skyfall recharging · ${Math.ceil(skyfallCooldownTimer)}s`);return;}
+  markUltimateUsed();
   skyfallCooldownTimer=SKYFALL_COOLDOWN;
   abilityButtonCooldown(SKYFALL_COOLDOWN);
   skyfallActiveTimer=SKYFALL_DURATION;
@@ -16824,6 +16851,7 @@ function impactIce(m){
 }
 function triggerBlizzardStorm(){
   if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='blizzard_storm'||!ownedAbilities.blizzard_storm||blizzardCooldownTimer>0)return;
+  markUltimateUsed();
   blizzardCooldownTimer=BLIZZARD_COOLDOWN; abilityButtonCooldown(BLIZZARD_COOLDOWN);
   blizzardActiveTimer=BLIZZARD_DURATION; blizzardSpawnTimer=0; blizzardDamageTimer=0; blizzardCenter.copy(player.position);
   blizzardLastPlayerPos.copy(player.position);
@@ -17369,6 +17397,7 @@ function spawnSuperMeteorForQuadrant(quadrantIndex){
 function triggerSuperMeteor(){
   if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='super_meteor'||!ownedAbilities.super_meteor||superMeteorCooldownTimer>0||activeSuperMeteor||superMeteorSequenceActive)return;
 
+  markUltimateUsed();
   superMeteorSequenceActive=true;
   superMeteorNextQuadrant=1;
   superMeteorNextDropTimer=0;
@@ -17825,6 +17854,7 @@ function laserAvailable(){
 }
 function startArcaneLaser(){
   if(!gameRunning || !laserAvailable() || laserActive || laserCharge<=1) return;
+  markUltimateUsed();
   laserActive = true;
   laserRegenDelayTimer = LASER_REGEN_DELAY;
   spawnArcaneRuneBurst(player.position, 1.6); // brief charge-up flourish before the beam ticks damage
@@ -17915,6 +17945,7 @@ function triggerShadowEclipse(){
   if(!gameRunning||state.avatarType!=='hooded'||hoodedUltimateActive>0)return;
   if(hoodedUltimateCharge<99.5){ toast('Eclipse is still charging'); return; }
 
+  markUltimateUsed();
   hoodedUltimateCharge=0;hoodedUltimateActive=3.2;hoodedUltimatePulse=0;updateHoodedHud();document.body.style.filter='brightness(.58) saturate(1.35)';
   spawnShadowSmoke(player.position.x,player.position.y+.7,player.position.z,48);triggerCombatShake(15,420);navigator.vibrate&&navigator.vibrate([80,40,160]);toast('SHADOW ECLIPSE!');
 }
@@ -18335,10 +18366,12 @@ function doSecondaryShoot(){
   if(w.kind==='chain_lightning_javelin'){
     if((player.userData.secondaryAttackCooldown||0)>0)return;
     player.userData.secondaryAttackCooldown=1.0;
+    markSecondaryUsed();
     triggerChainLightningJavelin(w);
     return;
   }
   if(w.kind==='mirror_volley'){
+    markSecondaryUsed();
     triggerMirrorVolley(w);
     return;
   }
@@ -18348,6 +18381,7 @@ function doSecondaryShoot(){
   if(w.kind==='knight_banner' && (knightRuntime.bannerCooldown||0)>0) return;
   if(w.kind==='knight_whirlwind_secondary'){
     if((knightRuntime.whirlwindCooldown||0)>0 || (knightRuntime.whirlwindTimer||0)>0) return;
+    markSecondaryUsed();
     triggerKnightDefensiveWhirlwind();
     return;
   }
@@ -18356,14 +18390,17 @@ function doSecondaryShoot(){
     if(activeGiantFireballs>=10)return;
   }
   if(w.kind==='rocket_arrow'){
+    markSecondaryUsed();
     triggerPhoenixFireball();
     return;
   }
   if(w.kind==='knight_banner'){
+    markSecondaryUsed();
     knightBannerSpear(w);
     return;
   }
   player.userData.secondaryAttackCooldown=attackCooldownFor(w);
+  markSecondaryUsed();
   performWeaponAttack(w,false);
 }
 
@@ -19449,11 +19486,23 @@ function completeCurrentRound(force=false){
   // it is deliberately kept separate from the run leaderboard: a practice
   // run that starts on round 25 still earns round 25's record.
   const flawlessRound = heartsLostThisRound === 0;
+  const noSecondaryRound = !secondaryUsedThisRound;
+  const noUltimateRound = !ultimateUsedThisRound;
+  const overallRound = overallRoundScoreFor(round,clearTime,flawlessRound,noSecondaryRound,noUltimateRound);
+  runOverallRoundPoints += overallRound.total;
+  runClearedRoundSeconds += clearTime;
+  runExpectedRoundSeconds += overallRound.budget;
+  if(noSecondaryRound)runNoSecondaryRounds++;
+  if(noUltimateRound)runNoUltimateRounds++;
+  if(noSecondaryRound&&noUltimateRound)runPrimaryOnlyRounds++;
+  runRoundScoreBreakdown.push(Object.assign({round},overallRound));
   const roundScore = roundScoreFor(round, clearTime, flawlessRound);
   if(state.currentName){
     Store.markRoundCleared(state.currentName, round);
     const rec = Store.submitRoundRecord(state.currentName, round, roundScore, clearTime, flawlessRound);
-    bonusMsg += ' \u00B7 ' + formatRoundScore(roundScore) + ' pts';
+    bonusMsg += ' · '+overallRound.total.toLocaleString()+' overall pts';
+    if(noSecondaryRound)bonusMsg += ' · No Secondary bonus';
+    if(noUltimateRound)bonusMsg += ' · No Ultimate bonus';
     if(rec.newWorld) bonusMsg += ' \uD83C\uDFC6 NEW BEST EVER!';
     else if(rec.newPersonal) bonusMsg += ' \u2B50 New personal best!';
   }
@@ -20103,6 +20152,15 @@ function startSurvival(){
   fx = [];
   reachedLevelUnlocks = new Set();
   runStartRound = clampStartRound(state.startRound);
+  runOverallRoundPoints=0;
+  runClearedRoundSeconds=0;
+  runExpectedRoundSeconds=0;
+  runNoSecondaryRounds=0;
+  runNoUltimateRounds=0;
+  runPrimaryOnlyRounds=0;
+  runRoundScoreBreakdown=[];
+  secondaryUsedThisRound=false;
+  ultimateUsedThisRound=false;
   hearts=3;maxHearts=3;round=runStartRound;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;archerVolleyStep=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;document.body.style.filter='';updateHoodedHud();
   playerStats = startingStatsForActiveHero();
   // Base survival health is three hearts. Hero HP bonuses are represented by
@@ -20181,18 +20239,11 @@ function startSurvival(){
 function endSurvival(){
   gameRunning = false;
   if(typeof clearKnightRoundSpecials==='function') clearKnightRoundSpecials(true);
-  // Rounds cleared dominates the score entirely (a full round is worth
-  // far more than any realistic time difference), and elapsed time is
-  // subtracted as the tiebreaker — so two runs that reach the same
-  // round are ranked by whoever got there faster, which is the actual
-  // goal: clear each round without dying, as fast as possible.
   const elapsedSec = (performance.now() - runStartTime) / 1000;
-  // Rounds *cleared during this run* -- not the round number reached. A
-  // practice run that starts on round 25 and clears one round scored one
-  // round, so it can never inflate the board. For a normal round-1 run
-  // (runStartRound === 1) this is exactly the old (round-1).
   const roundsCleared = Math.max(0, round - runStartRound);
-  const score = Math.max(0, roundsCleared*100000 - Math.floor(elapsedSec));
+  const runPaceBonus=totalRunPaceBonus();
+  const overallPoints=Math.max(0,Math.round(runOverallRoundPoints+runPaceBonus));
+  const score=encodeOverallScore(overallPoints);
   const mins = Math.floor(elapsedSec/60), secs = Math.floor(elapsedSec%60);
   const timeStr = mins+':'+String(secs).padStart(2,'0');
 
@@ -20237,7 +20288,12 @@ function endSurvival(){
   document.getElementById('statRounds').textContent = roundsCleared;
   document.getElementById('statTime').textContent = timeStr;
   document.getElementById('statKills').textContent = kills;
-  document.getElementById('statScore').textContent = score;
+  document.getElementById('statScore').textContent = overallPoints.toLocaleString();
+  document.getElementById('statRoundPoints').textContent = Math.round(runOverallRoundPoints).toLocaleString();
+  document.getElementById('statPaceBonus').textContent = '+'+runPaceBonus.toLocaleString();
+  document.getElementById('statNoSecondary').textContent = runNoSecondaryRounds+'/'+roundsCleared;
+  document.getElementById('statNoUltimate').textContent = runNoUltimateRounds+'/'+roundsCleared;
+  document.getElementById('statPrimaryOnly').textContent = runPrimaryOnlyRounds+'/'+roundsCleared;
   document.getElementById('statCrystals').textContent = practice ? '—' : '+'+crystalsAwarded;
   document.getElementById('rankName').textContent = practice
     ? 'PRACTICE RUN' : rank.toUpperCase()+' RANK';
@@ -20252,13 +20308,8 @@ function endSurvival(){
   lb.slice(0,5).forEach(row=>{
     const div = document.createElement('div');
     div.className = 'lbRow' + (row.name===state.currentName && row.score===score ? ' me':'');
-    // Scores are stored as (rounds*100000 - seconds) so the board sorts
-    // correctly with no extra fields — decode that back into something
-    // a person actually reads, rather than a giant raw number.
-    const rRounds = Math.floor(row.score/100000);
-    const rSecs = rRounds*100000 - row.score;
-    const rTime = Math.floor(rSecs/60)+':'+String(Math.floor(rSecs%60)).padStart(2,'0');
-    div.innerHTML = `<span>${row.name}</span><span>Round ${rRounds} · ${rTime}</span>`;
+    const points=decodeOverallScore(row.score);
+    div.innerHTML = `<span>${escapeHtmlText(row.name)}</span><span>${points.toLocaleString()} pts</span>`;
     lbList.appendChild(div);
   });
 
