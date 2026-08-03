@@ -1,3 +1,4 @@
+<!-- V22.13.44 Scoring Runtime Recovery: fixes the actual failure introduced by the Overall Score update. secondaryUsedThisRound and ultimateUsedThisRound were assigned before their let declarations, causing a temporal-dead-zone ReferenceError that stopped the main game script before themes, avatar models, arena objects, enemies, and gameplay initialization could finish. The duplicate early assignments are removed; the intended declarations and per-round resets remain intact. No avatar, map, combat, navigation, Knight, clone, or scoring formula behavior was otherwise changed. -->
 <!-- V22.13.43 High Score Rollback Repair: rebuilt from the clean V22.13.39 overall-score build and reapplied only the home-screen starter Top 3 plus synchronized version labels. No avatar preview, theme selection, game startup, Three.js loading, navigation, combat, or arena code was changed. Starter scores are display-only and are replaced one-by-one by real cloud records. -->
 <!-- V22.13.39 Overall Score System: replaces the old rounds-minus-time survival score with a full point system. Every cleared round awards escalating survival points, speed points based on its enemy-count pace budget, the existing flawless bonus, and bonuses for clearing without Secondary or Ultimate/Ability activation. Clearing with Primary attacks only earns an additional bonus. The combined clear time of all completed rounds produces a capped run-wide pace bonus. Results now show a complete score breakdown, and local/cloud leaderboards display total points. New scores use a versioned numeric encoding while legacy scores remain readable through conservative conversion. -->
 <!-- V22.13.38 Knight Special Slot Fix: Knights of the Round now occupies the large Knight signature button formerly used by Judgment. Its button displays readiness, cooldown, active clone count, and remaining duration. Judgment of the King is moved into the equipable ultimate-tier Ability list at Level 18 and uses the Ability button while retaining its 100% Valor requirement and existing attack sequence. Enemy melee and projectile hits on Knight clones are fully absorbed by the invincible clone and never call playerTakeHit; clone health is independent and infinite. -->
@@ -155,7 +156,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.43</title>
+<title>Family Arena V22.13.44</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1380,7 +1381,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.43 - High Score Rollback Repair';
+const GAME_VERSION='22.13.44 - Scoring Runtime Recovery';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2500,7 +2501,7 @@ let runStartTime = 0;
 let roundStartTime = 0;      // when the current round began — the whole point of this mode
 let roundTimerFrozenElapsed = null; // locked clear time while the between-round upgrade menu is visible
 let roundCompletionStartedAt = 0;   // watchdog timestamp for guaranteed round-end transition
-let heartsLostThisRound = 0; secondaryUsedThisRound=false; ultimateUsedThisRound=false; // tracks whether this round was "flawless" (no damage taken)
+let heartsLostThisRound = 0; // tracks whether this round was "flawless" (no damage taken)
 let secondaryUsedThisRound = false;
 let ultimateUsedThisRound = false;
 let runOverallRoundPoints = 0;
