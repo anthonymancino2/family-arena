@@ -1,3 +1,4 @@
+<!-- V22.13.23 Global Score and Scroll Fix: landing page now shows the highest live-url survival score from a Firestore-backed global leaderboard instead of the selected local player's score. Personal overall score and global rank moved to Round Select. All non-game screens regain vertical scrolling in landscape/browser mode. The added landscape-50% and portrait-two-thirds movement restrictions were removed, restoring the original movement/look control split. Existing combat and score balance are unchanged. -->
 <!-- V22.13.22 Shield Toss Hit Feedback: improves Shield Toss impact presentation with separate outgoing steel/gold and returning ivory/gold flashes, stronger metal sparks, heavier Brute/boss impact bursts, temporary shield-spin wobble on heavy contact, and smooth spin recovery. Damage, stun, hit detection, route, cooldown, and balance are unchanged. -->
 <!-- V22.13.21 Shield Toss Return Polish: improves only the return phase with smooth homing, subtle banking, a distinct ivory/gold return trail, cleaner hand-height catch alignment, a brief catch animation, guard burst, catch ring, and light vibration. Damage, stun, hit detection, ricochet, outgoing flight, cooldown, and balance are unchanged. -->
 <!-- V22.13.20 Shield Toss Flight Polish: improves only the outgoing Shield Toss flight with faster readable spin, slight heavy-shield wobble, smoother release timing, a brief royal launch burst, steel/gold/ivory metallic wake, and a subtle speed curve that starts strong and eases before return. Damage, stun, hit detection, ricochet, return behavior, cooldown, and balance are unchanged. -->
@@ -137,7 +138,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.22</title>
+<title>Family Arena V22.13.23</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -815,9 +816,7 @@
   }
 
 
-  /* V22.13.07 Responsive Landscape + Movement Zone Fix */
-  .moveZone{width:66.6667%;}
-  .lookZone{width:33.3333%;}
+  /* Original movement/look split restored. */
 
   .levelUpOverlay{
     overflow-y:auto;
@@ -840,9 +839,6 @@
   }
 
   @media (orientation:landscape){
-    .moveZone{width:50%;}
-    .lookZone{width:50%;}
-
     .levelUpOverlay{
       display:none;
       justify-content:center;
@@ -1036,6 +1032,32 @@
     }
   }
 
+
+  /* V22.13.23 Universal Menu Scrolling */
+  .screen:not(#screenGame){
+    overflow-y:auto;
+    overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior-y:contain;
+    touch-action:pan-y;
+  }
+  @media (orientation:landscape){
+    .screen:not(#screenGame).active{
+      height:100dvh;
+      max-height:100dvh;
+      overflow-y:auto!important;
+      touch-action:pan-y!important;
+      justify-content:flex-start;
+      padding-top:calc(70px + env(safe-area-inset-top));
+      padding-bottom:calc(110px + env(safe-area-inset-bottom));
+    }
+    #screenHome.active{
+      justify-content:flex-end;
+      padding-top:0;
+      padding-bottom:0;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -1061,7 +1083,7 @@
           <div class="homeHeroDetails">
             <div class="homeHeroLabel" id="homeHeroLabel">Select a player</div>
             <div class="homeHeroName" id="homeHeroName">Your Hero</div>
-            <div class="homeBestScore"><span>Highest Score</span><strong id="homeHighestScore">—</strong></div>
+            <div class="homeBestScore"><span>Global High Score</span><strong id="homeHighestScore">—</strong></div>
           </div>
         </div>
         <div class="homeActions">
@@ -1077,7 +1099,7 @@
             </span>
             <span class="syncUpdateBadge">UPDATE</span>
           </button>
-          <div class="homeSyncStatus" id="homeSyncStatus">Round records sync automatically · tap to refresh</div>
+          <div class="homeSyncStatus" id="homeSyncStatus">Global scores sync automatically · tap to refresh</div>
         </div>
         <div class="homeVersion" id="homeVersion"></div>
       </div>
@@ -1282,7 +1304,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.22 - Shield Toss Hit Feedback';
+const GAME_VERSION='22.13.23 - Global Score and Scroll Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1349,6 +1371,7 @@ function fsUnwrapFields(fields){
 }
 
 const CLOUD_ROUND_DOC = `${FIRESTORE_BASE}/arena/roundbests`;
+const CLOUD_SURVIVAL_DOC = `${FIRESTORE_BASE}/arena/survivalleaderboard`;
 
 const Cloud = {
   // Whole leaderboard in one read: every round card, one document.
@@ -1391,8 +1414,81 @@ const Cloud = {
       );
       return putRes.ok ? entry : null;
     }catch(e){ return null; }
+  },
+
+  async fetchSurvivalLeaderboard(){
+    try{
+      const res=await fsFetch(`${CLOUD_SURVIVAL_DOC}?key=${FIREBASE_API_KEY}`);
+      if(res.status===404) return [];
+      if(!res.ok) return null;
+      const data=await res.json();
+      const fields=fsUnwrapFields(data.fields);
+      return (Array.isArray(fields.entries)?fields.entries:[])
+        .filter(r=>r&&r.name&&Number.isFinite(Number(r.score)))
+        .sort((a,b)=>Number(b.score)-Number(a.score))
+        .slice(0,100);
+    }catch(e){ return null; }
+  },
+
+  async pushSurvivalScore(name,score){
+    if(!name||!Number.isFinite(Number(score))) return null;
+    try{
+      const existing=await this.fetchSurvivalLeaderboard();
+      if(existing===null) return null;
+      const byName=new Map();
+      for(const row of existing||[]){
+        const prev=byName.get(row.name);
+        if(!prev||Number(row.score)>Number(prev.score)) byName.set(row.name,row);
+      }
+      const current=byName.get(name);
+      if(!current||Number(score)>Number(current.score)){
+        byName.set(name,{name,score:Number(score),at:Date.now()});
+      }
+      const entries=[...byName.values()]
+        .sort((a,b)=>Number(b.score)-Number(a.score))
+        .slice(0,100);
+      const body={fields:fsFields({entries})};
+      const res=await fsFetch(
+        `${CLOUD_SURVIVAL_DOC}?key=${FIREBASE_API_KEY}`,
+        {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}
+      );
+      return res.ok?entries:null;
+    }catch(e){ return null; }
   }
 };
+
+
+let cloudSurvivalLeaderboardCache=(function(){
+  try{return JSON.parse(localStorage.getItem('famarena:cloudSurvivalLeaderboard')||'[]');}
+  catch(e){return [];}
+})();
+function saveCloudSurvivalLeaderboardCache(){
+  try{localStorage.setItem('famarena:cloudSurvivalLeaderboard',JSON.stringify(cloudSurvivalLeaderboardCache));}
+  catch(e){}
+}
+function formatSurvivalScore(score){
+  const n=Number(score)||0;
+  const rounds=Math.floor(n/100000);
+  const seconds=Math.max(0,rounds*100000-n);
+  return 'Round '+rounds+' · '+Math.floor(seconds/60)+':'+String(Math.floor(seconds%60)).padStart(2,'0');
+}
+function getCloudPersonalRank(name){
+  if(!name) return null;
+  const rows=(cloudSurvivalLeaderboardCache||[]).slice().sort((a,b)=>Number(b.score)-Number(a.score));
+  const i=rows.findIndex(r=>r&&r.name===name);
+  return i>=0?i+1:null;
+}
+async function refreshCloudSurvivalLeaderboard(onDone){
+  const rows=await Cloud.fetchSurvivalLeaderboard();
+  if(rows){
+    cloudSurvivalLeaderboardCache=rows;
+    saveCloudSurvivalLeaderboardCache();
+    updateHomePlayerShowcase();
+    if(typeof renderRoundBestPanel==='function') renderRoundBestPanel();
+    if(onDone) onDone(rows);
+  }
+  return rows;
+}
 
 // Read-through cache in front of the network, persisted to localStorage so
 // the round grid still shows last-known world bests instantly offline.
@@ -1516,6 +1612,7 @@ const Store = {
         cloudRoundBestsCache[roundNo] = confirmed || cloudRoundBestsCache[roundNo];
         saveCloudRoundBestsCache();
         if(!confirmed) refreshCloudRoundBests();
+refreshCloudSurvivalLeaderboard();
         const screen = document.getElementById('screenRoundSelect');
         if(screen && screen.classList.contains('active') && typeof renderRoundGrid==='function') renderRoundGrid();
       });
@@ -1677,36 +1774,36 @@ function updateHomePlayerShowcase(){
   const heroName=document.getElementById('homeHeroName');
   const portrait=document.getElementById('homeHeroPortrait');
   const scoreEl=document.getElementById('homeHighestScore');
-  if(!label || !heroName || !portrait || !scoreEl) return;
-  if(!state.currentName){
-    label.textContent='Select a player';
-    heroName.textContent='Your Hero';
-    portrait.textContent='⚔️';
-    scoreEl.textContent='—';
-    return;
-  }
-  const profile=Store.getProfile(state.currentName);
-  const heroType=profile.avatarType || state.avatarType || 'rogue';
-  const info=HERO_ROSTER_INFO[heroType];
-  label.textContent=state.currentName;
-  heroName.textContent=info ? info.title : (AVATAR_TYPE_LABELS[heroType] || 'Hero');
-  portrait.textContent=HOME_HERO_ICONS[heroType] || '⚔️';
-  const best=Store.getHighestScore('survival',state.currentName);
-  scoreEl.textContent=Number(best||0).toLocaleString();
+  if(!label||!heroName||!portrait||!scoreEl) return;
+  const champion=(cloudSurvivalLeaderboardCache||[])
+    .filter(r=>r&&r.name&&Number.isFinite(Number(r.score)))
+    .sort((a,b)=>Number(b.score)-Number(a.score))[0]||null;
+  portrait.textContent='🏆';
+  label.textContent=champion?'LIVE WORLD CHAMPION':'LIVE GLOBAL BOARD';
+  heroName.textContent=champion?champion.name:'No score registered yet';
+  scoreEl.textContent=champion?formatSurvivalScore(champion.score):'—';
 }
-
 async function refreshAndSyncGame(){
   const btn=document.getElementById('btnRefreshSync');
   const status=document.getElementById('homeSyncStatus');
   if(btn){ btn.disabled=true; btn.textContent='↻ Refreshing…'; }
   if(status) status.textContent='Syncing round records…';
-  const all = await Cloud.fetchAllRoundBests();
+  const [all,survivalRows]=await Promise.all([
+    Cloud.fetchAllRoundBests(),
+    Cloud.fetchSurvivalLeaderboard()
+  ]);
   if(all){
-    cloudRoundBestsCache = Object.assign({}, cloudRoundBestsCache, all);
+    cloudRoundBestsCache=Object.assign({},cloudRoundBestsCache,all);
     saveCloudRoundBestsCache();
-    if(status) status.textContent='Round records synced · refreshing game…';
+  }
+  if(survivalRows){
+    cloudSurvivalLeaderboardCache=survivalRows;
+    saveCloudSurvivalLeaderboardCache();
+  }
+  if(all||survivalRows){
+    if(status) status.textContent='Global scores synced · refreshing game…';
   }else if(status){
-    status.textContent='Offline — round records not synced this time · refreshing game…';
+    status.textContent='Offline — global scores not synced this time · refreshing game…';
   }
   try{
     if('caches' in window){
@@ -1869,6 +1966,7 @@ document.getElementById('btnStartGame').onclick = ()=>{
   renderRoundGrid();
   show('screenRoundSelect');
   refreshCloudRoundBests(renderRoundGrid);
+  refreshCloudSurvivalLeaderboard(renderRoundBestPanel);
 };
 document.getElementById('backCustomize2').onclick = ()=>show('screenCustomize');
 document.getElementById('btnRoundToTheme').onclick = ()=>{
@@ -1920,6 +2018,14 @@ function renderRoundBestPanel(){
   const mine = Store.getRoundBest(state.currentName, r);
   const world = Store.getRoundWorldBest(r);
   const rows = [];
+  const personalOverall=Store.getHighestScore('survival',state.currentName);
+  const globalRank=getCloudPersonalRank(state.currentName);
+  rows.push('<div class="rbTitle">'+escapeHtmlText(state.currentName||'Player')+' · Personal record</div>');
+  rows.push('<div class="rbRow"><span>⭐ Overall best</span><strong>'
+    +(personalOverall?formatSurvivalScore(personalOverall):'—')+'</strong></div>');
+  rows.push('<div class="rbRow"><span>🏆 Global ranking</span><strong>'
+    +(globalRank?'#'+globalRank:'Unranked')+'</strong></div>');
+  rows.push('<div class="rbNote">Selected round details</div>');
   rows.push('<div class="rbTitle">Round '+r+' \u00B7 '+killTargetForRound(r)+' enemies</div>');
   rows.push('<div class="rbRow"><span>\u2B50 Your best</span><strong>'
     + (mine ? formatRoundScore(mine.score)+' \u00B7 '+formatRoundTime(mine.seconds)+(mine.flawless?' \u00B7 flawless':'') : '\u2014')
@@ -10631,11 +10737,8 @@ function setupControls(){
   const maxRadius = 48;
 
   moveZone.addEventListener('touchstart', e=>{
-    const t = e.changedTouches[0];
-    const landscape=window.innerWidth>window.innerHeight;
-    const movementBoundary=window.innerWidth*(landscape?0.5:(2/3));
-    if(!t || t.clientX>movementBoundary) return;
     e.preventDefault();
+    const t = e.changedTouches[0];
     stickActive = true; stickId = t.identifier;
     center = {x:t.clientX, y:t.clientY};
     // Knob appears wherever you actually touched down — no fixed
@@ -19248,6 +19351,15 @@ function endSurvival(){
   }
   const lb = practice ? Store.getLeaderboard('survival')
                       : Store.submitScore('survival', state.currentName, score);
+  if(!practice){
+    Cloud.pushSurvivalScore(state.currentName,score).then(rows=>{
+      if(rows){
+        cloudSurvivalLeaderboardCache=rows;
+        saveCloudSurvivalLeaderboardCache();
+        updateHomePlayerShowcase();
+      }
+    });
+  }
   updateHomePlayerShowcase();
 
   document.getElementById('rankBadge').className = 'rankBadge '+rank;
