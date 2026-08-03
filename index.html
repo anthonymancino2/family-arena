@@ -1,3 +1,7 @@
+<!-- V22.13.27 Four Giant Banners: increases Banner Spear maximum active placements from two to four. A fifth placement still removes the oldest banner automatically through the existing queue logic. Also doubles the physical spear height and banner-cloth dimensions so the centerpiece matches the enlarged 7.0-radius control field. Slow strength, radius, duration, cooldown, defense bonus, placement behavior, and cleanup are unchanged. -->
+<!-- V22.13.26 Banner Spear Large Slow Field: doubles Banner Spear's radius from 3.5 to 7.0 and strengthens enemy movement slow from 72% speed to 28% speed while touching the field. This makes the circle twice as wide in radius and four times the covered area. Duration, two-banner maximum, cooldown, player damage reduction, placement, and cleanup are unchanged. -->
+<!-- V22.13.25 Banner Spear Function Restoration: repairs Banner Spear activation and placement with safe mesh creation, actual player-ground height instead of hard-coded y=0, explicit configured cooldown routing, success-only Secondary lockout, defensive banner state/cleanup, reliable enemy slowing, and visible zone pulses. Duration, maximum active banners, radius, damage reduction, enemy slow strength, and balance are unchanged. -->
+<!-- V22.13.24 Landscape Radar Placement: moves the enemy radar from the center-left camera/player area to the bottom-left corner in landscape, reduces it to 74px (66px on very short browser views), and keeps portrait placement unchanged. Radar behavior and gameplay are unchanged. -->
 <!-- V22.13.23 Global Score and Scroll Fix: landing page now shows the highest live-url survival score from a Firestore-backed global leaderboard instead of the selected local player's score. Personal overall score and global rank moved to Round Select. All non-game screens regain vertical scrolling in landscape/browser mode. The added landscape-50% and portrait-two-thirds movement restrictions were removed, restoring the original movement/look control split. Existing combat and score balance are unchanged. -->
 <!-- V22.13.22 Shield Toss Hit Feedback: improves Shield Toss impact presentation with separate outgoing steel/gold and returning ivory/gold flashes, stronger metal sparks, heavier Brute/boss impact bursts, temporary shield-spin wobble on heavy contact, and smooth spin recovery. Damage, stun, hit detection, route, cooldown, and balance are unchanged. -->
 <!-- V22.13.21 Shield Toss Return Polish: improves only the return phase with smooth homing, subtle banking, a distinct ivory/gold return trail, cleaner hand-height catch alignment, a brief catch animation, guard burst, catch ring, and light vibration. Damage, stun, hit detection, ricochet, outgoing flight, cooldown, and balance are unchanged. -->
@@ -138,7 +142,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.23</title>
+<title>Family Arena V22.13.27</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1058,6 +1062,28 @@
     }
   }
 
+
+  /* V22.13.24 Landscape Radar Placement
+     Keep the radar away from the centered player/camera view. */
+  @media (orientation:landscape){
+    .enemyRadar{
+      left:calc(14px + env(safe-area-inset-left))!important;
+      right:auto!important;
+      top:auto!important;
+      bottom:calc(18px + env(safe-area-inset-bottom))!important;
+      width:74px;
+      height:74px;
+      opacity:.88;
+    }
+  }
+  @media (orientation:landscape) and (max-height:430px){
+    .enemyRadar{
+      width:66px;
+      height:66px;
+      bottom:calc(12px + env(safe-area-inset-bottom))!important;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -1304,7 +1330,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.23 - Global Score and Scroll Fix';
+const GAME_VERSION='22.13.27 - Four Giant Banners';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2446,8 +2472,8 @@ const CHARACTER_COMBAT = {
         desc:'A short disciplined forward step into a shield strike. Strong frontal stun, interrupts enemy attacks, moderate knockback. Bosses resist most of the stun.'},
       shield_toss:{name:'Shield Toss', price:380, slot:'secondary', kind:'knight_shield_toss', cooldown:0.18, damage:1.6, radius:1.15,
         desc:'Throws the shield on a controlled path with one slight ricochet, staggering everything it touches before returning to your hand. You lose one Magical Armor charge while the shield is away.'},
-      banner_spear:{name:'Banner Spear', price:520, slot:'secondary', kind:'knight_banner', cooldown:0.20, damage:0, radius:3.5,
-        desc:'Plants a royal banner spear that holds a defensive zone for 12 seconds. You gain defense and stagger resistance inside it and enemies within are mildly slowed. Two banners can stand at once.'}
+      banner_spear:{name:'Banner Spear', price:520, slot:'secondary', kind:'knight_banner', cooldown:0.20, damage:0, radius:7.0,
+        desc:'Plants a royal banner spear that holds a very large defensive zone for 12 seconds. You gain defense and stagger resistance inside it, while enemies touching the field are heavily slowed. Four banners can stand at once.'}
     }
   },
   barbarian: {
@@ -11803,8 +11829,8 @@ const KNIGHT_CFG = {
     counterDamage:3.4, bruteMult:0.7, bossMult:0.3, bossCapFraction:0.06, counterStun:1.6},
   shieldToss:{cooldown:4.0, speed:15, range:9.5, damage:1.6, stun:0.5,
     bruteMult:0.75, bossMult:0.35, hitCooldown:0.35},
-  banner:{cooldown:8, duration:12, maxActive:2, radius:3.5,
-    damageReduction:0.30, enemySlow:0.72},
+  banner:{cooldown:8, duration:12, maxActive:4, radius:7.0,
+    damageReduction:0.30, enemySlow:0.28},
   ultimate:{
     fieldRadius:9.5, markCap:14, columnsPerTick:3, tickInterval:0.13,
     columnDamage:3.2, columnBruteMult:0.55, columnBossFraction:0.035,
@@ -13066,32 +13092,109 @@ function knightEndShieldToss(caught){
   }
 }
 function knightBannerSpear(w){
+  if(!player||!scene||!knightIsActive()) return false;
   const c=KNIGHT_CFG.banner;
+  if((knightRuntime.bannerCooldown||0)>0) return false;
+
+  let g=null;
+  try{
+    g=new THREE.Group();
+
+    const poleMat=new THREE.MeshStandardMaterial({
+      color:0xd9d9df,
+      emissive:0x2a2a33,
+      emissiveIntensity:.24,
+      metalness:.8,
+      roughness:.3
+    });
+    const pole=new THREE.Mesh(
+      new THREE.CylinderGeometry(.10,.10,5.6,12),
+      poleMat
+    );
+    pole.position.y=2.8;
+    g.add(pole);
+
+    const tip=new THREE.Mesh(
+      new THREE.ConeGeometry(.24,.82,12),
+      knightMat(KNIGHT_IVORY,.95,false)
+    );
+    tip.position.y=5.88;
+    g.add(tip);
+
+    const cloth=new THREE.Mesh(
+      new THREE.PlaneGeometry(2.10,1.64),
+      knightMat(KNIGHT_GOLD,.88,false)
+    );
+    cloth.position.set(1.10,4.28,0);
+    g.add(cloth);
+
+    const crest=new THREE.Mesh(
+      new THREE.RingGeometry(.34,.62,28),
+      knightMat(KNIGHT_IVORY,.86)
+    );
+    crest.position.set(1.10,4.28,.035);
+    g.add(crest);
+
+    const zone=new THREE.Mesh(
+      new THREE.RingGeometry(c.radius-.15,c.radius,52),
+      knightMat(KNIGHT_GOLD,.56)
+    );
+    zone.rotation.x=-Math.PI/2;
+    zone.position.y=.08;
+    g.add(zone);
+
+    const field=new THREE.Mesh(
+      new THREE.CircleGeometry(c.radius,44),
+      knightMat(KNIGHT_GOLD,.11)
+    );
+    field.rotation.x=-Math.PI/2;
+    field.position.y=.05;
+    g.add(field);
+
+    const base=new THREE.Mesh(
+      new THREE.CylinderGeometry(.42,.62,.26,20),
+      knightMat(KNIGHT_STEEL,.82,false)
+    );
+    base.position.y=.13;
+    g.add(base);
+  }catch(err){
+    console.error('Banner Spear creation failed',err);
+    if(g) disposeGroup(g);
+    return false;
+  }
+
   if(knightRuntime.banners.length>=c.maxActive) knightRemoveBanner(0);
-  const g=new THREE.Group();
-  const pole=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,2.6,10),
-    new THREE.MeshStandardMaterial({color:0xd9d9df,emissive:0x2a2a33,metalness:.8,roughness:.3}));
-  pole.position.y=1.3; g.add(pole);
-  const tip=new THREE.Mesh(new THREE.ConeGeometry(.14,.45,10),knightMat(KNIGHT_IVORY,.95,false));
-  tip.position.y=2.75; g.add(tip);
-  const cloth=new THREE.Mesh(new THREE.PlaneGeometry(.9,.75),knightMat(KNIGHT_GOLD,.85,false));
-  cloth.position.set(.48,2.05,0); g.add(cloth);
-  const zone=new THREE.Mesh(new THREE.RingGeometry(c.radius-.14,c.radius,52),knightMat(KNIGHT_GOLD,.5));
-  zone.rotation.x=-Math.PI/2; zone.position.y=.08; g.add(zone);
-  const field=new THREE.Mesh(new THREE.CircleGeometry(c.radius,44),knightMat(KNIGHT_GOLD,.09));
-  field.rotation.x=-Math.PI/2; field.position.y=.05; g.add(field);
-  g.position.set(player.position.x,0,player.position.z);
+
+  // Use the player's actual ground height. The earlier hard-coded y=0 could
+  // bury the spear/zone on maps where the arena floor is not exactly zero.
+  const groundY=Number.isFinite(player.position.y)?player.position.y:0;
+  g.position.set(player.position.x,groundY,player.position.z);
+  g.rotation.y=player.rotation.y;
   scene.add(g);
-  knightRuntime.banners.push({mesh:g,x:player.position.x,z:player.position.z,life:c.duration,pulse:0});
-  knightPlayClip(['melee','attack'],'1H_Melee_Attack_Chop',.20,.16);
+
+  knightRuntime.banners.push({
+    mesh:g,
+    x:g.position.x,
+    y:g.position.y,
+    z:g.position.z,
+    life:c.duration,
+    pulse:0,
+    visualPulse:0
+  });
+  knightRuntime.bannerCooldown=c.cooldown;
+
+  knightPlayClip(['melee','attack'],'1H_Melee_Attack_Chop',.18,.14);
   spawnKnightGuardBurst(player.position,c.radius,KNIGHT_GOLD);
+  knightShockRing(player.position,c.radius,KNIGHT_GOLD,.28);
   triggerCombatShake(7,140);
   if(navigator.vibrate) navigator.vibrate([22,14,30]);
+  return true;
 }
 function knightRemoveBanner(i){
+  if(!Array.isArray(knightRuntime.banners)) knightRuntime.banners=[];
   const b=knightRuntime.banners[i];
   if(!b) return;
-  if(b.mesh&&b.mesh.parent) scene.remove(b.mesh);
+  if(b.mesh&&b.mesh.parent) b.mesh.parent.remove(b.mesh);
   if(b.mesh) disposeGroup(b.mesh);
   knightRuntime.banners.splice(i,1);
 }
@@ -13100,24 +13203,49 @@ function knightClearBanners(){
 }
 function knightUpdateBanners(dt){
   const c=KNIGHT_CFG.banner;
+  if(!Array.isArray(knightRuntime.banners)) knightRuntime.banners=[];
+
   for(let i=knightRuntime.banners.length-1;i>=0;i--){
     const b=knightRuntime.banners[i];
+    if(!b||!b.mesh){
+      knightRuntime.banners.splice(i,1);
+      continue;
+    }
+
     b.life-=dt;
     b.pulse-=dt;
-    if(b.mesh) b.mesh.rotation.y+=dt*0.6;
+    b.visualPulse=(b.visualPulse||0)+dt;
+    b.mesh.rotation.y+=dt*.35;
+
+    // Keep the field readable without rotating the whole banner too quickly.
+    const pulseScale=1+Math.sin(b.visualPulse*4.2)*.025;
+    b.mesh.scale.set(pulseScale,1,pulseScale);
+
     if(b.pulse<=0){
-      b.pulse=0.4;
+      b.pulse=.4;
+
       for(const z of zombies){
-        if(z.userData.dead||z.userData.spawnPending) continue;
+        if(!z||!z.userData||z.userData.dead||z.userData.spawnPending) continue;
         if(Math.hypot(z.position.x-b.x,z.position.z-b.z)>c.radius) continue;
-        z.userData.slowTimer=Math.max(z.userData.slowTimer||0,0.6);
+        z.userData.slowTimer=Math.max(z.userData.slowTimer||0,.6);
         z.userData.slowMult=Math.min(z.userData.slowMult||1,c.enemySlow);
       }
+
+      if(knightFxBudget(1)){
+        const ring=new THREE.Mesh(
+          new THREE.RingGeometry(c.radius*.72,c.radius*.76,40),
+          knightMat(KNIGHT_GOLD,.24)
+        );
+        ring.rotation.x=-Math.PI/2;
+        ring.position.set(b.x,b.y+.07,b.z);
+        ring.userData.baseOpacity=.24;
+        pushKnightFx(ring,{life:.28,grow:.34,from:.88});
+      }
     }
+
     if(b.life<=0) knightRemoveBanner(i);
   }
 }
-
 /* ------------------------------------------------------------- ABILITY 1 */
 
 function knightWhirlwindStartFx(source){
@@ -14413,7 +14541,7 @@ function doKnightAttack(w){
     case 'knight_sweep': knightCleavingGuard(w); break;
     case 'knight_shield_bash': knightShieldBash(w); break;
     case 'knight_shield_toss': knightShieldToss(w); break;
-    case 'knight_banner': knightBannerSpear(w); break;
+    case 'knight_banner': return knightBannerSpear(w);
     default: knightRoyalCombo(w); break;
   }
 }
@@ -17488,12 +17616,18 @@ function doSecondaryShoot(){
   if((player.userData.secondaryAttackCooldown||0)>0)return;
   if(typeof knightMovementLocked==='function' && knightMovementLocked()) return;
   if(w.kind==='knight_shield_toss' && knightRuntime.shieldToss) return;
+  if(w.kind==='knight_banner' && (knightRuntime.bannerCooldown||0)>0) return;
   if(w.kind==='giant_fireball'){
     const activeGiantFireballs=bullets.reduce((count,b)=>count+(b.kind==='giant_fireball'?1:0),0);
     if(activeGiantFireballs>=10)return;
   }
   if(w.kind==='rocket_arrow'){
     triggerPhoenixFireball();
+    return;
+  }
+  if(w.kind==='knight_banner'){
+    const placed=knightBannerSpear(w);
+    if(placed) player.userData.secondaryAttackCooldown=attackCooldownFor(w);
     return;
   }
   player.userData.secondaryAttackCooldown=attackCooldownFor(w);
