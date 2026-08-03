@@ -1,3 +1,4 @@
+<!-- V22.13.38 Knight Special Slot Fix: Knights of the Round now occupies the large Knight signature button formerly used by Judgment. Its button displays readiness, cooldown, active clone count, and remaining duration. Judgment of the King is moved into the equipable ultimate-tier Ability list at Level 18 and uses the Ability button while retaining its 100% Valor requirement and existing attack sequence. Enemy melee and projectile hits on Knight clones are fully absorbed by the invincible clone and never call playerTakeHit; clone health is independent and infinite. -->
 <!-- V22.13.37 Knights of the Round: renames the Knight clone Ability from Royal Guard Clones to Knights of the Round across the shop, HUD, unlock notice, toast, and build labels. Clone count, duration, cooldown, invincibility, aggro, move inheritance, damage, movement, and cleanup are unchanged. -->
 <!-- V22.13.36 Knights of the Round: adds a Level-10 Knight clone Ability. Rounds 10-15 summon 2 invincible clones for 8 seconds with a 10-second cooldown; Rounds 16-20 summon 5 for 15 seconds with a 5-second cooldown; Round 21 onward summons 10 for 30 seconds with a 1.5-second cooldown. Clones deal 10% of player damage, take aggro before the player, seek enemies within 12 units, and return after remaining more than 11 units from the player for 10 seconds. Their attack rotation expands with Knight unlock levels. -->
 <!-- V22.13.35 Guardian Quake Combo: combines Guardian Charge and Earth Shatter into one Ability. Hold the Ability button through the completed charge to flow directly into Earth Shatter; releasing early cancels the follow-up. A smaller AUTO/MANUAL toggle appears beside the Ability button only when Guardian Quake is equipped. AUTO steers toward the nearest living enemy while held; MANUAL preserves normal movement steering. Any future infinite charge duration is capped at 20 seconds. The old separate Guardian Charge and Earth Shatter ability entries are removed; their existing damage, collision, impact, resistance, and visual logic are reused. -->
@@ -152,7 +153,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.37</title>
+<title>Family Arena V22.13.38</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -2312,7 +2313,9 @@ function updateEnemyProjectiles(dt){
       spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,12,FX_MAT_ENEMY_SHOT,3.4);
       if(hitTarget.userData&&hitTarget.userData.isArcaneEcho)destroyArcaneEcho(hitTarget);
       else if(hitTarget.userData&&hitTarget.userData.isArcherMirror)damageArcherMirrorClone(hitTarget);
-      else playerTakeHit();
+      else if(hitTarget.userData&&hitTarget.userData.isKnightRoyalClone){
+        spawnKnightGuardBurst(hitTarget.position,1.05,KNIGHT_STEEL);
+      }else playerTakeHit();
       scene.remove(p.mesh);disposeGroup(p.mesh);
       if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}
       enemyProjectiles.splice(i,1);
@@ -2339,7 +2342,7 @@ const LEVEL_UNLOCKS = [
   {level:12, id:'knight_guardian_quake', name:'Guardian Quake', desc:'Guardian Charge and Earth Shatter combine into one hold-controlled Ability with Auto and Manual steering.', avatar:'knight'},
   {level:14, id:'knight_aegis_counter', name:'Aegis Counter', desc:'The signature guard-and-counter becomes equipable in the Ability slot.', avatar:'knight'},
   {level:16, id:'knight_banner_spear', name:'Banner Spear', desc:'Plant a defensive royal banner zone from the Secondary slot.', avatar:'knight'},
-  {level:18, id:'knight_judgment', name:'Judgment of the King', desc:'The Knight ultimate reaches full royal authority.', avatar:'knight'}
+  {level:18, id:'knight_judgment', name:'Judgment of the King', desc:'Judgment becomes an equipable ultimate-tier move in the Ability slot.', avatar:'knight'}
 ];
 let reachedLevelUnlocks = new Set();
 function levelUnlockApplies(entry){ return !entry.avatar || entry.avatar===state.avatarType; }
@@ -2633,8 +2636,10 @@ const KNIGHT_GUARDIAN_QUAKE = {id:'knight_guardian_quake', name:'Guardian Quake'
   desc:'Hold the Ability button to begin Guardian Charge and automatically flow into Earth Shatter when the charge finishes. Releasing before the charge ends cancels the Earth Shatter follow-up. AUTO mode steers toward the nearest living enemy; MANUAL mode uses normal movement controls. If a future charge duration becomes infinite, it is capped at 20 seconds. 16-second cooldown.'};
 const KNIGHT_AEGIS_COUNTER = {id:'knight_aegis_counter', name:'Aegis Counter', price:780, avatar:'knight', unlockLevel:14,
   desc:'The signature counter. Enter a brief guard window with a clear timing ring; if you are struck the hit is negated and you immediately release a heavy sword-and-shield counterattack that scales by enemy type with a boss cap. A failed guard always ends safely. 11-second cooldown.'};
-const KNIGHT_ROYAL_GUARD_CLONES = {id:'knight_royal_guard_clones', name:'Knights of the Round', price:880, avatar:'knight', unlockLevel:10,
-  desc:'Summon invincible Knight clones that draw enemy attention and use only the Knight moves currently unlocked. Each clone deals 10% of the player\'s damage. Rounds 10–15 summon 2 clones for 8 seconds with a 10-second cooldown; Rounds 16–20 summon 5 for 15 seconds with a 5-second cooldown; Round 21 onward summons 10 for 30 seconds with a 1.5-second cooldown.'};
+const KNIGHT_ROYAL_GUARD_CLONES = {id:'knight_royal_guard_clones', name:'Knights of the Round', price:0, avatar:'knight', unlockLevel:10,
+  desc:'Knight signature move. Summon invincible Knight clones that draw enemy attention and use only the Knight moves currently unlocked. Each clone deals 10% of the player\'s damage. Rounds 10–15 summon 2 clones for 8 seconds with a 10-second cooldown; Rounds 16–20 summon 5 for 15 seconds with a 5-second cooldown; Round 21 onward summons 10 for 30 seconds with a 1.5-second cooldown.'};
+const KNIGHT_JUDGMENT_ULTIMATE = {id:'knight_judgment', name:'Judgment of the King', price:920, avatar:'knight', unlockLevel:18,
+  desc:'Ultimate-tier royal execution. Equip it in the Ability slot, build Valor to 100%, then activate Judgment of the King. Golden columns strike marked enemies before the final sword and shockwave. Boss damage remains capped.'};
 const SUPERNOVA_PIERCER = {id:'supernova_piercer', name:'Supernova Piercer', price:860,
   desc:'Signature ultimate. Enter a 3-second rooted sniper charge, then fire a solar beam completely across the map. Instantly defeats non-boss enemies in its path and deals 50% max HP to bosses. Uses a 30-second cooldown.'};
 // Coins earned per kill — a flat rate that inches up in later rounds so
@@ -10665,7 +10670,7 @@ function renderShopList(){
 // button remains in the approved position directly left of FIRE. Buying
 // an ability equips it immediately; owned abilities can be swapped here.
 const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
-  knight:[KNIGHT_ROYAL_GUARD_CLONES, KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER] };
+  knight:[KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER, KNIGHT_JUDGMENT_ULTIMATE] };
 const REMOVED_WEAPON_IDS=['radiant_cleave','blade_cyclone','holy_wave'];
 function sanitizeRemovedAbilitySelection(){
   if(equippedAbilityId==='tempest_domain'||equippedAbilityId==='arrow_storm'||
@@ -11057,7 +11062,7 @@ function setupControls(){
   const ultimateBtnEl=document.getElementById('ultimateBtn');
   const activateUltimate=e=>{
     if(e){ e.preventDefault(); e.stopPropagation(); }
-    if(state.avatarType==='mage') triggerArcaneEchoes(); else if(state.avatarType==='rogue') triggerArcherMirrorClones(); else if(state.avatarType==='knight') triggerKingsJudgment(); else if(state.avatarType==='barbarian') triggerPrimalRage(); else if(state.avatarType==='hooded') triggerShadowEclipse();
+    if(state.avatarType==='mage') triggerArcaneEchoes(); else if(state.avatarType==='rogue') triggerArcherMirrorClones(); else if(state.avatarType==='knight') triggerKnightRoyalGuardClones(); else if(state.avatarType==='barbarian') triggerPrimalRage(); else if(state.avatarType==='hooded') triggerShadowEclipse();
   };
   if(window.PointerEvent) ultimateBtnEl.addEventListener('pointerdown',activateUltimate,{passive:false});
   else ultimateBtnEl.addEventListener('touchstart',activateUltimate,{passive:false});
@@ -11617,7 +11622,8 @@ function updateHoodedHud(){
   if(!btn||!meter)return;
   const isHooded=state.avatarType==='hooded', isArcher=state.avatarType==='rogue', isMage=state.avatarType==='mage', isKnight=state.avatarType==='knight', isBarbarian=state.avatarType==='barbarian';
   const mageEchoReady=isMage&&arcaneEchoesUnlocked();
-  const hasSignature=isHooded||isArcher||isKnight||isBarbarian||mageEchoReady;
+  const knightCloneSpecialReady=isKnight&&Math.max(1,Number(round)||1)>=10;
+  const hasSignature=isHooded||isArcher||knightCloneSpecialReady||isBarbarian||mageEchoReady;
   btn.classList.toggle('hidden',!hasSignature); meter.classList.toggle('on',hasSignature);
   if(hasSignature){
     let pct=0;
@@ -11627,8 +11633,14 @@ function updateHoodedHud(){
     }else if(isArcher){
       const total=Math.max(.001,archerMirrorCycleDuration||archerMirrorCooldownForLevel());
       pct=archerMirrorCooldownTimer<=0?100:Math.max(0,Math.min(100,(1-archerMirrorCooldownTimer/total)*100));
+    }else if(isKnight){
+      const cfg=knightRoyalCloneConfig();
+      const total=Math.max(.001,cfg.cooldown||1);
+      pct=knightRoyalCloneCooldown<=0
+        ? 100
+        : Math.max(0,Math.min(100,(1-knightRoyalCloneCooldown/total)*100));
     }else{
-      const displayedCharge=isHooded?hoodedUltimateCharge:(isKnight?knightUltimateCharge:barbarianUltimateCharge);
+      const displayedCharge=isHooded?hoodedUltimateCharge:barbarianUltimateCharge;
       pct=Math.max(0,Math.min(100,displayedCharge));
     }
     btn.style.setProperty('--charge',pct+'%'); btn.classList.toggle('ready',pct>=100);
@@ -11643,7 +11655,18 @@ function updateHoodedHud(){
         ? `MIRRORS ${archerMirrorClones.length}/${ARCHER_MIRROR_COUNT} · HITS ${remainingHits}`
         : (pct>=100?'MIRROR CLONES READY':`CLONES ${archerMirrorCooldownTimer.toFixed(1)}s`);
     }
-    else if(isKnight){btn.textContent=pct>=100?'JUDGMENT!':'JUDGMENT';meter.textContent=knightRuntime.ultPhase>0?'JUDGMENT OF THE KING':'VALOR '+Math.round(pct)+'%';}
+    else if(isKnight){
+      const activeCount=knightRoyalClones.length;
+      const activeTime=activeCount
+        ? Math.max(...knightRoyalClones.map(c=>Math.max(0,c.userData.life||0)))
+        : 0;
+      btn.textContent=activeCount?'KNIGHTS!':(pct>=100?'KNIGHTS!':'KNIGHTS');
+      meter.textContent=activeCount
+        ? `KNIGHTS ${activeCount} · ${activeTime.toFixed(1)}s`
+        : (knightRoyalCloneCooldown>0
+          ? `ROUND TABLE ${knightRoyalCloneCooldown.toFixed(1)}s`
+          : 'KNIGHTS OF THE ROUND READY');
+    }
     else if(isBarbarian){btn.textContent=pct>=100?"PRIMAL RAGE!":"RAGE";meter.textContent='FURY '+Math.round(pct)+'%';}
   }else{
     btn.classList.remove('ready');
@@ -11685,9 +11708,14 @@ function updateHoodedHud(){
         if(info){
           abilityBtn.textContent=info.active
             ? `${info.label}${info.activeTime!==undefined?' '+info.activeTime.toFixed(1):'!'}`
-            : (info.cd>0 ? `${info.label} ${Math.ceil(info.cd)}` : info.label);
+            : (info.charge!==undefined
+              ? `${info.label} ${Math.round(info.charge)}%`
+              : (info.cd>0 ? `${info.label} ${Math.ceil(info.cd)}` : info.label));
           abilityBtn.classList.toggle('active',!!info.active);
-          abilityBtn.classList.toggle('cooling',info.cd>0&&!info.active);
+          abilityBtn.classList.toggle(
+            'cooling',
+            info.charge!==undefined ? info.charge<100&&!info.active : info.cd>0&&!info.active
+          );
         }else{
           abilityBtn.textContent='ABILITY';
           abilityBtn.classList.remove('active','cooling');
@@ -14930,7 +14958,7 @@ function triggerKnightRoyalGuardClones(){
       const a=(i/cfg.count)*Math.PI*2,rr=2+(i%3)*.45;
       wrap.position.set(player.position.x+Math.cos(a)*rr,player.position.y,player.position.z+Math.sin(a)*rr);
       Object.assign(wrap.userData,{
-        isKnightRoyalClone:true,invincible:true,hp:999999,dead:false,cloneIndex:i,life:cfg.duration,
+        isKnightRoyalClone:true,invincible:true,hp:Infinity,maxHp:Infinity,dead:false,cloneIndex:i,life:cfg.duration,
         attackCooldown:.18+i*.06,moveIndex:i,unlockedMoves:knightCloneAvailableMoves(),farTimer:0,returning:false,
         kayMixer:new THREEAsset.AnimationMixer(root),kayClips:{}
       });
@@ -15063,7 +15091,8 @@ function updateKnightSystems(dt){
   }
   updateKingsJudgment(dt);
   // Ability + ultimate cooldown labels must tick down visibly.
-  if(String(equippedAbilityId||'').indexOf('knight_')===0 || knightRuntime.ultPhase>0 || knightUltimateCharge<100){
+  if(String(equippedAbilityId||'').indexOf('knight_')===0 || knightRuntime.ultPhase>0 ||
+     knightUltimateCharge<100 || knightRoyalCloneCooldown>0 || knightRoyalClones.length>0){
     updateHoodedHud();
   }
 }
@@ -15123,13 +15152,15 @@ function resetKnightRuntime(){
 /* ------------------------------------------------------------- ABILITY HUD */
 function knightAbilityCooldownInfo(){
   switch(equippedAbilityId){
-    case 'knight_royal_guard_clones':
+    case 'knight_judgment':
       return {
-        label:'KNIGHTS',
-        cd:knightRoyalCloneCooldown,
-        active:knightRoyalClones.length>0,
-        activeTime:knightRoyalClones.length?Math.max(...knightRoyalClones.map(c=>c.userData.life||0)):0
+        label:'JUDGMENT',
+        cd:0,
+        active:knightRuntime.ultPhase>0,
+        activeTime:undefined,
+        charge:knightUltimateCharge
       };
+
     case 'knight_guardian_quake':
       return {
         label:knightRuntime.shatterPhase>0?'SHATTER':'G. QUAKE',
@@ -15145,9 +15176,9 @@ function knightAbilityCooldownInfo(){
 }
 function triggerKnightEquippedAbility(){
   if(!knightIsActive()) return;
-  if(equippedAbilityId==='knight_royal_guard_clones') triggerKnightRoyalGuardClones();
-  else if(equippedAbilityId==='knight_guardian_quake') triggerKnightGuardianQuake();
+  if(equippedAbilityId==='knight_guardian_quake') triggerKnightGuardianQuake();
   else if(equippedAbilityId==='knight_aegis_counter') triggerKnightAegisCounter();
+  else if(equippedAbilityId==='knight_judgment') triggerKingsJudgment();
 }
 
 
@@ -20005,7 +20036,9 @@ function update(dt){
         if(type==='brute'){spawnBurst(z.position.x,z.position.y+.2,z.position.z,16,FX_MAT_SPARK,4.5);triggerCombatShake(10,150);}
         if(target.userData&&target.userData.isArcaneEcho)destroyArcaneEcho(target);
         else if(target.userData&&target.userData.isArcherMirror)damageArcherMirrorClone(target);
-        else playerTakeHit();
+        else if(target.userData&&target.userData.isKnightRoyalClone){
+          spawnKnightGuardBurst(target.position,1.15,KNIGHT_STEEL);
+        }else playerTakeHit();
       }
     });
   }
