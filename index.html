@@ -1,3 +1,4 @@
+<!-- V22.13.40 Global Top Three: synchronizes the visible bottom build/version label with the current file and adds three starter global leaderboard candidates to the landing card. Real cloud records occupy ranks first and replace starter candidates one-by-one; starter entries never upload to Firestore or affect personal/global rankings. -->
 <!-- V22.13.39 Overall Score System: replaces the old rounds-minus-time survival score with a full point system. Every cleared round awards escalating survival points, speed points based on its enemy-count pace budget, the existing flawless bonus, and bonuses for clearing without Secondary or Ultimate/Ability activation. Clearing with Primary attacks only earns an additional bonus. The combined clear time of all completed rounds produces a capped run-wide pace bonus. Results now show a complete score breakdown, and local/cloud leaderboards display total points. New scores use a versioned numeric encoding while legacy scores remain readable through conservative conversion. -->
 <!-- V22.13.38 Knight Special Slot Fix: Knights of the Round now occupies the large Knight signature button formerly used by Judgment. Its button displays readiness, cooldown, active clone count, and remaining duration. Judgment of the King is moved into the equipable ultimate-tier Ability list at Level 18 and uses the Ability button while retaining its 100% Valor requirement and existing attack sequence. Enemy melee and projectile hits on Knight clones are fully absorbed by the invincible clone and never call playerTakeHit; clone health is independent and infinite. -->
 <!-- V22.13.37 Knights of the Round: renames the Knight clone Ability from Royal Guard Clones to Knights of the Round across the shop, HUD, unlock notice, toast, and build labels. Clone count, duration, cooldown, invincibility, aggro, move inheritance, damage, movement, and cleanup are unchanged. -->
@@ -154,7 +155,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.39</title>
+<title>Family Arena V22.13.40</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -634,10 +635,14 @@
 .homeHeroPortrait{width:72px;height:72px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:42px;background:radial-gradient(circle at 45% 30%,rgba(255,255,255,.30),rgba(33,57,82,.82) 70%);border:2px solid rgba(255,255,255,.42);filter:drop-shadow(0 5px 8px rgba(0,0,0,.28));}
 .homeHeroDetails{min-width:0;text-align:left;}
 .homeHeroLabel{font-size:9px;font-weight:900;letter-spacing:1.35px;color:#9fddff;text-transform:uppercase;}
-.homeHeroName{font-size:18px;font-weight:950;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
-.homeBestScore{display:flex;align-items:baseline;gap:7px;margin-top:5px;}
-.homeBestScore span:first-child{font-size:10px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;color:#f5dc8a;}
-.homeBestScore strong{font-size:21px;color:#ffe36e;text-shadow:0 2px 6px rgba(0,0,0,.35);}
+.homeHeroName{font-size:13px;font-weight:900;color:#fff;white-space:normal;overflow:visible;margin-top:3px;line-height:1.42;}
+.homeHeroName .homeRankRow{display:flex;align-items:center;gap:5px;min-height:18px;}
+.homeHeroName .homeRankNo{width:18px;color:#9fddff;font-size:10px;font-weight:950;}
+.homeHeroName .homeRankTarget{margin-left:auto;color:#8fa7b7;font-size:7px;font-weight:900;letter-spacing:.7px;}
+.homeBestScore{display:grid;grid-template-columns:auto 1fr;align-items:start;gap:7px;margin-top:5px;}
+.homeBestScore span:first-child{font-size:9px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;color:#f5dc8a;padding-top:2px;}
+.homeBestScore strong{display:block;font-size:12px;line-height:1.42;color:#ffe36e;text-shadow:0 2px 6px rgba(0,0,0,.35);}
+.homeBestScore strong .homeScoreRow{min-height:18px;white-space:nowrap;}
 .homeActions{display:grid;grid-template-columns:1fr .42fr;gap:10px;}
 .homeUtilityRow{display:grid;grid-template-columns:1fr;gap:7px;margin-top:10px;}
 #screenHome #btnRefreshSync{width:100%;min-height:39px;margin:0;padding:8px 12px;border-radius:13px;background:rgba(8,22,36,.62);border:1px solid rgba(159,223,255,.42);color:#dff7ff;font-size:12px;font-weight:850;letter-spacing:.25px;}
@@ -1152,7 +1157,7 @@
           <div class="homeHeroDetails">
             <div class="homeHeroLabel" id="homeHeroLabel">Select a player</div>
             <div class="homeHeroName" id="homeHeroName">Your Hero</div>
-            <div class="homeBestScore"><span>Global High Score</span><strong id="homeHighestScore">—</strong></div>
+            <div class="homeBestScore"><span>Scores</span><strong id="homeHighestScore">—</strong></div>
           </div>
         </div>
         <div class="homeActions">
@@ -1379,7 +1384,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.36 - Knights of the Round';
+const GAME_VERSION='22.13.40 - Global Top Three';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1880,19 +1885,38 @@ function refreshCrystalPills(){
 
 // ---- HOME: selected hero + local high score ----
 const HOME_HERO_ICONS = {rogue:'🏹',hooded:'🥷',mage:'🔮',knight:'🛡️',barbarian:'🪓'};
+const STARTER_GLOBAL_TOP_THREE=[
+  {name:'Arena Legend',score:encodeOverallScore(750000),starter:true},
+  {name:'Iron Vanguard',score:encodeOverallScore(500000),starter:true},
+  {name:'Storm Hunter',score:encodeOverallScore(300000),starter:true}
+];
 function updateHomePlayerShowcase(){
   const label=document.getElementById('homeHeroLabel');
   const heroName=document.getElementById('homeHeroName');
   const portrait=document.getElementById('homeHeroPortrait');
   const scoreEl=document.getElementById('homeHighestScore');
   if(!label||!heroName||!portrait||!scoreEl) return;
-  const champion=(cloudSurvivalLeaderboardCache||[])
+
+  // Real global records always occupy the first available ranks. Starter
+  // candidates fill only empty ranks and disappear one-by-one as real
+  // players submit scores from any username or device.
+  const realRows=(cloudSurvivalLeaderboardCache||[])
     .filter(r=>r&&r.name&&Number.isFinite(Number(r.score)))
-    .sort((a,b)=>Number(b.score)-Number(a.score))[0]||null;
+    .sort((a,b)=>Number(b.score)-Number(a.score))
+    .slice(0,3);
+  const rows=realRows.concat(STARTER_GLOBAL_TOP_THREE.slice(realRows.length)).slice(0,3);
+
   portrait.textContent='🏆';
-  label.textContent=champion?'LIVE WORLD CHAMPION':'LIVE GLOBAL BOARD';
-  heroName.textContent=champion?champion.name:'No score registered yet';
-  scoreEl.textContent=champion?formatSurvivalScore(champion.score):'—';
+  label.textContent=realRows.length?'LIVE GLOBAL TOP 3':'GLOBAL TOP 3 CHALLENGE';
+  heroName.innerHTML=rows.map((row,i)=>
+    `<div class="homeRankRow"><span class="homeRankNo">#${i+1}</span>`+
+    `<span>${escapeHtmlText(row.name)}</span>`+
+    (row.starter?'<span class="homeRankTarget">TARGET</span>':'')+
+    '</div>'
+  ).join('');
+  scoreEl.innerHTML=rows.map(row=>
+    `<div class="homeScoreRow">${formatSurvivalScore(row.score)}</div>`
+  ).join('');
 }
 async function refreshAndSyncGame(){
   const btn=document.getElementById('btnRefreshSync');
