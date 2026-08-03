@@ -1,5 +1,4 @@
-<!-- V22.13.42 Avatar and Navigation Recovery: avatar preview initialization now prefers the already-loaded global THREE build instead of depending entirely on a dynamic module import. If the remote GLB or module path fails, a local procedural preview appears rather than remaining stuck on Loading avatar. Round Select to Theme navigation now uses guarded click, pointer-up, and touch-end routing, forces the Theme screen open even if theme rendering throws, and raises the button above decorative overlays. -->
-<!-- V22.13.41 Stable Global Top Three: rebuilds the fake-to-real global leaderboard display on the clean V22.13.39 scoring base. The home card uses plain text inside its existing elements instead of injecting extra leaderboard rows, preventing overlays or malformed layout from blocking avatar loading and round-selection navigation. Up to three real cloud scores replace the starter targets one by one. Version labels are synchronized. -->
+<!-- V22.13.43 High Score Rollback Repair: rebuilt from the clean V22.13.39 overall-score build and reapplied only the home-screen starter Top 3 plus synchronized version labels. No avatar preview, theme selection, game startup, Three.js loading, navigation, combat, or arena code was changed. Starter scores are display-only and are replaced one-by-one by real cloud records. -->
 <!-- V22.13.39 Overall Score System: replaces the old rounds-minus-time survival score with a full point system. Every cleared round awards escalating survival points, speed points based on its enemy-count pace budget, the existing flawless bonus, and bonuses for clearing without Secondary or Ultimate/Ability activation. Clearing with Primary attacks only earns an additional bonus. The combined clear time of all completed rounds produces a capped run-wide pace bonus. Results now show a complete score breakdown, and local/cloud leaderboards display total points. New scores use a versioned numeric encoding while legacy scores remain readable through conservative conversion. -->
 <!-- V22.13.38 Knight Special Slot Fix: Knights of the Round now occupies the large Knight signature button formerly used by Judgment. Its button displays readiness, cooldown, active clone count, and remaining duration. Judgment of the King is moved into the equipable ultimate-tier Ability list at Level 18 and uses the Ability button while retaining its 100% Valor requirement and existing attack sequence. Enemy melee and projectile hits on Knight clones are fully absorbed by the invincible clone and never call playerTakeHit; clone health is independent and infinite. -->
 <!-- V22.13.37 Knights of the Round: renames the Knight clone Ability from Royal Guard Clones to Knights of the Round across the shop, HUD, unlock notice, toast, and build labels. Clone count, duration, cooldown, invincibility, aggro, move inheritance, damage, movement, and cleanup are unchanged. -->
@@ -156,7 +155,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.42</title>
+<title>Family Arena V22.13.43</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1130,18 +1129,6 @@
   }
 
 </style>
-
-<style id="roundThemeTapRecovery">
-#btnRoundToTheme{
-  pointer-events:auto !important;
-  touch-action:manipulation !important;
-  position:relative;
-  z-index:2147483000 !important;
-}
-#buildStamp{pointer-events:none !important;}
-#avatarPreviewStatus{pointer-events:none !important;}
-</style>
-
 </head>
 <body>
 <div id="app">
@@ -1393,7 +1380,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.42 - Avatar and Navigation Recovery';
+const GAME_VERSION='22.13.43 - High Score Rollback Repair';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1917,19 +1904,15 @@ function updateHomePlayerShowcase(){
     score:encodeOverallScore(r.points),
     starter:true
   }));
+
   const rows=realRows.concat(starterRows.slice(realRows.length)).slice(0,3);
 
   portrait.textContent='🏆';
   label.textContent=realRows.length?'LIVE GLOBAL TOP 3':'GLOBAL TOP 3 CHALLENGE';
-
-  // Use plain text only. This preserves the original home-card DOM structure
-  // and cannot create an overlay that blocks avatar or round-selection input.
   heroName.textContent=rows.map((row,i)=>
     '#'+(i+1)+' '+row.name+(row.starter?' · TARGET':'')
-  ).join('\n');
-  scoreEl.textContent=rows.map(row=>formatSurvivalScore(row.score)).join('\n');
-  heroName.style.whiteSpace='pre-line';
-  scoreEl.style.whiteSpace='pre-line';
+  ).join(' | ');
+  scoreEl.textContent=rows.map(row=>formatSurvivalScore(row.score)).join(' | ');
 }
 async function refreshAndSyncGame(){
   const btn=document.getElementById('btnRefreshSync');
@@ -2117,21 +2100,10 @@ document.getElementById('btnStartGame').onclick = ()=>{
   refreshCloudSurvivalLeaderboard(renderRoundBestPanel);
 };
 document.getElementById('backCustomize2').onclick = ()=>show('screenCustomize');
-const btnRoundToThemeEl=document.getElementById('btnRoundToTheme');
-let roundThemeNavAt=0;
-function goFromRoundToTheme(ev){
-  if(ev){ev.preventDefault();ev.stopPropagation();}
-  const now=Date.now();
-  if(now-roundThemeNavAt<350)return;
-  roundThemeNavAt=now;
-  try{renderThemeGrid();}catch(err){console.warn('Theme grid recovery:',err);}
+document.getElementById('btnRoundToTheme').onclick = ()=>{
+  renderThemeGrid();
   show('screenTheme');
-}
-if(btnRoundToThemeEl){
-  btnRoundToThemeEl.onclick=goFromRoundToTheme;
-  btnRoundToThemeEl.addEventListener('pointerup',goFromRoundToTheme,{passive:false});
-  btnRoundToThemeEl.addEventListener('touchend',goFromRoundToTheme,{passive:false});
-}
+};
 document.getElementById('backCustomize').onclick = ()=>{
   renderRoundGrid();
   show('screenRoundSelect');
@@ -2234,7 +2206,7 @@ document.getElementById('btnBeginSurvival').onclick = ()=>{
 async function ensureAvatarPreview(){
   const canvas=document.getElementById('avatarPreviewCanvas');
   if(!canvas || previewRenderer) return;
-  const THREEP=window.THREE || await import('three');
+  const THREEP=await import('three');
   previewRenderer=new THREEP.WebGLRenderer({canvas,alpha:true,antialias:true});
   previewRenderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
   previewRenderer.setSize(220,245,false);
@@ -2257,75 +2229,13 @@ async function ensureAvatarPreview(){
     previewRenderer.render(previewScene,previewCamera);
   }; animate();
 }
-function buildAvatarPreviewFallback(characterId){
-  const T=window.THREE;
-  if(!T) return null;
-  const g=new T.Group();
-  const colors={
-    rogue:0x62d9ff,
-    hooded:0x384455,
-    mage:0x8a55d8,
-    knight:0x9aa9b8,
-    barbarian:0xb66f3c
-  };
-  const accent={
-    rogue:0xe7f8ff,
-    hooded:0xe0c15c,
-    mage:0xf1b5ff,
-    knight:0xe4bd45,
-    barbarian:0x7f2d22
-  };
-  const bodyMat=new T.MeshStandardMaterial({color:colors[characterId]||0x62d9ff,roughness:.72,flatShading:true});
-  const accentMat=new T.MeshStandardMaterial({color:accent[characterId]||0xffffff,roughness:.55,metalness:.12,flatShading:true});
-  const skinMat=new T.MeshStandardMaterial({color:0xe5b58f,roughness:.85,flatShading:true});
-  const darkMat=new T.MeshStandardMaterial({color:0x1d2732,roughness:.8,flatShading:true});
-
-  const torso=new T.Mesh(new T.CylinderGeometry(.42,.52,.9,7),bodyMat);
-  torso.position.y=.83;g.add(torso);
-  const head=new T.Mesh(new T.IcosahedronGeometry(.39,1),skinMat);
-  head.position.y=1.58;g.add(head);
-  const legL=new T.Mesh(new T.BoxGeometry(.22,.58,.25),darkMat);
-  const legR=legL.clone();legL.position.set(-.18,.29,0);legR.position.set(.18,.29,0);g.add(legL,legR);
-  const armL=new T.Mesh(new T.CylinderGeometry(.12,.14,.7,6),bodyMat);
-  const armR=armL.clone();armL.position.set(-.49,.94,0);armR.position.set(.49,.94,0);
-  armL.rotation.z=-.18;armR.rotation.z=.18;g.add(armL,armR);
-
-  if(characterId==='knight'){
-    const shield=new T.Mesh(new T.CylinderGeometry(.34,.34,.12,8),accentMat);
-    shield.rotation.z=Math.PI/2;shield.position.set(-.57,.95,.12);g.add(shield);
-    const sword=new T.Mesh(new T.BoxGeometry(.08,.9,.09),accentMat);
-    sword.position.set(.58,1.02,.04);sword.rotation.z=-.2;g.add(sword);
-    const helmet=new T.Mesh(new T.CylinderGeometry(.4,.43,.34,8),bodyMat);
-    helmet.position.y=1.78;g.add(helmet);
-  }else if(characterId==='mage'){
-    const hat=new T.Mesh(new T.ConeGeometry(.55,.85,8),bodyMat);
-    hat.position.y=2.05;hat.rotation.z=-.12;g.add(hat);
-    const orb=new T.Mesh(new T.SphereGeometry(.18,12,10),accentMat);
-    orb.position.set(.62,1.28,.05);g.add(orb);
-  }else if(characterId==='rogue'){
-    const bow=new T.Mesh(new T.TorusGeometry(.4,.045,6,18,Math.PI*1.3),accentMat);
-    bow.position.set(.58,1.08,.04);bow.rotation.z=-.4;g.add(bow);
-  }else if(characterId==='hooded'){
-    const hood=new T.Mesh(new T.ConeGeometry(.5,.65,8),bodyMat);
-    hood.position.y=1.9;g.add(hood);
-    const eye1=new T.Mesh(new T.SphereGeometry(.045,8,6),accentMat);
-    const eye2=eye1.clone();eye1.position.set(-.12,1.62,.35);eye2.position.set(.12,1.62,.35);g.add(eye1,eye2);
-  }else if(characterId==='barbarian'){
-    const axeHead=new T.Mesh(new T.BoxGeometry(.38,.28,.12),accentMat);
-    const axeHandle=new T.Mesh(new T.BoxGeometry(.07,.85,.07),darkMat);
-    axeHead.position.set(.6,1.45,0);axeHandle.position.set(.55,1.05,0);axeHandle.rotation.z=-.15;g.add(axeHead,axeHandle);
-  }
-  g.userData.previewFallback=true;
-  return g;
-}
-
 let previewRequestId=0;
 async function updateAvatarPreview(characterId){
+  await ensureAvatarPreview();
   const requestId=++previewRequestId;
   const status=document.getElementById('avatarPreviewStatus');
   if(status) status.textContent='Loading '+AVATAR_TYPE_LABELS[characterId].replace(/^.\s/,'')+'…';
   try{
-    await ensureAvatarPreview();
     const {gltf,THREEAsset,cloneSkinned}=await getKayKitAssetPromise(characterId);
     if(requestId!==previewRequestId)return;
     if(previewRoot)previewScene.remove(previewRoot);
@@ -2340,23 +2250,7 @@ async function updateAvatarPreview(characterId){
     const idle=gltf.animations.find(c=>c.name.toLowerCase()==='idle')||gltf.animations[0];
     if(idle)previewMixer.clipAction(idle).play();
     if(status)status.textContent=AVATAR_TYPE_LABELS[characterId].replace(/^.\s/,'');
-  }catch(e){
-    try{
-      await ensureAvatarPreview();
-      if(requestId!==previewRequestId)return;
-      if(previewRoot)previewScene.remove(previewRoot);
-      previewMixer=null;
-      previewRoot=buildAvatarPreviewFallback(characterId);
-      if(previewRoot){
-        previewScene.add(previewRoot);
-        if(status)status.textContent=AVATAR_TYPE_LABELS[characterId].replace(/^.\s/,'')+' · offline preview';
-      }else if(status){
-        status.textContent=AVATAR_TYPE_LABELS[characterId].replace(/^.\s/,'');
-      }
-    }catch(fallbackError){
-      if(status)status.textContent=AVATAR_TYPE_LABELS[characterId].replace(/^.\s/,'');
-    }
-  }
+  }catch(e){if(status)status.textContent='Character model failed: '+(e?.message||'network error');}
 }
 
 // ---- SHOP (stub catalogue — purchase logic works now, character
