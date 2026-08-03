@@ -1,3 +1,4 @@
+<!-- V22.13.20 Shield Toss Flight Polish: improves only the outgoing Shield Toss flight with faster readable spin, slight heavy-shield wobble, smoother release timing, a brief royal launch burst, steel/gold/ivory metallic wake, and a subtle speed curve that starts strong and eases before return. Damage, stun, hit detection, ricochet, return behavior, cooldown, and balance are unchanged. -->
 <!-- V22.13.19 Shield Toss Function Restoration: restores the nonworking Knight Shield Toss by adding the missing knightBuildShieldMesh() implementation that the move calls. Adds a visible steel/gold royal shield, safe creation guards, and defensive cleanup so failed creation cannot leave the Knight shield-away state stuck. Existing flight, return, hit damage, stun, cooldown, ricochet, and balance remain unchanged. -->
 <!-- V22.13.17 Aegis Counter Impact Polish: minimum successful-counter polish increment. Adds a localized shield block flash, royal crest, steel/gold spark burst, larger layered counter slash trails, dual shock rings, stronger impact sparks, and hit-responsive shake/vibration. Counter damage, radius, stun, cooldown, boss cap, recovery, and failure behavior are unchanged. -->
 <!-- V22.13.16 Aegis Guard Window Clarity: minimum Aegis polish increment. Replaces the single timing ring with layered ivory/gold/steel guard rings, adds four shield-timing ticks, a localized guard burst, smoother animation timing, and a rotating/pulsing countdown effect. Counter damage, success behavior, failure recovery, cooldown, and balance are unchanged. -->
@@ -134,7 +135,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.19</title>
+<title>Family Arena V22.13.20</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1279,7 +1280,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.19 - Shield Toss Function Restoration';
+const GAME_VERSION='22.13.20 - Shield Toss Flight Polish';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12673,6 +12674,41 @@ function knightBuildShieldMesh(){
   return g;
 }
 
+
+function knightShieldTossTrailFx(t){
+  if(!t||!t.mesh||!knightFxBudget(2)) return;
+  const g=new THREE.Group();
+
+  const wake=new THREE.Mesh(
+    new THREE.PlaneGeometry(1.0,2.4),
+    knightMat(KNIGHT_STEEL,.24)
+  );
+  wake.rotation.x=-Math.PI/2;
+  wake.position.set(0,.02,-.72);
+  g.add(wake);
+
+  const goldWake=new THREE.Mesh(
+    new THREE.PlaneGeometry(.34,2.0),
+    knightMat(KNIGHT_GOLD,.40)
+  );
+  goldWake.rotation.x=-Math.PI/2;
+  goldWake.position.set(0,.04,-.60);
+  g.add(goldWake);
+
+  const ring=new THREE.Mesh(
+    new THREE.RingGeometry(.56,.86,30),
+    knightMat(KNIGHT_IVORY,.44)
+  );
+  ring.rotation.x=-Math.PI/2;
+  ring.position.y=.03;
+  g.add(ring);
+
+  g.position.copy(t.mesh.position);
+  g.rotation.y=Math.atan2(t.dirX||0,t.dirZ||1);
+  knightBaseOpacity(g);
+  pushKnightFx(g,{life:.24,grow:.34,from:.86,spin:6.5});
+}
+
 function knightShieldToss(w){
   if(knightRuntime.shieldToss||!player||!scene) return;
   knightAutoFace(11);
@@ -12690,13 +12726,15 @@ function knightShieldToss(w){
   scene.add(mesh);
   knightRuntime.shieldToss={
     mesh, dirX:Math.sin(yaw), dirZ:Math.cos(yaw),
-    travelled:0, returning:false, hitCooldowns:new Map(), ricocheted:false, life:4.0
+    travelled:0, returning:false, hitCooldowns:new Map(), ricocheted:false, life:4.0,
+    trailTimer:0, launchBlend:.12, spinSpeed:20
   };
   knightRuntime.shieldAway=true;
   // The Knight gives up one Magical Armor charge while the shield is away.
   passiveState.knightArmor=Math.min(passiveState.knightArmor||0,knightArmorMax());
-  knightPlayClip(['shield'],'1H_Melee_Attack_Chop',.18,.14);
-  spawnKnightGuardBurst(player.position,1.5,KNIGHT_STEEL);
+  knightPlayClip(['shield'],'1H_Melee_Attack_Chop',.15,.12);
+  spawnKnightGuardBurst(player.position,1.5,KNIGHT_GOLD);
+  triggerCombatShake(4,85);
   if(navigator.vibrate) navigator.vibrate(18);
 }
 function knightUpdateShieldToss(dt){
@@ -12704,7 +12742,8 @@ function knightUpdateShieldToss(dt){
   if(!t) return;
   const c=KNIGHT_CFG.shieldToss;
   t.life-=dt;
-  t.mesh.rotation.z+=dt*18;
+  t.mesh.rotation.z+=dt*(t.spinSpeed||20);
+  t.mesh.rotation.x=Math.sin((4-t.life)*18)*.10;
   if(!t.returning){
     // One controlled slight ricochet toward a nearby target — never pinball.
     if(!t.ricocheted && t.travelled>c.range*0.55){
@@ -12719,10 +12758,24 @@ function knightUpdateShieldToss(dt){
         const dl=Math.hypot(t.dirX,t.dirZ)||1; t.dirX/=dl; t.dirZ/=dl;
       }
     }
-    const stepLen=c.speed*dt;
+    let speed=c.speed;
+    if((t.launchBlend||0)>0){
+      t.launchBlend=Math.max(0,t.launchBlend-dt);
+      const p=1-t.launchBlend/.12;
+      speed*=.74+.26*Math.max(0,Math.min(1,p));
+    }
+    speed*=1-.10*Math.min(1,t.travelled/Math.max(.01,c.range));
+    const stepLen=speed*dt;
     t.mesh.position.x+=t.dirX*stepLen;
     t.mesh.position.z+=t.dirZ*stepLen;
     t.travelled+=stepLen;
+
+    t.trailTimer=(t.trailTimer||0)-dt;
+    if(t.trailTimer<=0){
+      t.trailTimer=.055;
+      knightShieldTossTrailFx(t);
+    }
+
     if(t.travelled>=c.range) t.returning=true;
   }else if(player){
     const dx=player.position.x-t.mesh.position.x;
