@@ -1,3 +1,4 @@
+<!-- V22.13.19 Shield Toss Function Restoration: restores the nonworking Knight Shield Toss by adding the missing knightBuildShieldMesh() implementation that the move calls. Adds a visible steel/gold royal shield, safe creation guards, and defensive cleanup so failed creation cannot leave the Knight shield-away state stuck. Existing flight, return, hit damage, stun, cooldown, ricochet, and balance remain unchanged. -->
 <!-- V22.13.17 Aegis Counter Impact Polish: minimum successful-counter polish increment. Adds a localized shield block flash, royal crest, steel/gold spark burst, larger layered counter slash trails, dual shock rings, stronger impact sparks, and hit-responsive shake/vibration. Counter damage, radius, stun, cooldown, boss cap, recovery, and failure behavior are unchanged. -->
 <!-- V22.13.16 Aegis Guard Window Clarity: minimum Aegis polish increment. Replaces the single timing ring with layered ivory/gold/steel guard rings, adds four shield-timing ticks, a localized guard burst, smoother animation timing, and a rotating/pulsing countdown effect. Counter damage, success behavior, failure recovery, cooldown, and balance are unchanged. -->
 <!-- V22.13.15 Guardian Charge Polish: upgrades Guardian Charge with a smoother acceleration start, steadier limited steering, a layered shield-front wake, repeated readable charge trails, distinct normal/heavy collision flashes, clearer enemy push-aside feedback, denser cracked-path presentation, and a heavier dual-ring ending burst. Damage, duration, speed cap, steering rate, cooldown, knockback, stun, and boss caps are unchanged. -->
@@ -133,7 +134,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.17</title>
+<title>Family Arena V22.13.19</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1278,7 +1279,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.17 - Aegis Counter Impact Polish';
+const GAME_VERSION='22.13.19 - Shield Toss Function Restoration';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12600,11 +12601,91 @@ function knightShieldBash(w){
 
   if(navigator.vibrate) navigator.vibrate(hits?[26,12,38]:10);
 }
+
+function knightBuildShieldMesh(){
+  const g=new THREE.Group();
+
+  const steelMat=new THREE.MeshStandardMaterial({
+    color:0x7f8b99,
+    metalness:.82,
+    roughness:.30,
+    emissive:0x17212b,
+    emissiveIntensity:.28,
+    side:THREE.DoubleSide
+  });
+  const darkMat=new THREE.MeshStandardMaterial({
+    color:0x273442,
+    metalness:.72,
+    roughness:.38,
+    emissive:0x0b1118,
+    emissiveIntensity:.18,
+    side:THREE.DoubleSide
+  });
+  const goldMat=new THREE.MeshStandardMaterial({
+    color:KNIGHT_GOLD,
+    metalness:.78,
+    roughness:.28,
+    emissive:KNIGHT_GOLD,
+    emissiveIntensity:.30,
+    side:THREE.DoubleSide
+  });
+  const ivoryMat=new THREE.MeshBasicMaterial({
+    color:KNIGHT_IVORY,
+    transparent:true,
+    opacity:.86,
+    depthWrite:false,
+    side:THREE.DoubleSide,
+    blending:THREE.AdditiveBlending
+  });
+
+  // Heavy royal shield silhouette.
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.92,.92,.18,32),steelMat);
+  body.rotation.x=Math.PI/2;
+  g.add(body);
+
+  const inset=new THREE.Mesh(new THREE.CylinderGeometry(.70,.70,.205,32),darkMat);
+  inset.rotation.x=Math.PI/2;
+  g.add(inset);
+
+  const rim=new THREE.Mesh(new THREE.TorusGeometry(.91,.095,10,36),goldMat);
+  rim.rotation.x=Math.PI/2;
+  g.add(rim);
+
+  const boss=new THREE.Mesh(new THREE.CylinderGeometry(.24,.30,.28,24),goldMat);
+  boss.rotation.x=Math.PI/2;
+  boss.position.z=.02;
+  g.add(boss);
+
+  // Four restrained royal spokes keep it readable while spinning.
+  for(let i=0;i<4;i++){
+    const spoke=new THREE.Mesh(new THREE.BoxGeometry(.12,1.15,.08),goldMat);
+    spoke.rotation.z=i*Math.PI/2;
+    spoke.position.z=.12;
+    g.add(spoke);
+  }
+
+  const glow=new THREE.Mesh(new THREE.RingGeometry(.73,.90,36),ivoryMat);
+  glow.position.z=.16;
+  g.add(glow);
+
+  g.scale.setScalar(1.12);
+  g.userData.isKnightShieldToss=true;
+  return g;
+}
+
 function knightShieldToss(w){
-  if(knightRuntime.shieldToss) return;
+  if(knightRuntime.shieldToss||!player||!scene) return;
   knightAutoFace(11);
   const yaw=player.rotation.y;
-  const mesh=knightBuildShieldMesh();
+  let mesh=null;
+  try{
+    mesh=knightBuildShieldMesh();
+  }catch(err){
+    console.error('Shield Toss mesh creation failed',err);
+    knightRuntime.shieldAway=false;
+    return;
+  }
+  if(!mesh) return;
   mesh.position.set(player.position.x,player.position.y+1.05,player.position.z);
   scene.add(mesh);
   knightRuntime.shieldToss={
@@ -12677,7 +12758,10 @@ function knightUpdateShieldToss(dt){
 }
 function knightEndShieldToss(caught){
   const t=knightRuntime.shieldToss;
-  if(!t) return;
+  if(!t){
+    knightRuntime.shieldAway=false;
+    return;
+  }
   if(t.mesh&&t.mesh.parent) scene.remove(t.mesh);
   if(t.mesh) disposeGroup(t.mesh);
   knightRuntime.shieldToss=null;
