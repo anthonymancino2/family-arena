@@ -1,3 +1,4 @@
+<!-- V22.13.45 Knight Primary Motion Polish: upgrades the Knight's main Royal Sword Combo with more heroic body commitment, cleaner chained swing motion, stronger slash geometry, heavier hit flashes, added guard-follow-through, and a more impressive finisher shockwave so the class feels prouder and more satisfying to pilot. Damage, unlocks, cooldowns, scoring, clone logic, maps, and all non-primary Knight systems remain unchanged. -->
 <!-- V22.13.44 Scoring Runtime Recovery: fixes the actual failure introduced by the Overall Score update. secondaryUsedThisRound and ultimateUsedThisRound were assigned before their let declarations, causing a temporal-dead-zone ReferenceError that stopped the main game script before themes, avatar models, arena objects, enemies, and gameplay initialization could finish. The duplicate early assignments are removed; the intended declarations and per-round resets remain intact. No avatar, map, combat, navigation, Knight, clone, or scoring formula behavior was otherwise changed. -->
 <!-- V22.13.43 High Score Rollback Repair: rebuilt from the clean V22.13.39 overall-score build and reapplied only the home-screen starter Top 3 plus synchronized version labels. No avatar preview, theme selection, game startup, Three.js loading, navigation, combat, or arena code was changed. Starter scores are display-only and are replaced one-by-one by real cloud records. -->
 <!-- V22.13.39 Overall Score System: replaces the old rounds-minus-time survival score with a full point system. Every cleared round awards escalating survival points, speed points based on its enemy-count pace budget, the existing flawless bonus, and bonuses for clearing without Secondary or Ultimate/Ability activation. Clearing with Primary attacks only earns an additional bonus. The combined clear time of all completed rounds produces a capped run-wide pace bonus. Results now show a complete score breakdown, and local/cloud leaderboards display total points. New scores use a versioned numeric encoding while legacy scores remain readable through conservative conversion. -->
@@ -156,7 +157,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.44</title>
+<title>Family Arena V22.13.45</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1381,7 +1382,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.44 - Scoring Runtime Recovery';
+const GAME_VERSION='22.13.45 - Knight Primary Motion Polish';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12147,32 +12148,91 @@ function knightBaseOpacity(root){
 }
 // Distinct trail shape per combo step so each swing reads differently.
 function knightSwordTrail(origin,yaw,step,scale=1){
-  if(!knightFxBudget(2)) return;
+  if(!knightFxBudget(3)) return;
   const g=new THREE.Group();
   const dx=Math.sin(yaw),dz=Math.cos(yaw);
   if(step===0){
-    const arc=new THREE.Mesh(new THREE.RingGeometry(.85*scale,1.75*scale,34,1,-1.15,2.30),knightMat(KNIGHT_GOLD,.92));
+    const back=new THREE.Mesh(
+      new THREE.RingGeometry(.74*scale,1.78*scale,40,1,-1.28,2.52),
+      knightMat(KNIGHT_STEEL,.34)
+    );
+    back.rotation.x=-Math.PI/2; back.rotation.z=-yaw-.10; back.position.y=-.02; g.add(back);
+
+    const arc=new THREE.Mesh(
+      new THREE.RingGeometry(.86*scale,1.94*scale,42,1,-1.20,2.42),
+      knightMat(KNIGHT_GOLD,.92)
+    );
     arc.rotation.x=-Math.PI/2; arc.rotation.z=-yaw; g.add(arc);
-    const edge=new THREE.Mesh(new THREE.RingGeometry(1.70*scale,1.86*scale,34,1,-1.15,2.30),knightMat(KNIGHT_IVORY,.95));
-    edge.rotation.x=-Math.PI/2; edge.rotation.z=-yaw; edge.position.y=.02; g.add(edge);
-    g.position.set(origin.x,origin.y+.95,origin.z);
+
+    const edge=new THREE.Mesh(
+      new THREE.RingGeometry(1.88*scale,2.02*scale,42,1,-1.20,2.42),
+      knightMat(KNIGHT_IVORY,.98)
+    );
+    edge.rotation.x=-Math.PI/2; edge.rotation.z=-yaw+.04; edge.position.y=.02; g.add(edge);
+
+    const guard=new THREE.Mesh(
+      new THREE.RingGeometry(.42*scale,.86*scale,28,1,-1.10,1.92),
+      knightMat(KNIGHT_IVORY,.42)
+    );
+    guard.rotation.x=-Math.PI/2; guard.rotation.z=-yaw-.25; guard.position.y=.03; g.add(guard);
+
+    g.position.set(origin.x,origin.y+.98,origin.z);
   }else if(step===1){
-    const arc=new THREE.Mesh(new THREE.RingGeometry(.80*scale,1.70*scale,34,1,-1.05,2.10),knightMat(KNIGHT_STEEL,.88));
-    arc.rotation.z=.62; arc.scale.y=1.22; g.add(arc);
-    const edge=new THREE.Mesh(new THREE.RingGeometry(1.62*scale,1.80*scale,34,1,-1.05,2.10),knightMat(KNIGHT_IVORY,.92));
-    edge.rotation.z=.62; edge.scale.y=1.22; g.add(edge);
-    g.position.set(origin.x+dx*.95,origin.y+1.05,origin.z+dz*.95); g.rotation.y=yaw;
+    const back=new THREE.Mesh(
+      new THREE.RingGeometry(.70*scale,1.76*scale,40,1,-1.16,2.22),
+      knightMat(KNIGHT_GOLD,.34)
+    );
+    back.rotation.z=.70; back.scale.y=1.28; back.position.y=-.02; g.add(back);
+
+    const arc=new THREE.Mesh(
+      new THREE.RingGeometry(.82*scale,1.92*scale,42,1,-1.06,2.22),
+      knightMat(KNIGHT_STEEL,.92)
+    );
+    arc.rotation.z=.68; arc.scale.y=1.26; g.add(arc);
+
+    const edge=new THREE.Mesh(
+      new THREE.RingGeometry(1.82*scale,1.98*scale,42,1,-1.06,2.22),
+      knightMat(KNIGHT_IVORY,.94)
+    );
+    edge.rotation.z=.68; edge.scale.y=1.26; edge.position.y=.02; g.add(edge);
+
+    const cross=new THREE.Mesh(
+      new THREE.PlaneGeometry(.24*scale,2.2*scale),
+      knightMat(KNIGHT_GOLD,.34)
+    );
+    cross.rotation.z=.38; cross.position.set(-.12,.06,.0); g.add(cross);
+
+    g.position.set(origin.x+dx*1.05,origin.y+1.10,origin.z+dz*1.05); g.rotation.y=yaw;
   }else{
-    // Overhead shield-assisted finisher: a vertical blade wedge, not a wild swing.
-    const blade=new THREE.Mesh(new THREE.PlaneGeometry(.34*scale,2.5*scale),knightMat(KNIGHT_IVORY,.95));
-    blade.position.y=.15; g.add(blade);
-    const flare=new THREE.Mesh(new THREE.RingGeometry(.55*scale,1.55*scale,30,1,-.85,1.70),knightMat(KNIGHT_GOLD,.86));
-    flare.rotation.z=Math.PI; flare.position.y=-.5; g.add(flare);
-    g.position.set(origin.x+dx*1.0,origin.y+1.25,origin.z+dz*1.0); g.rotation.y=yaw;
+    const blade=new THREE.Mesh(
+      new THREE.PlaneGeometry(.40*scale,3.2*scale),
+      knightMat(KNIGHT_IVORY,.98)
+    );
+    blade.position.y=.20; g.add(blade);
+
+    const goldBlade=new THREE.Mesh(
+      new THREE.PlaneGeometry(.82*scale,2.75*scale),
+      knightMat(KNIGHT_GOLD,.52)
+    );
+    goldBlade.position.y=.05; g.add(goldBlade);
+
+    const flare=new THREE.Mesh(
+      new THREE.RingGeometry(.62*scale,1.86*scale,34,1,-.92,1.84),
+      knightMat(KNIGHT_GOLD,.88)
+    );
+    flare.rotation.z=Math.PI; flare.position.y=-.62; g.add(flare);
+
+    const crest=new THREE.Mesh(
+      new THREE.RingGeometry(.22*scale,.58*scale,24),
+      knightMat(KNIGHT_IVORY,.64)
+    );
+    crest.position.y=-.88; g.add(crest);
+
+    g.position.set(origin.x+dx*1.06,origin.y+1.30,origin.z+dz*1.06); g.rotation.y=yaw;
   }
   knightBaseOpacity(g);
-  pushKnightFx(g,{life:.26,grow:step===2?.30:.55,from:1,spinZ:0});
-  spawnBurst(origin.x+dx*1.1,origin.y+1.0,origin.z+dz*1.1,step===2?12:8,FX_MAT_SPARK,step===2?3.8:2.9);
+  pushKnightFx(g,{life:step===2?.30:.28,grow:step===2?.38:.64,from:1,spinZ:0});
+  spawnBurst(origin.x+dx*1.18,origin.y+1.0,origin.z+dz*1.18,step===2?14:10,FX_MAT_SPARK,step===2?4.2:3.2);
 }
 
 
@@ -12341,45 +12401,69 @@ function knightShieldBashImpact(origin,yaw,hits){
 }
 
 function knightComboImpact(origin,yaw,step,hits){
-  if(!hits||!knightFxBudget(2)) return;
+  if(!hits||!knightFxBudget(3)) return;
   const fx1=Math.sin(yaw),fz1=Math.cos(yaw);
   const g=new THREE.Group();
 
   const flash=new THREE.Mesh(
-    new THREE.CircleGeometry(step===2?.78:.52,24),
-    knightMat(step===1?KNIGHT_STEEL:KNIGHT_IVORY,step===2?.92:.74)
+    new THREE.CircleGeometry(step===2?.88:.58,28),
+    knightMat(step===1?KNIGHT_STEEL:KNIGHT_IVORY,step===2?.94:.78)
   );
   flash.position.set(0,1.0,0);
   flash.rotation.y=yaw;
   g.add(flash);
 
   const ring=new THREE.Mesh(
-    new THREE.RingGeometry(step===2?.34:.22,step===2?.62:.42,28),
-    knightMat(KNIGHT_GOLD,step===2?.9:.68)
+    new THREE.RingGeometry(step===2?.30:.20,step===2?.72:.46,32),
+    knightMat(KNIGHT_GOLD,step===2?.92:.72)
   );
   ring.position.set(0,1.0,.02);
   ring.rotation.y=yaw;
   g.add(ring);
 
-  for(let i=0;i<(step===2?8:5);i++){
+  const halo=new THREE.Mesh(
+    new THREE.RingGeometry(step===2?.46:.26,step===2?1.02:.66,30),
+    knightMat(KNIGHT_IVORY,step===2?.36:.26)
+  );
+  halo.position.set(0,1.0,.03);
+  halo.rotation.y=yaw;
+  g.add(halo);
+
+  for(let i=0;i<(step===2?10:6);i++){
     const shard=new THREE.Mesh(
-      new THREE.PlaneGeometry(step===2?.10:.07,step===2?.58:.36),
-      knightMat(i%2?KNIGHT_GOLD:KNIGHT_IVORY,.82)
+      new THREE.PlaneGeometry(step===2?.11:.07,step===2?.66:.40),
+      knightMat(i%2?KNIGHT_GOLD:KNIGHT_IVORY,.84)
     );
-    const a=(i/(step===2?8:5))*Math.PI*2;
-    shard.position.set(Math.cos(a)*(step===2?.42:.28),1+Math.sin(a)*.18,Math.sin(a)*(step===2?.42:.28));
-    shard.rotation.set(0,-a,Math.sin(a)*.35);
+    const a=(i/(step===2?10:6))*Math.PI*2;
+    shard.position.set(Math.cos(a)*(step===2?.50:.30),1+Math.sin(a)*.20,Math.sin(a)*(step===2?.50:.30));
+    shard.rotation.set(0,-a,Math.sin(a)*.38);
     g.add(shard);
   }
 
-  g.position.set(origin.x+fx1*(step===2?1.55:1.15),origin.y,origin.z+fz1*(step===2?1.55:1.15));
+  if(step===2){
+    for(let i=0;i<4;i++){
+      const ray=new THREE.Mesh(
+        new THREE.PlaneGeometry(.08,.92),
+        knightMat(i%2?KNIGHT_GOLD:KNIGHT_IVORY,.72)
+      );
+      ray.position.set(0,1.02,0);
+      ray.rotation.z=i*Math.PI/2;
+      g.add(ray);
+    }
+  }
+
+  g.position.set(origin.x+fx1*(step===2?1.62:1.20),origin.y,origin.z+fz1*(step===2?1.62:1.20));
   knightBaseOpacity(g);
   pushKnightFx(g,{
-    life:step===2?.34:.22,
-    grow:step===2?1.15:.72,
+    life:step===2?.36:.24,
+    grow:step===2?1.28:.80,
     from:.55,
-    spin:step===1?-4.5:4.5
+    spin:step===1?-5.2:5.2
   });
+
+  if(step===2){
+    knightShockRing({x:g.position.x,y:origin.y,z:g.position.z},1.36,KNIGHT_GOLD,.22);
+  }
 }
 
 function spawnKnightGuardBurst(origin,radius=2.2,color=KNIGHT_GOLD){
@@ -12518,71 +12602,77 @@ function knightAutoFace(range){
   return t;
 }
 function knightRoyalCombo(w){
-  knightAutoFace(7);
-  const yaw=player.rotation.y;
-  const pos={x:player.position.x,y:player.position.y,z:player.position.z};
+  if(!player) return;
   if(knightRuntime.comboTimer<=0) knightRuntime.comboStep=0;
   const step=knightRuntime.comboStep%3;
   knightRuntime.comboStep=(knightRuntime.comboStep+1)%3;
   knightRuntime.comboTimer=KNIGHT_CFG.combo.resetWindow;
 
-  // Each hit now has its own readable cadence:
-  // 1 = quick committed opener, 2 = reverse follow-through, 3 = heavy finisher.
-  const clipWords=step===2?['melee','chop']:['melee','slash'];
-  const actionLock=[.13,.14,.22][step];
-  const blend=[.10,.11,.18][step];
+  // Each hit gets a little more commitment and spectacle as the chain builds.
+  knightAutoFace([7.2,7.8,8.4][step]);
+  const yaw=player.rotation.y;
+  const pos={x:player.position.x,y:player.position.y,z:player.position.z};
+  const fx1=Math.sin(yaw),fz1=Math.cos(yaw);
+
+  const clipWords=step===2?['melee','chop']:(step===1?['melee','slice']:['melee','slash']);
+  const actionLock=[.14,.16,.24][step];
+  const blend=[.10,.12,.20][step];
   knightPlayClip(clipWords,'1H_Melee_Attack_Chop',actionLock,blend);
 
-  // Brighter layered trails, with the finisher visibly larger.
-  knightSwordTrail(pos,yaw,step,[1.08,1.13,1.34][step]);
+  knightRuntime.frontGuardTimer=Math.max(knightRuntime.frontGuardTimer||0,[.14,.18,.24][step]);
+  knightRuntime.resistTimer=Math.max(knightRuntime.resistTimer||0,[.08,.12,.18][step]);
+
+  // Brighter layered trails, after-images, and a small guard pulse so the body and shield feel connected.
+  knightSwordTrail(pos,yaw,step,[1.16,1.22,1.48][step]);
   if(knightFxBudget(1)){
     const echoPos={
-      x:pos.x-Math.sin(yaw)*.08,
-      y:pos.y+(step===2?.08:0),
-      z:pos.z-Math.cos(yaw)*.08
+      x:pos.x-Math.sin(yaw)*.12,
+      y:pos.y+(step===2?.10:.04),
+      z:pos.z-Math.cos(yaw)*.12
     };
-    knightSwordTrail(echoPos,yaw+(step===1?.05:-.04),step,[.90,.94,1.12][step]);
+    knightSwordTrail(echoPos,yaw+(step===1?.09:-.06),step,[.94,1.00,1.18][step]);
+  }
+  if(knightFxBudget(1) && step!==2){
+    spawnKnightGuardBurst(pos,step===0?1.25:1.55,step===0?KNIGHT_STEEL:KNIGHT_GOLD);
   }
 
-  const dmgMult=[1,1.08,1.55][step];
-  const arc=[2.05,2.35,2.55][step];
-  const radius=w.radius*(step===2?1.15:1);
+  const dmgMult=[1.0,1.12,1.62][step];
+  const arc=[2.12,2.48,2.72][step];
+  const radius=w.radius*(step===2?1.20:(step===1?1.06:1));
   const hits=knightMeleeArc(pos,yaw,radius,arc,w.damage*dmgMult,
-    {knock:[2.6,3.6,5.8][step],stun:[.14,.20,.42][step],bruteMult:.85,bossMult:.42});
+    {knock:[2.9,4.1,6.3][step],stun:[.16,.24,.48][step],bruteMult:.85,bossMult:.42});
 
   knightComboImpact(pos,yaw,step,hits);
   if(hits){
-    knightHitStop([.032,.038,.062][step]);
+    knightHitStop([.034,.042,.068][step]);
     knightAddDiscipline();
-    const fx1=Math.sin(yaw),fz1=Math.cos(yaw);
     spawnBurst(
-      pos.x+fx1*(step===2?1.55:1.15),
-      pos.y+1.0,
-      pos.z+fz1*(step===2?1.55:1.15),
-      step===2?18:10,
+      pos.x+fx1*(step===2?1.62:1.18),
+      pos.y+1.02,
+      pos.z+fz1*(step===2?1.62:1.18),
+      step===2?20:12,
       FX_MAT_SPARK,
-      step===2?4.8:3.4
+      step===2?5.0:3.8
     );
   }
 
   if(step===2){
-    // Compact frontal shockwave — controlled, not an arena-wide blast.
-    const fx1=Math.sin(yaw),fz1=Math.cos(yaw);
-    const c={x:pos.x+fx1*1.5,y:pos.y,z:pos.z+fz1*1.5};
-    knightShockRing(c,2.5,KNIGHT_GOLD,.32);
-    knightShockRing(c,1.65,KNIGHT_IVORY,.24);
-    knightRadial(c,2.5,w.damage*.8,{knock:5.0,stun:.5,bruteMult:.7,bossMult:.3});
-    spawnKnightGuardBurst(player.position,2.5);
-    knightGroundCracks(c,2.25,6,KNIGHT_GOLD);
-    triggerCombatShake(13,190);
+    // Compact royal finisher: a brighter stomp-like release with a clearer crown moment.
+    const c={x:pos.x+fx1*1.58,y:pos.y,z:pos.z+fz1*1.58};
+    knightShockRing(c,2.85,KNIGHT_GOLD,.34);
+    knightShockRing(c,1.92,KNIGHT_IVORY,.26);
+    knightRadial(c,2.7,w.damage*.82,{knock:5.4,stun:.55,bruteMult:.7,bossMult:.3});
+    spawnKnightGuardBurst(player.position,2.9,KNIGHT_GOLD);
+    knightGroundCracks(c,2.45,7,KNIGHT_GOLD);
+    triggerCombatShake(16,220);
   }else{
-    triggerCombatShake(hits?[6,8][step]:3,[95,115][step]);
+    triggerCombatShake(hits?[7,10][step]:4,[105,130][step]);
   }
 
-  // Controlled forward body commitment. The first two hits flow forward;
-  // the finisher plants the Knight instead of sliding through the target.
-  const forward=[.40,.34,.18][step];
-  const side=[-.07,.08,0][step];
+  // Stronger body commitment: opener lunges in, second swing pivots through,
+  // finisher advances and plants with authority.
+  const forward=[.52,.44,.30][step];
+  const side=[-.11,.16,.02][step];
   const nx=player.position.x+Math.sin(yaw)*forward+Math.cos(yaw)*side;
   const nz=player.position.z+Math.cos(yaw)*forward-Math.sin(yaw)*side;
   const r=resolveCollision(nx,nz,player.position.y);
@@ -12590,7 +12680,7 @@ function knightRoyalCombo(w){
   player.position.z=r.z;
 
   if(navigator.vibrate){
-    navigator.vibrate(hits?(step===2?[28,14,48]:step===1?[18,8,24]:[14,8,18]):8);
+    navigator.vibrate(hits?(step===2?[30,14,56]:step===1?[20,10,30]:[16,8,22]):8);
   }
 }
 function knightGuardedThrust(w){
