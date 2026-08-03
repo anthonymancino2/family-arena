@@ -1,3 +1,4 @@
+<!-- V22.13.39 Starter Global Top Three: replaces the empty home leaderboard state with a compact three-rank Challenge Board. The starter candidates are Iron Crown (Round 25 · 8:42), Storm Knight (Round 20 · 6:18), and Nova Guard (Round 15 · 4:55). They are clearly labeled starter targets and are shown only while there are zero valid real global scores. As soon as any score arrives from Firestore—regardless of device or username—the entire starter list is removed and the board displays up to the top three real global entries. -->
 <!-- V22.13.38 Knight Special Slot Fix: Knights of the Round now occupies the large Knight signature button formerly used by Judgment. Its button displays readiness, cooldown, active clone count, and remaining duration. Judgment of the King is moved into the equipable ultimate-tier Ability list at Level 18 and uses the Ability button while retaining its 100% Valor requirement and existing attack sequence. Enemy melee and projectile hits on Knight clones are fully absorbed by the invincible clone and never call playerTakeHit; clone health is independent and infinite. -->
 <!-- V22.13.37 Knights of the Round: renames the Knight clone Ability from Royal Guard Clones to Knights of the Round across the shop, HUD, unlock notice, toast, and build labels. Clone count, duration, cooldown, invincibility, aggro, move inheritance, damage, movement, and cleanup are unchanged. -->
 <!-- V22.13.36 Knights of the Round: adds a Level-10 Knight clone Ability. Rounds 10-15 summon 2 invincible clones for 8 seconds with a 10-second cooldown; Rounds 16-20 summon 5 for 15 seconds with a 5-second cooldown; Round 21 onward summons 10 for 30 seconds with a 1.5-second cooldown. Clones deal 10% of player damage, take aggro before the player, seek enemies within 12 units, and return after remaining more than 11 units from the player for 10 seconds. Their attack rotation expands with Knight unlock levels. -->
@@ -153,7 +154,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.38</title>
+<title>Family Arena V22.13.39</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -629,7 +630,7 @@
 .homePrompt{font-size:12px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;color:#dff7ff;margin:0 0 8px 3px;}
 #screenHome .nameRow{margin:0 0 10px;max-height:82px;overflow-y:auto;}
 #screenHome #newName{margin:0 0 12px;background:rgba(255,255,255,.94);color:#18283a;border:none;box-shadow:inset 0 0 0 2px rgba(17,64,94,.12);}
-.homePlayerShowcase{display:grid;grid-template-columns:72px 1fr;gap:12px;align-items:center;margin:0 0 12px;padding:10px 12px;border-radius:18px;background:linear-gradient(135deg,rgba(70,176,229,.20),rgba(132,81,201,.18));border:1px solid rgba(198,235,255,.38);box-shadow:inset 0 1px 0 rgba(255,255,255,.12);}
+.homePlayerShowcase{display:grid;grid-template-columns:72px 1fr;gap:12px;align-items:center;margin:0 0 12px;padding:10px 12px;border-radius:18px;background:linear-gradient(135deg,rgba(70,176,229,.20),rgba(132,81,201,.18));border:1px solid rgba(198,235,255,.38);box-shadow:inset 0 1px 0 rgba(255,255,255,.12);min-height:112px;}
 .homeHeroPortrait{width:72px;height:72px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:42px;background:radial-gradient(circle at 45% 30%,rgba(255,255,255,.30),rgba(33,57,82,.82) 70%);border:2px solid rgba(255,255,255,.42);filter:drop-shadow(0 5px 8px rgba(0,0,0,.28));}
 .homeHeroDetails{min-width:0;text-align:left;}
 .homeHeroLabel{font-size:9px;font-weight:900;letter-spacing:1.35px;color:#9fddff;text-transform:uppercase;}
@@ -637,6 +638,14 @@
 .homeBestScore{display:flex;align-items:baseline;gap:7px;margin-top:5px;}
 .homeBestScore span:first-child{font-size:10px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;color:#f5dc8a;}
 .homeBestScore strong{font-size:21px;color:#ffe36e;text-shadow:0 2px 6px rgba(0,0,0,.35);}
+.homeLeaderboard{display:flex;flex-direction:column;gap:4px;margin-top:5px;}
+.homeLbRow{display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:center;gap:6px;min-height:21px;padding:2px 5px;border-radius:7px;background:rgba(5,14,25,.25);font-size:10px;font-weight:850;}
+.homeLbRank{color:#ffe36e;text-align:center;font-size:11px;}
+.homeLbName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;}
+.homeLbScore{white-space:nowrap;color:#bcecff;font-variant-numeric:tabular-nums;}
+.homeLbRow:first-child{background:rgba(255,211,90,.13);box-shadow:inset 0 0 0 1px rgba(255,224,118,.24);}
+.homeLbStarter{font-size:8px;color:#b8cbd8;letter-spacing:.45px;text-transform:uppercase;margin-top:2px;opacity:.86;}
+
 .homeActions{display:grid;grid-template-columns:1fr .42fr;gap:10px;}
 .homeUtilityRow{display:grid;grid-template-columns:1fr;gap:7px;margin-top:10px;}
 #screenHome #btnRefreshSync{width:100%;min-height:39px;margin:0;padding:8px 12px;border-radius:13px;background:rgba(8,22,36,.62);border:1px solid rgba(159,223,255,.42);color:#dff7ff;font-size:12px;font-weight:850;letter-spacing:.25px;}
@@ -1149,9 +1158,11 @@
         <div class="homePlayerShowcase" id="homePlayerShowcase">
           <div class="homeHeroPortrait" id="homeHeroPortrait" aria-hidden="true">⚔️</div>
           <div class="homeHeroDetails">
-            <div class="homeHeroLabel" id="homeHeroLabel">Select a player</div>
-            <div class="homeHeroName" id="homeHeroName">Your Hero</div>
-            <div class="homeBestScore"><span>Global High Score</span><strong id="homeHighestScore">—</strong></div>
+            <div class="homeHeroLabel" id="homeHeroLabel">Global Top 3</div>
+            <div class="homeLeaderboard" id="homeLeaderboard"></div>
+            <div class="homeLbStarter" id="homeLeaderboardStatus"></div>
+            <div class="homeHeroName" id="homeHeroName" style="display:none;"></div>
+            <strong id="homeHighestScore" style="display:none;"></strong>
           </div>
         </div>
         <div class="homeActions">
@@ -1838,19 +1849,39 @@ function refreshCrystalPills(){
 
 // ---- HOME: selected hero + local high score ----
 const HOME_HERO_ICONS = {rogue:'🏹',hooded:'🥷',mage:'🔮',knight:'🛡️',barbarian:'🪓'};
+const HOME_STARTER_LEADERBOARD=[
+  {name:'Iron Crown',score:25*100000-(8*60+42)},
+  {name:'Storm Knight',score:20*100000-(6*60+18)},
+  {name:'Nova Guard',score:15*100000-(4*60+55)}
+];
 function updateHomePlayerShowcase(){
   const label=document.getElementById('homeHeroLabel');
-  const heroName=document.getElementById('homeHeroName');
   const portrait=document.getElementById('homeHeroPortrait');
-  const scoreEl=document.getElementById('homeHighestScore');
-  if(!label||!heroName||!portrait||!scoreEl) return;
-  const champion=(cloudSurvivalLeaderboardCache||[])
+  const board=document.getElementById('homeLeaderboard');
+  const status=document.getElementById('homeLeaderboardStatus');
+  if(!label||!portrait||!board||!status) return;
+
+  const realRows=(cloudSurvivalLeaderboardCache||[])
     .filter(r=>r&&r.name&&Number.isFinite(Number(r.score)))
-    .sort((a,b)=>Number(b.score)-Number(a.score))[0]||null;
+    .sort((a,b)=>Number(b.score)-Number(a.score));
+  const usingStarter=realRows.length===0;
+  const rows=(usingStarter?HOME_STARTER_LEADERBOARD:realRows).slice(0,3);
+
   portrait.textContent='🏆';
-  label.textContent=champion?'LIVE WORLD CHAMPION':'LIVE GLOBAL BOARD';
-  heroName.textContent=champion?champion.name:'No score registered yet';
-  scoreEl.textContent=champion?formatSurvivalScore(champion.score):'—';
+  label.textContent=usingStarter?'CHALLENGE BOARD · TOP 3':'LIVE GLOBAL BOARD · TOP 3';
+  board.innerHTML='';
+  rows.forEach((row,index)=>{
+    const item=document.createElement('div');
+    item.className='homeLbRow';
+    const medal=index===0?'🥇':(index===1?'🥈':'🥉');
+    item.innerHTML=`<span class="homeLbRank">${medal}</span><span class="homeLbName"></span><span class="homeLbScore"></span>`;
+    item.querySelector('.homeLbName').textContent=row.name;
+    item.querySelector('.homeLbScore').textContent=formatSurvivalScore(row.score);
+    board.appendChild(item);
+  });
+  status.textContent=usingStarter
+    ? 'Starter targets · replaced when the first real global score arrives'
+    : (realRows.length===1?'1 verified global score':`${Math.min(3,realRows.length)} live global leaders`);
 }
 async function refreshAndSyncGame(){
   const btn=document.getElementById('btnRefreshSync');
