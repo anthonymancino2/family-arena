@@ -1,3 +1,5 @@
+<!-- V22.13.37 Knights of the Round: renames the Knight clone Ability from Royal Guard Clones to Knights of the Round across the shop, HUD, unlock notice, toast, and build labels. Clone count, duration, cooldown, invincibility, aggro, move inheritance, damage, movement, and cleanup are unchanged. -->
+<!-- V22.13.36 Knights of the Round: adds a Level-10 Knight clone Ability. Rounds 10-15 summon 2 invincible clones for 8 seconds with a 10-second cooldown; Rounds 16-20 summon 5 for 15 seconds with a 5-second cooldown; Round 21 onward summons 10 for 30 seconds with a 1.5-second cooldown. Clones deal 10% of player damage, take aggro before the player, seek enemies within 12 units, and return after remaining more than 11 units from the player for 10 seconds. Their attack rotation expands with Knight unlock levels. -->
 <!-- V22.13.35 Guardian Quake Combo: combines Guardian Charge and Earth Shatter into one Ability. Hold the Ability button through the completed charge to flow directly into Earth Shatter; releasing early cancels the follow-up. A smaller AUTO/MANUAL toggle appears beside the Ability button only when Guardian Quake is equipped. AUTO steers toward the nearest living enemy while held; MANUAL preserves normal movement steering. Any future infinite charge duration is capped at 20 seconds. The old separate Guardian Charge and Earth Shatter ability entries are removed; their existing damage, collision, impact, resistance, and visual logic are reused. -->
 <!-- V22.13.34 Whirlwind Secondary Scaling: Defensive Whirlwind moves from the Ability slot to the Knight Secondary slot and unlocks at Level 6. Its cooldown now scales by round: 8s for Rounds 1-10, 3s for 11-15, 1.5s for 16-20, and 0s from Round 21 onward. Duration begins at 3.8s on Round 1, increases by 0.5s each round through Round 24, and becomes permanent from Round 25 onward. The Secondary HUD displays active time or infinity. Existing whirlwind damage, knockback, projectile deflection, movement penalty, visuals, and passive version are unchanged. -->
 <!-- V22.13.33 Vanguard Hold Combo: Royal Vanguard Combo now continuously advances through Guarded Thrust, Cleaving Guard, and Shield Bash while the Primary FIRE button is held. Releasing the button stops the sequence immediately without a buffered extra strike. Individual taps still advance one combo step at a time. Damage, cadence, effects, unlock level, and other Knight moves are unchanged. -->
@@ -150,7 +152,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.35</title>
+<title>Family Arena V22.13.37</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1370,7 +1372,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.35 - Guardian Quake Combo';
+const GAME_VERSION='22.13.36 - Knights of the Round';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2333,8 +2335,8 @@ const LEVEL_UNLOCKS = [
   {level:5,  id:'knight_royal_vanguard', name:'Royal Vanguard Combo', desc:'The Knight unlocks an upgraded Primary chain combining Guarded Thrust, Cleaving Guard, and Shield Bash.', avatar:'knight'},
   {level:6,  id:'knight_defensive_whirlwind', name:'Defensive Whirlwind', desc:'The controlled sword-and-shield rotation becomes equipable in the Secondary slot.', avatar:'knight'},
   {level:8,  id:'knight_shield_toss', name:'Shield Toss', desc:'Throw and recall the royal shield from the Secondary slot.', avatar:'knight'},
-  {level:10, id:'knight_earth_shatter', name:'Earth Shatter', desc:'A tactical shield-and-sword ground impact joins the Ability slot.', avatar:'knight'},
-  {level:12, id:'knight_guardian_charge', name:'Guardian Charge', desc:'A shield-first armored advance joins the Ability slot.', avatar:'knight'},
+  {level:10, id:'knight_royal_guard_clones', name:'Knights of the Round', desc:'Summon invincible Knight copies that inherit the moves unlocked so far and draw enemy attention.', avatar:'knight'},
+  {level:12, id:'knight_guardian_quake', name:'Guardian Quake', desc:'Guardian Charge and Earth Shatter combine into one hold-controlled Ability with Auto and Manual steering.', avatar:'knight'},
   {level:14, id:'knight_aegis_counter', name:'Aegis Counter', desc:'The signature guard-and-counter becomes equipable in the Ability slot.', avatar:'knight'},
   {level:16, id:'knight_banner_spear', name:'Banner Spear', desc:'Plant a defensive royal banner zone from the Secondary slot.', avatar:'knight'},
   {level:18, id:'knight_judgment', name:'Judgment of the King', desc:'The Knight ultimate reaches full royal authority.', avatar:'knight'}
@@ -2631,6 +2633,8 @@ const KNIGHT_GUARDIAN_QUAKE = {id:'knight_guardian_quake', name:'Guardian Quake'
   desc:'Hold the Ability button to begin Guardian Charge and automatically flow into Earth Shatter when the charge finishes. Releasing before the charge ends cancels the Earth Shatter follow-up. AUTO mode steers toward the nearest living enemy; MANUAL mode uses normal movement controls. If a future charge duration becomes infinite, it is capped at 20 seconds. 16-second cooldown.'};
 const KNIGHT_AEGIS_COUNTER = {id:'knight_aegis_counter', name:'Aegis Counter', price:780, avatar:'knight', unlockLevel:14,
   desc:'The signature counter. Enter a brief guard window with a clear timing ring; if you are struck the hit is negated and you immediately release a heavy sword-and-shield counterattack that scales by enemy type with a boss cap. A failed guard always ends safely. 11-second cooldown.'};
+const KNIGHT_ROYAL_GUARD_CLONES = {id:'knight_royal_guard_clones', name:'Knights of the Round', price:880, avatar:'knight', unlockLevel:10,
+  desc:'Summon invincible Knight clones that draw enemy attention and use only the Knight moves currently unlocked. Each clone deals 10% of the player\'s damage. Rounds 10–15 summon 2 clones for 8 seconds with a 10-second cooldown; Rounds 16–20 summon 5 for 15 seconds with a 5-second cooldown; Round 21 onward summons 10 for 30 seconds with a 1.5-second cooldown.'};
 const SUPERNOVA_PIERCER = {id:'supernova_piercer', name:'Supernova Piercer', price:860,
   desc:'Signature ultimate. Enter a 3-second rooted sniper charge, then fire a solar beam completely across the map. Instantly defeats non-boss enemies in its path and deals 50% max HP to bosses. Uses a 30-second cooldown.'};
 // Coins earned per kill — a flat rate that inches up in later rounds so
@@ -9843,7 +9847,9 @@ function spawnPlayer(){
 
 // ---- Zombies ----
 function livingPlayers(){
-  // Temporary Mirror Volley decoys and permanent summons take aggro before the real player.
+  // Knight clones have first aggro priority and are invincible.
+  const knightClones=knightRoyalClones.filter(e=>e&&e.parent&&e.userData&&!e.userData.dead);
+  if(knightClones.length)return knightClones;
   const volleyDecoys=mirrorVolleyDecoys.filter(e=>e&&e.parent);
   if(volleyDecoys.length)return volleyDecoys;
   const mirrors=archerMirrorClones.filter(e=>e&&e.parent&&!e.userData.dead&&e.userData.hp>0);
@@ -10659,7 +10665,7 @@ function renderShopList(){
 // button remains in the approved position directly left of FIRE. Buying
 // an ability equips it immediately; owned abilities can be swapped here.
 const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
-  knight:[KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER] };
+  knight:[KNIGHT_ROYAL_GUARD_CLONES, KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER] };
 const REMOVED_WEAPON_IDS=['radiant_cleave','blade_cyclone','holy_wave'];
 function sanitizeRemovedAbilitySelection(){
   if(equippedAbilityId==='tempest_domain'||equippedAbilityId==='arrow_storm'||
@@ -11870,7 +11876,7 @@ function spawnArcherMuzzleFan(big=false){
   fx.push({kind:'archerFan',mesh:g,vx:dx*5.5,vz:dz*5.5,life:big?.30:.20,maxLife:big?.30:.20});
 }
 /* =====================================================================
-   KNIGHT — ROYAL GUARDIAN (full production pass)
+   KNIGHT — KNIGHTSIAN (full production pass)
    Tank / Counter-Bruiser / Battlefield Protector.
    Disciplined, armored, royal. Deliberately leaves rage, axes, frenzy,
    reckless leaps and destructive ground-tearing to the future Barbarian.
@@ -11937,6 +11943,20 @@ function createFreshKnightRuntime(){
 let knightRuntime = createFreshKnightRuntime();
 let knightGuardianQuakeHeld=false;
 let knightGuardianQuakeMode='auto';
+let knightRoyalClones=[];
+let knightRoyalCloneCooldown=0;
+let knightRoyalCloneCycleDuration=0;
+
+function knightRoyalCloneConfig(){
+  const r=Math.max(1,Number(round)||1);
+  if(r<10) return {count:0,duration:0,cooldown:0};
+  if(r<=15) return {count:2,duration:8,cooldown:10};
+  if(r<=20) return {count:5,duration:15,cooldown:5};
+  return {count:10,duration:30,cooldown:1.5};
+}
+function knightRoyalCloneUnlocked(){
+  return knightIsActive() && Math.max(1,Number(round)||1)>=10;
+}
 
 
 /* ---------------------------------------------------------------- state */
@@ -14779,12 +14799,212 @@ function knightUpdateLastStand(dt){
   }
 }
 
+
+function tintKnightRoyalClone(root,index){
+  root.traverse(o=>{
+    if(!o.isMesh||!o.material)return;
+    const mats=(Array.isArray(o.material)?o.material:[o.material]).map(m=>{
+      const c=m.clone();
+      c.transparent=true;c.opacity=.68;c.depthWrite=false;
+      if(c.color)c.color.lerp(new THREE.Color(index%2?0x9fd4ff:0xffd35a),.38);
+      if(c.emissive)c.emissive.setHex(index%2?0x173d59:0x4d3510);
+      return c;
+    });
+    o.material=Array.isArray(o.material)?mats:mats[0];
+  });
+}
+function clearKnightRoyalClones(){
+  for(const c of knightRoyalClones){
+    if(c&&c.parent){c.parent.remove(c);disposeGroup(c);}
+  }
+  knightRoyalClones=[];
+  for(const z of zombies){
+    if(z&&z.userData&&z.userData.targetPlayer&&z.userData.targetPlayer.userData&&
+       z.userData.targetPlayer.userData.isKnightRoyalClone){
+      z.userData.targetPlayer=null;z.userData.targetRefresh=0;
+    }
+  }
+}
+function removeKnightRoyalClone(c){
+  if(!c)return;
+  if(c.parent)c.parent.remove(c);
+  disposeGroup(c);
+  knightRoyalClones=knightRoyalClones.filter(x=>x!==c);
+  for(const z of zombies){
+    if(z&&z.userData&&z.userData.targetPlayer===c){
+      z.userData.targetPlayer=null;z.userData.targetRefresh=0;
+    }
+  }
+}
+function knightCloneAvailableMoves(){
+  const level=avatarLevel(),moves=['royal_combo'];
+  if(level>=5)moves.push('royal_vanguard');
+  if(level>=6)moves.push('defensive_whirlwind');
+  if(level>=8)moves.push('shield_toss');
+  if(level>=12)moves.push('guardian_quake');
+  if(level>=14)moves.push('aegis_counter');
+  if(level>=16)moves.push('banner_spear');
+  return moves;
+}
+function knightCloneDamageBase(){
+  const primary=weaponForAvatar();
+  return Math.max(1,Number(primary&&primary.damage)||1.35)*playerStats.power*.10;
+}
+function knightCloneStrikeFx(c,target,kind){
+  if(!c||!target||!knightFxBudget(2))return;
+  const yaw=Math.atan2(target.position.x-c.position.x,target.position.z-c.position.z);
+  const pos={x:c.position.x,y:c.position.y,z:c.position.z};
+  if(kind==='defensive_whirlwind'){
+    const ring=new THREE.Mesh(new THREE.RingGeometry(1.25,2.15,36),knightMat(KNIGHT_STEEL,.48));
+    ring.rotation.x=-Math.PI/2;ring.position.set(pos.x,pos.y+.06,pos.z);
+    knightBaseOpacity(ring);pushKnightFx(ring,{life:.30,grow:.34,from:.78,spin:11});return;
+  }
+  if(kind==='guardian_quake'){
+    knightShockRing(pos,2.4,KNIGHT_GOLD,.26);knightGroundCracks(pos,2.2,5,KNIGHT_STEEL);return;
+  }
+  if(kind==='shield_toss'){
+    const len=Math.max(1.6,c.position.distanceTo(target.position));
+    const line=new THREE.Mesh(new THREE.PlaneGeometry(.22,len),knightMat(KNIGHT_IVORY,.64));
+    line.rotation.x=-Math.PI/2;
+    line.position.set((c.position.x+target.position.x)*.5,c.position.y+.72,(c.position.z+target.position.z)*.5);
+    line.rotation.y=yaw;knightBaseOpacity(line);pushKnightFx(line,{life:.18,grow:.12,from:.92});return;
+  }
+  knightSwordTrail(pos,yaw,kind==='royal_vanguard'?1:0,kind==='royal_vanguard'?.82:.68);
+}
+function knightClonePerformMove(c,target){
+  if(!c||!target||target.userData.dead)return;
+  const moves=c.userData.unlockedMoves||['royal_combo'];
+  const kind=moves[c.userData.moveIndex%moves.length];
+  c.userData.moveIndex=(c.userData.moveIndex+1)%moves.length;
+  const base=knightCloneDamageBase();
+  const dx=target.position.x-c.position.x,dz=target.position.z-c.position.z,dist=Math.hypot(dx,dz)||1;
+  c.rotation.y=Math.atan2(dx,dz);
+
+  if(kind==='defensive_whirlwind'){
+    knightCloneStrikeFx(c,target,kind);
+    for(const z of zombies)if(z&&!z.userData.dead&&!z.userData.spawnPending&&Math.hypot(z.position.x-c.position.x,z.position.z-c.position.z)<=2.7)applyBulletDamage(z,base*.72);
+    c.userData.attackCooldown=.76;
+  }else if(kind==='guardian_quake'){
+    knightCloneStrikeFx(c,target,kind);
+    for(const z of zombies){
+      if(!z||z.userData.dead||z.userData.spawnPending)continue;
+      if(Math.hypot(z.position.x-c.position.x,z.position.z-c.position.z)<=3.3){
+        applyBulletDamage(z,base*1.15);
+        if(!z.userData.dead)z.userData.hitStun=Math.max(z.userData.hitStun||0,.28);
+      }
+    }
+    c.userData.attackCooldown=1.1;
+  }else if(kind==='shield_toss'){
+    knightCloneStrikeFx(c,target,kind);applyBulletDamage(target,base*.95);c.userData.attackCooldown=.82;
+  }else if(kind==='aegis_counter'){
+    knightShieldBashImpact(c.position,c.rotation.y,1);applyBulletDamage(target,base*1.05);
+    if(!target.userData.dead)target.userData.hitStun=Math.max(target.userData.hitStun||0,.32);
+    c.userData.attackCooldown=.88;
+  }else if(kind==='banner_spear'){
+    knightShockRing(c.position,2.8,KNIGHT_GOLD,.18);applyBulletDamage(target,base*.70);
+    target.userData.slowTimer=Math.max(target.userData.slowTimer||0,.8);
+    target.userData.slowMult=Math.min(target.userData.slowMult||1,.55);
+    c.userData.attackCooldown=1.0;
+  }else if(kind==='royal_vanguard'){
+    knightCloneStrikeFx(c,target,kind);applyBulletDamage(target,base*1.15);
+    if(!target.userData.dead){target.userData.knockbackX=(dx/dist)*2.1;target.userData.knockbackZ=(dz/dist)*2.1;}
+    c.userData.attackCooldown=.64;
+  }else{
+    knightCloneStrikeFx(c,target,kind);applyBulletDamage(target,base);c.userData.attackCooldown=.56;
+  }
+}
+function triggerKnightRoyalGuardClones(){
+  if(!gameRunning||!knightRoyalCloneUnlocked()||knightRoyalCloneCooldown>0)return false;
+  const cfg=knightRoyalCloneConfig();
+  if(cfg.count<=0)return false;
+  clearKnightRoyalClones();
+  knightRoyalCloneCooldown=cfg.cooldown;knightRoyalCloneCycleDuration=cfg.cooldown;
+  getKayKitAssetPromise('knight').then(({gltf,THREEAsset,cloneSkinned})=>{
+    for(let i=0;i<cfg.count;i++)setTimeout(()=>{
+      if(!player||state.avatarType!=='knight'||!gameRunning)return;
+      const wrap=new THREE.Group(),root=cloneSkinned(gltf.scene);root.rotation.y=0;
+      const box=new THREEAsset.Box3().setFromObject(root),size=box.getSize(new THREEAsset.Vector3());
+      root.scale.setScalar(1.48/Math.max(.001,size.y));
+      const box2=new THREEAsset.Box3().setFromObject(root);root.position.y-=box2.min.y;
+      tintKnightRoyalClone(root,i);wrap.add(root);
+      const a=(i/cfg.count)*Math.PI*2,rr=2+(i%3)*.45;
+      wrap.position.set(player.position.x+Math.cos(a)*rr,player.position.y,player.position.z+Math.sin(a)*rr);
+      Object.assign(wrap.userData,{
+        isKnightRoyalClone:true,invincible:true,hp:999999,dead:false,cloneIndex:i,life:cfg.duration,
+        attackCooldown:.18+i*.06,moveIndex:i,unlockedMoves:knightCloneAvailableMoves(),farTimer:0,returning:false,
+        kayMixer:new THREEAsset.AnimationMixer(root),kayClips:{}
+      });
+      for(const clip of gltf.animations)wrap.userData.kayClips[clip.name]=clip;
+      scene.add(wrap);knightRoyalClones.push(wrap);
+      spawnKnightGuardBurst(wrap.position,1.25,i%2?KNIGHT_STEEL:KNIGHT_GOLD);
+    },i*95);
+  });
+  toast('KNIGHTS · '+cfg.count+' CLONES');
+  if(navigator.vibrate)navigator.vibrate([28,18,52]);
+  return true;
+}
+function updateKnightRoyalClones(dt){
+  if(knightRoyalCloneCooldown>0)knightRoyalCloneCooldown=Math.max(0,knightRoyalCloneCooldown-dt);
+  if(!player)return;
+  const now=performance.now()*.001;
+  for(const c of [...knightRoyalClones]){
+    if(!c||!c.parent)continue;
+    c.userData.life-=dt;
+    if(c.userData.life<=0){spawnKnightGuardBurst(c.position,1,KNIGHT_STEEL);removeKnightRoyalClone(c);continue;}
+    if(c.userData.kayMixer)c.userData.kayMixer.update(dt);
+    c.userData.attackCooldown=Math.max(0,(c.userData.attackCooldown||0)-dt);
+
+    const playerDist=Math.hypot(c.position.x-player.position.x,c.position.z-player.position.z);
+    if(playerDist>11)c.userData.farTimer=(c.userData.farTimer||0)+dt;
+    else{c.userData.farTimer=0;c.userData.returning=false;}
+    if(c.userData.farTimer>=10)c.userData.returning=true;
+
+    let target=null,best=12*12;
+    if(!c.userData.returning){
+      for(const z of zombies){
+        if(!z||z.userData.dead||z.userData.spawnPending||!z.visible)continue;
+        const d=c.position.distanceToSquared(z.position);
+        if(d<best){best=d;target=z;}
+      }
+    }
+
+    let desired;
+    if(c.userData.returning){
+      const i=c.userData.cloneIndex||0,a=now*.28+(i/Math.max(1,knightRoyalClones.length))*Math.PI*2;
+      desired=new THREE.Vector3(player.position.x+Math.cos(a)*2.4,player.position.y,player.position.z+Math.sin(a)*2.4);
+      if(playerDist<4){c.userData.returning=false;c.userData.farTimer=0;}
+    }else if(target){
+      const toward=target.position.clone().sub(c.position);toward.y=0;const d=toward.length();
+      if(d>1.8){toward.normalize();desired=c.position.clone().addScaledVector(toward,Math.min(3,d-1.45));desired.y=player.position.y;}
+    }else{
+      const i=c.userData.cloneIndex||0,a=now*.34+(i/Math.max(1,knightRoyalClones.length))*Math.PI*2;
+      desired=new THREE.Vector3(player.position.x+Math.cos(a)*3.2,player.position.y,player.position.z+Math.sin(a)*3.2);
+    }
+
+    if(desired){
+      const dist=c.position.distanceTo(desired);
+      if(dist>18)c.position.copy(desired);
+      else{
+        const step=Math.min(1,dt*(c.userData.returning?7.5:5.4));
+        const nx=THREE.MathUtils.lerp(c.position.x,desired.x,step),nz=THREE.MathUtils.lerp(c.position.z,desired.z,step);
+        const r=resolveCollision(nx,nz,c.position.y);
+        c.position.x=r.x;c.position.z=r.z;c.position.y=player.position.y;
+      }
+    }
+    if(target&&target.parent&&!target.userData.dead){
+      c.rotation.y=Math.atan2(target.position.x-c.position.x,target.position.z-c.position.z);
+      if(c.position.distanceToSquared(target.position)<=3.1*3.1&&c.userData.attackCooldown<=0)knightClonePerformMove(c,target);
+    }else c.rotation.y=player.rotation.y;
+  }
+}
+
 /* ------------------------------------------------------------ MASTER UPDATE */
 function updateKnightSystems(dt){
   if(!knightIsActive()){
     if(knightRuntime.ultPhase>0||knightRuntime.ultSigil||knightRuntime.ultSword) knightClearJudgment();
     if(knightRuntime.shieldToss) knightEndShieldToss(false);
     if(knightRuntime.banners.length) knightClearBanners();
+    if(knightRoyalClones.length) clearKnightRoyalClones();
     return;
   }
   if(!player) return;
@@ -14827,6 +15047,7 @@ function updateKnightSystems(dt){
   knightUpdateAegis(dt);
   knightUpdateEarthShatter(dt);
   knightUpdateGuardianCharge(dt);
+  updateKnightRoyalClones(dt);
 
   if(knightRuntime.whirlwindTimer>0){
     knightRuntime.whirlwindTimer=Math.max(0,knightRuntime.whirlwindTimer-dt);
@@ -14875,7 +15096,10 @@ function clearKnightRoundSpecials(resetCooldowns=true){
   knightRuntime.mitigationPool=0;
   passiveState.knightWhirlwindTimer=0;
   if(player){ player.userData.spinVisualTimer=0; }
+  clearKnightRoyalClones();
   if(resetCooldowns){
+    knightRoyalCloneCooldown=0;
+    knightRoyalCloneCycleDuration=0;
     knightRuntime.whirlwindCooldown=0;
     knightRuntime.shatterCooldown=0;
     knightRuntime.chargeCooldown=0;
@@ -14899,6 +15123,13 @@ function resetKnightRuntime(){
 /* ------------------------------------------------------------- ABILITY HUD */
 function knightAbilityCooldownInfo(){
   switch(equippedAbilityId){
+    case 'knight_royal_guard_clones':
+      return {
+        label:'KNIGHTS',
+        cd:knightRoyalCloneCooldown,
+        active:knightRoyalClones.length>0,
+        activeTime:knightRoyalClones.length?Math.max(...knightRoyalClones.map(c=>c.userData.life||0)):0
+      };
     case 'knight_guardian_quake':
       return {
         label:knightRuntime.shatterPhase>0?'SHATTER':'G. QUAKE',
@@ -14914,7 +15145,8 @@ function knightAbilityCooldownInfo(){
 }
 function triggerKnightEquippedAbility(){
   if(!knightIsActive()) return;
-  if(equippedAbilityId==='knight_guardian_quake') triggerKnightGuardianQuake();
+  if(equippedAbilityId==='knight_royal_guard_clones') triggerKnightRoyalGuardClones();
+  else if(equippedAbilityId==='knight_guardian_quake') triggerKnightGuardianQuake();
   else if(equippedAbilityId==='knight_aegis_counter') triggerKnightAegisCounter();
 }
 
@@ -14975,7 +15207,7 @@ function isKnightWeaponKind(kind){
   return kind==='knight_combo'||kind==='knight_vanguard'||
          kind==='knight_shield_toss'||kind==='knight_banner';
 }
-/* =================== END KNIGHT — ROYAL GUARDIAN =================== */
+/* =================== END KNIGHT — KNIGHTSIAN =================== */
 
 
 
