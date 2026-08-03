@@ -1,3 +1,4 @@
+<!-- V22.13.48 Shield Toss Heroic Polish: upgrades the Knight's Shield Toss with a stronger shield-first launch pose, a royal departure crest, denser steel-gold-ivory flight wakes, heavier contact bursts, clearer return-path energy, and a more satisfying guarded catch. Damage, stun, range, ricochet behavior, cooldown, boss caps, scoring, and all other moves remain unchanged. -->
 <!-- V22.13.47 Royal Vanguard Spectacle Upgrade: makes the upgraded Knight Primary clearly more impressive than Royal Sword Combo. Every Vanguard step now gains a unique royal sigil, stronger body-commitment trail, denser layered steel-gold-ivory effects, and a visibly escalating three-stage presentation. The shield-bash finisher receives a large crown crest, triple shock-ring impact, and wider royal burst. Damage, cooldown, unlock level, hitboxes, scoring, clones, and all other abilities remain unchanged. -->
 <!-- V22.13.46 Royal Vanguard Motion Polish: upgrades Guarded Thrust, Cleaving Guard, and Shield Bash inside Royal Vanguard Combo with more forceful body motion, clearer step-to-step escalation, larger disciplined weapon trails, heavier impact feedback, and a stronger royal finisher presentation. Damage, cooldowns, unlocks, scoring, clone logic, maps, and non-Vanguard systems remain unchanged. -->
 <!-- V22.13.45 Knight Primary Motion Polish: upgrades the Knight's main Royal Sword Combo with more heroic body commitment, cleaner chained swing motion, stronger slash geometry, heavier hit flashes, added guard-follow-through, and a more impressive finisher shockwave so the class feels prouder and more satisfying to pilot. Damage, unlocks, cooldowns, scoring, clone logic, maps, and all non-primary Knight systems remain unchanged. -->
@@ -159,7 +160,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.47</title>
+<title>Family Arena V22.13.48</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1384,7 +1385,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.47 - Royal Vanguard Spectacle Upgrade';
+const GAME_VERSION='22.13.48 - Shield Toss Heroic Polish';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -13106,54 +13107,61 @@ function knightBuildShieldMesh(){
 
 
 function knightShieldTossHitFx(z,returning,heavy){
-  if(!z||!knightFxBudget(2)) return;
+  if(!z||!knightFxBudget(3)) return;
   const g=new THREE.Group();
 
   const flash=new THREE.Mesh(
-    new THREE.CircleGeometry(heavy?.62:.42,24),
-    knightMat(returning?KNIGHT_IVORY:KNIGHT_GOLD,heavy?.90:.74)
+    new THREE.CircleGeometry(heavy?.74:.48,28),
+    knightMat(returning?KNIGHT_IVORY:KNIGHT_GOLD,heavy?.94:.80)
   );
   flash.position.set(0,.95,0);
   g.add(flash);
 
   const ring=new THREE.Mesh(
-    new THREE.RingGeometry(heavy?.24:.16,heavy?.52:.34,24),
-    knightMat(returning?KNIGHT_GOLD:KNIGHT_STEEL,.82)
+    new THREE.RingGeometry(heavy?.22:.14,heavy?.64:.40,30),
+    knightMat(returning?KNIGHT_GOLD:KNIGHT_STEEL,.88)
   );
   ring.position.set(0,.95,.02);
   g.add(ring);
 
-  for(let i=0;i<(heavy?8:5);i++){
+  const outer=new THREE.Mesh(
+    new THREE.RingGeometry(heavy?.48:.30,heavy?.92:.58,30),
+    knightMat(returning?KNIGHT_STEEL:KNIGHT_IVORY,heavy?.44:.30)
+  );
+  outer.position.set(0,.95,.03);
+  g.add(outer);
+
+  for(let i=0;i<(heavy?10:6);i++){
     const shard=new THREE.Mesh(
-      new THREE.PlaneGeometry(.06,heavy?.48:.34),
-      knightMat(i%2?KNIGHT_GOLD:KNIGHT_STEEL,.82)
+      new THREE.PlaneGeometry(.07,heavy?.58:.40),
+      knightMat(i%2?KNIGHT_GOLD:(returning?KNIGHT_IVORY:KNIGHT_STEEL),.86)
     );
-    const a=(i/(heavy?8:5))*Math.PI*2;
+    const a=(i/(heavy?10:6))*Math.PI*2;
     shard.position.set(
-      Math.cos(a)*(heavy?.44:.30),
-      .95+Math.sin(a)*.20,
-      Math.sin(a)*(heavy?.44:.30)
+      Math.cos(a)*(heavy?.52:.34),
+      .95+Math.sin(a)*.22,
+      Math.sin(a)*(heavy?.52:.34)
     );
-    shard.rotation.set(0,-a,Math.sin(a)*.30);
+    shard.rotation.set(0,-a,Math.sin(a)*.34);
     g.add(shard);
   }
 
   g.position.set(z.position.x,z.position.y,z.position.z);
   knightBaseOpacity(g);
   pushKnightFx(g,{
-    life:heavy?.30:.22,
-    grow:heavy?.92:.66,
-    from:.60,
-    spin:returning?-5.5:5.5
+    life:heavy?.34:.24,
+    grow:heavy?1.08:.76,
+    from:.58,
+    spin:returning?-6.2:6.2
   });
 
   spawnBurst(
     z.position.x,
     z.position.y+.95,
     z.position.z,
-    heavy?14:8,
+    heavy?18:10,
     FX_MAT_SPARK,
-    heavy?4.3:3.0
+    heavy?4.8:3.4
   );
 }
 
@@ -13184,37 +13192,53 @@ function knightShieldTossReturnTrailFx(t){
 }
 
 function knightShieldTossTrailFx(t){
-  if(!t||!t.mesh||!knightFxBudget(2)) return;
+  if(!t||!t.mesh||!knightFxBudget(3)) return;
   const g=new THREE.Group();
 
   const wake=new THREE.Mesh(
-    new THREE.PlaneGeometry(1.0,2.4),
-    knightMat(KNIGHT_STEEL,.24)
+    new THREE.PlaneGeometry(1.18,2.8),
+    knightMat(KNIGHT_STEEL,.28)
   );
   wake.rotation.x=-Math.PI/2;
-  wake.position.set(0,.02,-.72);
+  wake.position.set(0,.02,-.84);
   g.add(wake);
 
   const goldWake=new THREE.Mesh(
-    new THREE.PlaneGeometry(.34,2.0),
-    knightMat(KNIGHT_GOLD,.40)
+    new THREE.PlaneGeometry(.42,2.35),
+    knightMat(KNIGHT_GOLD,.48)
   );
   goldWake.rotation.x=-Math.PI/2;
-  goldWake.position.set(0,.04,-.60);
+  goldWake.position.set(0,.04,-.70);
   g.add(goldWake);
 
+  const ivoryCore=new THREE.Mesh(
+    new THREE.PlaneGeometry(.14,1.85),
+    knightMat(KNIGHT_IVORY,.66)
+  );
+  ivoryCore.rotation.x=-Math.PI/2;
+  ivoryCore.position.set(0,.06,-.54);
+  g.add(ivoryCore);
+
   const ring=new THREE.Mesh(
-    new THREE.RingGeometry(.56,.86,30),
-    knightMat(KNIGHT_IVORY,.44)
+    new THREE.RingGeometry(.52,.94,32),
+    knightMat(KNIGHT_IVORY,.50)
   );
   ring.rotation.x=-Math.PI/2;
   ring.position.y=.03;
   g.add(ring);
 
+  const crest=new THREE.Mesh(
+    new THREE.RingGeometry(.18,.46,24),
+    knightMat(KNIGHT_GOLD,.34)
+  );
+  crest.rotation.x=-Math.PI/2;
+  crest.position.set(0,.05,-.22);
+  g.add(crest);
+
   g.position.copy(t.mesh.position);
   g.rotation.y=Math.atan2(t.dirX||0,t.dirZ||1);
   knightBaseOpacity(g);
-  pushKnightFx(g,{life:.24,grow:.34,from:.86,spin:6.5});
+  pushKnightFx(g,{life:.26,grow:.42,from:.84,spin:7.2});
 }
 
 function knightShieldToss(w){
@@ -13240,10 +13264,25 @@ function knightShieldToss(w){
   knightRuntime.shieldAway=true;
   // The Knight gives up one Magical Armor charge while the shield is away.
   passiveState.knightArmor=Math.min(passiveState.knightArmor||0,knightArmorMax());
-  knightPlayClip(['shield'],'1H_Melee_Attack_Chop',.15,.12);
-  spawnKnightGuardBurst(player.position,1.5,KNIGHT_GOLD);
-  triggerCombatShake(4,85);
-  if(navigator.vibrate) navigator.vibrate(18);
+  knightPlayClip(['shield'],'1H_Melee_Attack_Chop',.18,.14);
+  knightRuntime.frontGuardTimer=Math.max(knightRuntime.frontGuardTimer||0,.24);
+  knightRuntime.resistTimer=Math.max(knightRuntime.resistTimer||0,.16);
+  spawnKnightGuardBurst(player.position,1.85,KNIGHT_GOLD);
+  knightShockRing(player.position,1.55,KNIGHT_IVORY,.22);
+  if(knightFxBudget(2)){
+    const launch=new THREE.Group();
+    const crown=new THREE.Mesh(new THREE.RingGeometry(.34,.74,28),knightMat(KNIGHT_GOLD,.72));
+    crown.rotation.x=-Math.PI/2; launch.add(crown);
+    for(let i=0;i<4;i++){
+      const ray=new THREE.Mesh(new THREE.PlaneGeometry(.08,1.1),knightMat(i%2?KNIGHT_IVORY:KNIGHT_STEEL,.54));
+      ray.rotation.x=-Math.PI/2; ray.rotation.z=i*Math.PI/2; launch.add(ray);
+    }
+    launch.position.set(player.position.x,player.position.y+.10,player.position.z);
+    knightBaseOpacity(launch);
+    pushKnightFx(launch,{life:.34,grow:.92,from:.70,spin:5.6});
+  }
+  triggerCombatShake(6,105);
+  if(navigator.vibrate) navigator.vibrate([18,8,24]);
 }
 function knightUpdateShieldToss(dt){
   const t=knightRuntime.shieldToss;
@@ -13328,9 +13367,13 @@ function knightUpdateShieldToss(dt){
     }
 
     if(l<0.9){
-      spawnKnightGuardBurst(player.position,1.35,KNIGHT_GOLD);
-      knightPlayClip(['shield'],'1H_Melee_Attack_Chop',.12,.10);
-      triggerCombatShake(4,75);
+      spawnKnightGuardBurst(player.position,1.85,KNIGHT_GOLD);
+      knightShockRing(player.position,1.48,KNIGHT_IVORY,.22);
+      knightShockRing(player.position,1.08,KNIGHT_GOLD,.18);
+      knightPlayClip(['shield'],'1H_Melee_Attack_Chop',.15,.12);
+      knightRuntime.frontGuardTimer=Math.max(knightRuntime.frontGuardTimer||0,.30);
+      knightRuntime.resistTimer=Math.max(knightRuntime.resistTimer||0,.30);
+      triggerCombatShake(6,95);
       knightEndShieldToss(true);
       return;
     }
