@@ -1,3 +1,4 @@
+<!-- V22.13.49 Banner Spear Royal Polish: upgrades the moving Banner Spear into a proud royal battlefield centerpiece with a layered double-sided banner, crown-and-shield crest, luminous spearhead, stronger planting column, marching travel wake, controlled aura waves, and a dramatic final collapse. Effects stay localized and translucent so the arena remains playable. Duration, radius, 25% attack buff, defense, slow strength, movement, cooldown scaling, and all damage values are unchanged. -->
 <!-- V22.13.48 Shield Toss Heroic Polish: upgrades the Knight's Shield Toss with a stronger shield-first launch pose, a royal departure crest, denser steel-gold-ivory flight wakes, heavier contact bursts, clearer return-path energy, and a more satisfying guarded catch. Damage, stun, range, ricochet behavior, cooldown, boss caps, scoring, and all other moves remain unchanged. -->
 <!-- V22.13.47 Royal Vanguard Spectacle Upgrade: makes the upgraded Knight Primary clearly more impressive than Royal Sword Combo. Every Vanguard step now gains a unique royal sigil, stronger body-commitment trail, denser layered steel-gold-ivory effects, and a visibly escalating three-stage presentation. The shield-bash finisher receives a large crown crest, triple shock-ring impact, and wider royal burst. Damage, cooldown, unlock level, hitboxes, scoring, clones, and all other abilities remain unchanged. -->
 <!-- V22.13.46 Royal Vanguard Motion Polish: upgrades Guarded Thrust, Cleaving Guard, and Shield Bash inside Royal Vanguard Combo with more forceful body motion, clearer step-to-step escalation, larger disciplined weapon trails, heavier impact feedback, and a stronger royal finisher presentation. Damage, cooldowns, unlocks, scoring, clone logic, maps, and non-Vanguard systems remain unchanged. -->
@@ -160,7 +161,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.48</title>
+<title>Family Arena V22.13.49</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1385,7 +1386,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.48 - Shield Toss Heroic Polish';
+const GAME_VERSION='22.13.49 - Banner Spear Royal Polish';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -13533,16 +13534,159 @@ function knightBannerExpireFx(b){
   g.add(collapse);
 
   const crest=new THREE.Mesh(
-    new THREE.RingGeometry(.48,.86,30),
-    knightMat(KNIGHT_IVORY,.72)
+    new THREE.RingGeometry(.48,1.02,34),
+    knightMat(KNIGHT_IVORY,.76)
   );
   crest.rotation.x=-Math.PI/2;
   crest.position.y=.04;
   g.add(crest);
 
+  const crown=new THREE.Group();
+  const crownRing=new THREE.Mesh(
+    new THREE.RingGeometry(.34,.68,28),
+    knightMat(KNIGHT_GOLD,.82)
+  );
+  crownRing.rotation.x=-Math.PI/2;
+  crown.add(crownRing);
+  for(let i=0;i<5;i++){
+    const ray=new THREE.Mesh(
+      new THREE.PlaneGeometry(.07,.58),
+      knightMat(i%2?KNIGHT_IVORY:KNIGHT_GOLD,.68)
+    );
+    ray.rotation.x=-Math.PI/2;
+    ray.rotation.z=i*Math.PI*2/5;
+    crown.add(ray);
+  }
+  crown.position.y=.08;
+  g.add(crown);
+
   g.position.set(b.x,(b.y||0)+.06,b.z);
   knightBaseOpacity(g);
   pushKnightFx(g,{life:.38,grow:-.46,from:1.0,spin:-5});
+}
+
+function knightBannerRoyalColumnFx(pos,radius){
+  if(!pos||!knightFxBudget(4)) return;
+  const g=new THREE.Group();
+
+  const column=new THREE.Mesh(
+    new THREE.CylinderGeometry(.22,.78,6.8,20,1,true),
+    knightMat(KNIGHT_GOLD,.22)
+  );
+  column.position.y=3.35;
+  g.add(column);
+
+  const core=new THREE.Mesh(
+    new THREE.CylinderGeometry(.07,.22,7.3,16,1,true),
+    knightMat(KNIGHT_IVORY,.58)
+  );
+  core.position.y=3.55;
+  g.add(core);
+
+  const crown=new THREE.Group();
+  const crownRing=new THREE.Mesh(
+    new THREE.RingGeometry(.46,.82,30),
+    knightMat(KNIGHT_GOLD,.86)
+  );
+  crownRing.rotation.x=-Math.PI/2;
+  crown.add(crownRing);
+  for(let i=0;i<5;i++){
+    const a=i*Math.PI*2/5;
+    const ray=new THREE.Mesh(
+      new THREE.PlaneGeometry(.10,.72),
+      knightMat(i%2?KNIGHT_IVORY:KNIGHT_GOLD,.76)
+    );
+    ray.position.set(Math.cos(a)*.62,0,Math.sin(a)*.62);
+    ray.rotation.x=-Math.PI/2;
+    ray.rotation.z=-a;
+    crown.add(ray);
+  }
+  crown.position.y=6.55;
+  g.add(crown);
+
+  const ground=new THREE.Mesh(
+    new THREE.RingGeometry(radius*.18,radius*.23,48),
+    knightMat(KNIGHT_IVORY,.62)
+  );
+  ground.rotation.x=-Math.PI/2;
+  ground.position.y=.08;
+  g.add(ground);
+
+  g.position.set(pos.x,pos.y||0,pos.z);
+  knightBaseOpacity(g);
+  pushKnightFx(g,{life:.55,grow:.34,from:.72,spin:3.8});
+}
+
+function knightBannerTravelWakeFx(b){
+  if(!b||!knightFxBudget(2)) return;
+  const g=new THREE.Group();
+
+  const crest=new THREE.Mesh(
+    new THREE.RingGeometry(.36,.66,28),
+    knightMat(KNIGHT_GOLD,.42)
+  );
+  crest.rotation.x=-Math.PI/2;
+  crest.position.y=.06;
+  g.add(crest);
+
+  for(let i=0;i<4;i++){
+    const ray=new THREE.Mesh(
+      new THREE.PlaneGeometry(.06,1.15),
+      knightMat(i%2?KNIGHT_IVORY:KNIGHT_STEEL,.34)
+    );
+    ray.rotation.x=-Math.PI/2;
+    ray.rotation.z=i*Math.PI/2;
+    ray.position.y=.07;
+    g.add(ray);
+  }
+
+  const dust=new THREE.Mesh(
+    new THREE.CircleGeometry(.72,22),
+    knightMat(KNIGHT_STEEL,.11)
+  );
+  dust.rotation.x=-Math.PI/2;
+  dust.position.y=.035;
+  g.add(dust);
+
+  g.position.set(b.x,(b.y||0)+.02,b.z);
+  knightBaseOpacity(g);
+  pushKnightFx(g,{life:.28,grow:.62,from:.68,spin:-4.2});
+}
+
+function knightBannerRoyalAuraFx(b){
+  if(!b||!knightFxBudget(3)) return;
+  const c=KNIGHT_CFG.banner;
+  const g=new THREE.Group();
+
+  const inner=new THREE.Mesh(
+    new THREE.RingGeometry(c.radius*.34,c.radius*.38,52),
+    knightMat(KNIGHT_IVORY,.34)
+  );
+  inner.rotation.x=-Math.PI/2;
+  g.add(inner);
+
+  const middle=new THREE.Mesh(
+    new THREE.RingGeometry(c.radius*.58,c.radius*.61,56),
+    knightMat(KNIGHT_GOLD,.28)
+  );
+  middle.rotation.x=-Math.PI/2;
+  middle.position.y=.018;
+  g.add(middle);
+
+  for(let i=0;i<8;i++){
+    const ray=new THREE.Mesh(
+      new THREE.PlaneGeometry(.055,c.radius*.66),
+      knightMat(i%2?KNIGHT_GOLD:KNIGHT_IVORY,.16)
+    );
+    ray.rotation.x=-Math.PI/2;
+    ray.rotation.z=i*Math.PI/4;
+    ray.position.y=.025;
+    g.add(ray);
+  }
+
+  g.position.set(b.x,(b.y||0)+.04,b.z);
+  knightBaseOpacity(g);
+  pushKnightFx(g,{life:.46,grow:.42,from:.82,spin:1.8});
 }
 
 function knightBannerSpear(w){
@@ -13569,24 +13713,73 @@ function knightBannerSpear(w){
     g.add(pole);
 
     const tip=new THREE.Mesh(
-      new THREE.ConeGeometry(.24,.82,12),
+      new THREE.ConeGeometry(.31,1.02,14),
       knightMat(KNIGHT_IVORY,.95,false)
     );
-    tip.position.y=5.88;
+    tip.position.y=6.02;
     g.add(tip);
 
-    const cloth=new THREE.Mesh(
-      new THREE.PlaneGeometry(2.10,1.64),
-      knightMat(KNIGHT_GOLD,.88,false)
+    const cloth=new THREE.Group();
+    const clothBack=new THREE.Mesh(
+      new THREE.PlaneGeometry(2.52,1.84),
+      knightMat(KNIGHT_STEEL,.54,false)
     );
-    cloth.position.set(1.10,4.28,0);
+    clothBack.position.z=-.018;
+    cloth.add(clothBack);
+
+    const clothMain=new THREE.Mesh(
+      new THREE.PlaneGeometry(2.38,1.68),
+      knightMat(KNIGHT_GOLD,.92,false)
+    );
+    clothMain.position.z=.015;
+    cloth.add(clothMain);
+
+    const clothStripe=new THREE.Mesh(
+      new THREE.PlaneGeometry(2.18,.22),
+      knightMat(KNIGHT_IVORY,.78,false)
+    );
+    clothStripe.position.set(0,-.48,.035);
+    cloth.add(clothStripe);
+
+    cloth.position.set(1.28,4.34,0);
     g.add(cloth);
 
-    const crest=new THREE.Mesh(
-      new THREE.RingGeometry(.34,.62,28),
-      knightMat(KNIGHT_IVORY,.86)
+    const crest=new THREE.Group();
+    const crestOuter=new THREE.Mesh(
+      new THREE.RingGeometry(.38,.74,32),
+      knightMat(KNIGHT_IVORY,.90)
     );
-    crest.position.set(1.10,4.28,.035);
+    crest.add(crestOuter);
+    const crestInner=new THREE.Mesh(
+      new THREE.CircleGeometry(.31,26),
+      knightMat(KNIGHT_STEEL,.56)
+    );
+    crestInner.position.z=.012;
+    crest.add(crestInner);
+    for(let i=0;i<4;i++){
+      const spoke=new THREE.Mesh(
+        new THREE.PlaneGeometry(.08,.82),
+        knightMat(KNIGHT_GOLD,.84)
+      );
+      spoke.position.z=.03;
+      spoke.rotation.z=i*Math.PI/2;
+      crest.add(spoke);
+    }
+    const crownTop=new THREE.Mesh(
+      new THREE.PlaneGeometry(.72,.18),
+      knightMat(KNIGHT_GOLD,.92)
+    );
+    crownTop.position.set(0,.58,.035);
+    crest.add(crownTop);
+    for(let i=-1;i<=1;i++){
+      const point=new THREE.Mesh(
+        new THREE.ConeGeometry(.10,.34,6),
+        knightMat(KNIGHT_GOLD,.92)
+      );
+      point.position.set(i*.24,.78,.04);
+      crest.add(point);
+    }
+    crest.position.set(1.28,4.34,.05);
     g.add(crest);
 
     const zone=new THREE.Mesh(
@@ -13606,10 +13799,10 @@ function knightBannerSpear(w){
     g.add(field);
 
     const base=new THREE.Mesh(
-      new THREE.CylinderGeometry(.42,.62,.26,20),
+      new THREE.CylinderGeometry(.52,.76,.34,24),
       knightMat(KNIGHT_STEEL,.82,false)
     );
-    base.position.y=.13;
+    base.position.y=.17;
     g.add(base);
   }catch(err){
     console.error('Banner Spear creation failed',err);
@@ -13643,16 +13836,20 @@ function knightBannerSpear(w){
     visualPulse:0,
     slowFxTimer:0,
     retargetTimer:0,
+    travelFxTimer:0,
+    royalAuraTimer:.45,
     target:null
   });
   knightRuntime.bannerCooldown=knightBannerCooldownForRound();
 
   knightPlayClip(['melee','attack'],'1H_Melee_Attack_Chop',.18,.14);
   knightBannerPlantFx(player.position,c.radius);
+  knightBannerRoyalColumnFx(player.position,c.radius);
   spawnKnightGuardBurst(player.position,c.radius,KNIGHT_GOLD);
-  knightShockRing(player.position,c.radius,KNIGHT_GOLD,.28);
-  triggerCombatShake(9,165);
-  if(navigator.vibrate) navigator.vibrate([22,14,30]);
+  knightShockRing(player.position,c.radius,KNIGHT_GOLD,.30);
+  knightShockRing(player.position,c.radius*.58,KNIGHT_IVORY,.24);
+  triggerCombatShake(11,185);
+  if(navigator.vibrate) navigator.vibrate([24,12,38]);
   return true;
 }
 function knightRemoveBanner(i){
@@ -13682,6 +13879,8 @@ function knightUpdateBanners(dt){
     b.slowFxTimer=Math.max(0,(b.slowFxTimer||0)-dt);
     b.visualPulse=(b.visualPulse||0)+dt;
     b.retargetTimer=Math.max(0,(b.retargetTimer||0)-dt);
+    b.travelFxTimer=Math.max(0,(b.travelFxTimer||0)-dt);
+    b.royalAuraTimer=Math.max(0,(b.royalAuraTimer||0)-dt);
 
     // Retarget periodically so the banner follows the nearest living enemy
     // without jittering between enemies every frame.
@@ -13734,19 +13933,30 @@ function knightUpdateBanners(dt){
           faceYaw,
           Math.min(1,dt*4.5)
         );
+
+        if(b.travelFxTimer<=0){
+          b.travelFxTimer=.16;
+          knightBannerTravelWakeFx(b);
+        }
       }
     }
 
     // Keep the spear upright. Animate only the cloth/crest so the banner
     // feels alive without spinning like a signpost.
     if(b.cloth){
-      b.cloth.rotation.y=Math.sin(b.visualPulse*2.8)*.12;
-      b.cloth.rotation.z=Math.sin(b.visualPulse*3.9)*.045;
-      b.cloth.scale.y=1+Math.sin(b.visualPulse*4.6)*.035;
+      b.cloth.rotation.y=Math.sin(b.visualPulse*2.8)*.14;
+      b.cloth.rotation.z=Math.sin(b.visualPulse*3.9)*.050;
+      b.cloth.scale.y=1+Math.sin(b.visualPulse*4.6)*.042;
+      b.cloth.scale.x=1+Math.sin(b.visualPulse*3.2)*.018;
     }
     if(b.crest){
-      b.crest.rotation.z+=dt*.8;
-      b.crest.material.opacity=.74+Math.sin(b.visualPulse*4.0)*.12;
+      b.crest.rotation.z+=dt*.95;
+      const crestPulse=1+Math.sin(b.visualPulse*4.0)*.06;
+      b.crest.scale.setScalar(crestPulse);
+    }
+    if(b.royalAuraTimer<=0){
+      b.royalAuraTimer=1.35;
+      knightBannerRoyalAuraFx(b);
     }
     if(b.zone){
       b.zone.material.opacity=.43+Math.sin(b.visualPulse*3.2)*.10;
