@@ -1,4 +1,4 @@
-<!-- V22.13.57 Judgment Hammer Storm Moveable: Judgment of the King now allows the Knight to move freely during the ultimate. Hammer rain is upgraded to use larger Mjolnir-inspired hammers with a more realistic heavy head, shorter handle feel, gold banding, and leather-wrap cues. The storm now uses a much higher active rain cap and denser spawn counts so many larger hammers keep raining continuously until the move ends. The full-map radius remains near 98%. -->
+<!-- V22.13.58 Hammer Visibility Banner Guard: slows Judgment hammer rain so the player can actually read and enjoy the hammer visuals, upgrades every hammer landing with larger impact rings, dust, flash, and crack effects, prevents Banner Spear from being manually re-cast while one is still active, and trims banner-field transparency to 75% of the previous level so the ground aura reads a bit stronger without going back to the old white-out look. -->
 <!-- V22.13.51 Knights of the Round Spectacle: upgrades the Knight signature summon with a large royal summoning seal, sequential gold/steel arrival columns, crown flashes, formation trails, visible attack animations, stronger clone strike effects, and a coordinated departure collapse. Effects remain localized and translucent for gameplay readability. Clone count, duration, cooldown, invincibility, aggro priority, inherited moves, movement rules, and 10% damage remain unchanged. -->
 <!-- V22.13.50 Banner Spear Soft Field: reduces the Banner Spear ground-circle brightness so the field no longer washes out bright maps. The outer ring stays readable, while the inner field shifts to a softer steel-blue royal aura with noticeably lower opacity and gentler breathing animation. Radius, duration, slow strength, movement, cooldown scaling, attack buff, defense bonus, and all gameplay values are unchanged. -->
 <!-- V22.13.48 Shield Toss Heroic Polish: upgrades the Knight's Shield Toss with a stronger shield-first launch pose, a royal departure crest, denser steel-gold-ivory flight wakes, heavier contact bursts, clearer return-path energy, and a more satisfying guarded catch. Damage, stun, range, ricochet behavior, cooldown, boss caps, scoring, and all other moves remain unchanged. -->
@@ -1388,7 +1388,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.57 - Judgment Hammer Storm Moveable';
+const GAME_VERSION='22.13.58 - Hammer Visibility Banner Guard';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -13705,6 +13705,7 @@ function knightBannerSpear(w){
   if(!player||!scene||!knightIsActive()) return false;
   const c=KNIGHT_CFG.banner;
   if((knightRuntime.bannerCooldown||0)>0) return false;
+  if(Array.isArray(knightRuntime.banners) && knightRuntime.banners.length>0) return false;
 
   let g=null;
   try{
@@ -13796,7 +13797,7 @@ function knightBannerSpear(w){
 
     const zone=new THREE.Mesh(
       new THREE.RingGeometry(c.radius-.15,c.radius,52),
-      knightMat(KNIGHT_GOLD,.34)
+      knightMat(KNIGHT_GOLD,.425)
     );
     zone.rotation.x=-Math.PI/2;
     zone.position.y=.08;
@@ -13804,7 +13805,7 @@ function knightBannerSpear(w){
 
     const field=new THREE.Mesh(
       new THREE.CircleGeometry(c.radius,44),
-      knightMat(KNIGHT_STEEL,.055)
+      knightMat(KNIGHT_STEEL,.069)
     );
     field.rotation.x=-Math.PI/2;
     field.position.y=.05;
@@ -13822,9 +13823,8 @@ function knightBannerSpear(w){
     return false;
   }
 
-  // Only one Banner Spear can exist. A new manual activation replaces
-  // the current banner and restarts the 12-second buff at the new location.
-  while(knightRuntime.banners.length>=1) knightRemoveBanner(0);
+  // Only one Banner Spear can exist at a time. The player must wait for
+  // the active banner to expire before placing another one.
 
   // Use the player's actual ground height. The earlier hard-coded y=0 could
   // bury the spear/zone on maps where the arena floor is not exactly zero.
@@ -13971,10 +13971,10 @@ function knightUpdateBanners(dt){
       knightBannerRoyalAuraFx(b);
     }
     if(b.zone){
-      b.zone.material.opacity=.26+Math.sin(b.visualPulse*3.2)*.06;
+      b.zone.material.opacity=.325+Math.sin(b.visualPulse*3.2)*.075;
     }
     if(b.field){
-      b.field.material.opacity=.032+Math.sin(b.visualPulse*2.4)*.012;
+      b.field.material.opacity=.040+Math.sin(b.visualPulse*2.4)*.015;
     }
 
     const pulseScale=1+Math.sin(b.visualPulse*3.1)*.012;
@@ -15303,10 +15303,30 @@ function knightActiveJudgmentRainCount(){
 }
 function knightJudgmentRainImpact(x,z,scale,progress){
   const impactRadius=1.9+progress*2.2;
-  knightShockRing({x,y:0,z},impactRadius,KNIGHT_GOLD,.24);
-  knightShockRing({x,y:0,z},impactRadius*.62,KNIGHT_IVORY,.18);
-  spawnBurst(x,.95,z,14,FX_MAT_SPARK,4.2+progress*1.4);
-  if(knightFxBudget(1)) knightGroundCracks({x,y:0,z},impactRadius*.72,4,KNIGHT_GOLD);
+  knightShockRing({x,y:0,z},impactRadius,KNIGHT_GOLD,.30);
+  knightShockRing({x,y:0,z},impactRadius*.78,KNIGHT_IVORY,.24);
+  knightShockRing({x,y:0,z},impactRadius*.46,KNIGHT_STEEL,.18);
+  spawnBurst(x,.95,z,22,FX_MAT_SPARK,5.4+progress*2.0);
+  spawnBurst(x,.18,z,16,FX_MAT_DUST,4.8+progress*1.6);
+  if(knightFxBudget(2)){
+    const flash=new THREE.Mesh(
+      new THREE.CircleGeometry(impactRadius*.44,26),
+      knightMat(KNIGHT_GOLD,.26)
+    );
+    flash.rotation.x=-Math.PI/2;
+    flash.position.set(x,.055,z);
+    knightBaseOpacity(flash);
+    pushKnightFx(flash,{life:.18,grow:.38,from:.72});
+
+    const dust=new THREE.Mesh(
+      new THREE.CylinderGeometry(impactRadius*.20,impactRadius*.58,1.65+progress*1.2,14,1,true),
+      knightMat(KNIGHT_STEEL,.16)
+    );
+    dust.position.set(x,.88,z);
+    knightBaseOpacity(dust);
+    pushKnightFx(dust,{life:.34,grow:.24+progress*.12,from:.76});
+  }
+  if(knightFxBudget(1)) knightGroundCracks({x,y:0,z},impactRadius*.92,5,KNIGHT_GOLD);
   for(const enemy of zombies){
     if(enemy.userData.dead||enemy.userData.spawnPending) continue;
     const d=Math.hypot(enemy.position.x-x,enemy.position.z-z);
@@ -15322,13 +15342,13 @@ function knightJudgmentRainImpact(x,z,scale,progress){
   }
 }
 function knightJudgmentRainStrike(center,radius,progress){
-  if(knightActiveJudgmentRainCount()>=90) return;
+  if(knightActiveJudgmentRainCount()>=120) return;
   const a=Math.random()*Math.PI*2;
   const r=Math.sqrt(Math.random())*radius*0.98;
   const x=center.x+Math.sin(a)*r;
   const z=center.z+Math.cos(a)*r;
   const scale=0.86+Math.random()*.42+progress*.18;
-  const startY=20+Math.random()*10;
+  const startY=24+Math.random()*12;
 
   const g=new THREE.Group();
   const atmosphere=new THREE.Mesh(
@@ -15387,7 +15407,7 @@ function knightJudgmentRainStrike(center,radius,progress){
   g.rotation.z=(Math.random()-.5)*.08;
   knightBaseOpacity(g);
   scene.add(g);
-  fx.push({kind:'judgmentRainHammer',mesh:g,life:1.15,maxLife:1.15,targetY:1.0,fallSpeed:48+progress*11,impactScale:scale,impactProgress:progress,impactX:x,impactZ:z,dispose:true});
+  fx.push({kind:'judgmentRainHammer',mesh:g,life:1.55,maxLife:1.55,targetY:1.0,fallSpeed:24+progress*6,impactScale:scale,impactProgress:progress,impactX:x,impactZ:z,dispose:true});
 }
 
 function knightJudgmentFieldRadius(){
