@@ -1,4 +1,4 @@
-<!-- V22.13.51 Knights of the Round Visual Polish: gives the Knight signature summon a proud royal entrance, individual gold/steel aura bases, moving cape-like energy wakes, visible weapon-motion flashes, and a coordinated disappearance effect. Clone count, duration, cooldown, invincibility, aggro priority, unlocked-move inheritance, movement rules, and 10% damage remain unchanged. -->
+<!-- V22.13.51 Knights of the Round Spectacle: upgrades the Knight signature summon with a large royal summoning seal, sequential gold/steel arrival columns, crown flashes, formation trails, visible attack animations, stronger clone strike effects, and a coordinated departure collapse. Effects remain localized and translucent for gameplay readability. Clone count, duration, cooldown, invincibility, aggro priority, inherited moves, movement rules, and 10% damage remain unchanged. -->
 <!-- V22.13.50 Banner Spear Soft Field: reduces the Banner Spear ground-circle brightness so the field no longer washes out bright maps. The outer ring stays readable, while the inner field shifts to a softer steel-blue royal aura with noticeably lower opacity and gentler breathing animation. Radius, duration, slow strength, movement, cooldown scaling, attack buff, defense bonus, and all gameplay values are unchanged. -->
 <!-- V22.13.48 Shield Toss Heroic Polish: upgrades the Knight's Shield Toss with a stronger shield-first launch pose, a royal departure crest, denser steel-gold-ivory flight wakes, heavier contact bursts, clearer return-path energy, and a more satisfying guarded catch. Damage, stun, range, ricochet behavior, cooldown, boss caps, scoring, and all other moves remain unchanged. -->
 <!-- V22.13.47 Royal Vanguard Spectacle Upgrade: makes the upgraded Knight Primary clearly more impressive than Royal Sword Combo. Every Vanguard step now gains a unique royal sigil, stronger body-commitment trail, denser layered steel-gold-ivory effects, and a visibly escalating three-stage presentation. The shield-bash finisher receives a large crown crest, triple shock-ring impact, and wider royal burst. Damage, cooldown, unlock level, hitboxes, scoring, clones, and all other abilities remain unchanged. -->
@@ -162,7 +162,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.51</title>
+<title>Family Arena V22.13.49</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1387,7 +1387,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.51 - Knights of the Round Visual Polish';
+const GAME_VERSION='22.13.52 - Judgment of the King Spectacle';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -14992,51 +14992,195 @@ function knightEndAegis(success){
 /* ------------------------------------------------------ ULTIMATE: JUDGMENT */
 function knightBuildSigil(radius){
   const g=new THREE.Group();
-  const outer=new THREE.Mesh(new THREE.RingGeometry(radius*.94,radius,72),knightMat(KNIGHT_GOLD,.75));
+
+  const outerGlow=new THREE.Mesh(
+    new THREE.RingGeometry(radius*.89,radius*1.02,84),
+    knightMat(KNIGHT_STEEL,.22)
+  );
+  outerGlow.rotation.x=-Math.PI/2; outerGlow.position.y=.002; g.add(outerGlow);
+
+  const outer=new THREE.Mesh(
+    new THREE.RingGeometry(radius*.94,radius,84),
+    knightMat(KNIGHT_GOLD,.78)
+  );
   outer.rotation.x=-Math.PI/2; g.add(outer);
-  const inner=new THREE.Mesh(new THREE.RingGeometry(radius*.52,radius*.57,60),knightMat(KNIGHT_IVORY,.6));
-  inner.rotation.x=-Math.PI/2; inner.position.y=.01; g.add(inner);
-  const field=new THREE.Mesh(new THREE.CircleGeometry(radius,56),knightMat(KNIGHT_GOLD,.07));
-  field.rotation.x=-Math.PI/2; field.position.y=.005; g.add(field);
-  // Precise symmetrical royal runes.
+
+  const middle=new THREE.Mesh(
+    new THREE.RingGeometry(radius*.68,radius*.72,72),
+    knightMat(KNIGHT_STEEL,.42)
+  );
+  middle.rotation.x=-Math.PI/2; middle.position.y=.008; g.add(middle);
+
+  const inner=new THREE.Mesh(
+    new THREE.RingGeometry(radius*.48,radius*.55,68),
+    knightMat(KNIGHT_IVORY,.64)
+  );
+  inner.rotation.x=-Math.PI/2; inner.position.y=.012; g.add(inner);
+
+  const field=new THREE.Mesh(
+    new THREE.CircleGeometry(radius,64),
+    knightMat(KNIGHT_GOLD,.045)
+  );
+  field.rotation.x=-Math.PI/2; field.position.y=.004; g.add(field);
+
+  // Eight royal sword spokes and eight crown points create a true execution seal.
   for(let i=0;i<8;i++){
     const a=i*Math.PI/4;
-    const rune=new THREE.Mesh(new THREE.PlaneGeometry(.42,.42),knightMat(KNIGHT_IVORY,.7));
-    rune.rotation.x=-Math.PI/2; rune.rotation.z=-a;
-    rune.position.set(Math.sin(a)*radius*.76,.02,Math.cos(a)*radius*.76);
-    g.add(rune);
-    const spoke=new THREE.Mesh(new THREE.PlaneGeometry(.08,radius*.9),knightMat(KNIGHT_GOLD,.35));
+    const spoke=new THREE.Mesh(
+      new THREE.PlaneGeometry(.10,radius*.96),
+      knightMat(i%2?KNIGHT_GOLD:KNIGHT_STEEL,.38)
+    );
     spoke.rotation.x=-Math.PI/2; spoke.rotation.z=-a;
-    spoke.position.set(Math.sin(a)*radius*.45,.015,Math.cos(a)*radius*.45);
+    spoke.position.set(Math.sin(a)*radius*.46,.016,Math.cos(a)*radius*.46);
     g.add(spoke);
+
+    const rune=new THREE.Mesh(
+      new THREE.RingGeometry(.18,.34,20,1,-.9,1.8),
+      knightMat(KNIGHT_IVORY,.74)
+    );
+    rune.rotation.x=-Math.PI/2; rune.rotation.z=-a;
+    rune.position.set(Math.sin(a)*radius*.78,.024,Math.cos(a)*radius*.78);
+    g.add(rune);
+
+    const crownPoint=new THREE.Mesh(
+      new THREE.PlaneGeometry(.16,.58),
+      knightMat(KNIGHT_GOLD,.56)
+    );
+    crownPoint.rotation.x=-Math.PI/2; crownPoint.rotation.z=-a;
+    crownPoint.position.set(Math.sin(a)*radius*.61,.02,Math.cos(a)*radius*.61);
+    g.add(crownPoint);
   }
+
+  const crownCore=new THREE.Group();
+  for(let i=0;i<5;i++){
+    const ray=new THREE.Mesh(
+      new THREE.PlaneGeometry(.10,radius*.54),
+      knightMat(i===2?KNIGHT_IVORY:KNIGHT_GOLD,i===2?.60:.42)
+    );
+    ray.rotation.x=-Math.PI/2;
+    ray.rotation.z=(i-2)*.32;
+    ray.position.z=radius*.14;
+    crownCore.add(ray);
+  }
+  crownCore.position.y=.026;
+  g.add(crownCore);
+
+  g.userData.outerGlow=outerGlow;
+  g.userData.middle=middle;
+  g.userData.inner=inner;
+  g.userData.crownCore=crownCore;
   return g;
 }
 function knightJudgmentColumn(x,z){
-  if(!knightFxBudget(2)) return;
+  if(!knightFxBudget(3)) return;
   const g=new THREE.Group();
-  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.42,.55,12,14,1,true),knightMat(KNIGHT_IVORY,.55));
-  beam.position.y=6; g.add(beam);
-  const core=new THREE.Mesh(new THREE.CylinderGeometry(.16,.2,12,10,1,true),knightMat(KNIGHT_GOLD,.85));
-  core.position.y=6; g.add(core);
-  const base=new THREE.Mesh(new THREE.RingGeometry(.45,1.05,30),knightMat(KNIGHT_GOLD,.8));
-  base.rotation.x=-Math.PI/2; base.position.y=.09; g.add(base);
+
+  const aura=new THREE.Mesh(
+    new THREE.CylinderGeometry(.78,1.04,12.5,18,1,true),
+    knightMat(KNIGHT_STEEL,.20)
+  );
+  aura.position.y=6.25; g.add(aura);
+
+  const beam=new THREE.Mesh(
+    new THREE.CylinderGeometry(.46,.64,12.5,18,1,true),
+    knightMat(KNIGHT_IVORY,.54)
+  );
+  beam.position.y=6.25; g.add(beam);
+
+  const core=new THREE.Mesh(
+    new THREE.CylinderGeometry(.16,.23,12.7,12,1,true),
+    knightMat(KNIGHT_GOLD,.90)
+  );
+  core.position.y=6.35; g.add(core);
+
+  const baseOuter=new THREE.Mesh(
+    new THREE.RingGeometry(.52,1.28,36),
+    knightMat(KNIGHT_GOLD,.82)
+  );
+  baseOuter.rotation.x=-Math.PI/2; baseOuter.position.y=.09; g.add(baseOuter);
+
+  const baseInner=new THREE.Mesh(
+    new THREE.RingGeometry(.24,.76,32),
+    knightMat(KNIGHT_IVORY,.66)
+  );
+  baseInner.rotation.x=-Math.PI/2; baseInner.position.y=.11; g.add(baseInner);
+
+  for(let i=0;i<6;i++){
+    const ray=new THREE.Mesh(
+      new THREE.PlaneGeometry(.07,1.15),
+      knightMat(i%2?KNIGHT_GOLD:KNIGHT_STEEL,.62)
+    );
+    ray.rotation.x=-Math.PI/2;
+    ray.rotation.z=i*Math.PI/3;
+    ray.position.y=.13;
+    g.add(ray);
+  }
+
   g.position.set(x,0,z);
   knightBaseOpacity(g);
-  pushKnightFx(g,{life:.34,grow:.25,from:.85});
-  spawnBurst(x,.9,z,7,FX_MAT_SPARK,3.2);
+  pushKnightFx(g,{life:.42,grow:.34,from:.78,spin:2.8});
+  spawnBurst(x,.95,z,10,FX_MAT_SPARK,3.8);
+  knightShockRing({x,y:0,z},1.35,KNIGHT_GOLD,.20);
 }
 function knightSpawnJudgmentSword(){
   const g=new THREE.Group();
-  const blade=new THREE.Mesh(new THREE.BoxGeometry(.75,7.5,.22),knightMat(KNIGHT_IVORY,.5,false));
-  blade.position.y=4.6; g.add(blade);
-  const edge=new THREE.Mesh(new THREE.BoxGeometry(.32,7.6,.3),knightMat(KNIGHT_GOLD,.45,false));
-  edge.position.y=4.6; g.add(edge);
-  const cross=new THREE.Mesh(new THREE.BoxGeometry(3.2,.42,.42),knightMat(KNIGHT_GOLD,.55,false));
-  cross.position.y=1.0; g.add(cross);
-  const pommel=new THREE.Mesh(new THREE.SphereGeometry(.36,14,10),knightMat(KNIGHT_IVORY,.55,false));
-  pommel.position.y=8.6; g.add(pommel);
-  g.position.set(player.position.x,10,player.position.z);
+
+  const auraBlade=new THREE.Mesh(
+    new THREE.BoxGeometry(1.45,8.8,.32),
+    knightMat(KNIGHT_STEEL,.18)
+  );
+  auraBlade.position.y=4.9; g.add(auraBlade);
+
+  const blade=new THREE.Mesh(
+    new THREE.BoxGeometry(.86,8.4,.25),
+    knightMat(KNIGHT_IVORY,.62,false)
+  );
+  blade.position.y=4.7; g.add(blade);
+
+  const edge=new THREE.Mesh(
+    new THREE.BoxGeometry(.34,8.55,.34),
+    knightMat(KNIGHT_GOLD,.64,false)
+  );
+  edge.position.y=4.72; g.add(edge);
+
+  const tip=new THREE.Mesh(
+    new THREE.ConeGeometry(.66,1.45,4),
+    knightMat(KNIGHT_IVORY,.72,false)
+  );
+  tip.position.y=.05; tip.rotation.y=Math.PI/4; g.add(tip);
+
+  const cross=new THREE.Mesh(
+    new THREE.BoxGeometry(4.2,.48,.50),
+    knightMat(KNIGHT_GOLD,.68,false)
+  );
+  cross.position.y=1.12; g.add(cross);
+
+  const crossGlow=new THREE.Mesh(
+    new THREE.BoxGeometry(4.8,.90,.28),
+    knightMat(KNIGHT_STEEL,.22)
+  );
+  crossGlow.position.y=1.12; g.add(crossGlow);
+
+  const crown=new THREE.Group();
+  for(let i=0;i<5;i++){
+    const point=new THREE.Mesh(
+      new THREE.ConeGeometry(.18,.90,4),
+      knightMat(i===2?KNIGHT_IVORY:KNIGHT_GOLD,i===2?.78:.66,false)
+    );
+    point.position.set((i-2)*.36,9.35+(i===2?.26:0),0);
+    crown.add(point);
+  }
+  g.add(crown);
+
+  const pommel=new THREE.Mesh(
+    new THREE.SphereGeometry(.44,16,12),
+    knightMat(KNIGHT_IVORY,.70,false)
+  );
+  pommel.position.y=9.0; g.add(pommel);
+
+  g.position.set(player.position.x,11,player.position.z);
+  g.userData.auraBlade=auraBlade;
+  g.userData.crown=crown;
   scene.add(g);
   knightRuntime.ultSword=g;
 }
@@ -15092,9 +15236,14 @@ function updateKingsJudgment(dt){
   knightRuntime.ultTimer-=dt;
   const sig=knightRuntime.ultSigil;
   if(sig){
-    sig.rotation.y+=dt*0.7;
+    sig.rotation.y+=dt*.82;
     const target=1;
     sig.scale.setScalar(Math.min(target,sig.scale.x+dt*4));
+    const pulse=1+Math.sin(performance.now()*.006)*.035;
+    if(sig.userData.outerGlow) sig.userData.outerGlow.scale.setScalar(pulse);
+    if(sig.userData.middle) sig.userData.middle.rotation.z-=dt*.85;
+    if(sig.userData.inner) sig.userData.inner.rotation.z+=dt*1.15;
+    if(sig.userData.crownCore) sig.userData.crownCore.rotation.z=Math.sin(performance.now()*.003)*.08;
   }
   if(knightRuntime.ultPhase===1){
     if(knightRuntime.ultTimer<=0){
@@ -15105,12 +15254,31 @@ function updateKingsJudgment(dt){
         .slice(0,c.markCap)
         .map(z=>({enemy:z,x:z.position.x,z:z.position.z}));
       for(const m of knightRuntime.ultMarks){
-        if(!knightFxBudget(1)) break;
-        const mark=new THREE.Mesh(new THREE.RingGeometry(.42,.62,22),knightMat(KNIGHT_GOLD,.85));
-        mark.rotation.x=-Math.PI/2;
-        mark.position.set(m.x,.11,m.z);
-        mark.userData.baseOpacity=.85;
-        pushKnightFx(mark,{life:.8,grow:.3,from:1,spin:3});
+        if(!knightFxBudget(2)) break;
+        const markGroup=new THREE.Group();
+        const outer=new THREE.Mesh(
+          new THREE.RingGeometry(.44,.74,28),
+          knightMat(KNIGHT_GOLD,.88)
+        );
+        outer.rotation.x=-Math.PI/2; markGroup.add(outer);
+        const inner=new THREE.Mesh(
+          new THREE.RingGeometry(.18,.40,24),
+          knightMat(KNIGHT_IVORY,.68)
+        );
+        inner.rotation.x=-Math.PI/2; inner.position.y=.02; markGroup.add(inner);
+        for(let i=0;i<4;i++){
+          const tick=new THREE.Mesh(
+            new THREE.PlaneGeometry(.06,.42),
+            knightMat(i%2?KNIGHT_STEEL:KNIGHT_GOLD,.70)
+          );
+          tick.rotation.x=-Math.PI/2;
+          tick.rotation.z=i*Math.PI/2;
+          tick.position.y=.03;
+          markGroup.add(tick);
+        }
+        markGroup.position.set(m.x,.11,m.z);
+        knightBaseOpacity(markGroup);
+        pushKnightFx(markGroup,{life:.90,grow:.38,from:.84,spin:4.0});
       }
     }
   }else if(knightRuntime.ultPhase===2){
@@ -15142,16 +15310,63 @@ function updateKingsJudgment(dt){
     const sword=knightRuntime.ultSword;
     if(sword){
       const p=1-Math.max(0,knightRuntime.ultTimer)/c.phaseSword;
-      sword.position.set(player.position.x,10-9.4*p*p,player.position.z);
-      sword.rotation.y+=dt*1.2;
+      sword.position.set(player.position.x,11-10.4*p*p,player.position.z);
+      sword.rotation.y+=dt*(1.0+2.2*p);
+      sword.rotation.z=Math.sin(p*Math.PI)*.06;
+      if(sword.userData.auraBlade){
+        sword.userData.auraBlade.material.opacity=.12+.20*p;
+        sword.userData.auraBlade.scale.x=1+Math.sin(performance.now()*.012)*.08;
+      }
+      if(sword.userData.crown){
+        sword.userData.crown.rotation.y-=dt*1.8;
+      }
+      if(p>.25 && knightFxBudget(1) && Math.random()<dt*12){
+        const trail=new THREE.Mesh(
+          new THREE.PlaneGeometry(.55,2.6),
+          knightMat(Math.random()<.5?KNIGHT_GOLD:KNIGHT_IVORY,.28)
+        );
+        trail.position.set(
+          sword.position.x+(Math.random()-.5)*.5,
+          sword.position.y+3.6,
+          sword.position.z+(Math.random()-.5)*.5
+        );
+        trail.rotation.y=sword.rotation.y;
+        knightBaseOpacity(trail);
+        pushKnightFx(trail,{life:.20,grow:.18,from:.92});
+      }
     }
     if(knightRuntime.ultTimer<=0){
       knightRuntime.ultPhase=5; knightRuntime.ultTimer=c.phaseShock;
       const pos={x:player.position.x,y:player.position.y,z:player.position.z};
       knightShockRing(pos,c.shockRadius,KNIGHT_IVORY,.55);
-      knightShockRing(pos,c.shockRadius*.7,KNIGHT_GOLD,.45);
-      spawnKnightGuardBurst(pos,c.shockRadius*.55);
-      knightGroundCracks(pos,c.shockRadius*.6,8,KNIGHT_GOLD);
+      knightShockRing(pos,c.shockRadius*.78,KNIGHT_GOLD,.48);
+      knightShockRing(pos,c.shockRadius*.52,KNIGHT_STEEL,.36);
+      spawnKnightGuardBurst(pos,c.shockRadius*.62,KNIGHT_GOLD);
+      knightGroundCracks(pos,c.shockRadius*.64,10,KNIGHT_GOLD);
+
+      if(knightFxBudget(3)){
+        const crownBurst=new THREE.Group();
+        for(let i=0;i<7;i++){
+          const a=(i/7)*Math.PI*2;
+          const point=new THREE.Mesh(
+            new THREE.ConeGeometry(.18,.95,4),
+            knightMat(i%2?KNIGHT_GOLD:KNIGHT_IVORY,.72)
+          );
+          point.position.set(Math.sin(a)*1.8,.55,Math.cos(a)*1.8);
+          point.rotation.z=-a;
+          crownBurst.add(point);
+        }
+        const crownRing=new THREE.Mesh(
+          new THREE.RingGeometry(1.15,2.05,40),
+          knightMat(KNIGHT_GOLD,.54)
+        );
+        crownRing.rotation.x=-Math.PI/2;
+        crownRing.position.y=.10;
+        crownBurst.add(crownRing);
+        crownBurst.position.set(pos.x,pos.y,pos.z);
+        knightBaseOpacity(crownBurst);
+        pushKnightFx(crownBurst,{life:.46,grow:1.65,from:.58,spin:3.8});
+      }
       for(const z of zombies){
         if(z.userData.dead||z.userData.spawnPending) continue;
         const dx=z.position.x-pos.x,dz=z.position.z-pos.z;
@@ -15249,67 +15464,131 @@ function knightUpdateLastStand(dt){
 }
 
 
-function knightCloneSummonSigil(origin,count){
-  if(!origin||!knightFxBudget(3))return;
+function knightRoyalSummonSealFx(origin,count){
+  if(!origin||!knightFxBudget(4))return;
   const g=new THREE.Group();
-  const radius=Math.min(5.6,2.8+Math.sqrt(Math.max(1,count))*.62);
-  const outer=new THREE.Mesh(new THREE.RingGeometry(radius*.74,radius,64),knightMat(KNIGHT_GOLD,.58));
-  outer.rotation.x=-Math.PI/2;outer.position.y=.05;g.add(outer);
-  const inner=new THREE.Mesh(new THREE.RingGeometry(radius*.28,radius*.52,48),knightMat(KNIGHT_STEEL,.34));
-  inner.rotation.x=-Math.PI/2;inner.position.y=.07;g.add(inner);
+  const radius=Math.min(5.4,2.7+Math.max(1,count)*.20);
+
+  const outer=new THREE.Mesh(
+    new THREE.RingGeometry(radius*.78,radius,64),
+    knightMat(KNIGHT_GOLD,.62)
+  );
+  outer.rotation.x=-Math.PI/2;outer.position.y=.055;g.add(outer);
+
+  const inner=new THREE.Mesh(
+    new THREE.RingGeometry(radius*.42,radius*.57,52),
+    knightMat(KNIGHT_STEEL,.44)
+  );
+  inner.rotation.x=-Math.PI/2;inner.position.y=.065;g.add(inner);
+
+  const field=new THREE.Mesh(
+    new THREE.CircleGeometry(radius*.76,56),
+    knightMat(KNIGHT_STEEL,.055)
+  );
+  field.rotation.x=-Math.PI/2;field.position.y=.035;g.add(field);
+
   for(let i=0;i<8;i++){
-    const ray=new THREE.Mesh(new THREE.PlaneGeometry(.08,radius*1.45),knightMat(i%2?KNIGHT_IVORY:KNIGHT_GOLD,.32));
-    ray.rotation.x=-Math.PI/2;ray.rotation.z=i*Math.PI/4;ray.position.y=.08;g.add(ray);
+    const ray=new THREE.Mesh(
+      new THREE.PlaneGeometry(.08,radius*1.45),
+      knightMat(i%2?KNIGHT_IVORY:KNIGHT_GOLD,.34)
+    );
+    ray.rotation.x=-Math.PI/2;ray.rotation.z=i*Math.PI/4;ray.position.y=.075;g.add(ray);
   }
-  g.position.set(origin.x,origin.y,origin.z);
+
+  const crown=new THREE.Group();
+  const crownBase=new THREE.Mesh(new THREE.PlaneGeometry(1.45,.24),knightMat(KNIGHT_GOLD,.72));
+  crown.add(crownBase);
+  for(let i=0;i<3;i++){
+    const point=new THREE.Mesh(new THREE.ConeGeometry(.20,.66,5),knightMat(KNIGHT_IVORY,.78));
+    point.position.set((i-1)*.42,.34,0);crown.add(point);
+  }
+  crown.rotation.x=-Math.PI/2;crown.position.y=.09;g.add(crown);
+
+  g.position.set(origin.x,origin.y||0,origin.z);
   knightBaseOpacity(g);
-  pushKnightFx(g,{life:.72,grow:.42,from:.72,spin:2.2});
-  knightShockRing(origin,radius*.86,KNIGHT_GOLD,.38);
-  knightShockRing(origin,radius*.58,KNIGHT_IVORY,.30);
+  pushKnightFx(g,{life:.78,grow:.48,from:.68,spin:1.65});
+  knightShockRing(origin,radius*.92,KNIGHT_GOLD,.42);
+  knightShockRing(origin,radius*.62,KNIGHT_IVORY,.34);
 }
-function knightCloneBaseAura(c,index,life=.42){
-  if(!c||!knightFxBudget(2))return;
-  const g=new THREE.Group();
+function knightRoyalCloneArrivalFx(origin,index){
+  if(!origin||!knightFxBudget(3))return;
   const color=index%2?KNIGHT_STEEL:KNIGHT_GOLD;
-  const disk=new THREE.Mesh(new THREE.CircleGeometry(.82,30),knightMat(color,.16));
-  disk.rotation.x=-Math.PI/2;disk.position.y=.035;g.add(disk);
-  const ring=new THREE.Mesh(new THREE.RingGeometry(.68,.92,34),knightMat(KNIGHT_IVORY,.55));
-  ring.rotation.x=-Math.PI/2;ring.position.y=.055;g.add(ring);
-  const crest=new THREE.Mesh(new THREE.RingGeometry(.20,.40,22),knightMat(color,.58));
-  crest.rotation.x=-Math.PI/2;crest.position.y=.07;g.add(crest);
-  g.position.copy(c.position);
-  knightBaseOpacity(g);
-  pushKnightFx(g,{life,grow:.34,from:.76,spin:index%2?-5:5});
-}
-function knightCloneMoveWake(c,index){
-  if(!c||!knightFxBudget(2))return;
   const g=new THREE.Group();
-  const color=index%2?KNIGHT_STEEL:KNIGHT_GOLD;
-  const wake=new THREE.Mesh(new THREE.PlaneGeometry(.48,1.65),knightMat(color,.23));
-  wake.rotation.x=-Math.PI/2;wake.position.set(0,.04,-.54);g.add(wake);
-  const edge=new THREE.Mesh(new THREE.PlaneGeometry(.12,1.30),knightMat(KNIGHT_IVORY,.34));
-  edge.rotation.x=-Math.PI/2;edge.position.set(0,.055,-.42);g.add(edge);
-  g.position.copy(c.position);g.rotation.y=c.rotation.y;
+
+  const column=new THREE.Mesh(
+    new THREE.CylinderGeometry(.30,.72,4.8,22,1,true),
+    knightMat(color,.20)
+  );
+  column.position.y=2.4;g.add(column);
+
+  const core=new THREE.Mesh(
+    new THREE.CylinderGeometry(.08,.22,4.2,16,1,true),
+    knightMat(KNIGHT_IVORY,.38)
+  );
+  core.position.y=2.1;g.add(core);
+
+  const halo=new THREE.Mesh(
+    new THREE.RingGeometry(.42,1.05,36),
+    knightMat(color,.74)
+  );
+  halo.rotation.x=-Math.PI/2;halo.position.y=.08;g.add(halo);
+
+  for(let i=0;i<6;i++){
+    const shard=new THREE.Mesh(
+      new THREE.PlaneGeometry(.07,.62),
+      knightMat(i%2?KNIGHT_IVORY:color,.72)
+    );
+    const a=i/6*Math.PI*2;
+    shard.position.set(Math.cos(a)*.68,.50+Math.sin(i)*.15,Math.sin(a)*.68);
+    shard.rotation.y=-a;g.add(shard);
+  }
+
+  g.position.set(origin.x,origin.y||0,origin.z);
   knightBaseOpacity(g);
-  pushKnightFx(g,{life:.20,grow:.18,from:.86});
+  pushKnightFx(g,{life:.52,grow:.62,from:.55,spin:index%2?-3.4:3.4});
 }
-function knightClonePlayClip(c,kind){
-  if(!c||!c.userData||!c.userData.kayMixer)return;
-  const clips=c.userData.kayClips||{};
-  const names=Object.keys(clips);
-  const words=kind==='shield_toss'?['throw','chop']:
-    kind==='guardian_quake'?['slam','chop']:
-    kind==='defensive_whirlwind'?['spin','slice']:
-    kind==='royal_vanguard'?['stab','slice']:['slash','attack'];
+function knightRoyalCloneDepartureFx(origin,index){
+  if(!origin)return;
+  const color=index%2?KNIGHT_STEEL:KNIGHT_GOLD;
+  spawnKnightGuardBurst(origin,1.45,color);
+  knightShockRing(origin,1.25,color,.24);
+  if(knightFxBudget(2)){
+    const crown=new THREE.Group();
+    const bar=new THREE.Mesh(new THREE.PlaneGeometry(.72,.11),knightMat(color,.68));crown.add(bar);
+    for(let i=0;i<3;i++){
+      const p=new THREE.Mesh(new THREE.ConeGeometry(.09,.30,5),knightMat(KNIGHT_IVORY,.72));
+      p.position.set((i-1)*.20,.17,0);crown.add(p);
+    }
+    crown.position.set(origin.x,(origin.y||0)+1.65,origin.z);
+    knightBaseOpacity(crown);pushKnightFx(crown,{life:.34,grow:.60,from:.72,spin:2.4});
+  }
+}
+function knightClonePlayClip(c,words,fallback){
+  if(!c||!c.userData||!c.userData.kayMixer||!c.userData.kayClips)return;
+  const clips=Object.values(c.userData.kayClips);
   let clip=null;
-  for(const w of words){
-    const name=names.find(n=>n.toLowerCase().includes(w));
-    if(name){clip=clips[name];break;}
-  }
-  if(!clip&&names.length)clip=clips[names.find(n=>n.toLowerCase().includes('attack'))||names[0]];
+  const wanted=(words||[]).map(w=>String(w).toLowerCase());
+  clip=clips.find(x=>wanted.every(w=>String(x.name||'').toLowerCase().includes(w)));
+  if(!clip&&fallback)clip=clips.find(x=>String(x.name||'')===fallback);
+  if(!clip)clip=clips.find(x=>/attack|melee|slash|chop|stab/i.test(String(x.name||'')));
   if(!clip)return;
-  const action=c.userData.kayMixer.clipAction(clip);
-  action.reset();action.setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.fadeIn(.06).play();
+  try{
+    c.userData.kayMixer.stopAllAction();
+    const action=c.userData.kayMixer.clipAction(clip);
+    action.reset();action.setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.fadeIn(.06);action.play();
+  }catch(e){}
+}
+function knightCloneMotionTrailFx(c,returning){
+  if(!c||!knightFxBudget(1))return;
+  const color=(c.userData.cloneIndex||0)%2?KNIGHT_STEEL:KNIGHT_GOLD;
+  const ring=new THREE.Mesh(
+    new THREE.RingGeometry(.38,.68,24),
+    knightMat(returning?KNIGHT_IVORY:color,.28)
+  );
+  ring.rotation.x=-Math.PI/2;
+  ring.position.set(c.position.x,c.position.y+.045,c.position.z);
+  ring.userData.baseOpacity=.28;
+  pushKnightFx(ring,{life:.24,grow:.70,from:.72,spin:returning?-4:4});
 }
 
 function tintKnightRoyalClone(root,index){
@@ -15363,9 +15642,7 @@ function knightCloneDamageBase(){
   return Math.max(1,Number(primary&&primary.damage)||1.35)*playerStats.power*.10;
 }
 function knightCloneStrikeFx(c,target,kind){
-  if(!c||!target)return;
-  knightClonePlayClip(c,kind);
-  if(!knightFxBudget(2))return;
+  if(!c||!target||!knightFxBudget(2))return;
   const yaw=Math.atan2(target.position.x-c.position.x,target.position.z-c.position.z);
   const pos={x:c.position.x,y:c.position.y,z:c.position.z};
   if(kind==='defensive_whirlwind'){
@@ -15383,9 +15660,7 @@ function knightCloneStrikeFx(c,target,kind){
     line.position.set((c.position.x+target.position.x)*.5,c.position.y+.72,(c.position.z+target.position.z)*.5);
     line.rotation.y=yaw;knightBaseOpacity(line);pushKnightFx(line,{life:.18,grow:.12,from:.92});return;
   }
-  knightSwordTrail(pos,yaw,kind==='royal_vanguard'?1:0,kind==='royal_vanguard'?.92:.76);
-  const impact={x:target.position.x,y:target.position.y,z:target.position.z};
-  knightShockRing(impact,kind==='royal_vanguard'?1.15:.86,kind==='royal_vanguard'?KNIGHT_GOLD:KNIGHT_IVORY,.18);
+  knightSwordTrail(pos,yaw,kind==='royal_vanguard'?1:0,kind==='royal_vanguard'?.82:.68);
 }
 function knightClonePerformMove(c,target){
   if(!c||!target||target.userData.dead)return;
@@ -15395,6 +15670,10 @@ function knightClonePerformMove(c,target){
   const base=knightCloneDamageBase();
   const dx=target.position.x-c.position.x,dz=target.position.z-c.position.z,dist=Math.hypot(dx,dz)||1;
   c.rotation.y=Math.atan2(dx,dz);
+  const clipWords=kind==='shield_toss'?['melee','chop']:
+    kind==='guardian_quake'?['melee','chop']:
+    kind==='royal_vanguard'?['melee','stab']:['melee','slash'];
+  knightClonePlayClip(c,clipWords,'1H_Melee_Attack_Chop');
 
   if(kind==='defensive_whirlwind'){
     knightCloneStrikeFx(c,target,kind);
@@ -15435,9 +15714,10 @@ function triggerKnightRoyalGuardClones(){
   if(cfg.count<=0)return false;
   markUltimateUsed();
   clearKnightRoyalClones();
-  knightCloneSummonSigil(player.position,cfg.count);
-  spawnKnightGuardBurst(player.position,Math.min(5.2,2.6+cfg.count*.22),KNIGHT_GOLD);
   knightRoyalCloneCooldown=cfg.cooldown;knightRoyalCloneCycleDuration=cfg.cooldown;
+  knightRoyalSummonSealFx(player.position,cfg.count);
+  spawnKnightGuardBurst(player.position,Math.min(5.2,2.8+cfg.count*.18),KNIGHT_GOLD);
+  triggerCombatShake(13,210);
   getKayKitAssetPromise('knight').then(({gltf,THREEAsset,cloneSkinned})=>{
     for(let i=0;i<cfg.count;i++)setTimeout(()=>{
       if(!player||state.avatarType!=='knight'||!gameRunning)return;
@@ -15451,15 +15731,14 @@ function triggerKnightRoyalGuardClones(){
       Object.assign(wrap.userData,{
         isKnightRoyalClone:true,invincible:true,hp:Infinity,maxHp:Infinity,dead:false,cloneIndex:i,life:cfg.duration,
         attackCooldown:.18+i*.06,moveIndex:i,unlockedMoves:knightCloneAvailableMoves(),farTimer:0,returning:false,
-        auraTimer:.12+i*.025,wakeTimer:.08+i*.018,lastX:wrap.position.x,lastZ:wrap.position.z,
-        kayMixer:new THREEAsset.AnimationMixer(root),kayClips:{}
+        motionFxTimer:.08+i*.025,kayMixer:new THREEAsset.AnimationMixer(root),kayClips:{}
       });
       for(const clip of gltf.animations)wrap.userData.kayClips[clip.name]=clip;
       scene.add(wrap);knightRoyalClones.push(wrap);
+      knightRoyalCloneArrivalFx(wrap.position,i);
       spawnKnightGuardBurst(wrap.position,1.45,i%2?KNIGHT_STEEL:KNIGHT_GOLD);
-      knightCloneBaseAura(wrap,i,.58);
-      knightShockRing(wrap.position,1.10,i%2?KNIGHT_STEEL:KNIGHT_GOLD,.22);
-    },i*95);
+      knightShockRing(wrap.position,1.15,i%2?KNIGHT_STEEL:KNIGHT_GOLD,.22);
+    },i*105);
   });
   toast('KNIGHTS · '+cfg.count+' CLONES');
   if(navigator.vibrate)navigator.vibrate([28,18,52]);
@@ -15473,19 +15752,12 @@ function updateKnightRoyalClones(dt){
     if(!c||!c.parent)continue;
     c.userData.life-=dt;
     if(c.userData.life<=0){
-      spawnKnightGuardBurst(c.position,1.55,(c.userData.cloneIndex||0)%2?KNIGHT_STEEL:KNIGHT_GOLD);
-      knightShockRing(c.position,1.35,KNIGHT_IVORY,.24);
-      knightCloneBaseAura(c,c.userData.cloneIndex||0,.30);
+      knightRoyalCloneDepartureFx(c.position,c.userData.cloneIndex||0);
       removeKnightRoyalClone(c);continue;
     }
     if(c.userData.kayMixer)c.userData.kayMixer.update(dt);
     c.userData.attackCooldown=Math.max(0,(c.userData.attackCooldown||0)-dt);
-    c.userData.auraTimer=Math.max(0,(c.userData.auraTimer||0)-dt);
-    c.userData.wakeTimer=Math.max(0,(c.userData.wakeTimer||0)-dt);
-    if(c.userData.auraTimer<=0){
-      c.userData.auraTimer=.72+((c.userData.cloneIndex||0)%3)*.08;
-      knightCloneBaseAura(c,c.userData.cloneIndex||0,.34);
-    }
+    c.userData.motionFxTimer=Math.max(0,(c.userData.motionFxTimer||0)-dt);
 
     const playerDist=Math.hypot(c.position.x-player.position.x,c.position.z-player.position.z);
     if(playerDist>11)c.userData.farTimer=(c.userData.farTimer||0)+dt;
@@ -15522,14 +15794,12 @@ function updateKnightRoyalClones(dt){
         const nx=THREE.MathUtils.lerp(c.position.x,desired.x,step),nz=THREE.MathUtils.lerp(c.position.z,desired.z,step);
         const r=resolveCollision(nx,nz,c.position.y);
         c.position.x=r.x;c.position.z=r.z;c.position.y=player.position.y;
+        if(dist>.55&&c.userData.motionFxTimer<=0){
+          c.userData.motionFxTimer=c.userData.returning?.13:.20;
+          knightCloneMotionTrailFx(c,!!c.userData.returning);
+        }
       }
     }
-    const moved=Math.hypot(c.position.x-(c.userData.lastX||c.position.x),c.position.z-(c.userData.lastZ||c.position.z));
-    if(moved>.035&&c.userData.wakeTimer<=0){
-      c.userData.wakeTimer=.16;
-      knightCloneMoveWake(c,c.userData.cloneIndex||0);
-    }
-    c.userData.lastX=c.position.x;c.userData.lastZ=c.position.z;
     if(target&&target.parent&&!target.userData.dead){
       c.rotation.y=Math.atan2(target.position.x-c.position.x,target.position.z-c.position.z);
       if(c.position.distanceToSquared(target.position)<=3.1*3.1&&c.userData.attackCooldown<=0)knightClonePerformMove(c,target);
