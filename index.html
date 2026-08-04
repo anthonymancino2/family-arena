@@ -1,4 +1,4 @@
-<!-- V22.13.59 Banner Scaling Hammer Slow: restores Banner Spear to a scaling multi-banner move instead of a one-banner lockout. The Knight can keep 1 banner at round 1 and ramps up to 5 active banners by round 21-25+, while each manual cast still respects the round-based cooldown schedule. Judgment hammer rain is also slowed by another 50% so the hammers are easier to read, while keeping the heavier impact visuals from the previous pass. -->
+<!-- V22.13.60 Banner Cap And Immediate Hammer Rain: makes Banner Spear use an explicit round-based active cap (1/2/3/4/5 banners as rounds rise, reaching 5 by round 21-25+), trims any excess banners if a cap is exceeded, and surfaces a toast when the cap is reached. Judgment hammer rain now begins impacting almost immediately by spawning the rain from much lower in the sky while keeping the slower, more readable fall speed. -->
 <!-- V22.13.51 Knights of the Round Spectacle: upgrades the Knight signature summon with a large royal summoning seal, sequential gold/steel arrival columns, crown flashes, formation trails, visible attack animations, stronger clone strike effects, and a coordinated departure collapse. Effects remain localized and translucent for gameplay readability. Clone count, duration, cooldown, invincibility, aggro priority, inherited moves, movement rules, and 10% damage remain unchanged. -->
 <!-- V22.13.50 Banner Spear Soft Field: reduces the Banner Spear ground-circle brightness so the field no longer washes out bright maps. The outer ring stays readable, while the inner field shifts to a softer steel-blue royal aura with noticeably lower opacity and gentler breathing animation. Radius, duration, slow strength, movement, cooldown scaling, attack buff, defense bonus, and all gameplay values are unchanged. -->
 <!-- V22.13.48 Shield Toss Heroic Polish: upgrades the Knight's Shield Toss with a stronger shield-first launch pose, a royal departure crest, denser steel-gold-ivory flight wakes, heavier contact bursts, clearer return-path energy, and a more satisfying guarded catch. Damage, stun, range, ricochet behavior, cooldown, boss caps, scoring, and all other moves remain unchanged. -->
@@ -163,7 +163,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.49</title>
+<title>Family Arena V22.13.60</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1388,7 +1388,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.59 - Banner Scaling Hammer Slow';
+const GAME_VERSION='22.13.60 - Banner Cap And Immediate Hammer Rain';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12126,7 +12126,11 @@ function knightBannerCooldownForRound(){
 }
 function knightBannerMaxActiveForRound(){
   const r=Math.max(1,Number(round)||1);
-  return Math.min(5, 1 + Math.floor((r-1)/5));
+  if(r<=5) return 1;
+  if(r<=10) return 2;
+  if(r<=15) return 3;
+  if(r<=20) return 4;
+  return 5;
 }
 function knightMovementLocked(){
   if(!knightIsActive()) return false;
@@ -13710,7 +13714,11 @@ function knightBannerSpear(w){
   const c=KNIGHT_CFG.banner;
   if((knightRuntime.bannerCooldown||0)>0) return false;
   const activeBannerCount=Array.isArray(knightRuntime.banners)?knightRuntime.banners.length:0;
-  if(activeBannerCount>=knightBannerMaxActiveForRound()) return false;
+  const bannerCap=knightBannerMaxActiveForRound();
+  if(activeBannerCount>=bannerCap){
+    toast(`Banner limit ${bannerCap}`);
+    return false;
+  }
 
   let g=null;
   try{
@@ -13884,6 +13892,12 @@ function knightUpdateBanners(dt){
   const c=KNIGHT_CFG.banner;
   if(!Array.isArray(knightRuntime.banners)) knightRuntime.banners=[];
 
+  const bannerCap=knightBannerMaxActiveForRound();
+  while(knightRuntime.banners.length>bannerCap){
+    knightBannerExpireFx(knightRuntime.banners[0]);
+    knightRemoveBanner(0);
+  }
+
   for(let i=knightRuntime.banners.length-1;i>=0;i--){
     const b=knightRuntime.banners[i];
     if(!b||!b.mesh){
@@ -13976,10 +13990,10 @@ function knightUpdateBanners(dt){
       knightBannerRoyalAuraFx(b);
     }
     if(b.zone){
-      b.zone.material.opacity=.325+Math.sin(b.visualPulse*3.2)*.075;
+      b.zone.material.opacity=.24+Math.sin(b.visualPulse*3.2)*.05;
     }
     if(b.field){
-      b.field.material.opacity=.040+Math.sin(b.visualPulse*2.4)*.015;
+      b.field.material.opacity=.026+Math.sin(b.visualPulse*2.4)*.010;
     }
 
     const pulseScale=1+Math.sin(b.visualPulse*3.1)*.012;
@@ -15353,7 +15367,7 @@ function knightJudgmentRainStrike(center,radius,progress){
   const x=center.x+Math.sin(a)*r;
   const z=center.z+Math.cos(a)*r;
   const scale=0.86+Math.random()*.42+progress*.18;
-  const startY=24+Math.random()*12;
+  const startY=8+Math.random()*8;
 
   const g=new THREE.Group();
   const atmosphere=new THREE.Mesh(
@@ -15412,7 +15426,7 @@ function knightJudgmentRainStrike(center,radius,progress){
   g.rotation.z=(Math.random()-.5)*.08;
   knightBaseOpacity(g);
   scene.add(g);
-  fx.push({kind:'judgmentRainHammer',mesh:g,life:3.0,maxLife:3.0,targetY:1.0,fallSpeed:12+progress*3,impactScale:scale,impactProgress:progress,impactX:x,impactZ:z,dispose:true});
+  fx.push({kind:'judgmentRainHammer',mesh:g,life:2.5,maxLife:2.5,targetY:1.0,fallSpeed:8+progress*2,impactScale:scale,impactProgress:progress,impactX:x,impactZ:z,dispose:true});
 }
 
 function knightJudgmentFieldRadius(){
