@@ -1,3 +1,4 @@
+<!-- V22.13.51 Knights of the Round Visual Polish: gives the Knight signature summon a proud royal entrance, individual gold/steel aura bases, moving cape-like energy wakes, visible weapon-motion flashes, and a coordinated disappearance effect. Clone count, duration, cooldown, invincibility, aggro priority, unlocked-move inheritance, movement rules, and 10% damage remain unchanged. -->
 <!-- V22.13.50 Banner Spear Soft Field: reduces the Banner Spear ground-circle brightness so the field no longer washes out bright maps. The outer ring stays readable, while the inner field shifts to a softer steel-blue royal aura with noticeably lower opacity and gentler breathing animation. Radius, duration, slow strength, movement, cooldown scaling, attack buff, defense bonus, and all gameplay values are unchanged. -->
 <!-- V22.13.48 Shield Toss Heroic Polish: upgrades the Knight's Shield Toss with a stronger shield-first launch pose, a royal departure crest, denser steel-gold-ivory flight wakes, heavier contact bursts, clearer return-path energy, and a more satisfying guarded catch. Damage, stun, range, ricochet behavior, cooldown, boss caps, scoring, and all other moves remain unchanged. -->
 <!-- V22.13.47 Royal Vanguard Spectacle Upgrade: makes the upgraded Knight Primary clearly more impressive than Royal Sword Combo. Every Vanguard step now gains a unique royal sigil, stronger body-commitment trail, denser layered steel-gold-ivory effects, and a visibly escalating three-stage presentation. The shield-bash finisher receives a large crown crest, triple shock-ring impact, and wider royal burst. Damage, cooldown, unlock level, hitboxes, scoring, clones, and all other abilities remain unchanged. -->
@@ -161,7 +162,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.49</title>
+<title>Family Arena V22.13.51</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1386,7 +1387,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.50 - Banner Spear Soft Field';
+const GAME_VERSION='22.13.51 - Knights of the Round Visual Polish';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -15248,6 +15249,69 @@ function knightUpdateLastStand(dt){
 }
 
 
+function knightCloneSummonSigil(origin,count){
+  if(!origin||!knightFxBudget(3))return;
+  const g=new THREE.Group();
+  const radius=Math.min(5.6,2.8+Math.sqrt(Math.max(1,count))*.62);
+  const outer=new THREE.Mesh(new THREE.RingGeometry(radius*.74,radius,64),knightMat(KNIGHT_GOLD,.58));
+  outer.rotation.x=-Math.PI/2;outer.position.y=.05;g.add(outer);
+  const inner=new THREE.Mesh(new THREE.RingGeometry(radius*.28,radius*.52,48),knightMat(KNIGHT_STEEL,.34));
+  inner.rotation.x=-Math.PI/2;inner.position.y=.07;g.add(inner);
+  for(let i=0;i<8;i++){
+    const ray=new THREE.Mesh(new THREE.PlaneGeometry(.08,radius*1.45),knightMat(i%2?KNIGHT_IVORY:KNIGHT_GOLD,.32));
+    ray.rotation.x=-Math.PI/2;ray.rotation.z=i*Math.PI/4;ray.position.y=.08;g.add(ray);
+  }
+  g.position.set(origin.x,origin.y,origin.z);
+  knightBaseOpacity(g);
+  pushKnightFx(g,{life:.72,grow:.42,from:.72,spin:2.2});
+  knightShockRing(origin,radius*.86,KNIGHT_GOLD,.38);
+  knightShockRing(origin,radius*.58,KNIGHT_IVORY,.30);
+}
+function knightCloneBaseAura(c,index,life=.42){
+  if(!c||!knightFxBudget(2))return;
+  const g=new THREE.Group();
+  const color=index%2?KNIGHT_STEEL:KNIGHT_GOLD;
+  const disk=new THREE.Mesh(new THREE.CircleGeometry(.82,30),knightMat(color,.16));
+  disk.rotation.x=-Math.PI/2;disk.position.y=.035;g.add(disk);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.68,.92,34),knightMat(KNIGHT_IVORY,.55));
+  ring.rotation.x=-Math.PI/2;ring.position.y=.055;g.add(ring);
+  const crest=new THREE.Mesh(new THREE.RingGeometry(.20,.40,22),knightMat(color,.58));
+  crest.rotation.x=-Math.PI/2;crest.position.y=.07;g.add(crest);
+  g.position.copy(c.position);
+  knightBaseOpacity(g);
+  pushKnightFx(g,{life,grow:.34,from:.76,spin:index%2?-5:5});
+}
+function knightCloneMoveWake(c,index){
+  if(!c||!knightFxBudget(2))return;
+  const g=new THREE.Group();
+  const color=index%2?KNIGHT_STEEL:KNIGHT_GOLD;
+  const wake=new THREE.Mesh(new THREE.PlaneGeometry(.48,1.65),knightMat(color,.23));
+  wake.rotation.x=-Math.PI/2;wake.position.set(0,.04,-.54);g.add(wake);
+  const edge=new THREE.Mesh(new THREE.PlaneGeometry(.12,1.30),knightMat(KNIGHT_IVORY,.34));
+  edge.rotation.x=-Math.PI/2;edge.position.set(0,.055,-.42);g.add(edge);
+  g.position.copy(c.position);g.rotation.y=c.rotation.y;
+  knightBaseOpacity(g);
+  pushKnightFx(g,{life:.20,grow:.18,from:.86});
+}
+function knightClonePlayClip(c,kind){
+  if(!c||!c.userData||!c.userData.kayMixer)return;
+  const clips=c.userData.kayClips||{};
+  const names=Object.keys(clips);
+  const words=kind==='shield_toss'?['throw','chop']:
+    kind==='guardian_quake'?['slam','chop']:
+    kind==='defensive_whirlwind'?['spin','slice']:
+    kind==='royal_vanguard'?['stab','slice']:['slash','attack'];
+  let clip=null;
+  for(const w of words){
+    const name=names.find(n=>n.toLowerCase().includes(w));
+    if(name){clip=clips[name];break;}
+  }
+  if(!clip&&names.length)clip=clips[names.find(n=>n.toLowerCase().includes('attack'))||names[0]];
+  if(!clip)return;
+  const action=c.userData.kayMixer.clipAction(clip);
+  action.reset();action.setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.fadeIn(.06).play();
+}
+
 function tintKnightRoyalClone(root,index){
   root.traverse(o=>{
     if(!o.isMesh||!o.material)return;
@@ -15299,7 +15363,9 @@ function knightCloneDamageBase(){
   return Math.max(1,Number(primary&&primary.damage)||1.35)*playerStats.power*.10;
 }
 function knightCloneStrikeFx(c,target,kind){
-  if(!c||!target||!knightFxBudget(2))return;
+  if(!c||!target)return;
+  knightClonePlayClip(c,kind);
+  if(!knightFxBudget(2))return;
   const yaw=Math.atan2(target.position.x-c.position.x,target.position.z-c.position.z);
   const pos={x:c.position.x,y:c.position.y,z:c.position.z};
   if(kind==='defensive_whirlwind'){
@@ -15317,7 +15383,9 @@ function knightCloneStrikeFx(c,target,kind){
     line.position.set((c.position.x+target.position.x)*.5,c.position.y+.72,(c.position.z+target.position.z)*.5);
     line.rotation.y=yaw;knightBaseOpacity(line);pushKnightFx(line,{life:.18,grow:.12,from:.92});return;
   }
-  knightSwordTrail(pos,yaw,kind==='royal_vanguard'?1:0,kind==='royal_vanguard'?.82:.68);
+  knightSwordTrail(pos,yaw,kind==='royal_vanguard'?1:0,kind==='royal_vanguard'?.92:.76);
+  const impact={x:target.position.x,y:target.position.y,z:target.position.z};
+  knightShockRing(impact,kind==='royal_vanguard'?1.15:.86,kind==='royal_vanguard'?KNIGHT_GOLD:KNIGHT_IVORY,.18);
 }
 function knightClonePerformMove(c,target){
   if(!c||!target||target.userData.dead)return;
@@ -15367,6 +15435,8 @@ function triggerKnightRoyalGuardClones(){
   if(cfg.count<=0)return false;
   markUltimateUsed();
   clearKnightRoyalClones();
+  knightCloneSummonSigil(player.position,cfg.count);
+  spawnKnightGuardBurst(player.position,Math.min(5.2,2.6+cfg.count*.22),KNIGHT_GOLD);
   knightRoyalCloneCooldown=cfg.cooldown;knightRoyalCloneCycleDuration=cfg.cooldown;
   getKayKitAssetPromise('knight').then(({gltf,THREEAsset,cloneSkinned})=>{
     for(let i=0;i<cfg.count;i++)setTimeout(()=>{
@@ -15381,11 +15451,14 @@ function triggerKnightRoyalGuardClones(){
       Object.assign(wrap.userData,{
         isKnightRoyalClone:true,invincible:true,hp:Infinity,maxHp:Infinity,dead:false,cloneIndex:i,life:cfg.duration,
         attackCooldown:.18+i*.06,moveIndex:i,unlockedMoves:knightCloneAvailableMoves(),farTimer:0,returning:false,
+        auraTimer:.12+i*.025,wakeTimer:.08+i*.018,lastX:wrap.position.x,lastZ:wrap.position.z,
         kayMixer:new THREEAsset.AnimationMixer(root),kayClips:{}
       });
       for(const clip of gltf.animations)wrap.userData.kayClips[clip.name]=clip;
       scene.add(wrap);knightRoyalClones.push(wrap);
-      spawnKnightGuardBurst(wrap.position,1.25,i%2?KNIGHT_STEEL:KNIGHT_GOLD);
+      spawnKnightGuardBurst(wrap.position,1.45,i%2?KNIGHT_STEEL:KNIGHT_GOLD);
+      knightCloneBaseAura(wrap,i,.58);
+      knightShockRing(wrap.position,1.10,i%2?KNIGHT_STEEL:KNIGHT_GOLD,.22);
     },i*95);
   });
   toast('KNIGHTS · '+cfg.count+' CLONES');
@@ -15399,9 +15472,20 @@ function updateKnightRoyalClones(dt){
   for(const c of [...knightRoyalClones]){
     if(!c||!c.parent)continue;
     c.userData.life-=dt;
-    if(c.userData.life<=0){spawnKnightGuardBurst(c.position,1,KNIGHT_STEEL);removeKnightRoyalClone(c);continue;}
+    if(c.userData.life<=0){
+      spawnKnightGuardBurst(c.position,1.55,(c.userData.cloneIndex||0)%2?KNIGHT_STEEL:KNIGHT_GOLD);
+      knightShockRing(c.position,1.35,KNIGHT_IVORY,.24);
+      knightCloneBaseAura(c,c.userData.cloneIndex||0,.30);
+      removeKnightRoyalClone(c);continue;
+    }
     if(c.userData.kayMixer)c.userData.kayMixer.update(dt);
     c.userData.attackCooldown=Math.max(0,(c.userData.attackCooldown||0)-dt);
+    c.userData.auraTimer=Math.max(0,(c.userData.auraTimer||0)-dt);
+    c.userData.wakeTimer=Math.max(0,(c.userData.wakeTimer||0)-dt);
+    if(c.userData.auraTimer<=0){
+      c.userData.auraTimer=.72+((c.userData.cloneIndex||0)%3)*.08;
+      knightCloneBaseAura(c,c.userData.cloneIndex||0,.34);
+    }
 
     const playerDist=Math.hypot(c.position.x-player.position.x,c.position.z-player.position.z);
     if(playerDist>11)c.userData.farTimer=(c.userData.farTimer||0)+dt;
@@ -15440,6 +15524,12 @@ function updateKnightRoyalClones(dt){
         c.position.x=r.x;c.position.z=r.z;c.position.y=player.position.y;
       }
     }
+    const moved=Math.hypot(c.position.x-(c.userData.lastX||c.position.x),c.position.z-(c.userData.lastZ||c.position.z));
+    if(moved>.035&&c.userData.wakeTimer<=0){
+      c.userData.wakeTimer=.16;
+      knightCloneMoveWake(c,c.userData.cloneIndex||0);
+    }
+    c.userData.lastX=c.position.x;c.userData.lastZ=c.position.z;
     if(target&&target.parent&&!target.userData.dead){
       c.rotation.y=Math.atan2(target.position.x-c.position.x,target.position.z-c.position.z);
       if(c.position.distanceToSquared(target.position)<=3.1*3.1&&c.userData.attackCooldown<=0)knightClonePerformMove(c,target);
