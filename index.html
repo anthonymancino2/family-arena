@@ -1,4 +1,4 @@
-<!-- V22.13.49 Banner Spear Royal Polish: upgrades the moving Banner Spear into a proud royal battlefield centerpiece with a layered double-sided banner, crown-and-shield crest, luminous spearhead, stronger planting column, marching travel wake, controlled aura waves, and a dramatic final collapse. Effects stay localized and translucent so the arena remains playable. Duration, radius, 25% attack buff, defense, slow strength, movement, cooldown scaling, and all damage values are unchanged. -->
+<!-- V22.13.50 Banner Spear Soft Field: reduces the Banner Spear ground-circle brightness so the field no longer washes out bright maps. The outer ring stays readable, while the inner field shifts to a softer steel-blue royal aura with noticeably lower opacity and gentler breathing animation. Radius, duration, slow strength, movement, cooldown scaling, attack buff, defense bonus, and all gameplay values are unchanged. -->
 <!-- V22.13.48 Shield Toss Heroic Polish: upgrades the Knight's Shield Toss with a stronger shield-first launch pose, a royal departure crest, denser steel-gold-ivory flight wakes, heavier contact bursts, clearer return-path energy, and a more satisfying guarded catch. Damage, stun, range, ricochet behavior, cooldown, boss caps, scoring, and all other moves remain unchanged. -->
 <!-- V22.13.47 Royal Vanguard Spectacle Upgrade: makes the upgraded Knight Primary clearly more impressive than Royal Sword Combo. Every Vanguard step now gains a unique royal sigil, stronger body-commitment trail, denser layered steel-gold-ivory effects, and a visibly escalating three-stage presentation. The shield-bash finisher receives a large crown crest, triple shock-ring impact, and wider royal burst. Damage, cooldown, unlock level, hitboxes, scoring, clones, and all other abilities remain unchanged. -->
 <!-- V22.13.46 Royal Vanguard Motion Polish: upgrades Guarded Thrust, Cleaving Guard, and Shield Bash inside Royal Vanguard Combo with more forceful body motion, clearer step-to-step escalation, larger disciplined weapon trails, heavier impact feedback, and a stronger royal finisher presentation. Damage, cooldowns, unlocks, scoring, clone logic, maps, and non-Vanguard systems remain unchanged. -->
@@ -1386,7 +1386,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.49 - Banner Spear Royal Polish';
+const GAME_VERSION='22.13.50 - Banner Spear Soft Field';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -13784,7 +13784,7 @@ function knightBannerSpear(w){
 
     const zone=new THREE.Mesh(
       new THREE.RingGeometry(c.radius-.15,c.radius,52),
-      knightMat(KNIGHT_GOLD,.56)
+      knightMat(KNIGHT_GOLD,.34)
     );
     zone.rotation.x=-Math.PI/2;
     zone.position.y=.08;
@@ -13792,7 +13792,7 @@ function knightBannerSpear(w){
 
     const field=new THREE.Mesh(
       new THREE.CircleGeometry(c.radius,44),
-      knightMat(KNIGHT_GOLD,.11)
+      knightMat(KNIGHT_STEEL,.055)
     );
     field.rotation.x=-Math.PI/2;
     field.position.y=.05;
@@ -13959,10 +13959,10 @@ function knightUpdateBanners(dt){
       knightBannerRoyalAuraFx(b);
     }
     if(b.zone){
-      b.zone.material.opacity=.43+Math.sin(b.visualPulse*3.2)*.10;
+      b.zone.material.opacity=.26+Math.sin(b.visualPulse*3.2)*.06;
     }
     if(b.field){
-      b.field.material.opacity=.075+Math.sin(b.visualPulse*2.4)*.025;
+      b.field.material.opacity=.032+Math.sin(b.visualPulse*2.4)*.012;
     }
 
     const pulseScale=1+Math.sin(b.visualPulse*3.1)*.012;
