@@ -1,6 +1,5 @@
-<!-- V22.13.60 Banner Cap And Immediate Hammer Rain: makes Banner Spear use an explicit round-based active cap (1/2/3/4/5 banners as rounds rise, reaching 5 by round 21-25+), trims any excess banners if a cap is exceeded, and surfaces a toast when the cap is reached. Judgment hammer rain now begins impacting almost immediately by spawning the rain from much lower in the sky while keeping the slower, more readable fall speed. -->
+<!-- V22.13.62 Knights Round Formation Polish: upgrades Knights of the Round with a stronger summoning formation, brighter individual arrivals, clearer clone role colors, improved movement wakes, heavier attack impacts, and coordinated departure effects. Clone count, damage, aggro, duration, cooldowns, invincibility, inherited moves, and return behavior remain unchanged. -->
 <!-- V22.13.51 Knights of the Round Spectacle: upgrades the Knight signature summon with a large royal summoning seal, sequential gold/steel arrival columns, crown flashes, formation trails, visible attack animations, stronger clone strike effects, and a coordinated departure collapse. Effects remain localized and translucent for gameplay readability. Clone count, duration, cooldown, invincibility, aggro priority, inherited moves, movement rules, and 10% damage remain unchanged. -->
-<!-- V22.13.50 Banner Spear Soft Field: reduces the Banner Spear ground-circle brightness so the field no longer washes out bright maps. The outer ring stays readable, while the inner field shifts to a softer steel-blue royal aura with noticeably lower opacity and gentler breathing animation. Radius, duration, slow strength, movement, cooldown scaling, attack buff, defense bonus, and all gameplay values are unchanged. -->
 <!-- V22.13.48 Shield Toss Heroic Polish: upgrades the Knight's Shield Toss with a stronger shield-first launch pose, a royal departure crest, denser steel-gold-ivory flight wakes, heavier contact bursts, clearer return-path energy, and a more satisfying guarded catch. Damage, stun, range, ricochet behavior, cooldown, boss caps, scoring, and all other moves remain unchanged. -->
 <!-- V22.13.47 Royal Vanguard Spectacle Upgrade: makes the upgraded Knight Primary clearly more impressive than Royal Sword Combo. Every Vanguard step now gains a unique royal sigil, stronger body-commitment trail, denser layered steel-gold-ivory effects, and a visibly escalating three-stage presentation. The shield-bash finisher receives a large crown crest, triple shock-ring impact, and wider royal burst. Damage, cooldown, unlock level, hitboxes, scoring, clones, and all other abilities remain unchanged. -->
 <!-- V22.13.46 Royal Vanguard Motion Polish: upgrades Guarded Thrust, Cleaving Guard, and Shield Bash inside Royal Vanguard Combo with more forceful body motion, clearer step-to-step escalation, larger disciplined weapon trails, heavier impact feedback, and a stronger royal finisher presentation. Damage, cooldowns, unlocks, scoring, clone logic, maps, and non-Vanguard systems remain unchanged. -->
@@ -14,14 +13,7 @@
 <!-- V22.13.35 Guardian Quake Combo: combines Guardian Charge and Earth Shatter into one Ability. Hold the Ability button through the completed charge to flow directly into Earth Shatter; releasing early cancels the follow-up. A smaller AUTO/MANUAL toggle appears beside the Ability button only when Guardian Quake is equipped. AUTO steers toward the nearest living enemy while held; MANUAL preserves normal movement steering. Any future infinite charge duration is capped at 20 seconds. The old separate Guardian Charge and Earth Shatter ability entries are removed; their existing damage, collision, impact, resistance, and visual logic are reused. -->
 <!-- V22.13.34 Whirlwind Secondary Scaling: Defensive Whirlwind moves from the Ability slot to the Knight Secondary slot and unlocks at Level 6. Its cooldown now scales by round: 8s for Rounds 1-10, 3s for 11-15, 1.5s for 16-20, and 0s from Round 21 onward. Duration begins at 3.8s on Round 1, increases by 0.5s each round through Round 24, and becomes permanent from Round 25 onward. The Secondary HUD displays active time or infinity. Existing whirlwind damage, knockback, projectile deflection, movement penalty, visuals, and passive version are unchanged. -->
 <!-- V22.13.33 Vanguard Hold Combo: Royal Vanguard Combo now continuously advances through Guarded Thrust, Cleaving Guard, and Shield Bash while the Primary FIRE button is held. Releasing the button stops the sequence immediately without a buffered extra strike. Individual taps still advance one combo step at a time. Damage, cadence, effects, unlock level, and other Knight moves are unchanged. -->
-<!-- V22.13.32 Royal Vanguard Combo: combines Guarded Thrust, Cleaving Guard, and Shield Bash into one upgraded second Primary move called Royal Vanguard Combo. Repeated manual taps advance through a long piercing thrust, wide shield-backed sweep, and heavy shield-bash finisher. The three former separate shop entries are removed; Shield Bash is no longer a Secondary. Royal Sword Combo remains the first Primary, while Royal Vanguard Combo unlocks at Level 5 as its stronger, more versatile counterpart. Shield Toss and Banner Spear remain the Knight's Secondary choices. -->
-<!-- V22.13.31 Homing Banner Spear: the single manually activated Banner Spear now automatically glides toward the nearest living enemy at a controlled speed and retargets several times per second. Its full 7.0-radius effect circle is clamped inside the playable arena boundary, and movement also uses the existing collision resolver to avoid solid obstacles. The 12-second duration, 25% damage buff, defensive field, heavy enemy slow, single-banner rule, manual activation, and round-scaled cooldowns are unchanged. -->
-<!-- V22.13.30 Banner Spear Attack Buff Redesign: Banner Spear is now a single manually activated timed buff move. Only one banner may exist; a new activation replaces and relocates the current one. The banner remains active for 12 seconds with the same 7.0-radius circle, heavy enemy slow, defensive field, and visual effects. Knight damage is increased by 25% for the full banner lifetime, regardless of whether the player remains inside the circle. Cooldown scales by current round: 8s for Rounds 1-10, 5s for 11-15, 2s for 16-20, and 0s from Round 21 onward. The former four-banner placement rule and generic one-second lockout are removed. -->
-<!-- V22.13.29 Banner Spear Rapid Placement Buff: Banner Spear remains fully manual—each banner requires another button tap. Placement cooldown is reduced to exactly 1 second. A hard maximum of four banners is enforced; placing a fifth removes the oldest. Standing inside any banner field now grants a non-stacking 25% Knight damage buff in addition to the existing defense and slow effects. Radius, 12-second duration, enemy speed reduction, visual effects, and cleanup remain unchanged. -->
-<!-- V22.13.28 Banner Spear Visual Polish: adds a stronger planting impact, animated banner cloth and rotating crest, breathing zone opacity, distinct aura pulses when enemies are slowed, compact slow-contact rings, a final-second expiration warning, and a collapsing royal expiration effect. Four-banner maximum, 7.0 radius, 28% enemy speed, 12-second duration, cooldown, defense bonus, and balance are unchanged. -->
-<!-- V22.13.27 Four Giant Banners: increases Banner Spear maximum active placements from two to four. A fifth placement still removes the oldest banner automatically through the existing queue logic. Also doubles the physical spear height and banner-cloth dimensions so the centerpiece matches the enlarged 7.0-radius control field. Slow strength, radius, duration, cooldown, defense bonus, placement behavior, and cleanup are unchanged. -->
-<!-- V22.13.26 Banner Spear Large Slow Field: doubles Banner Spear's radius from 3.5 to 7.0 and strengthens enemy movement slow from 72% speed to 28% speed while touching the field. This makes the circle twice as wide in radius and four times the covered area. Duration, two-banner maximum, cooldown, player damage reduction, placement, and cleanup are unchanged. -->
-<!-- V22.13.25 Banner Spear Function Restoration: repairs Banner Spear activation and placement with safe mesh creation, actual player-ground height instead of hard-coded y=0, explicit configured cooldown routing, success-only Secondary lockout, defensive banner state/cleanup, reliable enemy slowing, and visible zone pulses. Duration, maximum active banners, radius, damage reduction, enemy slow strength, and balance are unchanged. -->
+<!-- V22.13.32 Royal Vanguard Combo: combines Guarded Thrust, Cleaving Guard, and Shield Bash into one upgraded second Primary move called Royal Vanguard Combo. Repeated manual taps advance through a long piercing thrust, wide shield-backed sweep, and heavy shield-bash finisher. The three former separate shop entries are removed; Shield Bash is no longer a Secondary. Royal Sword Combo remains the first Primary, while Royal Vanguard Combo unlocks at Level 5 as its stronger, more versatile counterpart. Shield Toss remains a Knight Secondary choice. -->
 <!-- V22.13.24 Landscape Radar Placement: moves the enemy radar from the center-left camera/player area to the bottom-left corner in landscape, reduces it to 74px (66px on very short browser views), and keeps portrait placement unchanged. Radar behavior and gameplay are unchanged. -->
 <!-- V22.13.23 Global Score and Scroll Fix: landing page now shows the highest live-url survival score from a Firestore-backed global leaderboard instead of the selected local player's score. Personal overall score and global rank moved to Round Select. All non-game screens regain vertical scrolling in landscape/browser mode. The added landscape-50% and portrait-two-thirds movement restrictions were removed, restoring the original movement/look control split. Existing combat and score balance are unchanged. -->
 <!-- V22.13.22 Shield Toss Hit Feedback: improves Shield Toss impact presentation with separate outgoing steel/gold and returning ivory/gold flashes, stronger metal sparks, heavier Brute/boss impact bursts, temporary shield-spin wobble on heavy contact, and smooth spin recovery. Damage, stun, hit detection, route, cooldown, and balance are unchanged. -->
@@ -52,7 +44,7 @@
      diverged from the same V22.12.01 base -- one adding cloud sync, the
      other rebuilding Knight -- with no duplicated code either way. -->
 <!-- V22.13.01 Knight Responsiveness Pass: sharply reduces Knight primary and secondary lockouts, expands combo input buffering, and shortens attack animation blend/recovery timing so tap and hold attacks flow more like Mage and Archer. Damage, hit areas, passives, abilities, and VFX are unchanged. -->
-<!-- V22.13.00 Knight — Royal Guardian: complete Knight rebuild. Three primary moves (Royal Sword Combo with buffered 3-hit chain and frontal finisher shockwave, Guarded Thrust, Cleaving Guard), three secondaries (Shield Bash, Shield Toss, Banner Spear), four equipable abilities (Defensive Whirlwind, Earth Shatter, Guardian Charge, Aegis Counter), five passives (Magical Armor, Royal Discipline, Fortified Position, Last Stand, Fifth-Kill Whirlwind) and the new Judgment of the King ultimate. Adds knight ability HUD, shop/loadout integration, level unlocks, effect caps, hit-stop, and full pause/restart/round cleanup. Mage, Archer, Rogue and Barbarian balance untouched. -->
+<!-- V22.13.00 Knight — Royal Guardian: complete Knight rebuild. Three primary moves (Royal Sword Combo with buffered 3-hit chain and frontal finisher shockwave, Guarded Thrust, Cleaving Guard), three secondaries (Shield Bash and Shield Toss), four equipable abilities (Defensive Whirlwind, Earth Shatter, Guardian Charge, Aegis Counter), five passives (Magical Armor, Royal Discipline, Fortified Position, Last Stand, Fifth-Kill Whirlwind) and the new Judgment of the King ultimate. Adds knight ability HUD, shop/loadout integration, level unlocks, effect caps, hit-stop, and full pause/restart/round cleanup. Mage, Archer, Rogue and Barbarian balance untouched. -->
 <!-- V22.12.01 Meteor Apocalypse Atmosphere: the four-meteor Super Meteor sequence now dims arena lighting over 0.75s, lays an ember red-orange ambient glow over the arena, pulses only the current quadrant's warning bright and fast while the other three stay dim and steady, flashes the arena orange on each impact, rumbles the camera subtly while a meteor falls, and smoothly restores the original lighting after meteor four. Quadrant order, 1.5s inter-meteor delay, meteor size, damage radius, 20% boss damage, 3s stun, 5s burn, and 24s cooldown are all unchanged. -->
 <!-- V22.12.00 Round Select & Round Records: adds a Start Round screen after avatar selection (Rounds 1-50, all unlocked during build/test), rebuilds the round kill target as a pure function so any round can be entered directly, anchors the chosen starting theme to the round the run actually begins on, grants a catch-up stat/coin loadout proportional to the skipped rounds, and adds per-round personal-best and world-best records with a cloud-sync-ready Store API. Runs started above Round 1 are practice runs: round records still count, crystals and the main leaderboard do not. -->
 <!-- V22.11.33 Four Warning Circles: all four Super Meteor landing circles now appear immediately. The current quadrant keeps its existing bright pulsing marker, completed quadrant warnings disappear on impact, and all remaining markers clear after meteor four or during reset cleanup. Gameplay values are unchanged. -->
@@ -163,7 +155,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.60</title>
+<title>Family Arena V22.13.62</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1388,7 +1380,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.60 - Banner Cap And Immediate Hammer Rain';
+const GAME_VERSION='22.13.62 - Knights Round Formation Polish';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2411,7 +2403,6 @@ const LEVEL_UNLOCKS = [
   {level:10, id:'knight_royal_guard_clones', name:'Knights of the Round', desc:'Summon invincible Knight copies that inherit the moves unlocked so far and draw enemy attention.', avatar:'knight'},
   {level:12, id:'knight_guardian_quake', name:'Guardian Quake', desc:'Guardian Charge and Earth Shatter combine into one hold-controlled Ability with Auto and Manual steering.', avatar:'knight'},
   {level:14, id:'knight_aegis_counter', name:'Aegis Counter', desc:'The signature guard-and-counter becomes equipable in the Ability slot.', avatar:'knight'},
-  {level:16, id:'knight_banner_spear', name:'Banner Spear', desc:'Plant a defensive royal banner zone from the Secondary slot.', avatar:'knight'},
   {level:18, id:'knight_judgment', name:'Judgment of the King', desc:'Judgment becomes an equipable ultimate-tier move in the Ability slot.', avatar:'knight'}
 ];
 let reachedLevelUnlocks = new Set();
@@ -2591,8 +2582,6 @@ const CHARACTER_COMBAT = {
         desc:'An upgraded three-step Primary chain combining Guarded Thrust, Cleaving Guard, and Shield Bash. Hold FIRE to automatically continue through the piercing thrust, wide crowd-clearing sweep, and heavy shield-bash finisher; release to stop. Individual taps still advance one step at a time. Stronger and more versatile than Royal Sword Combo, but each step is more committed.'},
       shield_toss:{name:'Shield Toss', price:380, slot:'secondary', kind:'knight_shield_toss', cooldown:0.18, damage:1.6, radius:1.15,
         desc:'Throws the shield on a controlled path with one slight ricochet, staggering everything it touches before returning to your hand. You lose one Magical Armor charge while the shield is away.'},
-      banner_spear:{name:'Banner Spear', price:520, slot:'secondary', kind:'knight_banner', cooldown:0, damage:0, radius:7.0,
-        desc:'Tap to manually activate a royal Banner Spear. Each banner lasts 12 seconds, automatically glides toward the nearest living enemy without leaving the playable arena, heavily slows enemies inside the circle, reduces incoming damage while you stand inside it, and grants 25% more Knight damage for the full active duration. Max active banners scale with round: 1 at the start, then 2 / 3 / 4 / up to 5 by Round 21+. Cooldown is 8 seconds in Rounds 1–10, 5 seconds in Rounds 11–15, 2 seconds in Rounds 16–20, and zero from Round 21 onward.'},
       defensive_whirlwind:{name:'Defensive Whirlwind', price:420, slot:'secondary', kind:'knight_whirlwind_secondary', cooldown:0, damage:0, radius:3.25,
         desc:'Activate a moving sword-and-shield whirlwind that repeatedly damages and pushes enemies away while deflecting weak projectiles. Duration starts at 3.8 seconds and increases by 0.5 seconds each round through Round 24; from Round 25 onward it remains active indefinitely. Cooldown is 8 seconds in Rounds 1–10, 3 seconds in Rounds 11–15, 1.5 seconds in Rounds 16–20, and zero from Round 21 onward.'}
     }
@@ -2666,9 +2655,7 @@ function resetCharacterLoadout(){
   if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING){
     for(const id of Object.keys(c.weapons||{})) ownedWeapons[id]=true;
   }
-  // Shield Bash is now part of Royal Vanguard Combo, not a Secondary.
-  // Knight secondaries are Shield Toss and Banner Spear and follow their
-  // normal unlock/equip rules.
+  // Shield Bash is part of Royal Vanguard Combo, not a Secondary.
   if(state.avatarType==='knight' && currentWeaponId==='shield_bash'){
     currentWeaponId=null;
   }
@@ -10583,7 +10570,7 @@ function updateSecondaryButton(){
     btn.innerHTML='<span class="secondaryIcon">🔒</span><span class="secondaryLabel">SECONDARY</span>';
     return;
   }
-  const icon=w.kind==='giant_fireball'?'☄️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='knight_banner'?'🚩':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦')))));
+  const icon=w.kind==='giant_fireball'?'☄️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'))));
   const status=w.kind==='mirror_volley'
     ? (mirrorReadyCount>0?` · ${mirrorReadyCount}/3 READY`:` · ${cooldown.toFixed(1)}s`)
     : (w.kind==='knight_whirlwind_secondary' && knightRuntime.whirlwindTimer>0
@@ -10677,7 +10664,7 @@ function closeShop(){
   clock.getDelta();
   animate();
 }
-const KNIGHT_WEAPON_UNLOCK_LEVELS = {royal_vanguard:5, defensive_whirlwind:6, shield_toss:8, banner_spear:16};
+const KNIGHT_WEAPON_UNLOCK_LEVELS = {royal_vanguard:5, defensive_whirlwind:6, shield_toss:8};
 function renderShopList(){
   updateRunTokensHud();
   const list = document.getElementById('shopList');
@@ -10750,7 +10737,7 @@ function renderShopList(){
 // an ability equips it immediately; owned abilities can be swapped here.
 const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
   knight:[KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER, KNIGHT_JUDGMENT_ULTIMATE] };
-const REMOVED_WEAPON_IDS=['radiant_cleave','blade_cyclone','holy_wave'];
+const REMOVED_WEAPON_IDS=['radiant_cleave','blade_cyclone','holy_wave','banner_spear'];
 function sanitizeRemovedAbilitySelection(){
   if(equippedAbilityId==='tempest_domain'||equippedAbilityId==='arrow_storm'||
      equippedAbilityId==='knight_whirlwind'||equippedAbilityId==='knight_earth_shatter'||
@@ -12018,8 +12005,6 @@ const KNIGHT_CFG = {
     counterDamage:3.4, bruteMult:0.7, bossMult:0.3, bossCapFraction:0.06, counterStun:1.6},
   shieldToss:{cooldown:4.0, speed:15, range:9.5, damage:1.6, stun:0.5,
     bruteMult:0.75, bossMult:0.35, hitCooldown:0.35},
-  banner:{duration:12, maxActive:5, radius:7.0, moveSpeed:3.2, retargetInterval:0.22,
-    damageReduction:0.30, damageMult:1.25, enemySlow:0.28},
   ultimate:{
     fieldRadius:29.4, markCap:0, columnsPerTick:0, tickInterval:0.32,
     columnDamage:0.95, columnBruteMult:0.78, columnBossFraction:0.012,
@@ -12051,7 +12036,6 @@ function createFreshKnightRuntime(){
     chargeCooldown:0, chargeTimer:0, chargeYaw:0, chargeHits:null,
     aegisCooldown:0, aegisWindow:0, aegisRecovery:0, aegisRing:null,
     shieldTossCooldown:0, shieldToss:null, shieldAway:false,
-    bannerCooldown:0, banners:[],
     resistTimer:0, frontGuardTimer:0,
     ultPhase:0, ultTimer:0, ultMarks:[], ultTickTimer:0, ultMarkIndex:0,
     ultBossDamage:null, ultSigil:null, ultSword:null, ultInvuln:0, ultCooldown:0, ultRadius:0
@@ -12093,9 +12077,6 @@ function knightDisciplineAttackSpeedMult(){
 function knightDisciplineAttackMult(){
   if(!knightIsActive()) return 1;
   let mult=1+(knightRuntime.discipline||0)*KNIGHT_CFG.discipline.attackPerStack;
-  // Banner Spear is now a timed attack-buff move. The damage increase lasts
-  // for the entire banner lifetime and does not depend on standing in the circle.
-  if(knightBannerActive()) mult*=KNIGHT_CFG.banner.damageMult;
   return mult;
 }
 function knightDamageReduction(){
@@ -12103,34 +12084,7 @@ function knightDamageReduction(){
   if(knightRuntime.fortActive) dr+=KNIGHT_CFG.fortified.damageReduction;
   if(knightRuntime.lastStandTimer>0) dr+=KNIGHT_CFG.lastStand.damageReduction;
   if(knightRuntime.resistTimer>0) dr+=0.35;
-  if(knightInsideBanner()) dr+=KNIGHT_CFG.banner.damageReduction;
   return Math.min(0.85,dr);
-}
-function knightInsideBanner(){
-  if(!player) return false;
-  for(const b of knightRuntime.banners){
-    if(Math.hypot(player.position.x-b.x,player.position.z-b.z)<=KNIGHT_CFG.banner.radius) return true;
-  }
-  return false;
-}
-function knightBannerActive(){
-  return Array.isArray(knightRuntime.banners) &&
-    knightRuntime.banners.some(b=>b&&b.life>0&&b.mesh);
-}
-function knightBannerCooldownForRound(){
-  const r=Math.max(1,Number(round)||1);
-  if(r<=10) return 8;
-  if(r<=15) return 5;
-  if(r<=20) return 2;
-  return 0;
-}
-function knightBannerMaxActiveForRound(){
-  const r=Math.max(1,Number(round)||1);
-  if(r<=5) return 1;
-  if(r<=10) return 2;
-  if(r<=15) return 3;
-  if(r<=20) return 4;
-  return 5;
 }
 function knightMovementLocked(){
   if(!knightIsActive()) return false;
@@ -13453,586 +13407,6 @@ function knightEndShieldToss(caught){
   }
 }
 
-function knightBannerPlantFx(pos,radius){
-  if(!pos||!knightFxBudget(3)) return;
-
-  const g=new THREE.Group();
-
-  const outer=new THREE.Mesh(
-    new THREE.RingGeometry(radius*.18,radius*.34,44),
-    knightMat(KNIGHT_GOLD,.82)
-  );
-  outer.rotation.x=-Math.PI/2;
-  g.add(outer);
-
-  const inner=new THREE.Mesh(
-    new THREE.RingGeometry(radius*.06,radius*.16,36),
-    knightMat(KNIGHT_IVORY,.88)
-  );
-  inner.rotation.x=-Math.PI/2;
-  inner.position.y=.025;
-  g.add(inner);
-
-  for(let i=0;i<8;i++){
-    const ray=new THREE.Mesh(
-      new THREE.PlaneGeometry(.08,radius*.28),
-      knightMat(i%2?KNIGHT_GOLD:KNIGHT_STEEL,.78)
-    );
-    const a=i*(Math.PI*2/8);
-    ray.rotation.x=-Math.PI/2;
-    ray.rotation.z=a;
-    ray.position.set(
-      Math.cos(a)*radius*.22,
-      .05,
-      Math.sin(a)*radius*.22
-    );
-    g.add(ray);
-  }
-
-  g.position.set(pos.x,pos.y+.05,pos.z);
-  knightBaseOpacity(g);
-  pushKnightFx(g,{life:.42,grow:1.12,from:.44,spin:3.4});
-}
-
-function knightBannerAuraPulseFx(b,strong=false){
-  if(!b||!knightFxBudget(2)) return;
-  const c=KNIGHT_CFG.banner;
-  const g=new THREE.Group();
-
-  const ring=new THREE.Mesh(
-    new THREE.RingGeometry(
-      c.radius*(strong?.56:.76),
-      c.radius*(strong?.61:.80),
-      56
-    ),
-    knightMat(strong?KNIGHT_IVORY:KNIGHT_GOLD,strong?.52:.26)
-  );
-  ring.rotation.x=-Math.PI/2;
-  g.add(ring);
-
-  if(strong){
-    const disc=new THREE.Mesh(
-      new THREE.CircleGeometry(c.radius*.34,40),
-      knightMat(KNIGHT_GOLD,.11)
-    );
-    disc.rotation.x=-Math.PI/2;
-    disc.position.y=.015;
-    g.add(disc);
-  }
-
-  g.position.set(b.x,(b.y||0)+.07,b.z);
-  knightBaseOpacity(g);
-  pushKnightFx(g,{
-    life:strong?.36:.28,
-    grow:strong?.54:.32,
-    from:strong?.72:.88
-  });
-}
-
-function knightBannerSlowFx(z){
-  if(!z||!knightFxBudget(1)) return;
-  const ring=new THREE.Mesh(
-    new THREE.RingGeometry(.22,.42,22),
-    knightMat(KNIGHT_IVORY,.48)
-  );
-  ring.rotation.x=-Math.PI/2;
-  ring.position.set(z.position.x,z.position.y+.08,z.position.z);
-  ring.userData.baseOpacity=.48;
-  pushKnightFx(ring,{life:.24,grow:.28,from:.84,spin:-4});
-}
-
-function knightBannerExpireFx(b){
-  if(!b||!knightFxBudget(3)) return;
-  const c=KNIGHT_CFG.banner;
-  const g=new THREE.Group();
-
-  const collapse=new THREE.Mesh(
-    new THREE.RingGeometry(c.radius*.64,c.radius*.70,56),
-    knightMat(KNIGHT_GOLD,.52)
-  );
-  collapse.rotation.x=-Math.PI/2;
-  g.add(collapse);
-
-  const crest=new THREE.Mesh(
-    new THREE.RingGeometry(.48,1.02,34),
-    knightMat(KNIGHT_IVORY,.76)
-  );
-  crest.rotation.x=-Math.PI/2;
-  crest.position.y=.04;
-  g.add(crest);
-
-  const crown=new THREE.Group();
-  const crownRing=new THREE.Mesh(
-    new THREE.RingGeometry(.34,.68,28),
-    knightMat(KNIGHT_GOLD,.82)
-  );
-  crownRing.rotation.x=-Math.PI/2;
-  crown.add(crownRing);
-  for(let i=0;i<5;i++){
-    const ray=new THREE.Mesh(
-      new THREE.PlaneGeometry(.07,.58),
-      knightMat(i%2?KNIGHT_IVORY:KNIGHT_GOLD,.68)
-    );
-    ray.rotation.x=-Math.PI/2;
-    ray.rotation.z=i*Math.PI*2/5;
-    crown.add(ray);
-  }
-  crown.position.y=.08;
-  g.add(crown);
-
-  g.position.set(b.x,(b.y||0)+.06,b.z);
-  knightBaseOpacity(g);
-  pushKnightFx(g,{life:.38,grow:-.46,from:1.0,spin:-5});
-}
-
-function knightBannerRoyalColumnFx(pos,radius){
-  if(!pos||!knightFxBudget(4)) return;
-  const g=new THREE.Group();
-
-  const column=new THREE.Mesh(
-    new THREE.CylinderGeometry(.22,.78,6.8,20,1,true),
-    knightMat(KNIGHT_GOLD,.22)
-  );
-  column.position.y=3.35;
-  g.add(column);
-
-  const core=new THREE.Mesh(
-    new THREE.CylinderGeometry(.07,.22,7.3,16,1,true),
-    knightMat(KNIGHT_IVORY,.58)
-  );
-  core.position.y=3.55;
-  g.add(core);
-
-  const crown=new THREE.Group();
-  const crownRing=new THREE.Mesh(
-    new THREE.RingGeometry(.46,.82,30),
-    knightMat(KNIGHT_GOLD,.86)
-  );
-  crownRing.rotation.x=-Math.PI/2;
-  crown.add(crownRing);
-  for(let i=0;i<5;i++){
-    const a=i*Math.PI*2/5;
-    const ray=new THREE.Mesh(
-      new THREE.PlaneGeometry(.10,.72),
-      knightMat(i%2?KNIGHT_IVORY:KNIGHT_GOLD,.76)
-    );
-    ray.position.set(Math.cos(a)*.62,0,Math.sin(a)*.62);
-    ray.rotation.x=-Math.PI/2;
-    ray.rotation.z=-a;
-    crown.add(ray);
-  }
-  crown.position.y=6.55;
-  g.add(crown);
-
-  const ground=new THREE.Mesh(
-    new THREE.RingGeometry(radius*.18,radius*.23,48),
-    knightMat(KNIGHT_IVORY,.62)
-  );
-  ground.rotation.x=-Math.PI/2;
-  ground.position.y=.08;
-  g.add(ground);
-
-  g.position.set(pos.x,pos.y||0,pos.z);
-  knightBaseOpacity(g);
-  pushKnightFx(g,{life:.55,grow:.34,from:.72,spin:3.8});
-}
-
-function knightBannerTravelWakeFx(b){
-  if(!b||!knightFxBudget(2)) return;
-  const g=new THREE.Group();
-
-  const crest=new THREE.Mesh(
-    new THREE.RingGeometry(.36,.66,28),
-    knightMat(KNIGHT_GOLD,.42)
-  );
-  crest.rotation.x=-Math.PI/2;
-  crest.position.y=.06;
-  g.add(crest);
-
-  for(let i=0;i<4;i++){
-    const ray=new THREE.Mesh(
-      new THREE.PlaneGeometry(.06,1.15),
-      knightMat(i%2?KNIGHT_IVORY:KNIGHT_STEEL,.34)
-    );
-    ray.rotation.x=-Math.PI/2;
-    ray.rotation.z=i*Math.PI/2;
-    ray.position.y=.07;
-    g.add(ray);
-  }
-
-  const dust=new THREE.Mesh(
-    new THREE.CircleGeometry(.72,22),
-    knightMat(KNIGHT_STEEL,.11)
-  );
-  dust.rotation.x=-Math.PI/2;
-  dust.position.y=.035;
-  g.add(dust);
-
-  g.position.set(b.x,(b.y||0)+.02,b.z);
-  knightBaseOpacity(g);
-  pushKnightFx(g,{life:.28,grow:.62,from:.68,spin:-4.2});
-}
-
-function knightBannerRoyalAuraFx(b){
-  if(!b||!knightFxBudget(3)) return;
-  const c=KNIGHT_CFG.banner;
-  const g=new THREE.Group();
-
-  const inner=new THREE.Mesh(
-    new THREE.RingGeometry(c.radius*.34,c.radius*.38,52),
-    knightMat(KNIGHT_IVORY,.34)
-  );
-  inner.rotation.x=-Math.PI/2;
-  g.add(inner);
-
-  const middle=new THREE.Mesh(
-    new THREE.RingGeometry(c.radius*.58,c.radius*.61,56),
-    knightMat(KNIGHT_GOLD,.28)
-  );
-  middle.rotation.x=-Math.PI/2;
-  middle.position.y=.018;
-  g.add(middle);
-
-  for(let i=0;i<8;i++){
-    const ray=new THREE.Mesh(
-      new THREE.PlaneGeometry(.055,c.radius*.66),
-      knightMat(i%2?KNIGHT_GOLD:KNIGHT_IVORY,.16)
-    );
-    ray.rotation.x=-Math.PI/2;
-    ray.rotation.z=i*Math.PI/4;
-    ray.position.y=.025;
-    g.add(ray);
-  }
-
-  g.position.set(b.x,(b.y||0)+.04,b.z);
-  knightBaseOpacity(g);
-  pushKnightFx(g,{life:.46,grow:.42,from:.82,spin:1.8});
-}
-
-function knightBannerSpear(w){
-  if(!player||!scene||!knightIsActive()) return false;
-  const c=KNIGHT_CFG.banner;
-  if((knightRuntime.bannerCooldown||0)>0) return false;
-  const activeBannerCount=Array.isArray(knightRuntime.banners)?knightRuntime.banners.length:0;
-  const bannerCap=knightBannerMaxActiveForRound();
-  if(activeBannerCount>=bannerCap){
-    toast(`Banner limit ${bannerCap}`);
-    return false;
-  }
-
-  let g=null;
-  try{
-    g=new THREE.Group();
-
-    const poleMat=new THREE.MeshStandardMaterial({
-      color:0xd9d9df,
-      emissive:0x2a2a33,
-      emissiveIntensity:.24,
-      metalness:.8,
-      roughness:.3
-    });
-    const pole=new THREE.Mesh(
-      new THREE.CylinderGeometry(.10,.10,5.6,12),
-      poleMat
-    );
-    pole.position.y=2.8;
-    g.add(pole);
-
-    const tip=new THREE.Mesh(
-      new THREE.ConeGeometry(.31,1.02,14),
-      knightMat(KNIGHT_IVORY,.95,false)
-    );
-    tip.position.y=6.02;
-    g.add(tip);
-
-    const cloth=new THREE.Group();
-    const clothBack=new THREE.Mesh(
-      new THREE.PlaneGeometry(2.52,1.84),
-      knightMat(KNIGHT_STEEL,.54,false)
-    );
-    clothBack.position.z=-.018;
-    cloth.add(clothBack);
-
-    const clothMain=new THREE.Mesh(
-      new THREE.PlaneGeometry(2.38,1.68),
-      knightMat(KNIGHT_GOLD,.92,false)
-    );
-    clothMain.position.z=.015;
-    cloth.add(clothMain);
-
-    const clothStripe=new THREE.Mesh(
-      new THREE.PlaneGeometry(2.18,.22),
-      knightMat(KNIGHT_IVORY,.78,false)
-    );
-    clothStripe.position.set(0,-.48,.035);
-    cloth.add(clothStripe);
-
-    cloth.position.set(1.28,4.34,0);
-    g.add(cloth);
-
-    const crest=new THREE.Group();
-    const crestOuter=new THREE.Mesh(
-      new THREE.RingGeometry(.38,.74,32),
-      knightMat(KNIGHT_IVORY,.90)
-    );
-    crest.add(crestOuter);
-    const crestInner=new THREE.Mesh(
-      new THREE.CircleGeometry(.31,26),
-      knightMat(KNIGHT_STEEL,.56)
-    );
-    crestInner.position.z=.012;
-    crest.add(crestInner);
-    for(let i=0;i<4;i++){
-      const spoke=new THREE.Mesh(
-        new THREE.PlaneGeometry(.08,.82),
-        knightMat(KNIGHT_GOLD,.84)
-      );
-      spoke.position.z=.03;
-      spoke.rotation.z=i*Math.PI/2;
-      crest.add(spoke);
-    }
-    const crownTop=new THREE.Mesh(
-      new THREE.PlaneGeometry(.72,.18),
-      knightMat(KNIGHT_GOLD,.92)
-    );
-    crownTop.position.set(0,.58,.035);
-    crest.add(crownTop);
-    for(let i=-1;i<=1;i++){
-      const point=new THREE.Mesh(
-        new THREE.ConeGeometry(.10,.34,6),
-        knightMat(KNIGHT_GOLD,.92)
-      );
-      point.position.set(i*.24,.78,.04);
-      crest.add(point);
-    }
-    crest.position.set(1.28,4.34,.05);
-    g.add(crest);
-
-    const zone=new THREE.Mesh(
-      new THREE.RingGeometry(c.radius-.15,c.radius,52),
-      knightMat(KNIGHT_GOLD,.425)
-    );
-    zone.rotation.x=-Math.PI/2;
-    zone.position.y=.08;
-    g.add(zone);
-
-    const field=new THREE.Mesh(
-      new THREE.CircleGeometry(c.radius,44),
-      knightMat(KNIGHT_STEEL,.069)
-    );
-    field.rotation.x=-Math.PI/2;
-    field.position.y=.05;
-    g.add(field);
-
-    const base=new THREE.Mesh(
-      new THREE.CylinderGeometry(.52,.76,.34,24),
-      knightMat(KNIGHT_STEEL,.82,false)
-    );
-    base.position.y=.17;
-    g.add(base);
-  }catch(err){
-    console.error('Banner Spear creation failed',err);
-    if(g) disposeGroup(g);
-    return false;
-  }
-
-  // Banner Spear scales from 1 active banner early up to 5 banners later.
-  // Manual casts stop only when the round-based active cap is already filled.
-
-  // Use the player's actual ground height. The earlier hard-coded y=0 could
-  // bury the spear/zone on maps where the arena floor is not exactly zero.
-  const groundY=Number.isFinite(player.position.y)?player.position.y:0;
-  g.position.set(player.position.x,groundY,player.position.z);
-  g.rotation.y=player.rotation.y;
-  scene.add(g);
-
-  knightRuntime.banners.push({
-    mesh:g,
-    cloth,
-    crest,
-    pole,
-    zone,
-    field,
-    x:g.position.x,
-    y:g.position.y,
-    z:g.position.z,
-    life:c.duration,
-    pulse:0,
-    visualPulse:0,
-    slowFxTimer:0,
-    retargetTimer:0,
-    travelFxTimer:0,
-    royalAuraTimer:.45,
-    target:null
-  });
-  knightRuntime.bannerCooldown=knightBannerCooldownForRound();
-
-  knightPlayClip(['melee','attack'],'1H_Melee_Attack_Chop',.18,.14);
-  knightBannerPlantFx(player.position,c.radius);
-  knightBannerRoyalColumnFx(player.position,c.radius);
-  spawnKnightGuardBurst(player.position,c.radius,KNIGHT_GOLD);
-  knightShockRing(player.position,c.radius,KNIGHT_GOLD,.30);
-  knightShockRing(player.position,c.radius*.58,KNIGHT_IVORY,.24);
-  triggerCombatShake(11,185);
-  if(navigator.vibrate) navigator.vibrate([24,12,38]);
-  return true;
-}
-function knightRemoveBanner(i){
-  if(!Array.isArray(knightRuntime.banners)) knightRuntime.banners=[];
-  const b=knightRuntime.banners[i];
-  if(!b) return;
-  if(b.mesh&&b.mesh.parent) b.mesh.parent.remove(b.mesh);
-  if(b.mesh) disposeGroup(b.mesh);
-  knightRuntime.banners.splice(i,1);
-}
-function knightClearBanners(){
-  while(knightRuntime.banners.length) knightRemoveBanner(0);
-}
-function knightUpdateBanners(dt){
-  const c=KNIGHT_CFG.banner;
-  if(!Array.isArray(knightRuntime.banners)) knightRuntime.banners=[];
-
-  const bannerCap=knightBannerMaxActiveForRound();
-  while(knightRuntime.banners.length>bannerCap){
-    knightBannerExpireFx(knightRuntime.banners[0]);
-    knightRemoveBanner(0);
-  }
-
-  for(let i=knightRuntime.banners.length-1;i>=0;i--){
-    const b=knightRuntime.banners[i];
-    if(!b||!b.mesh){
-      knightRuntime.banners.splice(i,1);
-      continue;
-    }
-
-    b.life-=dt;
-    b.pulse-=dt;
-    b.slowFxTimer=Math.max(0,(b.slowFxTimer||0)-dt);
-    b.visualPulse=(b.visualPulse||0)+dt;
-    b.retargetTimer=Math.max(0,(b.retargetTimer||0)-dt);
-    b.travelFxTimer=Math.max(0,(b.travelFxTimer||0)-dt);
-    b.royalAuraTimer=Math.max(0,(b.royalAuraTimer||0)-dt);
-
-    // Retarget periodically so the banner follows the nearest living enemy
-    // without jittering between enemies every frame.
-    if(b.retargetTimer<=0){
-      b.retargetTimer=c.retargetInterval;
-      let nearest=null;
-      let nearestD=Infinity;
-      for(const z of zombies){
-        if(!z||!z.userData||z.userData.dead||z.userData.spawnPending||!z.parent) continue;
-        const d=Math.hypot(z.position.x-b.x,z.position.z-b.z);
-        if(d<nearestD){
-          nearestD=d;
-          nearest=z;
-        }
-      }
-      b.target=nearest;
-    }
-
-    // The single active banner automatically glides toward its nearest target.
-    // Its entire effect circle is kept inside the playable arena boundary.
-    const target=b.target;
-    if(target&&target.parent&&target.userData&&!target.userData.dead){
-      const dx=target.position.x-b.x;
-      const dz=target.position.z-b.z;
-      const dist=Math.hypot(dx,dz);
-
-      if(dist>.35){
-        const step=Math.min(dist,c.moveSpeed*dt);
-        let nx=b.x+(dx/dist)*step;
-        let nz=b.z+(dz/dist)*step;
-
-        // Keep the full 7.0-radius circle inside the visible collision curb.
-        const safeRadius=Math.max(1,(arenaSize-1)-c.radius);
-        const centerDist=Math.hypot(nx,nz);
-        if(centerDist>safeRadius){
-          nx=(nx/centerDist)*safeRadius;
-          nz=(nz/centerDist)*safeRadius;
-        }
-
-        // Respect solid arena obstacles as well as the outer map boundary.
-        const resolved=resolveCollision(nx,nz,b.y||0);
-        b.x=resolved.x;
-        b.z=resolved.z;
-        b.mesh.position.x=b.x;
-        b.mesh.position.z=b.z;
-
-        const faceYaw=Math.atan2(dx,dz);
-        b.mesh.rotation.y=THREE.MathUtils.lerp(
-          b.mesh.rotation.y,
-          faceYaw,
-          Math.min(1,dt*4.5)
-        );
-
-        if(b.travelFxTimer<=0){
-          b.travelFxTimer=.16;
-          knightBannerTravelWakeFx(b);
-        }
-      }
-    }
-
-    // Keep the spear upright. Animate only the cloth/crest so the banner
-    // feels alive without spinning like a signpost.
-    if(b.cloth){
-      b.cloth.rotation.y=Math.sin(b.visualPulse*2.8)*.14;
-      b.cloth.rotation.z=Math.sin(b.visualPulse*3.9)*.050;
-      b.cloth.scale.y=1+Math.sin(b.visualPulse*4.6)*.042;
-      b.cloth.scale.x=1+Math.sin(b.visualPulse*3.2)*.018;
-    }
-    if(b.crest){
-      b.crest.rotation.z+=dt*.95;
-      const crestPulse=1+Math.sin(b.visualPulse*4.0)*.06;
-      b.crest.scale.setScalar(crestPulse);
-    }
-    if(b.royalAuraTimer<=0){
-      b.royalAuraTimer=1.35;
-      knightBannerRoyalAuraFx(b);
-    }
-    if(b.zone){
-      b.zone.material.opacity=.24+Math.sin(b.visualPulse*3.2)*.05;
-    }
-    if(b.field){
-      b.field.material.opacity=.026+Math.sin(b.visualPulse*2.4)*.010;
-    }
-
-    const pulseScale=1+Math.sin(b.visualPulse*3.1)*.012;
-    b.mesh.scale.set(pulseScale,1,pulseScale);
-
-    if(b.pulse<=0){
-      b.pulse=.4;
-      let slowedAny=false;
-
-      for(const z of zombies){
-        if(!z||!z.userData||z.userData.dead||z.userData.spawnPending) continue;
-        if(Math.hypot(z.position.x-b.x,z.position.z-b.z)>c.radius) continue;
-
-        z.userData.slowTimer=Math.max(z.userData.slowTimer||0,.6);
-        z.userData.slowMult=Math.min(z.userData.slowMult||1,c.enemySlow);
-        slowedAny=true;
-
-        if(b.slowFxTimer<=0){
-          knightBannerSlowFx(z);
-          b.slowFxTimer=.10;
-        }
-      }
-
-      knightBannerAuraPulseFx(b,slowedAny);
-    }
-
-    // Final second warning: tighten the aura pulse so expiry is readable.
-    if(b.life<=1.0 && !b.expireWarned){
-      b.expireWarned=true;
-      knightBannerAuraPulseFx(b,true);
-    }
-
-    if(b.life<=0){
-      knightBannerExpireFx(b);
-      knightRemoveBanner(i);
-    }
-  }
-
-}
 /* ------------------------------------------------------------- ABILITY 1 */
 
 function knightWhirlwindStartFx(source){
@@ -15706,19 +15080,19 @@ function knightRoyalSummonSealFx(origin,count){
 
   const outer=new THREE.Mesh(
     new THREE.RingGeometry(radius*.78,radius,64),
-    knightMat(KNIGHT_GOLD,.62)
+    knightMat(KNIGHT_GOLD,.76)
   );
   outer.rotation.x=-Math.PI/2;outer.position.y=.055;g.add(outer);
 
   const inner=new THREE.Mesh(
     new THREE.RingGeometry(radius*.42,radius*.57,52),
-    knightMat(KNIGHT_STEEL,.44)
+    knightMat(KNIGHT_STEEL,.56)
   );
   inner.rotation.x=-Math.PI/2;inner.position.y=.065;g.add(inner);
 
   const field=new THREE.Mesh(
     new THREE.CircleGeometry(radius*.76,56),
-    knightMat(KNIGHT_STEEL,.055)
+    knightMat(KNIGHT_STEEL,.075)
   );
   field.rotation.x=-Math.PI/2;field.position.y=.035;g.add(field);
 
@@ -15751,19 +15125,19 @@ function knightRoyalCloneArrivalFx(origin,index){
   const g=new THREE.Group();
 
   const column=new THREE.Mesh(
-    new THREE.CylinderGeometry(.30,.72,4.8,22,1,true),
+    new THREE.CylinderGeometry(.36,.86,5.6,22,1,true),
     knightMat(color,.20)
   );
-  column.position.y=2.4;g.add(column);
+  column.position.y=2.8;g.add(column);
 
   const core=new THREE.Mesh(
-    new THREE.CylinderGeometry(.08,.22,4.2,16,1,true),
+    new THREE.CylinderGeometry(.10,.28,5.0,16,1,true),
     knightMat(KNIGHT_IVORY,.38)
   );
-  core.position.y=2.1;g.add(core);
+  core.position.y=2.5;g.add(core);
 
   const halo=new THREE.Mesh(
-    new THREE.RingGeometry(.42,1.05,36),
+    new THREE.RingGeometry(.48,1.26,40),
     knightMat(color,.74)
   );
   halo.rotation.x=-Math.PI/2;halo.position.y=.08;g.add(halo);
@@ -15780,13 +15154,13 @@ function knightRoyalCloneArrivalFx(origin,index){
 
   g.position.set(origin.x,origin.y||0,origin.z);
   knightBaseOpacity(g);
-  pushKnightFx(g,{life:.52,grow:.62,from:.55,spin:index%2?-3.4:3.4});
+  pushKnightFx(g,{life:.64,grow:.76,from:.50,spin:index%2?-3.8:3.8});
 }
 function knightRoyalCloneDepartureFx(origin,index){
   if(!origin)return;
   const color=index%2?KNIGHT_STEEL:KNIGHT_GOLD;
-  spawnKnightGuardBurst(origin,1.45,color);
-  knightShockRing(origin,1.25,color,.24);
+  spawnKnightGuardBurst(origin,1.75,color);
+  knightShockRing(origin,1.55,color,.30);
   if(knightFxBudget(2)){
     const crown=new THREE.Group();
     const bar=new THREE.Mesh(new THREE.PlaneGeometry(.72,.11),knightMat(color,.68));crown.add(bar);
@@ -15795,7 +15169,7 @@ function knightRoyalCloneDepartureFx(origin,index){
       p.position.set((i-1)*.20,.17,0);crown.add(p);
     }
     crown.position.set(origin.x,(origin.y||0)+1.65,origin.z);
-    knightBaseOpacity(crown);pushKnightFx(crown,{life:.34,grow:.60,from:.72,spin:2.4});
+    knightBaseOpacity(crown);pushKnightFx(crown,{life:.42,grow:.78,from:.68,spin:2.8});
   }
 }
 function knightClonePlayClip(c,words,fallback){
@@ -15814,16 +15188,23 @@ function knightClonePlayClip(c,words,fallback){
   }catch(e){}
 }
 function knightCloneMotionTrailFx(c,returning){
-  if(!c||!knightFxBudget(1))return;
-  const color=(c.userData.cloneIndex||0)%2?KNIGHT_STEEL:KNIGHT_GOLD;
-  const ring=new THREE.Mesh(
-    new THREE.RingGeometry(.38,.68,24),
-    knightMat(returning?KNIGHT_IVORY:color,.28)
+  if(!c||!knightFxBudget(2))return;
+  const idx=c.userData.cloneIndex||0;
+  const color=idx%3===0?KNIGHT_GOLD:(idx%3===1?KNIGHT_STEEL:KNIGHT_IVORY);
+  const g=new THREE.Group();
+  const outer=new THREE.Mesh(
+    new THREE.RingGeometry(.42,.78,28),
+    knightMat(returning?KNIGHT_IVORY:color,.34)
   );
-  ring.rotation.x=-Math.PI/2;
-  ring.position.set(c.position.x,c.position.y+.045,c.position.z);
-  ring.userData.baseOpacity=.28;
-  pushKnightFx(ring,{life:.24,grow:.70,from:.72,spin:returning?-4:4});
+  outer.rotation.x=-Math.PI/2;g.add(outer);
+  const inner=new THREE.Mesh(
+    new THREE.RingGeometry(.18,.36,22),
+    knightMat(returning?KNIGHT_STEEL:KNIGHT_IVORY,.24)
+  );
+  inner.rotation.x=-Math.PI/2;inner.position.y=.02;g.add(inner);
+  g.position.set(c.position.x,c.position.y+.045,c.position.z);
+  knightBaseOpacity(g);
+  pushKnightFx(g,{life:.28,grow:.78,from:.68,spin:returning?-4.8:4.8});
 }
 
 function tintKnightRoyalClone(root,index){
@@ -15831,9 +15212,9 @@ function tintKnightRoyalClone(root,index){
     if(!o.isMesh||!o.material)return;
     const mats=(Array.isArray(o.material)?o.material:[o.material]).map(m=>{
       const c=m.clone();
-      c.transparent=true;c.opacity=.68;c.depthWrite=false;
-      if(c.color)c.color.lerp(new THREE.Color(index%2?0x9fd4ff:0xffd35a),.38);
-      if(c.emissive)c.emissive.setHex(index%2?0x173d59:0x4d3510);
+      c.transparent=true;c.opacity=.82;c.depthWrite=false;
+      if(c.color)c.color.lerp(new THREE.Color(index%3===0?0xffd35a:(index%3===1?0x9fd4ff:0xffffff)),.46);
+      if(c.emissive)c.emissive.setHex(index%3===0?0x5a3d0f:(index%3===1?0x173d59:0x3a3a3a));
       return c;
     });
     o.material=Array.isArray(o.material)?mats:mats[0];
@@ -15869,7 +15250,6 @@ function knightCloneAvailableMoves(){
   if(level>=8)moves.push('shield_toss');
   if(level>=12)moves.push('guardian_quake');
   if(level>=14)moves.push('aegis_counter');
-  if(level>=16)moves.push('banner_spear');
   return moves;
 }
 function knightCloneDamageBase(){
@@ -15881,21 +15261,22 @@ function knightCloneStrikeFx(c,target,kind){
   const yaw=Math.atan2(target.position.x-c.position.x,target.position.z-c.position.z);
   const pos={x:c.position.x,y:c.position.y,z:c.position.z};
   if(kind==='defensive_whirlwind'){
-    const ring=new THREE.Mesh(new THREE.RingGeometry(1.25,2.15,36),knightMat(KNIGHT_STEEL,.48));
+    const ring=new THREE.Mesh(new THREE.RingGeometry(1.18,2.35,42),knightMat(KNIGHT_STEEL,.62));
     ring.rotation.x=-Math.PI/2;ring.position.set(pos.x,pos.y+.06,pos.z);
     knightBaseOpacity(ring);pushKnightFx(ring,{life:.30,grow:.34,from:.78,spin:11});return;
   }
   if(kind==='guardian_quake'){
-    knightShockRing(pos,2.4,KNIGHT_GOLD,.26);knightGroundCracks(pos,2.2,5,KNIGHT_STEEL);return;
+    knightShockRing(pos,2.7,KNIGHT_GOLD,.34);knightShockRing(pos,1.7,KNIGHT_IVORY,.22);knightGroundCracks(pos,2.5,6,KNIGHT_STEEL);spawnBurst(pos.x,pos.y+.35,pos.z,10,FX_MAT_SPARK,3.4);return;
   }
   if(kind==='shield_toss'){
     const len=Math.max(1.6,c.position.distanceTo(target.position));
-    const line=new THREE.Mesh(new THREE.PlaneGeometry(.22,len),knightMat(KNIGHT_IVORY,.64));
+    const line=new THREE.Mesh(new THREE.PlaneGeometry(.30,len),knightMat(KNIGHT_IVORY,.78));
     line.rotation.x=-Math.PI/2;
     line.position.set((c.position.x+target.position.x)*.5,c.position.y+.72,(c.position.z+target.position.z)*.5);
     line.rotation.y=yaw;knightBaseOpacity(line);pushKnightFx(line,{life:.18,grow:.12,from:.92});return;
   }
-  knightSwordTrail(pos,yaw,kind==='royal_vanguard'?1:0,kind==='royal_vanguard'?.82:.68);
+  knightSwordTrail(pos,yaw,kind==='royal_vanguard'?1:0,kind==='royal_vanguard'?1.02:.84);
+  spawnBurst(target.position.x,target.position.y+.7,target.position.z,kind==='royal_vanguard'?10:7,FX_MAT_SPARK,kind==='royal_vanguard'?3.4:2.7);
 }
 function knightClonePerformMove(c,target){
   if(!c||!target||target.userData.dead)return;
@@ -15930,11 +15311,6 @@ function knightClonePerformMove(c,target){
     knightShieldBashImpact(c.position,c.rotation.y,1);applyBulletDamage(target,base*1.05);
     if(!target.userData.dead)target.userData.hitStun=Math.max(target.userData.hitStun||0,.32);
     c.userData.attackCooldown=.88;
-  }else if(kind==='banner_spear'){
-    knightShockRing(c.position,2.8,KNIGHT_GOLD,.18);applyBulletDamage(target,base*.70);
-    target.userData.slowTimer=Math.max(target.userData.slowTimer||0,.8);
-    target.userData.slowMult=Math.min(target.userData.slowMult||1,.55);
-    c.userData.attackCooldown=1.0;
   }else if(kind==='royal_vanguard'){
     knightCloneStrikeFx(c,target,kind);applyBulletDamage(target,base*1.15);
     if(!target.userData.dead){target.userData.knockbackX=(dx/dist)*2.1;target.userData.knockbackZ=(dz/dist)*2.1;}
@@ -15952,7 +15328,7 @@ function triggerKnightRoyalGuardClones(){
   knightRoyalCloneCooldown=cfg.cooldown;knightRoyalCloneCycleDuration=cfg.cooldown;
   knightRoyalSummonSealFx(player.position,cfg.count);
   spawnKnightGuardBurst(player.position,Math.min(5.2,2.8+cfg.count*.18),KNIGHT_GOLD);
-  triggerCombatShake(13,210);
+  triggerCombatShake(15,240);
   getKayKitAssetPromise('knight').then(({gltf,THREEAsset,cloneSkinned})=>{
     for(let i=0;i<cfg.count;i++)setTimeout(()=>{
       if(!player||state.avatarType!=='knight'||!gameRunning)return;
@@ -15961,7 +15337,7 @@ function triggerKnightRoyalGuardClones(){
       root.scale.setScalar(1.48/Math.max(.001,size.y));
       const box2=new THREEAsset.Box3().setFromObject(root);root.position.y-=box2.min.y;
       tintKnightRoyalClone(root,i);wrap.add(root);
-      const a=(i/cfg.count)*Math.PI*2,rr=2+(i%3)*.45;
+      const a=(i/cfg.count)*Math.PI*2,rr=2.4+(i%3)*.55;
       wrap.position.set(player.position.x+Math.cos(a)*rr,player.position.y,player.position.z+Math.sin(a)*rr);
       Object.assign(wrap.userData,{
         isKnightRoyalClone:true,invincible:true,hp:Infinity,maxHp:Infinity,dead:false,cloneIndex:i,life:cfg.duration,
@@ -15973,9 +15349,9 @@ function triggerKnightRoyalGuardClones(){
       knightRoyalCloneArrivalFx(wrap.position,i);
       spawnKnightGuardBurst(wrap.position,1.45,i%2?KNIGHT_STEEL:KNIGHT_GOLD);
       knightShockRing(wrap.position,1.15,i%2?KNIGHT_STEEL:KNIGHT_GOLD,.22);
-    },i*105);
+    },i*125);
   });
-  toast('KNIGHTS · '+cfg.count+' CLONES');
+  toast('KNIGHTS OF THE ROUND · '+cfg.count);
   if(navigator.vibrate)navigator.vibrate([28,18,52]);
   return true;
 }
@@ -16047,7 +15423,6 @@ function updateKnightSystems(dt){
   if(!knightIsActive()){
     if(knightRuntime.ultPhase>0||knightRuntime.ultSigil||knightRuntime.ultSword) knightClearJudgment();
     if(knightRuntime.shieldToss) knightEndShieldToss(false);
-    if(knightRuntime.banners.length) knightClearBanners();
     if(knightRoyalClones.length) clearKnightRoyalClones();
     return;
   }
@@ -16058,7 +15433,6 @@ function updateKnightSystems(dt){
   knightRuntime.chargeCooldown=Math.max(0,knightRuntime.chargeCooldown-dt);
   knightRuntime.aegisCooldown=Math.max(0,knightRuntime.aegisCooldown-dt);
   knightRuntime.shieldTossCooldown=Math.max(0,knightRuntime.shieldTossCooldown-dt);
-  knightRuntime.bannerCooldown=Math.max(0,knightRuntime.bannerCooldown-dt);
   knightRuntime.resistTimer=Math.max(0,knightRuntime.resistTimer-dt);
   knightRuntime.frontGuardTimer=Math.max(0,knightRuntime.frontGuardTimer-dt);
   knightRuntime.ultCooldown=Math.max(0,(knightRuntime.ultCooldown||0)-dt);
@@ -16088,7 +15462,6 @@ function updateKnightSystems(dt){
   knightUpdateFortified(dt);
   knightUpdateLastStand(dt);
   knightUpdateShieldToss(dt);
-  knightUpdateBanners(dt);
   knightUpdateAegis(dt);
   knightUpdateEarthShatter(dt);
   knightUpdateGuardianCharge(dt);
@@ -16117,7 +15490,6 @@ function updateKnightSystems(dt){
 function clearKnightRoundSpecials(resetCooldowns=true){
   knightClearJudgment();
   knightEndShieldToss(false);
-  knightClearBanners();
   if(knightRuntime.aegisRing){
     if(knightRuntime.aegisRing.parent) scene.remove(knightRuntime.aegisRing);
     disposeGroup(knightRuntime.aegisRing);
@@ -16151,7 +15523,6 @@ function clearKnightRoundSpecials(resetCooldowns=true){
     knightRuntime.chargeCooldown=0;
     knightRuntime.aegisCooldown=0;
     knightRuntime.shieldTossCooldown=0;
-    knightRuntime.bannerCooldown=0;
     knightRuntime.ultCooldown=0;
     knightRuntime.discipline=0;
     knightRuntime.disciplineTimer=0;
@@ -16341,13 +15712,12 @@ function doKnightAttack(w){
   switch(w.kind){
     case 'knight_vanguard': knightRoyalVanguardCombo(w); break;
     case 'knight_shield_toss': knightShieldToss(w); break;
-    case 'knight_banner': return knightBannerSpear(w);
     default: knightRoyalCombo(w); break;
   }
 }
 function isKnightWeaponKind(kind){
   return kind==='knight_combo'||kind==='knight_vanguard'||
-         kind==='knight_shield_toss'||kind==='knight_banner';
+         kind==='knight_shield_toss';
 }
 /* =================== END KNIGHT — KNIGHTSIAN =================== */
 
@@ -19434,7 +18804,6 @@ function doSecondaryShoot(){
   if((player.userData.secondaryAttackCooldown||0)>0)return;
   if(typeof knightMovementLocked==='function' && knightMovementLocked()) return;
   if(w.kind==='knight_shield_toss' && knightRuntime.shieldToss) return;
-  if(w.kind==='knight_banner' && (knightRuntime.bannerCooldown||0)>0) return;
   if(w.kind==='knight_whirlwind_secondary'){
     if((knightRuntime.whirlwindCooldown||0)>0 || (knightRuntime.whirlwindTimer||0)>0) return;
     markSecondaryUsed();
@@ -19448,11 +18817,6 @@ function doSecondaryShoot(){
   if(w.kind==='rocket_arrow'){
     markSecondaryUsed();
     triggerPhoenixFireball();
-    return;
-  }
-  if(w.kind==='knight_banner'){
-    markSecondaryUsed();
-    knightBannerSpear(w);
     return;
   }
   player.userData.secondaryAttackCooldown=attackCooldownFor(w);
