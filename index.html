@@ -1,4 +1,4 @@
-<!-- V22.13.53 Judgment Meteor Hammer: transforms Judgment of the King into a giant semi-transparent celestial warhammer that descends in dramatic slow motion and dominates roughly 80% of the map. The judgment field and impact radius are massively expanded. Enemies inside the field take immediate low heat-wave damage on activation, then repeated escalating burn-pressure damage as the hammer travels downward, followed by a huge final impact. On impact the hammer becomes solid briefly before fading away. The move remains readable and avoids a full-screen whiteout. -->
+<!-- V22.13.54 Judgment Apocalypse Rain: Judgment of the King now anchors to the middle of the map, expands to roughly 98% of the map radius, and becomes a 10-second apocalypse event. Giant semi-transparent hammers rain across the map blizzard-style while a central celestial hammer slowly descends. Enemies take immediate heat-wave damage on activation, repeated escalating field damage during the fall, local hammer-rain impact damage throughout the arena, and a huge final central impact. The move now uses a round-scaling cooldown that starts at 30s and reaches 0s at round 45. -->
 <!-- V22.13.51 Knights of the Round Spectacle: upgrades the Knight signature summon with a large royal summoning seal, sequential gold/steel arrival columns, crown flashes, formation trails, visible attack animations, stronger clone strike effects, and a coordinated departure collapse. Effects remain localized and translucent for gameplay readability. Clone count, duration, cooldown, invincibility, aggro priority, inherited moves, movement rules, and 10% damage remain unchanged. -->
 <!-- V22.13.50 Banner Spear Soft Field: reduces the Banner Spear ground-circle brightness so the field no longer washes out bright maps. The outer ring stays readable, while the inner field shifts to a softer steel-blue royal aura with noticeably lower opacity and gentler breathing animation. Radius, duration, slow strength, movement, cooldown scaling, attack buff, defense bonus, and all gameplay values are unchanged. -->
 <!-- V22.13.48 Shield Toss Heroic Polish: upgrades the Knight's Shield Toss with a stronger shield-first launch pose, a royal departure crest, denser steel-gold-ivory flight wakes, heavier contact bursts, clearer return-path energy, and a more satisfying guarded catch. Damage, stun, range, ricochet behavior, cooldown, boss caps, scoring, and all other moves remain unchanged. -->
@@ -1388,7 +1388,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.53 - Judgment Meteor Hammer';
+const GAME_VERSION='22.13.54 - Judgment Apocalypse Rain';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12011,11 +12011,11 @@ const KNIGHT_CFG = {
   banner:{duration:12, maxActive:1, radius:7.0, moveSpeed:3.2, retargetInterval:0.22,
     damageReduction:0.30, damageMult:1.25, enemySlow:0.28},
   ultimate:{
-    fieldRadius:24, markCap:24, columnsPerTick:1, tickInterval:0.18,
-    columnDamage:1.15, columnBruteMult:0.72, columnBossFraction:0.016,
-    bossTotalCap:0.45, swordDamage:7.8, shockRadius:24, shockDamage:8.4,
-    shockStun:2.5, shockKnockback:9.2, shockBossFraction:0.08,
-    phasePlant:0.35, phaseMark:0.45, phaseColumns:1.20, phaseSword:2.40, phaseShock:1.20
+    fieldRadius:29.4, markCap:0, columnsPerTick:0, tickInterval:0.32,
+    columnDamage:0.95, columnBruteMult:0.78, columnBossFraction:0.012,
+    bossTotalCap:0.55, swordDamage:8.6, shockRadius:29.4, shockDamage:10.5,
+    shockStun:2.8, shockKnockback:10.5, shockBossFraction:0.10,
+    phasePlant:0.35, phaseMark:0.65, phaseColumns:5.90, phaseSword:2.00, phaseShock:1.10
   },
   fxCap:150
 };
@@ -12044,7 +12044,7 @@ function createFreshKnightRuntime(){
     bannerCooldown:0, banners:[],
     resistTimer:0, frontGuardTimer:0,
     ultPhase:0, ultTimer:0, ultMarks:[], ultTickTimer:0, ultMarkIndex:0,
-    ultBossDamage:null, ultSigil:null, ultSword:null, ultInvuln:0
+    ultBossDamage:null, ultSigil:null, ultSword:null, ultInvuln:0, ultCooldown:0, ultRadius:0
   };
 }
 let knightRuntime = createFreshKnightRuntime();
@@ -15208,11 +15208,12 @@ function knightSpawnJudgmentSword(){
 }
 function triggerKingsJudgment(){
   if(!gameRunning||!knightIsActive()||knightRuntime.ultPhase>0) return;
-  if(knightUltimateCharge<99.5){ toast('Judgment of the King is still charging'); return; }
+  if((knightRuntime.ultCooldown||0)>0){ toast(`Judgment ready in ${Math.ceil(knightRuntime.ultCooldown)}s`); return; }
   const c=KNIGHT_CFG.ultimate;
+  const center=knightJudgmentCenter();
   const radius=knightJudgmentFieldRadius();
   markUltimateUsed();
-  knightUltimateCharge=0;
+  knightRuntime.ultCooldown=knightJudgmentCooldownForRound();
   knightRuntime.ultPhase=1;
   knightRuntime.ultTimer=c.phasePlant;
   knightRuntime.ultMarks=[];
@@ -15220,16 +15221,17 @@ function triggerKingsJudgment(){
   knightRuntime.ultTickTimer=0;
   knightRuntime.ultBossDamage=new Map();
   knightRuntime.ultRadius=radius;
-  knightRuntime.ultInvuln=c.phasePlant+c.phaseMark+c.phaseColumns+c.phaseSword+c.phaseShock+0.4;
+  knightRuntime.ultInvuln=c.phasePlant+c.phaseMark+c.phaseColumns+c.phaseSword+c.phaseShock+0.35;
   knightRuntime.ultSigil=knightBuildSigil(radius);
-  knightRuntime.ultSigil.position.set(player.position.x,0.02,player.position.z);
+  knightRuntime.ultSigil.position.set(center.x,0.02,center.z);
   knightRuntime.ultSigil.scale.setScalar(0.05);
   scene.add(knightRuntime.ultSigil);
   knightSpawnJudgmentSword();
   knightPlayClip(['melee','chop'],'1H_Melee_Attack_Chop',.5,.25);
   document.body.style.filter='brightness(.93) saturate(1.16) contrast(1.05)';
-  spawnKnightGuardBurst(player.position,Math.max(4.8,radius*.22),KNIGHT_GOLD);
-  knightJudgmentHeatPulse({x:player.position.x,y:player.position.y,z:player.position.z},radius,.08,true);
+  spawnKnightGuardBurst(center,Math.max(5.2,radius*.22),KNIGHT_GOLD);
+  knightJudgmentHeatPulse(center,radius,.06,true);
+  for(let i=0;i<4;i++) knightJudgmentRainStrike(center,radius,0.08);
   triggerCombatShake(14,300);
   if(navigator.vibrate) navigator.vibrate([80,40,130]);
   toast('JUDGMENT OF THE KING');
@@ -15252,6 +15254,78 @@ function knightJudgmentDamage(z,damage,bossFraction,bruteMult){
   const mult=cls==='brute'?bruteMult:1;
   applyBulletDamage(z,damage*mult*playerStats.power);
   if(!z.userData.dead) z.userData.hitStun=Math.max(z.userData.hitStun||0,cls==='brute'?.8:1.2);
+}
+function knightJudgmentCenter(){
+  return {x:0,y:0,z:0};
+}
+function knightJudgmentFieldRadius(){
+  return Math.max(6, arenaSize*0.98);
+}
+function knightJudgmentCooldownForRound(){
+  const r=Math.max(1,Number(round)||1);
+  if(r>=45) return 0;
+  const t=(r-1)/44;
+  return Math.max(0,30*(1-t));
+}
+function knightJudgmentRemainingTime(){
+  const c=KNIGHT_CFG.ultimate;
+  if(knightRuntime.ultPhase<=0) return undefined;
+  const remaining=Math.max(0,knightRuntime.ultTimer)
+    +(knightRuntime.ultPhase<2?c.phaseMark:0)
+    +(knightRuntime.ultPhase<3?c.phaseColumns:0)
+    +(knightRuntime.ultPhase<4?c.phaseSword:0)
+    +(knightRuntime.ultPhase<5?c.phaseShock:0);
+  return remaining;
+}
+function knightJudgmentRainStrike(center,radius,progress){
+  const a=Math.random()*Math.PI*2;
+  const r=Math.sqrt(Math.random())*radius*0.96;
+  const x=center.x+Math.sin(a)*r;
+  const z=center.z+Math.cos(a)*r;
+  const scale=.8+Math.random()*.5+progress*.3;
+  if(knightFxBudget(2)){
+    const g=new THREE.Group();
+    const handle=new THREE.Mesh(
+      new THREE.CylinderGeometry(.12*scale,.15*scale,3.0*scale,8),
+      knightMat(KNIGHT_STEEL,.24,false)
+    );
+    handle.position.y=4.0*scale; g.add(handle);
+    const headAura=new THREE.Mesh(
+      new THREE.BoxGeometry(2.6*scale,1.7*scale,1.9*scale),
+      knightMat(KNIGHT_GOLD,.14,false)
+    );
+    headAura.position.y=2.1*scale; g.add(headAura);
+    const head=new THREE.Mesh(
+      new THREE.BoxGeometry(2.1*scale,1.1*scale,1.4*scale),
+      knightMat(KNIGHT_IVORY,.22,false)
+    );
+    head.position.y=2.1*scale; g.add(head);
+    const band=new THREE.Mesh(
+      new THREE.BoxGeometry(2.35*scale,.24*scale,1.55*scale),
+      knightMat(KNIGHT_GOLD,.26,false)
+    );
+    band.position.y=2.1*scale; g.add(band);
+    g.position.set(x,12+Math.random()*7,z);
+    g.rotation.z=(Math.random()-.5)*.10;
+    knightBaseOpacity(g);
+    pushKnightFx(g,{life:.48,grow:.04,from:1,vy:-(20+progress*8)});
+  }
+  const localRadius=1.7+progress*1.6;
+  knightShockRing({x,y:0,z},localRadius,KNIGHT_GOLD,.20);
+  spawnBurst(x,.85,z,12,FX_MAT_SPARK,3.8);
+  for(const enemy of zombies){
+    if(enemy.userData.dead||enemy.userData.spawnPending) continue;
+    const d=Math.hypot(enemy.position.x-x,enemy.position.z-z);
+    if(d>localRadius) continue;
+    knightJudgmentDamage(enemy,0.70+progress*1.55,0.010+progress*0.016,0.78);
+    if(!enemy.userData.dead){
+      const cls=knightEnemyClass(enemy), l=d||1;
+      const force=(3.0+progress*2.0)*(cls==='boss'?0.10:(cls==='brute'?0.35:1));
+      enemy.userData.knockbackX=((enemy.position.x-x)/l)*force;
+      enemy.userData.knockbackZ=((enemy.position.z-z)/l)*force;
+      enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,.22+progress*.24);
+    }
+  }
 }
 function knightJudgmentFieldRadius(){
   return Math.max(KNIGHT_CFG.ultimate.fieldRadius, Math.min(arenaSize*0.80, arenaSize-1.5));
@@ -15314,17 +15388,17 @@ function updateKingsJudgment(dt){
   if(!player||!gameRunning){ knightClearJudgment(); return; }
   knightRuntime.ultTimer-=dt;
   const radius=knightRuntime.ultRadius||knightJudgmentFieldRadius();
-  const center={x:player.position.x,y:player.position.y,z:player.position.z};
+  const center=knightJudgmentCenter();
   const sig=knightRuntime.ultSigil;
   if(sig){
     sig.position.set(center.x,0.02,center.z);
-    sig.rotation.y+=dt*.42;
-    sig.scale.setScalar(Math.min(1,sig.scale.x+dt*3.3));
-    const pulse=1+Math.sin(performance.now()*.004)*.03;
+    sig.rotation.y+=dt*.36;
+    sig.scale.setScalar(Math.min(1,sig.scale.x+dt*2.7));
+    const pulse=1+Math.sin(performance.now()*.0035)*.03;
     if(sig.userData.outerGlow) sig.userData.outerGlow.scale.setScalar(pulse);
-    if(sig.userData.middle) sig.userData.middle.rotation.z-=dt*.45;
-    if(sig.userData.inner) sig.userData.inner.rotation.z+=dt*.62;
-    if(sig.userData.crownCore) sig.userData.crownCore.rotation.z=Math.sin(performance.now()*.0025)*.08;
+    if(sig.userData.middle) sig.userData.middle.rotation.z-=dt*.40;
+    if(sig.userData.inner) sig.userData.inner.rotation.z+=dt*.56;
+    if(sig.userData.crownCore) sig.userData.crownCore.rotation.z=Math.sin(performance.now()*.0022)*.07;
   }
 
   const hammer=knightRuntime.ultSword;
@@ -15334,6 +15408,12 @@ function updateKingsJudgment(dt){
   }
 
   if(knightRuntime.ultPhase===1){
+    if(hammer){
+      hammer.position.y=58;
+      hammer.rotation.y+=dt*.28;
+      hammer.rotation.z=.12;
+      hammer.traverse(o=>{ if(o.material) o.material.opacity=Math.max(0.06,Math.min(0.18,o.userData.baseOpacity?o.userData.baseOpacity*.24:0.12)); });
+    }
     if(knightRuntime.ultTimer<=0){
       knightRuntime.ultPhase=2;
       knightRuntime.ultTimer=c.phaseMark;
@@ -15341,16 +15421,16 @@ function updateKingsJudgment(dt){
     }
   }else if(knightRuntime.ultPhase===2){
     knightRuntime.ultTickTimer-=dt;
+    const progress=1-Math.max(0,knightRuntime.ultTimer)/c.phaseMark;
     if(knightRuntime.ultTickTimer<=0){
-      knightRuntime.ultTickTimer=c.tickInterval;
-      knightJudgmentHeatPulse(center,radius,.16+(1-Math.max(0,knightRuntime.ultTimer)/c.phaseMark)*.14,false);
+      knightRuntime.ultTickTimer=Math.max(0.18,c.tickInterval*.85);
+      knightJudgmentHeatPulse(center,radius,.10+progress*.10,false);
+      for(let i=0;i<2;i++) knightJudgmentRainStrike(center,radius,.12+progress*.10);
       triggerCombatShake(4,55);
     }
     if(hammer){
-      hammer.position.y=54;
-      hammer.rotation.y+=dt*.32;
-      hammer.rotation.z=.10+Math.sin(performance.now()*.0018)*.03;
-      hammer.traverse(o=>{ if(o.material) o.material.opacity=Math.max(0.05,Math.min(0.18,o.userData.baseOpacity?o.userData.baseOpacity*.28:0.12)); });
+      hammer.position.y=58;
+      hammer.rotation.y+=dt*.30;
     }
     if(knightRuntime.ultTimer<=0){
       knightRuntime.ultPhase=3;
@@ -15359,22 +15439,20 @@ function updateKingsJudgment(dt){
     }
   }else if(knightRuntime.ultPhase===3){
     knightRuntime.ultTickTimer-=dt;
-    const preP=1-Math.max(0,knightRuntime.ultTimer)/c.phaseColumns;
+    const progress=1-Math.max(0,knightRuntime.ultTimer)/c.phaseColumns;
     if(knightRuntime.ultTickTimer<=0){
       knightRuntime.ultTickTimer=c.tickInterval;
-      knightJudgmentHeatPulse(center,radius,.30+preP*.22,false);
+      knightJudgmentHeatPulse(center,radius,.22+progress*.30,false);
+      const rainCount=2 + (progress>.45?1:0) + (progress>.78?1:0);
+      for(let i=0;i<rainCount;i++) knightJudgmentRainStrike(center,radius,.25+progress*.28);
       triggerCombatShake(5,70);
     }
     if(hammer){
-      hammer.position.y=54-(preP*6.0);
-      hammer.rotation.y+=dt*.38;
-      hammer.rotation.z=.12+Math.sin(preP*Math.PI)*.04;
-      hammer.scale.setScalar(1.0+preP*.08);
-      hammer.traverse(o=>{ if(o.material) o.material.opacity=Math.max(0.06,Math.min(0.24,o.userData.baseOpacity?o.userData.baseOpacity*(0.32+preP*.12):0.14)); });
-      if(hammer.userData.auraBlade){
-        hammer.userData.auraBlade.scale.x=1+Math.sin(performance.now()*.010)*.05;
-        hammer.userData.auraBlade.scale.z=1+Math.cos(performance.now()*.009)*.05;
-      }
+      hammer.position.y=58-progress*9;
+      hammer.rotation.y+=dt*.34;
+      hammer.rotation.z=.12+Math.sin(progress*Math.PI)*.02;
+      hammer.scale.setScalar(1.02+progress*.10);
+      hammer.traverse(o=>{ if(o.material) o.material.opacity=Math.max(0.08,Math.min(0.30,o.userData.baseOpacity?o.userData.baseOpacity*(0.26+progress*.14):0.16)); });
     }
     if(knightRuntime.ultTimer<=0){
       knightRuntime.ultPhase=4;
@@ -15385,100 +15463,59 @@ function updateKingsJudgment(dt){
     knightRuntime.ultTickTimer-=dt;
     const p=1-Math.max(0,knightRuntime.ultTimer)/c.phaseSword;
     if(knightRuntime.ultTickTimer<=0){
-      knightRuntime.ultTickTimer=c.tickInterval;
-      knightJudgmentHeatPulse(center,radius,.54+p*.36,false);
-      triggerCombatShake(6,85);
+      knightRuntime.ultTickTimer=Math.max(0.16,c.tickInterval*.78);
+      knightJudgmentHeatPulse(center,radius,.55+p*.25,false);
+      for(let i=0;i<3;i++) knightJudgmentRainStrike(center,radius,.60+p*.20);
+      triggerCombatShake(6,90);
     }
     if(hammer){
       const ease=p*p;
-      hammer.position.y=48-46.8*ease;
-      hammer.rotation.y+=dt*(.42+.8*p);
-      hammer.rotation.z=.14-(p*.08);
-      hammer.scale.setScalar(1.05+p*.24);
-      const targetOpacity=.22+p*.28;
-      hammer.traverse(o=>{ if(o.material) o.material.opacity=Math.max(0.08,Math.min(0.72,o.userData.baseOpacity?o.userData.baseOpacity*(0.38+p*.34):targetOpacity)); });
-      if(hammer.userData.auraBlade){
-        hammer.userData.auraBlade.material.opacity=.10+.16*p;
-      }
-      if(hammer.userData.headAura){
-        hammer.userData.headAura.material.opacity=.12+.18*p;
-      }
-      if(knightFxBudget(1) && Math.random()<dt*14){
-        const trail=new THREE.Mesh(
-          new THREE.CylinderGeometry(.18+.18*p,.56+.24*p,3.8+2.2*p,10,1,true),
-          knightMat(Math.random()<.55?KNIGHT_GOLD:KNIGHT_STEEL,.12+.10*p)
-        );
-        trail.position.set(
-          center.x+(Math.random()-.5)*radius*.34,
-          hammer.position.y+7.0,
-          center.z+(Math.random()-.5)*radius*.34
-        );
-        knightBaseOpacity(trail);
-        pushKnightFx(trail,{life:.20,grow:.16,from:.88});
-      }
+      hammer.position.y=49-47.3*ease;
+      hammer.rotation.y+=dt*(.38+.45*p);
+      hammer.rotation.z=.10-(p*.06);
+      hammer.scale.setScalar(1.12+p*.26);
+      hammer.traverse(o=>{ if(o.material) o.material.opacity=Math.max(0.10,Math.min(0.72,o.userData.baseOpacity?o.userData.baseOpacity*(0.34+p*.38):0.26)); });
+      if(hammer.userData.auraBlade) hammer.userData.auraBlade.material.opacity=.12+.18*p;
+      if(hammer.userData.headAura) hammer.userData.headAura.material.opacity=.14+.20*p;
     }
     if(knightRuntime.ultTimer<=0){
       knightRuntime.ultPhase=5;
       knightRuntime.ultTimer=c.phaseShock;
       if(hammer){
-        hammer.position.set(center.x,1.4,center.z);
-        hammer.scale.setScalar(1.30);
+        hammer.position.set(center.x,1.5,center.z);
+        hammer.scale.setScalar(1.42);
         hammer.rotation.z=0;
-        hammer.traverse(o=>{ if(o.material) o.material.opacity=Math.min(.98,o.userData.baseOpacity?Math.max(.52,o.userData.baseOpacity*.95):.85); });
+        hammer.traverse(o=>{ if(o.material) o.material.opacity=Math.min(.98,o.userData.baseOpacity?Math.max(.58,o.userData.baseOpacity*.98):.90); });
       }
-      knightShockRing(center,radius,KNIGHT_IVORY,.58);
-      knightShockRing(center,radius*.80,KNIGHT_GOLD,.50);
-      knightShockRing(center,radius*.58,KNIGHT_STEEL,.42);
-      spawnKnightGuardBurst(center,radius*.65,KNIGHT_GOLD);
-      knightGroundCracks(center,radius*.70,14,KNIGHT_GOLD);
-
-      if(knightFxBudget(3)){
-        const crownBurst=new THREE.Group();
-        for(let i=0;i<8;i++){
-          const a=(i/8)*Math.PI*2;
-          const point=new THREE.Mesh(
-            new THREE.ConeGeometry(.28,1.35,4),
-            knightMat(i%2?KNIGHT_GOLD:KNIGHT_IVORY,.74)
-          );
-          point.position.set(Math.sin(a)*3.2,.75,Math.cos(a)*3.2);
-          point.rotation.z=-a;
-          crownBurst.add(point);
-        }
-        const crownRing=new THREE.Mesh(
-          new THREE.RingGeometry(2.2,3.5,48),
-          knightMat(KNIGHT_GOLD,.54)
-        );
-        crownRing.rotation.x=-Math.PI/2;
-        crownRing.position.y=.10;
-        crownBurst.add(crownRing);
-        crownBurst.position.set(center.x,center.y,center.z);
-        knightBaseOpacity(crownBurst);
-        pushKnightFx(crownBurst,{life:.58,grow:1.95,from:.56,spin:3.8});
-      }
+      knightShockRing(center,radius,KNIGHT_IVORY,.60);
+      knightShockRing(center,radius*.82,KNIGHT_GOLD,.52);
+      knightShockRing(center,radius*.60,KNIGHT_STEEL,.44);
+      spawnKnightGuardBurst(center,radius*.66,KNIGHT_GOLD);
+      knightGroundCracks(center,radius*.72,16,KNIGHT_GOLD);
       for(const z of zombies){
         if(z.userData.dead||z.userData.spawnPending) continue;
         const dx=z.position.x-center.x,dz=z.position.z-center.z;
         const d=Math.hypot(dx,dz);
         if(d>radius) continue;
-        knightJudgmentDamage(z,c.shockDamage,c.shockBossFraction,.75);
+        knightJudgmentDamage(z,c.shockDamage,c.shockBossFraction,.85);
         if(z.userData.dead) continue;
         const cls=knightEnemyClass(z), l=d||1;
-        const force=c.shockKnockback*(cls==='boss'?0.16:(cls==='brute'?0.48:1));
+        const force=c.shockKnockback*(cls==='boss'?0.18:(cls==='brute'?0.52:1));
         z.userData.knockbackX=(dx/l)*force;
         z.userData.knockbackZ=(dz/l)*force;
         z.userData.hitStun=Math.max(z.userData.hitStun||0,c.shockStun*(cls==='boss'?0.25:1));
       }
-      triggerCombatShake(24,420);
+      triggerCombatShake(26,430);
       if(navigator.vibrate) navigator.vibrate([110,45,170]);
     }
   }else if(knightRuntime.ultPhase===5){
     if(hammer){
-      const holdWindow=c.phaseShock*0.55;
-      if(knightRuntime.ultTimer>holdWindow){
-        hammer.traverse(o=>{ if(o.material) o.material.opacity=Math.min(.98,o.userData.baseOpacity?Math.max(.52,o.userData.baseOpacity*.95):.85); });
+      const hold=1.0;
+      if(knightRuntime.ultTimer>c.phaseShock-hold){
+        hammer.traverse(o=>{ if(o.material) o.material.opacity=Math.min(.98,o.userData.baseOpacity?Math.max(.58,o.userData.baseOpacity*.98):.90); });
       }else{
-        const fade=Math.max(0,knightRuntime.ultTimer/holdWindow);
-        hammer.traverse(o=>{ if(o.material) o.material.opacity=(o.userData.baseOpacity?Math.max(.02,o.userData.baseOpacity*.95*fade):fade*.8); });
+        const fade=Math.max(0,knightRuntime.ultTimer/Math.max(.001,c.phaseShock-hold));
+        hammer.traverse(o=>{ if(o.material) o.material.opacity=(o.userData.baseOpacity?Math.max(.02,o.userData.baseOpacity*.98*fade):fade*.8); });
       }
     }
     if(knightRuntime.ultTimer<=0) knightClearJudgment();
@@ -15492,6 +15529,7 @@ function knightClearJudgment(){
   knightRuntime.ultTickTimer=0;
   knightRuntime.ultBossDamage=null;
   knightRuntime.ultInvuln=0;
+  knightRuntime.ultRadius=0;
   if(knightRuntime.ultSigil){
     if(knightRuntime.ultSigil.parent) scene.remove(knightRuntime.ultSigil);
     disposeGroup(knightRuntime.ultSigil);
@@ -15918,6 +15956,7 @@ function updateKnightSystems(dt){
   knightRuntime.bannerCooldown=Math.max(0,knightRuntime.bannerCooldown-dt);
   knightRuntime.resistTimer=Math.max(0,knightRuntime.resistTimer-dt);
   knightRuntime.frontGuardTimer=Math.max(0,knightRuntime.frontGuardTimer-dt);
+  knightRuntime.ultCooldown=Math.max(0,(knightRuntime.ultCooldown||0)-dt);
   knightRuntime.comboTimer=Math.max(0,knightRuntime.comboTimer-dt);
   if(knightRuntime.comboTimer<=0) knightRuntime.comboStep=0;
   knightRuntime.vanguardTimer=Math.max(0,(knightRuntime.vanguardTimer||0)-dt);
@@ -15965,7 +16004,7 @@ function updateKnightSystems(dt){
   updateKingsJudgment(dt);
   // Ability + ultimate cooldown labels must tick down visibly.
   if(String(equippedAbilityId||'').indexOf('knight_')===0 || knightRuntime.ultPhase>0 ||
-     knightUltimateCharge<100 || knightRoyalCloneCooldown>0 || knightRoyalClones.length>0){
+     knightRuntime.ultCooldown>0 || knightRoyalCloneCooldown>0 || knightRoyalClones.length>0){
     updateHoodedHud();
   }
 }
@@ -16008,6 +16047,7 @@ function clearKnightRoundSpecials(resetCooldowns=true){
     knightRuntime.aegisCooldown=0;
     knightRuntime.shieldTossCooldown=0;
     knightRuntime.bannerCooldown=0;
+    knightRuntime.ultCooldown=0;
     knightRuntime.discipline=0;
     knightRuntime.disciplineTimer=0;
     knightRuntime.fortActive=false;
@@ -16028,10 +16068,9 @@ function knightAbilityCooldownInfo(){
     case 'knight_judgment':
       return {
         label:'JUDGMENT',
-        cd:0,
+        cd:knightRuntime.ultCooldown||0,
         active:knightRuntime.ultPhase>0,
-        activeTime:undefined,
-        charge:knightUltimateCharge
+        activeTime:knightJudgmentRemainingTime()
       };
 
     case 'knight_guardian_quake':
