@@ -1,4 +1,4 @@
-<!-- V22.13.56 Judgment Hammer Rain Fix: fixes Judgment of the King so many smaller hammers rain continuously instead of reading like a single hammer. Hammer rain now starts immediately, keeps spawning throughout the full move, uses smaller hammer sizes, denser random map coverage, faster refresh timing, and a dedicated active-rain cap so rain does not get starved by the normal FX budget. Every falling hammer still creates visible impact visuals and damage on landing. -->
+<!-- V22.13.57 Judgment Hammer Storm Moveable: Judgment of the King now allows the Knight to move freely during the ultimate. Hammer rain is upgraded to use larger Mjolnir-inspired hammers with a more realistic heavy head, shorter handle feel, gold banding, and leather-wrap cues. The storm now uses a much higher active rain cap and denser spawn counts so many larger hammers keep raining continuously until the move ends. The full-map radius remains near 98%. -->
 <!-- V22.13.51 Knights of the Round Spectacle: upgrades the Knight signature summon with a large royal summoning seal, sequential gold/steel arrival columns, crown flashes, formation trails, visible attack animations, stronger clone strike effects, and a coordinated departure collapse. Effects remain localized and translucent for gameplay readability. Clone count, duration, cooldown, invincibility, aggro priority, inherited moves, movement rules, and 10% damage remain unchanged. -->
 <!-- V22.13.50 Banner Spear Soft Field: reduces the Banner Spear ground-circle brightness so the field no longer washes out bright maps. The outer ring stays readable, while the inner field shifts to a softer steel-blue royal aura with noticeably lower opacity and gentler breathing animation. Radius, duration, slow strength, movement, cooldown scaling, attack buff, defense bonus, and all gameplay values are unchanged. -->
 <!-- V22.13.48 Shield Toss Heroic Polish: upgrades the Knight's Shield Toss with a stronger shield-first launch pose, a royal departure crest, denser steel-gold-ivory flight wakes, heavier contact bursts, clearer return-path energy, and a more satisfying guarded catch. Damage, stun, range, ricochet behavior, cooldown, boss caps, scoring, and all other moves remain unchanged. -->
@@ -1388,7 +1388,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.56 - Judgment Hammer Rain Fix';
+const GAME_VERSION='22.13.57 - Judgment Hammer Storm Moveable';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12126,7 +12126,7 @@ function knightBannerCooldownForRound(){
 }
 function knightMovementLocked(){
   if(!knightIsActive()) return false;
-  return knightRuntime.chargeTimer>0 || knightRuntime.shatterPhase>0 || knightRuntime.ultPhase>0;
+  return knightRuntime.chargeTimer>0 || knightRuntime.shatterPhase>0;
 }
 function knightMoveMultiplier(){
   if(!knightIsActive()) return 1;
@@ -15149,66 +15149,75 @@ function knightSpawnJudgmentSword(){
   wake.position.y=7.6; g.add(wake);
 
   const handle=new THREE.Mesh(
-    new THREE.CylinderGeometry(.30,.34,10.8,10),
-    knightMat(KNIGHT_STEEL,.54,false)
+    new THREE.CylinderGeometry(.24,.30,8.6,10),
+    knightMat(KNIGHT_STEEL,.62,false)
   );
-  handle.position.y=10.2; g.add(handle);
+  handle.position.y=9.6; g.add(handle);
 
   const grip=new THREE.Mesh(
-    new THREE.CylinderGeometry(.20,.22,3.6,10),
-    knightMat(KNIGHT_IVORY,.56,false)
+    new THREE.CylinderGeometry(.18,.20,3.2,10),
+    knightMat(KNIGHT_IVORY,.66,false)
   );
-  grip.position.y=13.5; g.add(grip);
+  grip.position.y=12.3; g.add(grip);
 
   const pommel=new THREE.Mesh(
-    new THREE.SphereGeometry(.72,16,12),
-    knightMat(KNIGHT_GOLD,.62,false)
+    new THREE.SphereGeometry(.66,16,12),
+    knightMat(KNIGHT_GOLD,.74,false)
   );
-  pommel.position.y=15.7; g.add(pommel);
+  pommel.position.y=14.7; g.add(pommel);
 
   const headAura=new THREE.Mesh(
-    new THREE.BoxGeometry(7.0,3.9,4.8),
-    knightMat(KNIGHT_GOLD,.26,false)
+    new THREE.BoxGeometry(7.6,4.3,5.2),
+    knightMat(KNIGHT_GOLD,.28,false)
   );
   headAura.position.y=4.8; g.add(headAura);
 
   const headCore=new THREE.Mesh(
-    new THREE.BoxGeometry(5.8,2.8,3.7),
-    knightMat(KNIGHT_STEEL,.62,false)
+    new THREE.BoxGeometry(6.5,3.2,4.1),
+    knightMat(KNIGHT_STEEL,.70,false)
   );
   headCore.position.y=4.8; g.add(headCore);
 
   const face=new THREE.Mesh(
-    new THREE.BoxGeometry(5.0,2.2,3.1),
-    knightMat(KNIGHT_IVORY,.76,false)
+    new THREE.BoxGeometry(5.5,2.5,3.5),
+    knightMat(KNIGHT_IVORY,.82,false)
   );
   face.position.y=4.8; g.add(face);
 
   const band=new THREE.Mesh(
-    new THREE.BoxGeometry(6.4,.56,4.1),
-    knightMat(KNIGHT_GOLD,.74,false)
+    new THREE.BoxGeometry(7.0,.62,4.5),
+    knightMat(KNIGHT_GOLD,.82,false)
   );
   band.position.y=4.8; g.add(band);
 
   for(const side of [-1,1]){
     const cap=new THREE.Mesh(
-      new THREE.CylinderGeometry(1.15,1.15,3.4,16),
-      knightMat(KNIGHT_GOLD,.58,false)
+      new THREE.CylinderGeometry(1.25,1.25,3.8,16),
+      knightMat(KNIGHT_GOLD,.64,false)
     );
     cap.rotation.z=Math.PI/2;
-    cap.position.set(side*3.05,4.8,0);
+    cap.position.set(side*3.35,4.8,0);
     g.add(cap);
 
     const rune=new THREE.Mesh(
-      new THREE.RingGeometry(.40,.88,22),
-      knightMat(KNIGHT_IVORY,.72,false)
+      new THREE.RingGeometry(.42,.96,22),
+      knightMat(KNIGHT_IVORY,.78,false)
     );
     rune.rotation.y=Math.PI/2;
-    rune.position.set(side*2.54,4.8,0);
+    rune.position.set(side*2.75,4.8,0);
     g.add(rune);
   }
+  for(const oy of [8.6,10.3,12.0]){
+    const wrap=new THREE.Mesh(
+      new THREE.TorusGeometry(.30,.05,8,14),
+      knightMat(KNIGHT_GOLD,.52,false)
+    );
+    wrap.rotation.x=Math.PI/2;
+    wrap.position.y=oy;
+    g.add(wrap);
+  }
 
-  g.position.set(player.position.x,54,player.position.z);
+  g.position.set(0,54,0);
   g.rotation.z=.12;
   g.userData.auraBlade=atmosphere;
   g.userData.headAura=headAura;
@@ -15241,7 +15250,7 @@ function triggerKingsJudgment(){
   document.body.style.filter='brightness(.93) saturate(1.16) contrast(1.05)';
   spawnKnightGuardBurst(center,Math.max(5.2,radius*.22),KNIGHT_GOLD);
   knightJudgmentHeatPulse(center,radius,.06,true);
-  for(let i=0;i<20;i++) knightJudgmentRainStrike(center,radius,0.10);
+  for(let i=0;i<28;i++) knightJudgmentRainStrike(center,radius,0.10);
   triggerCombatShake(14,300);
   if(navigator.vibrate) navigator.vibrate([80,40,130]);
   toast('JUDGMENT OF THE KING');
@@ -15313,49 +15322,76 @@ function knightJudgmentRainImpact(x,z,scale,progress){
   }
 }
 function knightJudgmentRainStrike(center,radius,progress){
-  if(knightActiveJudgmentRainCount()>=40) return;
+  if(knightActiveJudgmentRainCount()>=90) return;
   const a=Math.random()*Math.PI*2;
   const r=Math.sqrt(Math.random())*radius*0.98;
   const x=center.x+Math.sin(a)*r;
   const z=center.z+Math.cos(a)*r;
-  const scale=0.52+Math.random()*.28+progress*.14;
-  const startY=18+Math.random()*8;
+  const scale=0.86+Math.random()*.42+progress*.18;
+  const startY=20+Math.random()*10;
 
   const g=new THREE.Group();
   const atmosphere=new THREE.Mesh(
-    new THREE.CylinderGeometry(.22*scale,.56*scale,3.6*scale,10,1,true),
-    knightMat(KNIGHT_GOLD,.18)
+    new THREE.CylinderGeometry(.28*scale,.74*scale,4.5*scale,10,1,true),
+    knightMat(KNIGHT_GOLD,.22)
   );
-  atmosphere.position.y=2.0*scale; g.add(atmosphere);
+  atmosphere.position.y=2.55*scale; g.add(atmosphere);
+
   const handle=new THREE.Mesh(
-    new THREE.CylinderGeometry(.10*scale,.12*scale,2.7*scale,8),
-    knightMat(KNIGHT_STEEL,.58,false)
+    new THREE.CylinderGeometry(.12*scale,.15*scale,2.8*scale,8),
+    knightMat(KNIGHT_STEEL,.72,false)
   );
-  handle.position.y=3.25*scale; g.add(handle);
+  handle.position.y=3.55*scale; g.add(handle);
+
+  const grip=new THREE.Mesh(
+    new THREE.CylinderGeometry(.10*scale,.11*scale,1.05*scale,8),
+    knightMat(KNIGHT_IVORY,.72,false)
+  );
+  grip.position.y=4.55*scale; g.add(grip);
+
+  const pommel=new THREE.Mesh(
+    new THREE.SphereGeometry(.24*scale,12,10),
+    knightMat(KNIGHT_GOLD,.78,false)
+  );
+  pommel.position.y=5.2*scale; g.add(pommel);
+
   const headAura=new THREE.Mesh(
-    new THREE.BoxGeometry(2.2*scale,1.5*scale,1.7*scale),
-    knightMat(KNIGHT_GOLD,.22,false)
+    new THREE.BoxGeometry(3.2*scale,2.0*scale,2.2*scale),
+    knightMat(KNIGHT_GOLD,.24,false)
   );
-  headAura.position.y=1.75*scale; g.add(headAura);
+  headAura.position.y=1.95*scale; g.add(headAura);
+
   const head=new THREE.Mesh(
-    new THREE.BoxGeometry(1.72*scale,.95*scale,1.18*scale),
-    knightMat(KNIGHT_IVORY,.82,false)
+    new THREE.BoxGeometry(2.6*scale,1.25*scale,1.7*scale),
+    knightMat(KNIGHT_IVORY,.88,false)
   );
-  head.position.y=1.75*scale; g.add(head);
+  head.position.y=1.95*scale; g.add(head);
+
   const band=new THREE.Mesh(
-    new THREE.BoxGeometry(1.96*scale,.20*scale,1.30*scale),
-    knightMat(KNIGHT_GOLD,.76,false)
+    new THREE.BoxGeometry(2.85*scale,.22*scale,1.92*scale),
+    knightMat(KNIGHT_GOLD,.84,false)
   );
-  band.position.y=1.75*scale; g.add(band);
+  band.position.y=1.95*scale; g.add(band);
+
+  for(const side of [-1,1]){
+    const cap=new THREE.Mesh(
+      new THREE.CylinderGeometry(.45*scale,.45*scale,1.55*scale,12),
+      knightMat(KNIGHT_GOLD,.62,false)
+    );
+    cap.rotation.z=Math.PI/2;
+    cap.position.set(side*1.38*scale,1.95*scale,0);
+    g.add(cap);
+  }
+
   g.position.set(x,startY,z);
-  g.rotation.z=(Math.random()-.5)*.10;
+  g.rotation.z=(Math.random()-.5)*.08;
   knightBaseOpacity(g);
   scene.add(g);
-  fx.push({kind:'judgmentRainHammer',mesh:g,life:1.25,maxLife:1.25,targetY:1.0,fallSpeed:44+progress*10,impactScale:scale,impactProgress:progress,impactX:x,impactZ:z,dispose:true});
+  fx.push({kind:'judgmentRainHammer',mesh:g,life:1.15,maxLife:1.15,targetY:1.0,fallSpeed:48+progress*11,impactScale:scale,impactProgress:progress,impactX:x,impactZ:z,dispose:true});
 }
 
 function knightJudgmentFieldRadius(){
-  return Math.max(KNIGHT_CFG.ultimate.fieldRadius, Math.min(arenaSize*0.80, arenaSize-1.5));
+  return Math.max(KNIGHT_CFG.ultimate.fieldRadius, Math.min(arenaSize*0.98, arenaSize-1.0));
 }
 function knightJudgmentHeatPulse(center,radius,progress,initial=false){
   const c=KNIGHT_CFG.ultimate;
@@ -15457,7 +15493,7 @@ function updateKingsJudgment(dt){
     if(knightRuntime.ultTickTimer<=0){
       knightRuntime.ultTickTimer=0.10;
       knightJudgmentHeatPulse(center,radius,.08,false);
-      for(let i=0;i<8;i++) knightJudgmentRainStrike(center,radius,0.12);
+      for(let i=0;i<10;i++) knightJudgmentRainStrike(center,radius,0.12);
       triggerCombatShake(4,48);
     }
     if(knightRuntime.ultTimer<=0){
@@ -15471,7 +15507,7 @@ function updateKingsJudgment(dt){
     if(knightRuntime.ultTickTimer<=0){
       knightRuntime.ultTickTimer=0.09;
       knightJudgmentHeatPulse(center,radius,.12+progress*.10,false);
-      for(let i=0;i<9;i++) knightJudgmentRainStrike(center,radius,.16+progress*.10);
+      for(let i=0;i<12;i++) knightJudgmentRainStrike(center,radius,.16+progress*.10);
       triggerCombatShake(5,56);
     }
     if(knightRuntime.ultTimer<=0){
@@ -15485,7 +15521,7 @@ function updateKingsJudgment(dt){
     if(knightRuntime.ultTickTimer<=0){
       knightRuntime.ultTickTimer=0.08;
       knightJudgmentHeatPulse(center,radius,.24+progress*.28,false);
-      const rainCount=10+(progress>.25?2:0)+(progress>.60?2:0);
+      const rainCount=14+(progress>.25?3:0)+(progress>.60?3:0);
       for(let i=0;i<rainCount;i++) knightJudgmentRainStrike(center,radius,.28+progress*.30);
       triggerCombatShake(6,66);
     }
@@ -15500,7 +15536,7 @@ function updateKingsJudgment(dt){
     if(knightRuntime.ultTickTimer<=0){
       knightRuntime.ultTickTimer=0.07;
       knightJudgmentHeatPulse(center,radius,.62+p*.18,false);
-      for(let i=0;i<14;i++) knightJudgmentRainStrike(center,radius,.68+p*.20);
+      for(let i=0;i<18;i++) knightJudgmentRainStrike(center,radius,.68+p*.20);
       triggerCombatShake(7,80);
     }
     if(knightRuntime.ultTimer<=0){
@@ -15537,7 +15573,7 @@ function updateKingsJudgment(dt){
     knightRuntime.ultTickTimer-=dt;
     if(knightRuntime.ultTickTimer<=0){
       knightRuntime.ultTickTimer=0.10;
-      for(let i=0;i<6;i++) knightJudgmentRainStrike(center,radius,.95);
+      for(let i=0;i<10;i++) knightJudgmentRainStrike(center,radius,.95);
     }
     if(hammer){
       const hold=1.0;
