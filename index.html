@@ -1,4 +1,4 @@
-<!-- V22.13.58 Hammer Visibility Banner Guard: slows Judgment hammer rain so the player can actually read and enjoy the hammer visuals, upgrades every hammer landing with larger impact rings, dust, flash, and crack effects, prevents Banner Spear from being manually re-cast while one is still active, and trims banner-field transparency to 75% of the previous level so the ground aura reads a bit stronger without going back to the old white-out look. -->
+<!-- V22.13.59 Banner Scaling Hammer Slow: restores Banner Spear to a scaling multi-banner move instead of a one-banner lockout. The Knight can keep 1 banner at round 1 and ramps up to 5 active banners by round 21-25+, while each manual cast still respects the round-based cooldown schedule. Judgment hammer rain is also slowed by another 50% so the hammers are easier to read, while keeping the heavier impact visuals from the previous pass. -->
 <!-- V22.13.51 Knights of the Round Spectacle: upgrades the Knight signature summon with a large royal summoning seal, sequential gold/steel arrival columns, crown flashes, formation trails, visible attack animations, stronger clone strike effects, and a coordinated departure collapse. Effects remain localized and translucent for gameplay readability. Clone count, duration, cooldown, invincibility, aggro priority, inherited moves, movement rules, and 10% damage remain unchanged. -->
 <!-- V22.13.50 Banner Spear Soft Field: reduces the Banner Spear ground-circle brightness so the field no longer washes out bright maps. The outer ring stays readable, while the inner field shifts to a softer steel-blue royal aura with noticeably lower opacity and gentler breathing animation. Radius, duration, slow strength, movement, cooldown scaling, attack buff, defense bonus, and all gameplay values are unchanged. -->
 <!-- V22.13.48 Shield Toss Heroic Polish: upgrades the Knight's Shield Toss with a stronger shield-first launch pose, a royal departure crest, denser steel-gold-ivory flight wakes, heavier contact bursts, clearer return-path energy, and a more satisfying guarded catch. Damage, stun, range, ricochet behavior, cooldown, boss caps, scoring, and all other moves remain unchanged. -->
@@ -1388,7 +1388,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.58 - Hammer Visibility Banner Guard';
+const GAME_VERSION='22.13.59 - Banner Scaling Hammer Slow';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2592,7 +2592,7 @@ const CHARACTER_COMBAT = {
       shield_toss:{name:'Shield Toss', price:380, slot:'secondary', kind:'knight_shield_toss', cooldown:0.18, damage:1.6, radius:1.15,
         desc:'Throws the shield on a controlled path with one slight ricochet, staggering everything it touches before returning to your hand. You lose one Magical Armor charge while the shield is away.'},
       banner_spear:{name:'Banner Spear', price:520, slot:'secondary', kind:'knight_banner', cooldown:0, damage:0, radius:7.0,
-        desc:'Tap to manually activate one royal Banner Spear. It lasts 12 seconds, automatically glides toward the nearest living enemy without leaving the playable arena, heavily slows enemies inside the circle, reduces incoming damage while you stand inside it, and grants 25% more Knight damage for the full active duration. Only one banner can exist. Cooldown is 8 seconds in Rounds 1–10, 5 seconds in Rounds 11–15, 2 seconds in Rounds 16–20, and zero from Round 21 onward.'},
+        desc:'Tap to manually activate a royal Banner Spear. Each banner lasts 12 seconds, automatically glides toward the nearest living enemy without leaving the playable arena, heavily slows enemies inside the circle, reduces incoming damage while you stand inside it, and grants 25% more Knight damage for the full active duration. Max active banners scale with round: 1 at the start, then 2 / 3 / 4 / up to 5 by Round 21+. Cooldown is 8 seconds in Rounds 1–10, 5 seconds in Rounds 11–15, 2 seconds in Rounds 16–20, and zero from Round 21 onward.'},
       defensive_whirlwind:{name:'Defensive Whirlwind', price:420, slot:'secondary', kind:'knight_whirlwind_secondary', cooldown:0, damage:0, radius:3.25,
         desc:'Activate a moving sword-and-shield whirlwind that repeatedly damages and pushes enemies away while deflecting weak projectiles. Duration starts at 3.8 seconds and increases by 0.5 seconds each round through Round 24; from Round 25 onward it remains active indefinitely. Cooldown is 8 seconds in Rounds 1–10, 3 seconds in Rounds 11–15, 1.5 seconds in Rounds 16–20, and zero from Round 21 onward.'}
     }
@@ -12018,7 +12018,7 @@ const KNIGHT_CFG = {
     counterDamage:3.4, bruteMult:0.7, bossMult:0.3, bossCapFraction:0.06, counterStun:1.6},
   shieldToss:{cooldown:4.0, speed:15, range:9.5, damage:1.6, stun:0.5,
     bruteMult:0.75, bossMult:0.35, hitCooldown:0.35},
-  banner:{duration:12, maxActive:1, radius:7.0, moveSpeed:3.2, retargetInterval:0.22,
+  banner:{duration:12, maxActive:5, radius:7.0, moveSpeed:3.2, retargetInterval:0.22,
     damageReduction:0.30, damageMult:1.25, enemySlow:0.28},
   ultimate:{
     fieldRadius:29.4, markCap:0, columnsPerTick:0, tickInterval:0.32,
@@ -12123,6 +12123,10 @@ function knightBannerCooldownForRound(){
   if(r<=15) return 5;
   if(r<=20) return 2;
   return 0;
+}
+function knightBannerMaxActiveForRound(){
+  const r=Math.max(1,Number(round)||1);
+  return Math.min(5, 1 + Math.floor((r-1)/5));
 }
 function knightMovementLocked(){
   if(!knightIsActive()) return false;
@@ -13705,7 +13709,8 @@ function knightBannerSpear(w){
   if(!player||!scene||!knightIsActive()) return false;
   const c=KNIGHT_CFG.banner;
   if((knightRuntime.bannerCooldown||0)>0) return false;
-  if(Array.isArray(knightRuntime.banners) && knightRuntime.banners.length>0) return false;
+  const activeBannerCount=Array.isArray(knightRuntime.banners)?knightRuntime.banners.length:0;
+  if(activeBannerCount>=knightBannerMaxActiveForRound()) return false;
 
   let g=null;
   try{
@@ -13823,8 +13828,8 @@ function knightBannerSpear(w){
     return false;
   }
 
-  // Only one Banner Spear can exist at a time. The player must wait for
-  // the active banner to expire before placing another one.
+  // Banner Spear scales from 1 active banner early up to 5 banners later.
+  // Manual casts stop only when the round-based active cap is already filled.
 
   // Use the player's actual ground height. The earlier hard-coded y=0 could
   // bury the spear/zone on maps where the arena floor is not exactly zero.
@@ -15342,7 +15347,7 @@ function knightJudgmentRainImpact(x,z,scale,progress){
   }
 }
 function knightJudgmentRainStrike(center,radius,progress){
-  if(knightActiveJudgmentRainCount()>=120) return;
+  if(knightActiveJudgmentRainCount()>=180) return;
   const a=Math.random()*Math.PI*2;
   const r=Math.sqrt(Math.random())*radius*0.98;
   const x=center.x+Math.sin(a)*r;
@@ -15407,7 +15412,7 @@ function knightJudgmentRainStrike(center,radius,progress){
   g.rotation.z=(Math.random()-.5)*.08;
   knightBaseOpacity(g);
   scene.add(g);
-  fx.push({kind:'judgmentRainHammer',mesh:g,life:1.55,maxLife:1.55,targetY:1.0,fallSpeed:24+progress*6,impactScale:scale,impactProgress:progress,impactX:x,impactZ:z,dispose:true});
+  fx.push({kind:'judgmentRainHammer',mesh:g,life:3.0,maxLife:3.0,targetY:1.0,fallSpeed:12+progress*3,impactScale:scale,impactProgress:progress,impactX:x,impactZ:z,dispose:true});
 }
 
 function knightJudgmentFieldRadius(){
