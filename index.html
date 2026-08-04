@@ -1,4 +1,4 @@
-<!-- V22.13.62 Guardian Quake Heroic Polish: upgrades Guardian Quake with a larger shield-first launch crest, stronger acceleration presentation, wider royal charge lanes, brighter collision flashes, heavier end burst, improved rise/fall streaks, and a more dramatic Earth Shatter impact with layered shockwaves, crown-like rays, dust, debris, and ground cracks. Damage, hitboxes, cooldowns, Auto/Manual behavior, combo timing, and balance are unchanged. -->
+<!-- V22.13.63 Guardian Quake Titan Mode: upgrades Guardian Quake into a true ultimate spectacle. The Knight now grows to 10x size while the move is active, then keeps that giant form for a 15-second post-move buff. Giant mode slows Knight movement by 15%, expands the Knight hurtbox to match the huge body, and delays Guardian Quake cooldown until the giant buff ends, using the same cooldown duration as Knights of the Round for the current round tier. -->
 <!-- V22.13.61 Banner Spear Removed: completely removes the Knight Banner Spear move from unlocks, shop/loadout data, HUD icons, runtime state, buffs, damage reduction, movement/targeting logic, visual effects, cleanup, clone move inheritance, and attack dispatch. Shield Toss and Defensive Whirlwind remain the Knight Secondary choices. Judgment hammer rain behavior remains based on V22.13.60. -->
 <!-- V22.13.51 Knights of the Round Spectacle: upgrades the Knight signature summon with a large royal summoning seal, sequential gold/steel arrival columns, crown flashes, formation trails, visible attack animations, stronger clone strike effects, and a coordinated departure collapse. Effects remain localized and translucent for gameplay readability. Clone count, duration, cooldown, invincibility, aggro priority, inherited moves, movement rules, and 10% damage remain unchanged. -->
 <!-- V22.13.48 Shield Toss Heroic Polish: upgrades the Knight's Shield Toss with a stronger shield-first launch pose, a royal departure crest, denser steel-gold-ivory flight wakes, heavier contact bursts, clearer return-path energy, and a more satisfying guarded catch. Damage, stun, range, ricochet behavior, cooldown, boss caps, scoring, and all other moves remain unchanged. -->
@@ -154,7 +154,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.62</title>
+<title>Family Arena V22.13.63</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1379,7 +1379,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.62 - Guardian Quake Heroic Polish';
+const GAME_VERSION='22.13.63 - Guardian Quake Titan Mode';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2369,7 +2369,7 @@ function updateEnemyProjectiles(dt){
     if(p.trailTimer<=0){ p.trailTimer=0.035; spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,1,FX_MAT_ENEMY_SHOT,0.35); }
     const targets=livingPlayers();
     let hitTarget=null,hitDist=Infinity;
-    for(const t of targets){const d=Math.hypot(t.position.x-p.mesh.position.x,(t.position.y+.55)-p.mesh.position.y,t.position.z-p.mesh.position.z);if(d<hitDist){hitDist=d;hitTarget=t;}}
+    for(const t of targets){let d=Math.hypot(t.position.x-p.mesh.position.x,(t.position.y+.55)-p.mesh.position.y,t.position.z-p.mesh.position.z);if(t===player)d-=knightGuardianGiantHitRadius();if(d<hitDist){hitDist=d;hitTarget=t;}}
     if(hitTarget&&hitDist<.55){
       spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,12,FX_MAT_ENEMY_SHOT,3.4);
       if(hitTarget.userData&&hitTarget.userData.isArcaneEcho)destroyArcaneEcho(hitTarget);
@@ -9878,7 +9878,9 @@ function spawnPlayer(){
   player = buildKayKitPlayer(state.avatarType);
   const avatarScale = AVATAR_SCALE[state.avatarType] || 1;
   player.scale.setScalar(avatarScale);
+  player.userData.baseAvatarScale = avatarScale;
   player.userData.avatarScale = avatarScale;
+  player.userData.currentSizeMult = 1;
   player.position.set(0,0,0);
   player.userData.facing = 0;
   player.userData.hp = 3;
@@ -12002,6 +12004,7 @@ const KNIGHT_CFG = {
   guardianCharge:{cooldown:15, duration:0.9, speed:11.5, steerRate:1.5, radius:1.35,
     damage:1.5, bruteMult:0.6, bossMult:0.3, bossCapFraction:0.03,
     burstRadius:3.4, burstDamage:1.8, burstStun:1.4, crackCap:8},
+  guardianQuakeGiant:{sizeMult:10, buffDuration:15, moveMult:0.85, hitboxRadius:5.6},
   aegis:{cooldown:11, window:0.85, recovery:0.22, counterRadius:3.6,
     counterDamage:3.4, bruteMult:0.7, bossMult:0.3, bossCapFraction:0.06, counterStun:1.6},
   shieldToss:{cooldown:4.0, speed:15, range:9.5, damage:1.6, stun:0.5,
@@ -12035,6 +12038,7 @@ function createFreshKnightRuntime(){
     whirlwindTimer:0, whirlwindPulse:0, whirlwindSource:null, whirlwindCooldown:0,
     shatterCooldown:0, shatterPhase:0, shatterTimer:0, shatterBaseY:0,
     chargeCooldown:0, chargeTimer:0, chargeYaw:0, chargeHits:null,
+    guardianQuakeSequence:false, guardianGiantBuffTimer:0, guardianGiantCooldownPending:0,
     aegisCooldown:0, aegisWindow:0, aegisRecovery:0, aegisRing:null,
     shieldTossCooldown:0, shieldToss:null, shieldAway:false,
     resistTimer:0, frontGuardTimer:0,
@@ -12097,6 +12101,7 @@ function knightMoveMultiplier(){
   if(knightRuntime.whirlwindTimer>0) m*=KNIGHT_CFG.whirlwind.moveMult;
   if(knightRuntime.aegisWindow>0) m*=0.5 + (knightRuntime.discipline||0)*KNIGHT_CFG.discipline.guardMovePerStack;
   if(knightRuntime.aegisRecovery>0) m*=0.6;
+  if(knightGuardianGiantActive()) m*=KNIGHT_CFG.guardianQuakeGiant.moveMult;
   return Math.max(0,m);
 }
 function knightHitStop(t){
@@ -13908,6 +13913,7 @@ function knightEarthShatterImpact(){
   const impactStrength=Math.min(19,16+Math.min(3,normalHits*.25+heavyHits*.7));
   triggerCombatShake(impactStrength,320);
   if(navigator.vibrate) navigator.vibrate([55,22,78]);
+  if(knightRuntime.guardianQuakeSequence) knightStartGuardianGiantBuff();
 }
 
 function knightGuardianChargeStartFx(){
@@ -14116,16 +14122,74 @@ function knightGuardianQuakeChargeDuration(){
 function knightGuardianQuakeEquipped(){
   return equippedAbilityId==='knight_guardian_quake';
 }
+function knightGuardianQuakeCooldownDuration(){
+  const cfg=knightRoyalCloneConfig();
+  return Math.max(0.5,Number(cfg.cooldown)||0);
+}
+function knightGuardianGiantSizeMult(){
+  if(!knightIsActive()) return 1;
+  return (knightRuntime.guardianQuakeSequence||knightRuntime.guardianGiantBuffTimer>0)
+    ? KNIGHT_CFG.guardianQuakeGiant.sizeMult
+    : 1;
+}
+function knightGuardianGiantActive(){
+  return knightGuardianGiantSizeMult()>1;
+}
+function knightGuardianGiantHitRadius(){
+  return knightGuardianGiantActive()?KNIGHT_CFG.guardianQuakeGiant.hitboxRadius:0;
+}
+function knightSyncAvatarScale(){
+  if(!player) return;
+  const base=player.userData.baseAvatarScale || AVATAR_SCALE[state.avatarType] || 1;
+  const mult=knightGuardianGiantSizeMult();
+  const targetScale=base*mult;
+  if(Math.abs((player.scale.x||0)-targetScale)>1e-4) player.scale.setScalar(targetScale);
+  player.userData.avatarScale=targetScale;
+  player.userData.currentSizeMult=mult;
+  if(player.userData.visibilityRing){
+    const ringScale=mult>1?Math.min(3.4,1+(mult-1)*0.22):1;
+    player.userData.visibilityRing.scale.setScalar(ringScale);
+  }
+}
+function knightStartGuardianGiantBuff(){
+  knightRuntime.guardianQuakeCombo=false;
+  knightRuntime.guardianQuakeSequence=false;
+  knightRuntime.guardianGiantBuffTimer=KNIGHT_CFG.guardianQuakeGiant.buffDuration;
+  knightRuntime.chargeCooldown=0;
+  knightRuntime.shatterCooldown=0;
+  knightSyncAvatarScale();
+  updateHoodedHud();
+}
+function knightEndGuardianGiantBuff(applyCooldown=true){
+  knightRuntime.guardianGiantBuffTimer=0;
+  knightRuntime.guardianQuakeSequence=false;
+  if(applyCooldown){
+    const cd=knightRuntime.guardianGiantCooldownPending||knightGuardianQuakeCooldownDuration();
+    knightRuntime.chargeCooldown=Math.max(knightRuntime.chargeCooldown||0,cd);
+    knightRuntime.shatterCooldown=Math.max(knightRuntime.shatterCooldown||0,cd);
+  }
+  knightRuntime.guardianGiantCooldownPending=0;
+  knightSyncAvatarScale();
+  updateHoodedHud();
+}
+function updateKnightGuardianGiant(dt){
+  if(knightRuntime.guardianGiantBuffTimer>0){
+    knightRuntime.guardianGiantBuffTimer=Math.max(0,knightRuntime.guardianGiantBuffTimer-dt);
+    if(knightRuntime.guardianGiantBuffTimer<=0) knightEndGuardianGiantBuff(true);
+  }
+  knightSyncAvatarScale();
+}
 function triggerKnightGuardianQuake(){
   if(!gameRunning||!knightIsActive()||!knightGuardianQuakeEquipped()) return false;
   if(knightRuntime.chargeCooldown>0||knightRuntime.shatterCooldown>0||
-     knightRuntime.chargeTimer>0||knightRuntime.shatterPhase>0) return false;
+     knightRuntime.chargeTimer>0||knightRuntime.shatterPhase>0||
+     knightRuntime.guardianGiantBuffTimer>0||knightRuntime.guardianQuakeSequence) return false;
   if(knightMovementLocked()) return false;
 
   const c=KNIGHT_CFG.guardianCharge;
   markUltimateUsed();
-  knightRuntime.chargeCooldown=Math.max(c.cooldown,KNIGHT_CFG.earthShatter.cooldown);
-  knightRuntime.shatterCooldown=knightRuntime.chargeCooldown;
+  knightRuntime.chargeCooldown=0;
+  knightRuntime.shatterCooldown=0;
   knightRuntime.chargeTimer=knightGuardianQuakeChargeDuration();
   knightRuntime.chargeYaw=player.rotation.y;
   knightRuntime.chargeHits=new Set();
@@ -14133,6 +14197,10 @@ function triggerKnightGuardianQuake(){
   knightRuntime.chargeStartBlend=.20;
   knightRuntime.guardianQuakeCombo=true;
   knightRuntime.guardianQuakeFollowup=false;
+  knightRuntime.guardianQuakeSequence=true;
+  knightRuntime.guardianGiantBuffTimer=0;
+  knightRuntime.guardianGiantCooldownPending=knightGuardianQuakeCooldownDuration();
+  knightSyncAvatarScale();
 
   knightPlayClip(['run'],'Running_A',.16,.14);
   knightGuardianChargeStartFx();
@@ -14330,6 +14398,8 @@ function knightEndGuardianCharge(allowFollowup=true){
     knightPlayClip(['jump'],'Jump_Idle',.30,.16);
     knightEarthShatterLaunchFx();
     triggerCombatShake(4,90);
+  }else if(knightRuntime.guardianQuakeSequence){
+    knightStartGuardianGiantBuff();
   }
 }
 /* ------------------------------------------------------------- ABILITY 4 */
@@ -15554,6 +15624,7 @@ function updateKnightSystems(dt){
   knightUpdateAegis(dt);
   knightUpdateEarthShatter(dt);
   knightUpdateGuardianCharge(dt);
+  updateKnightGuardianGiant(dt);
   updateKnightRoyalClones(dt);
 
   if(knightRuntime.whirlwindTimer>0){
@@ -15593,6 +15664,9 @@ function clearKnightRoundSpecials(resetCooldowns=true){
   knightRuntime.shatterTimer=0;
   knightRuntime.chargeTimer=0;
   knightRuntime.chargeHits=null;
+  knightRuntime.guardianQuakeSequence=false;
+  knightRuntime.guardianGiantBuffTimer=0;
+  knightRuntime.guardianGiantCooldownPending=0;
   knightRuntime.hitStop=0;
   knightRuntime.bufferedAttack=0;
   knightRuntime.comboStep=0;
@@ -15604,6 +15678,7 @@ function clearKnightRoundSpecials(resetCooldowns=true){
   passiveState.knightWhirlwindTimer=0;
   if(player){ player.userData.spinVisualTimer=0; }
   clearKnightRoyalClones();
+  knightSyncAvatarScale();
   if(resetCooldowns){
     knightRoyalCloneCooldown=0;
     knightRoyalCloneCycleDuration=0;
@@ -15640,10 +15715,14 @@ function knightAbilityCooldownInfo(){
 
     case 'knight_guardian_quake':
       return {
-        label:knightRuntime.shatterPhase>0?'SHATTER':'G. QUAKE',
+        label:knightRuntime.shatterPhase>0?'SHATTER':(knightRuntime.guardianGiantBuffTimer>0?'TITAN':'G. QUAKE'),
         cd:Math.max(knightRuntime.chargeCooldown||0,knightRuntime.shatterCooldown||0),
-        active:knightRuntime.chargeTimer>0||knightRuntime.shatterPhase>0,
-        activeTime:knightRuntime.chargeTimer>0?knightRuntime.chargeTimer:undefined
+        active:knightRuntime.chargeTimer>0||knightRuntime.shatterPhase>0||knightRuntime.guardianGiantBuffTimer>0,
+        activeTime:knightRuntime.guardianGiantBuffTimer>0
+          ? knightRuntime.guardianGiantBuffTimer
+          : (knightRuntime.chargeTimer>0
+              ? knightRuntime.chargeTimer
+              : (knightRuntime.shatterPhase>0?knightRuntime.shatterTimer:undefined))
       };
     case 'knight_aegis_counter':
       return {label:'AEGIS', cd:knightRuntime.aegisCooldown,
@@ -20617,7 +20696,7 @@ function update(dt){
       }
 
       const verticalGap=Math.abs(target.position.y-z.position.y);
-      const hitRange=type==='brute'?1.28:.9;
+      const hitRange=(type==='brute'?1.28:.9)+(target===player?knightGuardianGiantHitRadius():0);
       if(dist<hitRange && verticalGap<1.0 && z.userData.attackCooldown<=0){
         z.userData.attackCooldown=type==='brute'?1.65:1.0;
         const attackClip=type==='brute'?'2H_Melee_Attack_Spin':'1H_Melee_Attack_Chop';
