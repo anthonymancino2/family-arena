@@ -1,3 +1,4 @@
+<!-- V22.13.53 Judgment Meteor Hammer: transforms Judgment of the King into a giant semi-transparent celestial warhammer that descends in dramatic slow motion and dominates roughly 80% of the map. The judgment field and impact radius are massively expanded. Enemies inside the field take immediate low heat-wave damage on activation, then repeated escalating burn-pressure damage as the hammer travels downward, followed by a huge final impact. On impact the hammer becomes solid briefly before fading away. The move remains readable and avoids a full-screen whiteout. -->
 <!-- V22.13.51 Knights of the Round Spectacle: upgrades the Knight signature summon with a large royal summoning seal, sequential gold/steel arrival columns, crown flashes, formation trails, visible attack animations, stronger clone strike effects, and a coordinated departure collapse. Effects remain localized and translucent for gameplay readability. Clone count, duration, cooldown, invincibility, aggro priority, inherited moves, movement rules, and 10% damage remain unchanged. -->
 <!-- V22.13.50 Banner Spear Soft Field: reduces the Banner Spear ground-circle brightness so the field no longer washes out bright maps. The outer ring stays readable, while the inner field shifts to a softer steel-blue royal aura with noticeably lower opacity and gentler breathing animation. Radius, duration, slow strength, movement, cooldown scaling, attack buff, defense bonus, and all gameplay values are unchanged. -->
 <!-- V22.13.48 Shield Toss Heroic Polish: upgrades the Knight's Shield Toss with a stronger shield-first launch pose, a royal departure crest, denser steel-gold-ivory flight wakes, heavier contact bursts, clearer return-path energy, and a more satisfying guarded catch. Damage, stun, range, ricochet behavior, cooldown, boss caps, scoring, and all other moves remain unchanged. -->
@@ -1387,7 +1388,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.52 - Judgment of the King Spectacle';
+const GAME_VERSION='22.13.53 - Judgment Meteor Hammer';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12010,11 +12011,11 @@ const KNIGHT_CFG = {
   banner:{duration:12, maxActive:1, radius:7.0, moveSpeed:3.2, retargetInterval:0.22,
     damageReduction:0.30, damageMult:1.25, enemySlow:0.28},
   ultimate:{
-    fieldRadius:9.5, markCap:14, columnsPerTick:3, tickInterval:0.13,
-    columnDamage:3.2, columnBruteMult:0.55, columnBossFraction:0.035,
-    bossTotalCap:0.30, swordDamage:4.5, shockRadius:11, shockDamage:3.6,
-    shockStun:2.2, shockKnockback:8, shockBossFraction:0.05,
-    phasePlant:0.55, phaseMark:0.30, phaseColumns:1.45, phaseSword:0.60, phaseShock:0.55
+    fieldRadius:24, markCap:24, columnsPerTick:1, tickInterval:0.18,
+    columnDamage:1.15, columnBruteMult:0.72, columnBossFraction:0.016,
+    bossTotalCap:0.45, swordDamage:7.8, shockRadius:24, shockDamage:8.4,
+    shockStun:2.5, shockKnockback:9.2, shockBossFraction:0.08,
+    phasePlant:0.35, phaseMark:0.45, phaseColumns:1.20, phaseSword:2.40, phaseShock:1.20
   },
   fxCap:150
 };
@@ -15125,62 +15126,83 @@ function knightJudgmentColumn(x,z){
 function knightSpawnJudgmentSword(){
   const g=new THREE.Group();
 
-  const auraBlade=new THREE.Mesh(
-    new THREE.BoxGeometry(1.45,8.8,.32),
-    knightMat(KNIGHT_STEEL,.18)
+  const atmosphere=new THREE.Mesh(
+    new THREE.CylinderGeometry(2.6,3.1,19.0,14,1,true),
+    knightMat(KNIGHT_GOLD,.10)
   );
-  auraBlade.position.y=4.9; g.add(auraBlade);
+  atmosphere.position.y=8.0; g.add(atmosphere);
 
-  const blade=new THREE.Mesh(
-    new THREE.BoxGeometry(.86,8.4,.25),
-    knightMat(KNIGHT_IVORY,.62,false)
+  const wake=new THREE.Mesh(
+    new THREE.CylinderGeometry(1.4,2.0,17.5,12,1,true),
+    knightMat(KNIGHT_STEEL,.14)
   );
-  blade.position.y=4.7; g.add(blade);
+  wake.position.y=7.6; g.add(wake);
 
-  const edge=new THREE.Mesh(
-    new THREE.BoxGeometry(.34,8.55,.34),
-    knightMat(KNIGHT_GOLD,.64,false)
+  const handle=new THREE.Mesh(
+    new THREE.CylinderGeometry(.30,.34,10.8,10),
+    knightMat(KNIGHT_STEEL,.30,false)
   );
-  edge.position.y=4.72; g.add(edge);
+  handle.position.y=10.2; g.add(handle);
 
-  const tip=new THREE.Mesh(
-    new THREE.ConeGeometry(.66,1.45,4),
-    knightMat(KNIGHT_IVORY,.72,false)
+  const grip=new THREE.Mesh(
+    new THREE.CylinderGeometry(.20,.22,3.6,10),
+    knightMat(KNIGHT_IVORY,.32,false)
   );
-  tip.position.y=.05; tip.rotation.y=Math.PI/4; g.add(tip);
-
-  const cross=new THREE.Mesh(
-    new THREE.BoxGeometry(4.2,.48,.50),
-    knightMat(KNIGHT_GOLD,.68,false)
-  );
-  cross.position.y=1.12; g.add(cross);
-
-  const crossGlow=new THREE.Mesh(
-    new THREE.BoxGeometry(4.8,.90,.28),
-    knightMat(KNIGHT_STEEL,.22)
-  );
-  crossGlow.position.y=1.12; g.add(crossGlow);
-
-  const crown=new THREE.Group();
-  for(let i=0;i<5;i++){
-    const point=new THREE.Mesh(
-      new THREE.ConeGeometry(.18,.90,4),
-      knightMat(i===2?KNIGHT_IVORY:KNIGHT_GOLD,i===2?.78:.66,false)
-    );
-    point.position.set((i-2)*.36,9.35+(i===2?.26:0),0);
-    crown.add(point);
-  }
-  g.add(crown);
+  grip.position.y=13.5; g.add(grip);
 
   const pommel=new THREE.Mesh(
-    new THREE.SphereGeometry(.44,16,12),
-    knightMat(KNIGHT_IVORY,.70,false)
+    new THREE.SphereGeometry(.72,16,12),
+    knightMat(KNIGHT_GOLD,.34,false)
   );
-  pommel.position.y=9.0; g.add(pommel);
+  pommel.position.y=15.7; g.add(pommel);
 
-  g.position.set(player.position.x,11,player.position.z);
-  g.userData.auraBlade=auraBlade;
-  g.userData.crown=crown;
+  const headAura=new THREE.Mesh(
+    new THREE.BoxGeometry(7.0,3.9,4.8),
+    knightMat(KNIGHT_GOLD,.14,false)
+  );
+  headAura.position.y=4.8; g.add(headAura);
+
+  const headCore=new THREE.Mesh(
+    new THREE.BoxGeometry(5.8,2.8,3.7),
+    knightMat(KNIGHT_STEEL,.34,false)
+  );
+  headCore.position.y=4.8; g.add(headCore);
+
+  const face=new THREE.Mesh(
+    new THREE.BoxGeometry(5.0,2.2,3.1),
+    knightMat(KNIGHT_IVORY,.42,false)
+  );
+  face.position.y=4.8; g.add(face);
+
+  const band=new THREE.Mesh(
+    new THREE.BoxGeometry(6.4,.56,4.1),
+    knightMat(KNIGHT_GOLD,.44,false)
+  );
+  band.position.y=4.8; g.add(band);
+
+  for(const side of [-1,1]){
+    const cap=new THREE.Mesh(
+      new THREE.CylinderGeometry(1.15,1.15,3.4,16),
+      knightMat(KNIGHT_GOLD,.30,false)
+    );
+    cap.rotation.z=Math.PI/2;
+    cap.position.set(side*3.05,4.8,0);
+    g.add(cap);
+
+    const rune=new THREE.Mesh(
+      new THREE.RingGeometry(.40,.88,22),
+      knightMat(KNIGHT_IVORY,.46,false)
+    );
+    rune.rotation.y=Math.PI/2;
+    rune.position.set(side*2.54,4.8,0);
+    g.add(rune);
+  }
+
+  g.position.set(player.position.x,54,player.position.z);
+  g.rotation.z=.12;
+  g.userData.auraBlade=atmosphere;
+  g.userData.headAura=headAura;
+  g.userData.hammerHead=headCore;
   scene.add(g);
   knightRuntime.ultSword=g;
 }
@@ -15188,6 +15210,7 @@ function triggerKingsJudgment(){
   if(!gameRunning||!knightIsActive()||knightRuntime.ultPhase>0) return;
   if(knightUltimateCharge<99.5){ toast('Judgment of the King is still charging'); return; }
   const c=KNIGHT_CFG.ultimate;
+  const radius=knightJudgmentFieldRadius();
   markUltimateUsed();
   knightUltimateCharge=0;
   knightRuntime.ultPhase=1;
@@ -15196,17 +15219,19 @@ function triggerKingsJudgment(){
   knightRuntime.ultMarkIndex=0;
   knightRuntime.ultTickTimer=0;
   knightRuntime.ultBossDamage=new Map();
-  knightRuntime.ultInvuln=c.phasePlant+c.phaseMark+c.phaseColumns+c.phaseSword+c.phaseShock+0.3;
-  knightRuntime.ultSigil=knightBuildSigil(c.fieldRadius);
+  knightRuntime.ultRadius=radius;
+  knightRuntime.ultInvuln=c.phasePlant+c.phaseMark+c.phaseColumns+c.phaseSword+c.phaseShock+0.4;
+  knightRuntime.ultSigil=knightBuildSigil(radius);
   knightRuntime.ultSigil.position.set(player.position.x,0.02,player.position.z);
   knightRuntime.ultSigil.scale.setScalar(0.05);
   scene.add(knightRuntime.ultSigil);
+  knightSpawnJudgmentSword();
   knightPlayClip(['melee','chop'],'1H_Melee_Attack_Chop',.5,.25);
-  // Royal, readable atmosphere — never a full-screen whiteout.
-  document.body.style.filter='brightness(.92) saturate(1.18) contrast(1.05)';
-  spawnKnightGuardBurst(player.position,4.2);
-  triggerCombatShake(12,260);
-  if(navigator.vibrate) navigator.vibrate([70,35,120]);
+  document.body.style.filter='brightness(.93) saturate(1.16) contrast(1.05)';
+  spawnKnightGuardBurst(player.position,Math.max(4.8,radius*.22),KNIGHT_GOLD);
+  knightJudgmentHeatPulse({x:player.position.x,y:player.position.y,z:player.position.z},radius,.08,true);
+  triggerCombatShake(14,300);
+  if(navigator.vibrate) navigator.vibrate([80,40,130]);
   toast('JUDGMENT OF THE KING');
   updateHoodedHud();
 }
@@ -15228,166 +15253,233 @@ function knightJudgmentDamage(z,damage,bossFraction,bruteMult){
   applyBulletDamage(z,damage*mult*playerStats.power);
   if(!z.userData.dead) z.userData.hitStun=Math.max(z.userData.hitStun||0,cls==='brute'?.8:1.2);
 }
+function knightJudgmentFieldRadius(){
+  return Math.max(KNIGHT_CFG.ultimate.fieldRadius, Math.min(arenaSize*0.80, arenaSize-1.5));
+}
+function knightJudgmentHeatPulse(center,radius,progress,initial=false){
+  const c=KNIGHT_CFG.ultimate;
+  progress=Math.max(0,Math.min(1,progress||0));
+  if(knightFxBudget(2)){
+    const ring=new THREE.Mesh(
+      new THREE.RingGeometry(radius*(.16+progress*.06),radius*(.92+progress*.04),84),
+      knightMat(progress>.55?KNIGHT_GOLD:KNIGHT_STEEL,initial?.08:(.09+progress*.08))
+    );
+    ring.rotation.x=-Math.PI/2;
+    ring.position.set(center.x,.05,center.z);
+    knightBaseOpacity(ring);
+    pushKnightFx(ring,{life:initial?.22:.26,grow:.12+progress*.24,from:.92,spin:1.2});
+
+    const field=new THREE.Mesh(
+      new THREE.CircleGeometry(radius*.98,72),
+      knightMat(KNIGHT_GOLD,initial?.012:(.014+progress*.018))
+    );
+    field.rotation.x=-Math.PI/2;
+    field.position.set(center.x,.03,center.z);
+    knightBaseOpacity(field);
+    pushKnightFx(field,{life:initial?.26:.30,grow:.05,from:.96});
+  }
+  if(knightFxBudget(1) && Math.random()<0.85){
+    const a=Math.random()*Math.PI*2;
+    const r=Math.random()*radius*.88;
+    const plume=new THREE.Mesh(
+      new THREE.CylinderGeometry(.26+.12*progress,.72+progress*.45,2.2+progress*3.6,10,1,true),
+      knightMat(progress>.6?KNIGHT_GOLD:KNIGHT_STEEL,.12+progress*.08)
+    );
+    plume.position.set(center.x+Math.sin(a)*r,1.2+progress*1.8,center.z+Math.cos(a)*r);
+    knightBaseOpacity(plume);
+    pushKnightFx(plume,{life:.24,grow:.18+progress*.16,from:.82});
+  }
+  const damage = c.columnDamage*(initial?0.36:(0.55+progress*1.55));
+  const bossFraction = c.columnBossFraction*(initial?0.25:(0.42+progress*1.45));
+  const bruteMult = Math.min(1,c.columnBruteMult+(initial?.04:(.08+progress*.22)));
+  for(const z of zombies){
+    if(z.userData.dead||z.userData.spawnPending) continue;
+    const dx=z.position.x-center.x,dz=z.position.z-center.z;
+    const d=Math.hypot(dx,dz);
+    if(d>radius) continue;
+    knightJudgmentDamage(z,damage,bossFraction,bruteMult);
+    if(!z.userData.dead){
+      const push=(0.18+progress*.55)*(knightEnemyClass(z)==='boss'?0.18:(knightEnemyClass(z)==='brute'?0.55:1));
+      const l=d||1;
+      z.userData.knockbackX=(dx/l)*push;
+      z.userData.knockbackZ=(dz/l)*push;
+      z.userData.hitStun=Math.max(z.userData.hitStun||0,.10+progress*.36);
+    }
+  }
+}
 function updateKingsJudgment(dt){
   const c=KNIGHT_CFG.ultimate;
   if(knightRuntime.ultInvuln>0) knightRuntime.ultInvuln=Math.max(0,knightRuntime.ultInvuln-dt);
   if(knightRuntime.ultPhase<=0) return;
   if(!player||!gameRunning){ knightClearJudgment(); return; }
   knightRuntime.ultTimer-=dt;
+  const radius=knightRuntime.ultRadius||knightJudgmentFieldRadius();
+  const center={x:player.position.x,y:player.position.y,z:player.position.z};
   const sig=knightRuntime.ultSigil;
   if(sig){
-    sig.rotation.y+=dt*.82;
-    const target=1;
-    sig.scale.setScalar(Math.min(target,sig.scale.x+dt*4));
-    const pulse=1+Math.sin(performance.now()*.006)*.035;
+    sig.position.set(center.x,0.02,center.z);
+    sig.rotation.y+=dt*.42;
+    sig.scale.setScalar(Math.min(1,sig.scale.x+dt*3.3));
+    const pulse=1+Math.sin(performance.now()*.004)*.03;
     if(sig.userData.outerGlow) sig.userData.outerGlow.scale.setScalar(pulse);
-    if(sig.userData.middle) sig.userData.middle.rotation.z-=dt*.85;
-    if(sig.userData.inner) sig.userData.inner.rotation.z+=dt*1.15;
-    if(sig.userData.crownCore) sig.userData.crownCore.rotation.z=Math.sin(performance.now()*.003)*.08;
+    if(sig.userData.middle) sig.userData.middle.rotation.z-=dt*.45;
+    if(sig.userData.inner) sig.userData.inner.rotation.z+=dt*.62;
+    if(sig.userData.crownCore) sig.userData.crownCore.rotation.z=Math.sin(performance.now()*.0025)*.08;
   }
+
+  const hammer=knightRuntime.ultSword;
+  if(hammer){
+    hammer.position.x=center.x;
+    hammer.position.z=center.z;
+  }
+
   if(knightRuntime.ultPhase===1){
     if(knightRuntime.ultTimer<=0){
-      knightRuntime.ultPhase=2; knightRuntime.ultTimer=c.phaseMark;
-      // Mark enemies inside the judgment field.
-      knightRuntime.ultMarks=zombies.filter(z=>!z.userData.dead&&!z.userData.spawnPending&&
-        Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=c.fieldRadius)
-        .slice(0,c.markCap)
-        .map(z=>({enemy:z,x:z.position.x,z:z.position.z}));
-      for(const m of knightRuntime.ultMarks){
-        if(!knightFxBudget(2)) break;
-        const markGroup=new THREE.Group();
-        const outer=new THREE.Mesh(
-          new THREE.RingGeometry(.44,.74,28),
-          knightMat(KNIGHT_GOLD,.88)
-        );
-        outer.rotation.x=-Math.PI/2; markGroup.add(outer);
-        const inner=new THREE.Mesh(
-          new THREE.RingGeometry(.18,.40,24),
-          knightMat(KNIGHT_IVORY,.68)
-        );
-        inner.rotation.x=-Math.PI/2; inner.position.y=.02; markGroup.add(inner);
-        for(let i=0;i<4;i++){
-          const tick=new THREE.Mesh(
-            new THREE.PlaneGeometry(.06,.42),
-            knightMat(i%2?KNIGHT_STEEL:KNIGHT_GOLD,.70)
-          );
-          tick.rotation.x=-Math.PI/2;
-          tick.rotation.z=i*Math.PI/2;
-          tick.position.y=.03;
-          markGroup.add(tick);
-        }
-        markGroup.position.set(m.x,.11,m.z);
-        knightBaseOpacity(markGroup);
-        pushKnightFx(markGroup,{life:.90,grow:.38,from:.84,spin:4.0});
-      }
+      knightRuntime.ultPhase=2;
+      knightRuntime.ultTimer=c.phaseMark;
+      knightRuntime.ultTickTimer=0;
     }
   }else if(knightRuntime.ultPhase===2){
-    if(knightRuntime.ultTimer<=0){ knightRuntime.ultPhase=3; knightRuntime.ultTimer=c.phaseColumns; knightRuntime.ultTickTimer=0; }
-  }else if(knightRuntime.ultPhase===3){
     knightRuntime.ultTickTimer-=dt;
     if(knightRuntime.ultTickTimer<=0){
       knightRuntime.ultTickTimer=c.tickInterval;
-      for(let n=0;n<c.columnsPerTick;n++){
-        const m=knightRuntime.ultMarks[knightRuntime.ultMarkIndex % Math.max(1,knightRuntime.ultMarks.length)];
-        knightRuntime.ultMarkIndex++;
-        if(!m) break;
-        const tx=(m.enemy&&!m.enemy.userData.dead)?m.enemy.position.x:m.x;
-        const tz=(m.enemy&&!m.enemy.userData.dead)?m.enemy.position.z:m.z;
-        knightJudgmentColumn(tx,tz);
-        for(const z of zombies){
-          if(z.userData.dead||z.userData.spawnPending) continue;
-          if(Math.hypot(z.position.x-tx,z.position.z-tz)>1.5) continue;
-          knightJudgmentDamage(z,c.columnDamage,c.columnBossFraction,c.columnBruteMult);
-        }
-      }
+      knightJudgmentHeatPulse(center,radius,.16+(1-Math.max(0,knightRuntime.ultTimer)/c.phaseMark)*.14,false);
+      triggerCombatShake(4,55);
+    }
+    if(hammer){
+      hammer.position.y=54;
+      hammer.rotation.y+=dt*.32;
+      hammer.rotation.z=.10+Math.sin(performance.now()*.0018)*.03;
+      hammer.traverse(o=>{ if(o.material) o.material.opacity=Math.max(0.05,Math.min(0.18,o.userData.baseOpacity?o.userData.baseOpacity*.28:0.12)); });
+    }
+    if(knightRuntime.ultTimer<=0){
+      knightRuntime.ultPhase=3;
+      knightRuntime.ultTimer=c.phaseColumns;
+      knightRuntime.ultTickTimer=0;
+    }
+  }else if(knightRuntime.ultPhase===3){
+    knightRuntime.ultTickTimer-=dt;
+    const preP=1-Math.max(0,knightRuntime.ultTimer)/c.phaseColumns;
+    if(knightRuntime.ultTickTimer<=0){
+      knightRuntime.ultTickTimer=c.tickInterval;
+      knightJudgmentHeatPulse(center,radius,.30+preP*.22,false);
       triggerCombatShake(5,70);
     }
+    if(hammer){
+      hammer.position.y=54-(preP*6.0);
+      hammer.rotation.y+=dt*.38;
+      hammer.rotation.z=.12+Math.sin(preP*Math.PI)*.04;
+      hammer.scale.setScalar(1.0+preP*.08);
+      hammer.traverse(o=>{ if(o.material) o.material.opacity=Math.max(0.06,Math.min(0.24,o.userData.baseOpacity?o.userData.baseOpacity*(0.32+preP*.12):0.14)); });
+      if(hammer.userData.auraBlade){
+        hammer.userData.auraBlade.scale.x=1+Math.sin(performance.now()*.010)*.05;
+        hammer.userData.auraBlade.scale.z=1+Math.cos(performance.now()*.009)*.05;
+      }
+    }
     if(knightRuntime.ultTimer<=0){
-      knightRuntime.ultPhase=4; knightRuntime.ultTimer=c.phaseSword;
-      knightSpawnJudgmentSword();
+      knightRuntime.ultPhase=4;
+      knightRuntime.ultTimer=c.phaseSword;
+      knightRuntime.ultTickTimer=0;
     }
   }else if(knightRuntime.ultPhase===4){
-    const sword=knightRuntime.ultSword;
-    if(sword){
-      const p=1-Math.max(0,knightRuntime.ultTimer)/c.phaseSword;
-      sword.position.set(player.position.x,11-10.4*p*p,player.position.z);
-      sword.rotation.y+=dt*(1.0+2.2*p);
-      sword.rotation.z=Math.sin(p*Math.PI)*.06;
-      if(sword.userData.auraBlade){
-        sword.userData.auraBlade.material.opacity=.12+.20*p;
-        sword.userData.auraBlade.scale.x=1+Math.sin(performance.now()*.012)*.08;
+    knightRuntime.ultTickTimer-=dt;
+    const p=1-Math.max(0,knightRuntime.ultTimer)/c.phaseSword;
+    if(knightRuntime.ultTickTimer<=0){
+      knightRuntime.ultTickTimer=c.tickInterval;
+      knightJudgmentHeatPulse(center,radius,.54+p*.36,false);
+      triggerCombatShake(6,85);
+    }
+    if(hammer){
+      const ease=p*p;
+      hammer.position.y=48-46.8*ease;
+      hammer.rotation.y+=dt*(.42+.8*p);
+      hammer.rotation.z=.14-(p*.08);
+      hammer.scale.setScalar(1.05+p*.24);
+      const targetOpacity=.22+p*.28;
+      hammer.traverse(o=>{ if(o.material) o.material.opacity=Math.max(0.08,Math.min(0.72,o.userData.baseOpacity?o.userData.baseOpacity*(0.38+p*.34):targetOpacity)); });
+      if(hammer.userData.auraBlade){
+        hammer.userData.auraBlade.material.opacity=.10+.16*p;
       }
-      if(sword.userData.crown){
-        sword.userData.crown.rotation.y-=dt*1.8;
+      if(hammer.userData.headAura){
+        hammer.userData.headAura.material.opacity=.12+.18*p;
       }
-      if(p>.25 && knightFxBudget(1) && Math.random()<dt*12){
+      if(knightFxBudget(1) && Math.random()<dt*14){
         const trail=new THREE.Mesh(
-          new THREE.PlaneGeometry(.55,2.6),
-          knightMat(Math.random()<.5?KNIGHT_GOLD:KNIGHT_IVORY,.28)
+          new THREE.CylinderGeometry(.18+.18*p,.56+.24*p,3.8+2.2*p,10,1,true),
+          knightMat(Math.random()<.55?KNIGHT_GOLD:KNIGHT_STEEL,.12+.10*p)
         );
         trail.position.set(
-          sword.position.x+(Math.random()-.5)*.5,
-          sword.position.y+3.6,
-          sword.position.z+(Math.random()-.5)*.5
+          center.x+(Math.random()-.5)*radius*.34,
+          hammer.position.y+7.0,
+          center.z+(Math.random()-.5)*radius*.34
         );
-        trail.rotation.y=sword.rotation.y;
         knightBaseOpacity(trail);
-        pushKnightFx(trail,{life:.20,grow:.18,from:.92});
+        pushKnightFx(trail,{life:.20,grow:.16,from:.88});
       }
     }
     if(knightRuntime.ultTimer<=0){
-      knightRuntime.ultPhase=5; knightRuntime.ultTimer=c.phaseShock;
-      const pos={x:player.position.x,y:player.position.y,z:player.position.z};
-      knightShockRing(pos,c.shockRadius,KNIGHT_IVORY,.55);
-      knightShockRing(pos,c.shockRadius*.78,KNIGHT_GOLD,.48);
-      knightShockRing(pos,c.shockRadius*.52,KNIGHT_STEEL,.36);
-      spawnKnightGuardBurst(pos,c.shockRadius*.62,KNIGHT_GOLD);
-      knightGroundCracks(pos,c.shockRadius*.64,10,KNIGHT_GOLD);
+      knightRuntime.ultPhase=5;
+      knightRuntime.ultTimer=c.phaseShock;
+      if(hammer){
+        hammer.position.set(center.x,1.4,center.z);
+        hammer.scale.setScalar(1.30);
+        hammer.rotation.z=0;
+        hammer.traverse(o=>{ if(o.material) o.material.opacity=Math.min(.98,o.userData.baseOpacity?Math.max(.52,o.userData.baseOpacity*.95):.85); });
+      }
+      knightShockRing(center,radius,KNIGHT_IVORY,.58);
+      knightShockRing(center,radius*.80,KNIGHT_GOLD,.50);
+      knightShockRing(center,radius*.58,KNIGHT_STEEL,.42);
+      spawnKnightGuardBurst(center,radius*.65,KNIGHT_GOLD);
+      knightGroundCracks(center,radius*.70,14,KNIGHT_GOLD);
 
       if(knightFxBudget(3)){
         const crownBurst=new THREE.Group();
-        for(let i=0;i<7;i++){
-          const a=(i/7)*Math.PI*2;
+        for(let i=0;i<8;i++){
+          const a=(i/8)*Math.PI*2;
           const point=new THREE.Mesh(
-            new THREE.ConeGeometry(.18,.95,4),
-            knightMat(i%2?KNIGHT_GOLD:KNIGHT_IVORY,.72)
+            new THREE.ConeGeometry(.28,1.35,4),
+            knightMat(i%2?KNIGHT_GOLD:KNIGHT_IVORY,.74)
           );
-          point.position.set(Math.sin(a)*1.8,.55,Math.cos(a)*1.8);
+          point.position.set(Math.sin(a)*3.2,.75,Math.cos(a)*3.2);
           point.rotation.z=-a;
           crownBurst.add(point);
         }
         const crownRing=new THREE.Mesh(
-          new THREE.RingGeometry(1.15,2.05,40),
+          new THREE.RingGeometry(2.2,3.5,48),
           knightMat(KNIGHT_GOLD,.54)
         );
         crownRing.rotation.x=-Math.PI/2;
         crownRing.position.y=.10;
         crownBurst.add(crownRing);
-        crownBurst.position.set(pos.x,pos.y,pos.z);
+        crownBurst.position.set(center.x,center.y,center.z);
         knightBaseOpacity(crownBurst);
-        pushKnightFx(crownBurst,{life:.46,grow:1.65,from:.58,spin:3.8});
+        pushKnightFx(crownBurst,{life:.58,grow:1.95,from:.56,spin:3.8});
       }
       for(const z of zombies){
         if(z.userData.dead||z.userData.spawnPending) continue;
-        const dx=z.position.x-pos.x,dz=z.position.z-pos.z;
+        const dx=z.position.x-center.x,dz=z.position.z-center.z;
         const d=Math.hypot(dx,dz);
-        if(d>c.shockRadius) continue;
-        knightJudgmentDamage(z,c.shockDamage,c.shockBossFraction,.6);
+        if(d>radius) continue;
+        knightJudgmentDamage(z,c.shockDamage,c.shockBossFraction,.75);
         if(z.userData.dead) continue;
         const cls=knightEnemyClass(z), l=d||1;
-        const force=c.shockKnockback*(cls==='boss'?0.12:(cls==='brute'?0.4:1));
+        const force=c.shockKnockback*(cls==='boss'?0.16:(cls==='brute'?0.48:1));
         z.userData.knockbackX=(dx/l)*force;
         z.userData.knockbackZ=(dz/l)*force;
-        z.userData.hitStun=Math.max(z.userData.hitStun||0,c.shockStun*(cls==='boss'?0.2:1));
+        z.userData.hitStun=Math.max(z.userData.hitStun||0,c.shockStun*(cls==='boss'?0.25:1));
       }
-      triggerCombatShake(18,340);
-      if(navigator.vibrate) navigator.vibrate([90,40,140]);
+      triggerCombatShake(24,420);
+      if(navigator.vibrate) navigator.vibrate([110,45,170]);
     }
   }else if(knightRuntime.ultPhase===5){
-    const sword=knightRuntime.ultSword;
-    if(sword){
-      sword.scale.setScalar(Math.max(0.01,1+ (1-Math.max(0,knightRuntime.ultTimer)/c.phaseShock)*0.4));
-      sword.traverse(o=>{ if(o.material) o.material.opacity=Math.max(0,(knightRuntime.ultTimer/c.phaseShock)*0.55); });
+    if(hammer){
+      const holdWindow=c.phaseShock*0.55;
+      if(knightRuntime.ultTimer>holdWindow){
+        hammer.traverse(o=>{ if(o.material) o.material.opacity=Math.min(.98,o.userData.baseOpacity?Math.max(.52,o.userData.baseOpacity*.95):.85); });
+      }else{
+        const fade=Math.max(0,knightRuntime.ultTimer/holdWindow);
+        hammer.traverse(o=>{ if(o.material) o.material.opacity=(o.userData.baseOpacity?Math.max(.02,o.userData.baseOpacity*.95*fade):fade*.8); });
+      }
     }
     if(knightRuntime.ultTimer<=0) knightClearJudgment();
   }
