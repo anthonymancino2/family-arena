@@ -1,3 +1,4 @@
+<!-- V22.13.67 Guardian Titan Visibility Fix: removes the washed-out white gameplay screen during Guardian Quake Titan mode. Titan camera distance now correctly expands the scene fog range, and player-attached locator/ground-helper effects are inverse-scaled so they remain normal-sized instead of becoming giant translucent overlays. Knight size, damage, defense, duration, cooldown, and full moveset behavior are unchanged. -->
 <!-- V22.13.66 Guardian Titan Fivefold Power: Titan mode now supports the Knight's complete combat kit. Primary combo reach, Vanguard hit areas, auto-targeting, lunges, Shield Toss size/range/collision/launch height, and Whirlwind radius/visuals all scale for the 5x body while damage values remain unchanged.
 <!-- V22.13.64 Guardian Titan Defense Camera: adds automatic giant-mode camera pullback and Titan damage rules to Guardian Quake. During the full 5x-size action and 15-second giant buff, normal enemies deal no damage, the largest non-boss Brutes deal only 10% damage through a deterministic accumulated-damage meter, and bosses still deal full damage. The camera automatically backs away enough to keep the giant Knight readable, including a safe third-person fallback when the player entered giant mode from POV. -->
 <!-- V22.13.61 Banner Spear Removed: completely removes the Knight Banner Spear move from unlocks, shop/loadout data, HUD icons, runtime state, buffs, damage reduction, movement/targeting logic, visual effects, cleanup, clone move inheritance, and attack dispatch. Shield Toss and Defensive Whirlwind remain the Knight Secondary choices. Judgment hammer rain behavior remains based on V22.13.60. -->
@@ -155,7 +156,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.66</title>
+<title>Family Arena V22.13.67</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1380,7 +1381,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.66 - Guardian Titan Fivefold Power';
+const GAME_VERSION='22.13.67 - Guardian Titan Visibility Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -9887,7 +9888,7 @@ function spawnPlayer(){
   player.userData.hp = 3;
   // Localized visibility aid only: glowing ground ring, no screen tint.
   const locatorRing=new THREE.Mesh(new THREE.RingGeometry(.62,.82,32),new THREE.MeshBasicMaterial({color:0x7ff4ff,transparent:true,opacity:.82,side:THREE.DoubleSide,depthWrite:false,depthTest:false}));
-  locatorRing.rotation.x=-Math.PI/2;locatorRing.position.y=.035;locatorRing.renderOrder=999;player.add(locatorRing);player.userData.visibilityRing=locatorRing;
+  locatorRing.rotation.x=-Math.PI/2;locatorRing.position.y=.035;locatorRing.renderOrder=999;locatorRing.userData.keepNormalWorldSize=true;player.add(locatorRing);player.userData.visibilityRing=locatorRing;
   player.userData.attackCooldown = 0;
   player.userData.secondaryAttackCooldown = 0;
   player.userData.spinVisualTimer = 0;
@@ -9895,6 +9896,8 @@ function spawnPlayer(){
   player.userData.spinBaseY = undefined;
   enableShadows(player, false);
   addContactShadow(player, 0.5*avatarScale);
+  const playerShadow=player.children[player.children.length-1];
+  if(playerShadow){playerShadow.userData.keepNormalWorldSize=true;player.userData.contactShadow=playerShadow;}
   scene.add(player);
   // Every selectable character is now a real KayKit asset. Their fitted
   // weapon/accessory geometry is already part of the imported model.
@@ -9915,6 +9918,7 @@ function spawnPlayer(){
   loc.add(beam);
   loc.visible = false;
   loc.userData.ringMat = ringMat;
+  loc.userData.keepNormalWorldSize=true;
   player.add(loc);
   player.userData.locator = loc;
   applyCameraMode();
@@ -14170,10 +14174,13 @@ function knightSyncAvatarScale(){
   if(Math.abs((player.scale.x||0)-targetScale)>1e-4) player.scale.setScalar(targetScale);
   player.userData.avatarScale=targetScale;
   player.userData.currentSizeMult=mult;
-  if(player.userData.visibilityRing){
-    const ringScale=mult>1?Math.min(3.4,1+(mult-1)*0.22):1;
-    player.userData.visibilityRing.scale.setScalar(ringScale);
-  }
+  // Child helpers inherit the player's 5x transform. Counter-scale them so
+  // translucent rings, beams and the contact shadow stay at normal world size
+  // instead of becoming giant bright overlays around the camera.
+  const inverse=mult>1?1/mult:1;
+  if(player.userData.visibilityRing) player.userData.visibilityRing.scale.setScalar(inverse);
+  if(player.userData.locator) player.userData.locator.scale.setScalar(inverse);
+  if(player.userData.contactShadow) player.userData.contactShadow.scale.setScalar(inverse);
 }
 function knightStartGuardianGiantBuff(){
   knightRuntime.guardianQuakeCombo=false;
@@ -20489,8 +20496,14 @@ function update(dt){
   // Fog is tuned for a camera 5 metres back; at the pulled-back tiers it
   // would swallow the whole arena, so push it out in step with the view.
   if(scene.fog){
-    const reach = camMode === BIRD_MODE ? 46 : (CAM_DISTS[camMode] || 0);
-    const fs = Math.min(2.9, 1 + Math.max(0, reach - 9.5)*0.055);
+    // Use the real Titan camera distance, not the selected base view distance.
+    // The old calculation left fog tuned for a close camera while Titan mode
+    // moved the camera 22-100 units away, producing the nearly solid white view.
+    const baseReach = camMode === BIRD_MODE ? 46 : (CAM_DISTS[camMode] || 0);
+    const reach = guardianTitanCamera
+      ? (camMode===BIRD_MODE ? 66.7 : Math.max(22,baseReach*3.2))
+      : baseReach;
+    const fs = Math.min(8.0, 1 + Math.max(0, reach - 9.5)*0.072);
     scene.fog.near = fogBase.near * fs;
     scene.fog.far  = fogBase.far  * fs;
   }
