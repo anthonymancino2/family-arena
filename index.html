@@ -1,3 +1,4 @@
+<!-- V22.13.68 Guardian Titan Knockback: when Guardian Quake leaves the Knight in giant Titan mode, attacks now launch much smaller enemies backward with a heavy visible knockback. Titan-sized hits strongly punt normal enemies and still push brutes, while bosses remain resistant. The giant-size, defense, camera, and full-moveset behavior are unchanged. -->
 <!-- V22.13.67 Guardian Titan Visibility Fix: removes the washed-out white gameplay screen during Guardian Quake Titan mode. Titan camera distance now correctly expands the scene fog range, and player-attached locator/ground-helper effects are inverse-scaled so they remain normal-sized instead of becoming giant translucent overlays. Knight size, damage, defense, duration, cooldown, and full moveset behavior are unchanged. -->
 <!-- V22.13.66 Guardian Titan Fivefold Power: Titan mode now supports the Knight's complete combat kit. Primary combo reach, Vanguard hit areas, auto-targeting, lunges, Shield Toss size/range/collision/launch height, and Whirlwind radius/visuals all scale for the 5x body while damage values remain unchanged.
 <!-- V22.13.64 Guardian Titan Defense Camera: adds automatic giant-mode camera pullback and Titan damage rules to Guardian Quake. During the full 5x-size action and 15-second giant buff, normal enemies deal no damage, the largest non-boss Brutes deal only 10% damage through a deterministic accumulated-damage meter, and bosses still deal full damage. The camera automatically backs away enough to keep the giant Knight readable, including a safe third-person fallback when the player entered giant mode from POV. -->
@@ -1381,7 +1382,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.67 - Guardian Titan Visibility Fix';
+const GAME_VERSION='22.13.68 - Guardian Titan Knockback';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12009,7 +12010,7 @@ const KNIGHT_CFG = {
   guardianCharge:{cooldown:15, duration:0.9, speed:11.5, steerRate:1.5, radius:1.35,
     damage:1.5, bruteMult:0.6, bossMult:0.3, bossCapFraction:0.03,
     burstRadius:3.4, burstDamage:1.8, burstStun:1.4, crackCap:8},
-  guardianQuakeGiant:{sizeMult:5, damageMult:5, buffDuration:15, moveMult:0.85, hitboxRadius:3.2},
+  guardianQuakeGiant:{sizeMult:5, damageMult:5, buffDuration:15, moveMult:0.85, hitboxRadius:3.2, knockMultNormal:3.25, knockMultBrute:1.65, knockMinNormal:8.5, knockMinBrute:4.6},
   aegis:{cooldown:11, window:0.85, recovery:0.22, counterRadius:3.6,
     counterDamage:3.4, bruteMult:0.7, bossMult:0.3, bossCapFraction:0.06, counterStun:1.6},
   shieldToss:{cooldown:4.0, speed:15, range:9.5, damage:1.6, stun:0.5,
@@ -12029,6 +12030,13 @@ function knightFxBudget(n=1){ return fx.length + n < KNIGHT_CFG.fxCap; }
 function knightEnemyClass(z){
   const t=(z&&z.userData&&z.userData.archetype)||'walker';
   return t==='boss'?'boss':(t==='brute'?'brute':'normal');
+}
+function knightTitanCrushClass(z,cls){
+  if(!knightGuardianGiantActive()||cls==='boss'||!z) return null;
+  const enemyScale=Math.max(0.35,Math.abs((z.scale&&z.scale.x)||1));
+  const titanScale=knightGuardianGiantSizeMult();
+  if(enemyScale>titanScale*0.72) return null;
+  return cls==='brute'?'brute':'normal';
 }
 
 function createFreshKnightRuntime(){
@@ -12531,9 +12539,17 @@ function knightApplyDamage(z,damage,opts){
     const kx=z.position.x-(opts.fromX!==undefined?opts.fromX:player.position.x);
     const kz=z.position.z-(opts.fromZ!==undefined?opts.fromZ:player.position.z);
     const l=Math.hypot(kx,kz)||1;
-    const force=opts.knock*(cls==='boss'?0.14:(cls==='brute'?0.45:1));
+    let force=opts.knock*(cls==='boss'?0.14:(cls==='brute'?0.45:1));
+    const titanCrush=knightTitanCrushClass(z,cls);
+    if(titanCrush==='normal') force=Math.max(KNIGHT_CFG.guardianQuakeGiant.knockMinNormal,force*KNIGHT_CFG.guardianQuakeGiant.knockMultNormal);
+    else if(titanCrush==='brute') force=Math.max(KNIGHT_CFG.guardianQuakeGiant.knockMinBrute,force*KNIGHT_CFG.guardianQuakeGiant.knockMultBrute);
+    const prev=Math.hypot(z.userData.knockbackX||0,z.userData.knockbackZ||0);
+    force=Math.max(force,prev);
     z.userData.knockbackX=(kx/l)*force;
     z.userData.knockbackZ=(kz/l)*force;
+    if(titanCrush){
+      z.userData.hitStun=Math.max(z.userData.hitStun||0,titanCrush==='brute'?0.42:0.62);
+    }
   }
   if(opts.slow){
     z.userData.slowTimer=Math.max(z.userData.slowTimer||0,opts.slowTime||1);
