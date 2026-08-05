@@ -1,3 +1,5 @@
+<!-- V22.13.70 Guardian Titan Impact Polish: Titan-mode Knight hits now add scale-matched ground shock rings, directional launch streaks, compact dust/debris, and movement-weight footsteps. Effects are capped and localized for iPhone performance and gameplay visibility. Size, damage, duration, defense, cooldown timing, camera/fog behavior, boss caps, knockback rules, and Shield Toss universal stun are unchanged. -->
+<!-- V22.13.69 Shield Toss Universal Stun: Shield Toss now applies its full stun duration to every enemy class, including Brutes and bosses. Damage, boss damage resistance/caps, knockback resistance, flight path, return behavior, cooldown, Titan scaling, and visuals are unchanged. -->
 <!-- V22.13.68 Guardian Titan Knockback: when Guardian Quake leaves the Knight in giant Titan mode, attacks now launch much smaller enemies backward with a heavy visible knockback. Titan-sized hits strongly punt normal enemies and still push brutes, while bosses remain resistant. The giant-size, defense, camera, and full-moveset behavior are unchanged. -->
 <!-- V22.13.67 Guardian Titan Visibility Fix: removes the washed-out white gameplay screen during Guardian Quake Titan mode. Titan camera distance now correctly expands the scene fog range, and player-attached locator/ground-helper effects are inverse-scaled so they remain normal-sized instead of becoming giant translucent overlays. Knight size, damage, defense, duration, cooldown, and full moveset behavior are unchanged. -->
 <!-- V22.13.66 Guardian Titan Fivefold Power: Titan mode now supports the Knight's complete combat kit. Primary combo reach, Vanguard hit areas, auto-targeting, lunges, Shield Toss size/range/collision/launch height, and Whirlwind radius/visuals all scale for the 5x body while damage values remain unchanged.
@@ -157,7 +159,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.67</title>
+<title>Family Arena V22.13.70</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1382,7 +1384,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.68 - Guardian Titan Knockback';
+const GAME_VERSION='22.13.70 - Guardian Titan Impact Polish';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12052,6 +12054,7 @@ function createFreshKnightRuntime(){
     shatterCooldown:0, shatterPhase:0, shatterTimer:0, shatterBaseY:0,
     chargeCooldown:0, chargeTimer:0, chargeYaw:0, chargeHits:null,
     guardianQuakeSequence:false, guardianGiantBuffTimer:0, guardianGiantCooldownPending:0, guardianGiantDamagePool:0,
+    guardianTitanStepTimer:0, guardianTitanLastX:null, guardianTitanLastZ:null,
     aegisCooldown:0, aegisWindow:0, aegisRecovery:0, aegisRing:null,
     shieldTossCooldown:0, shieldToss:null, shieldAway:false,
     resistTimer:0, frontGuardTimer:0,
@@ -12516,6 +12519,62 @@ function knightGroundCracks(origin,radius,count=6,color=KNIGHT_STEEL){
   pushKnightFx(g,{life:.85,grow:.18,from:.85});
 }
 
+
+function knightTitanImpactFx(z,cls,force,fromX,fromZ){
+  if(!knightGuardianGiantActive()||!z||cls==='boss'||!knightFxBudget(5)) return;
+  const x=z.position.x,zp=z.position.z;
+  const dx=x-fromX,dz=zp-fromZ,len=Math.hypot(dx,dz)||1;
+  const nx=dx/len,nz=dz/len;
+  const heavy=cls==='brute';
+  const radius=heavy?2.5:3.15;
+
+  const ground=new THREE.Group();
+  const ringA=new THREE.Mesh(new THREE.RingGeometry(radius*.28,radius*.40,36),knightMat(KNIGHT_IVORY,heavy?.58:.72));
+  ringA.rotation.x=-Math.PI/2; ringA.position.y=.055; ground.add(ringA);
+  const ringB=new THREE.Mesh(new THREE.RingGeometry(radius*.48,radius*.58,40),knightMat(heavy?KNIGHT_STEEL:KNIGHT_GOLD,heavy?.42:.54));
+  ringB.rotation.x=-Math.PI/2; ringB.position.y=.045; ground.add(ringB);
+  const lane=new THREE.Mesh(new THREE.PlaneGeometry(heavy?.34:.46,heavy?2.8:4.0),knightMat(KNIGHT_IVORY,heavy?.34:.48));
+  lane.rotation.x=-Math.PI/2; lane.rotation.z=-Math.atan2(nx,nz); lane.position.set(nx*(heavy?1.1:1.55),.065,nz*(heavy?1.1:1.55)); ground.add(lane);
+  ground.position.set(x,0,zp); knightBaseOpacity(ground);
+  pushKnightFx(ground,{life:heavy?.34:.42,grow:heavy?1.25:1.65,from:.72});
+
+  const streaks=new THREE.Group();
+  for(let i=-1;i<=1;i++){
+    const streak=new THREE.Mesh(new THREE.PlaneGeometry(heavy?.16:.22,heavy?1.8:2.7),knightMat(i===0?KNIGHT_IVORY:(heavy?KNIGHT_STEEL:KNIGHT_GOLD),i===0?.78:.46));
+    streak.rotation.x=-Math.PI/2; streak.rotation.z=-Math.atan2(nx,nz);
+    streak.position.set(i*(heavy?.22:.32),.18,0); streaks.add(streak);
+  }
+  streaks.position.set(x,heavy?1.0:1.25,zp); knightBaseOpacity(streaks);
+  pushKnightFx(streaks,{life:heavy?.28:.36,vx:nx*Math.min(force,heavy?5.5:8.5),vz:nz*Math.min(force,heavy?5.5:8.5),grow:.35,from:.85});
+
+  const debris=new THREE.Group();
+  const count=heavy?5:7;
+  for(let i=0;i<count;i++){
+    const a=Math.atan2(nx,nz)+(i-(count-1)/2)*.22;
+    const shard=new THREE.Mesh(new THREE.PlaneGeometry(.10+(i%2)*.04,.34+(i%3)*.10),knightMat(i%2?KNIGHT_GOLD:KNIGHT_STEEL,.52));
+    shard.position.set(Math.sin(a)*(.28+i*.05),.12+(i%3)*.09,Math.cos(a)*(.28+i*.05));
+    shard.rotation.set(-Math.PI/2,0,-a); debris.add(shard);
+  }
+  debris.position.set(x,0,zp); knightBaseOpacity(debris);
+  pushKnightFx(debris,{life:.38,vx:nx*(heavy?1.4:2.2),vz:nz*(heavy?1.4:2.2),vy:.45,spin:2.2,grow:.45,from:.8});
+}
+
+function knightTitanFootstepFx(){
+  if(!player||!knightGuardianGiantActive()||!knightFxBudget(3)) return;
+  const p=player.position;
+  const radius=2.25;
+  const g=new THREE.Group();
+  const ring=new THREE.Mesh(new THREE.RingGeometry(radius*.34,radius*.44,34),knightMat(KNIGHT_STEEL,.34));
+  ring.rotation.x=-Math.PI/2; ring.position.y=.035; g.add(ring);
+  for(let i=0;i<4;i++){
+    const a=i*Math.PI*.5+Math.random()*.18;
+    const chip=new THREE.Mesh(new THREE.PlaneGeometry(.10,.55),knightMat(i%2?KNIGHT_GOLD:KNIGHT_IVORY,.32));
+    chip.rotation.x=-Math.PI/2; chip.rotation.z=-a; chip.position.set(Math.sin(a)*.48,.045,Math.cos(a)*.48); g.add(chip);
+  }
+  g.position.set(p.x,0,p.z); knightBaseOpacity(g);
+  pushKnightFx(g,{life:.32,grow:1.15,from:.72});
+}
+
 /* ------------------------------------------------------------- damage core */
 function knightApplyDamage(z,damage,opts){
   if(!z||z.userData.dead||z.userData.spawnPending) return false;
@@ -12533,7 +12592,7 @@ function knightApplyDamage(z,damage,opts){
   applyBulletDamage(z,d);
   if(z.userData.dead) return true;
   // Stagger: bosses resist most control, brutes take reduced control.
-  const stunScale=cls==='boss'?0.18:(cls==='brute'?0.55:1);
+  const stunScale=opts.ignoreStunResistance?1:(cls==='boss'?0.18:(cls==='brute'?0.55:1));
   if(opts.stun) z.userData.hitStun=Math.max(z.userData.hitStun||0,opts.stun*stunScale);
   if(opts.knock&&player){
     const kx=z.position.x-(opts.fromX!==undefined?opts.fromX:player.position.x);
@@ -12549,6 +12608,7 @@ function knightApplyDamage(z,damage,opts){
     z.userData.knockbackZ=(kz/l)*force;
     if(titanCrush){
       z.userData.hitStun=Math.max(z.userData.hitStun||0,titanCrush==='brute'?0.42:0.62);
+      knightTitanImpactFx(z,cls,force,opts.fromX!==undefined?opts.fromX:player.position.x,opts.fromZ!==undefined?opts.fromZ:player.position.z);
     }
   }
   if(opts.slow){
@@ -13406,7 +13466,7 @@ function knightUpdateShieldToss(dt){
     if(cd>0){ t.hitCooldowns.set(key,cd-dt); continue; }
     if(Math.hypot(z.position.x-t.mesh.position.x,z.position.z-t.mesh.position.z)>tossHitRadius) continue;
     t.hitCooldowns.set(key,c.hitCooldown);
-    knightApplyDamage(z,c.damage,{knock:3.4,stun:c.stun,bruteMult:c.bruteMult,bossMult:c.bossMult,
+    knightApplyDamage(z,c.damage,{knock:3.4,stun:c.stun,ignoreStunResistance:true,bruteMult:c.bruteMult,bossMult:c.bossMult,
       bossCapFraction:.015,fromX:t.mesh.position.x,fromZ:t.mesh.position.z});
 
     const cls=knightEnemyClass(z);
@@ -14225,6 +14285,21 @@ function updateKnightGuardianGiant(dt){
   if(knightRuntime.guardianGiantBuffTimer>0){
     knightRuntime.guardianGiantBuffTimer=Math.max(0,knightRuntime.guardianGiantBuffTimer-dt);
     if(knightRuntime.guardianGiantBuffTimer<=0) knightEndGuardianGiantBuff(true);
+  }
+  if(knightGuardianGiantActive()&&player){
+    const lastX=knightRuntime.guardianTitanLastX,lastZ=knightRuntime.guardianTitanLastZ;
+    const moved=lastX===null?0:Math.hypot(player.position.x-lastX,player.position.z-lastZ);
+    knightRuntime.guardianTitanStepTimer=Math.max(0,(knightRuntime.guardianTitanStepTimer||0)-dt);
+    if(moved>.018&&knightRuntime.guardianTitanStepTimer<=0){
+      knightTitanFootstepFx();
+      knightRuntime.guardianTitanStepTimer=.36;
+    }
+    knightRuntime.guardianTitanLastX=player.position.x;
+    knightRuntime.guardianTitanLastZ=player.position.z;
+  }else{
+    knightRuntime.guardianTitanStepTimer=0;
+    knightRuntime.guardianTitanLastX=null;
+    knightRuntime.guardianTitanLastZ=null;
   }
   knightSyncAvatarScale();
 }
