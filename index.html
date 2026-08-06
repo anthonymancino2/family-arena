@@ -1,3 +1,4 @@
+<!-- V22.13.91 Whirlwind Button Countdown: adds a large live remaining-time readout directly inside the Defensive Whirlwind Secondary button while active. The timer updates in tenths of a second and shows infinity from Round 25 onward. Whirlwind duration, cooldown scaling, damage, knockback, projectile deflection, movement penalty, and all Royal Onslaught behavior are unchanged. -->
 <!-- V22.13.90 Royal Onslaught Non-Boss One-Hit: every non-boss enemy struck by Royal Onslaught is now instantly defeated, whether hit as a designated endpoint, crossed during a ghost-pass route, reached by the completion sweep, or caught by the crown finisher. Bosses retain repeated controlled damage and remain the only enemies that can survive an Onslaught hit. The minimum-20 expanding elimination sequence, 3-second capture window, bullet time, cooldown scaling, camera angle, Guardian Titan restrictions, and Mage Primary routing are unchanged. -->
 <!-- V22.13.89 Royal Onslaught Elimination Sequence: Royal Onslaught now begins with a minimum 20 designated strikes, then automatically extends beyond 20 until every enemy captured at activation or spawned during the first 3 seconds has been eliminated. Route-contact enemies still take full strike damage without increasing the designated sequence count. The move waits for the 3-second capture window to close before finishing, and captured bosses can now be defeated through repeated Onslaught strikes instead of being trapped behind the former total-damage cap. Bullet time, cooldown scaling, round-based target skipping, invulnerability, camera angle, Guardian Titan restrictions, and Mage Primary routing remain unchanged. -->
 <!-- V22.13.88 Royal Onslaught Spawn Window + Round Camera Angle: Royal Onslaught now locks in every enemy present at activation plus every enemy created during the following 3 seconds. Eligible enemies are prioritized as endpoint targets and any eligible survivor not contacted during the 20-strike route receives one full completion-sweep strike before the crown finisher, guaranteeing map-wide coverage without increasing the designated 20-hit count. The default camera pitch now resets to a steeper third-person top-down angle at game/round load while remaining below bird's-eye. Bullet time, cooldown scaling, damage rules, boss caps, ghost-pass route damage, Guardian Titan restrictions, and Mage Primary routing remain unchanged. -->
@@ -386,6 +387,8 @@
   .secondaryBtn.locked{background:rgba(38,40,48,.72);color:rgba(255,255,255,.72);filter:saturate(.35);}
   .secondaryBtn .secondaryIcon{font-size:19px;line-height:1;margin-bottom:2px;}
   .secondaryBtn .secondaryLabel{font-size:8px;max-width:62px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .secondaryBtn .secondaryTimer{font-size:16px;line-height:1;font-weight:1000;margin-top:2px;color:#fff8cf;text-shadow:0 0 7px rgba(255,221,105,.95),0 1px 3px rgba(0,0,0,.95);}
+  .secondaryBtn.whirlwindActive{box-shadow:0 0 0 2px rgba(255,239,171,.82),0 0 18px rgba(140,204,255,.78),inset 0 0 16px rgba(255,255,255,.14);}
   .secondaryBtn:active{transform:scale(.96);}
   .jumpBtn{position:relative;bottom:auto;right:auto;
     width:52px;height:46px;border-radius:12px;background:rgba(20,22,28,0.5);
@@ -1374,7 +1377,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.90 - Royal Onslaught Non-Boss One-Hit';
+const GAME_VERSION='22.13.91 - Whirlwind Button Countdown';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10578,21 +10581,26 @@ function updateSecondaryButton(){
     const pending=mirrorVolleySlots.filter(s=>s.placementId===null&&s.cooldown>0).map(s=>s.cooldown);
     cooldown=mirrorReadyCount>0?0:(pending.length?Math.min(...pending):0);
   }
+  const whirlwindActive=!!(w&&w.kind==='knight_whirlwind_secondary'&&knightRuntime.whirlwindTimer>0);
   btn.classList.toggle('locked',!w);
   btn.classList.toggle('cooling',!!w&&cooldown>0);
-  btn.style.opacity=(!w)?'':(cooldown>0?'.72':'1');
+  btn.classList.toggle('whirlwindActive',whirlwindActive);
+  btn.style.opacity=(!w)?'':(cooldown>0&&!whirlwindActive?'.72':'1');
   if(!w){
     btn.innerHTML='<span class="secondaryIcon">🔒</span><span class="secondaryLabel">SECONDARY</span>';
     return;
   }
   const icon=w.kind==='giant_fireball'?'☄️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'))));
+  if(whirlwindActive){
+    const remaining=Number.isFinite(knightRuntime.whirlwindTimer)
+      ? `${knightRuntime.whirlwindTimer.toFixed(1)}s`
+      : '∞';
+    btn.innerHTML=`<span class="secondaryIcon">${icon}</span><span class="secondaryLabel">WHIRLWIND ACTIVE</span><span class="secondaryTimer">${remaining}</span>`;
+    return;
+  }
   const status=w.kind==='mirror_volley'
     ? (mirrorReadyCount>0?` · ${mirrorReadyCount}/3 READY`:` · ${cooldown.toFixed(1)}s`)
-    : (w.kind==='knight_whirlwind_secondary' && knightRuntime.whirlwindTimer>0
-      ? (Number.isFinite(knightRuntime.whirlwindTimer)
-        ? ` · ACTIVE ${knightRuntime.whirlwindTimer.toFixed(1)}s`
-        : ' · ACTIVE ∞')
-      : (cooldown>0?` · ${cooldown.toFixed(1)}s`:' · READY'));
+    : (cooldown>0?` · ${cooldown.toFixed(1)}s`:' · READY');
   btn.innerHTML=`<span class="secondaryIcon">${icon}</span><span class="secondaryLabel">${w.name}${status}</span>`;
 }
 function updateWeaponHud(){
