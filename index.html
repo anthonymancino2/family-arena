@@ -1,3 +1,4 @@
+<!-- V22.13.96 Royal Onslaught Freeze Fix: replaces wall-clock capture/elapsed timing with gameplay-delta timing so pause truly freezes Royal Onslaught instead of letting it finish in the background, removes the per-sigil 16ms interval introduced in the visual flare pass, and caps the most expensive repeated sigil effects during long sequences. Damage, elimination rules, bullet time, cooldown scaling, camera behavior, and core visuals are unchanged. -->
 <!-- V22.13.95 Royal Onslaught Visual Flare: significantly upgrades Royal Onslaught presentation with a richer bullet-time veil, larger activation sigils, brighter multi-layer dash lanes, route-space flare shards, heavier endpoint impact columns, and a more spectacular crown finisher while preserving the verified damage rules, target capture/elimination behavior, cooldown scaling, and iPhone-safe caps. -->
 <!-- V22.13.94 Royal Onslaught Live Balance + Camera Verification: keeps every Onslaught dash endpoint inside the playable arena, caps long-sequence camera shake, accelerates boss-only continuation slightly after the minimum 20 hits, stabilizes the Knight at a safe readable final position near arena edges, reconfirms the elevated round-start camera reset, and preserves projectile visibility/performance during extended bullet time. Damage rules, capture window, elimination requirement, non-boss one-hit behavior, cooldown scaling, and invulnerability are unchanged. -->
 <!-- V22.13.93 Royal Onslaught Combat + Cleanup Verification: hardens captured-enemy tracking through spawn warnings and removal, rotates designated targets fairly so bosses and survivors cannot be ignored, guarantees measurable boss progress on every endpoint strike, restores bullet time/markers/atmosphere on pause, round completion, reset, avatar change, or interruption, replaces the meaningless 9999-second active HUD with elapsed-strike/capture status, and caps optional extended-sequence visuals without changing damage rules, capture window, elimination requirement, cooldown scaling, or invulnerability. -->
@@ -1381,7 +1382,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.95 - Royal Onslaught Visual Flare';
+const GAME_VERSION='22.13.96 - Royal Onslaught Freeze Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10042,7 +10043,7 @@ function spawnZombie(){
   // Royal Onslaught includes all enemies created during its first 3 seconds,
   // even while their spawn warning is still resolving.
   if(knightRuntime && knightRuntime.royalOnslaughtEligibleIds &&
-     performance.now() <= (knightRuntime.royalOnslaughtCaptureUntil||0)){
+     (knightRuntime.royalOnslaughtCaptureRemainingTime||0) > 0){
     knightRuntime.royalOnslaughtEligibleIds.add(z.uuid);
     if(typeof knightRoyalOnslaughtMarkEnemy==='function') knightRoyalOnslaughtMarkEnemy(z);
   }
@@ -12089,7 +12090,7 @@ function createFreshKnightRuntime(){
     guardianQuakeSequence:false, guardianGiantBuffTimer:0, guardianGiantCooldownPending:0, guardianGiantDamagePool:0,
     guardianTitanStepTimer:0, guardianTitanLastX:null, guardianTitanLastZ:null, guardianTitanImpactWindowStart:0, guardianTitanImpactCount:0,
     aegisCooldown:0, aegisWindow:0, aegisRecovery:0, aegisRing:null,
-    royalOnslaughtStartedAt:0, royalOnslaughtCaptureUntil:0,
+    royalOnslaughtStartedAt:0, royalOnslaughtCaptureUntil:0, royalOnslaughtElapsed:0, royalOnslaughtCaptureRemainingTime:0,
     royalOnslaughtStrikeIndex:0, royalOnslaughtStrikeTimer:0,
     royalOnslaughtTargetCursor:0, royalOnslaughtEligibleIds:null,
     royalOnslaughtHitIds:null, royalOnslaughtDamagedIds:null,
@@ -14706,16 +14707,10 @@ function knightRoyalOnslaughtSigilFx(pos,scale=1,ttl=300){
   }
   g.position.set(pos.x,.02,pos.z);
   scene.add(g);
-  const born=performance.now();
-  const timer=setInterval(()=>{
-    if(!g.parent){clearInterval(timer);return;}
-    const p=Math.min(1,(performance.now()-born)/ttl);
-    g.rotation.y+=.14;
-    const s=1+p*.38;
-    g.scale.setScalar(s);
-    for(const c of g.children){ if(c.material&&c.material.opacity!==undefined) c.material.opacity=Math.max(0,(c.material.opacity||.6)*(1-p*.08)); }
-    if(p>=1){ clearInterval(timer); if(g.parent){scene.remove(g);disposeGroup(g);} }
-  },16);
+  // Keep this effect static and short-lived. The previous 16ms interval could
+  // stack dozens of timers during long Onslaught chains and stall iPhone Safari.
+  g.rotation.y=Math.random()*Math.PI*2;
+  setTimeout(()=>{if(g.parent){scene.remove(g);disposeGroup(g);}},ttl);
 }
 function knightRoyalOnslaughtImpactColumn(pos,scale=1,color=KNIGHT_GOLD,ttl=220){
   if(!scene||!pos) return;
@@ -14792,9 +14787,11 @@ function triggerKnightAegisCounter(){
   knightRuntime.royalOnslaughtHitIds=new Set();
   knightRuntime.royalOnslaughtDamagedIds=new Set();
   knightRuntime.royalOnslaughtStartedAt=performance.now();
+  knightRuntime.royalOnslaughtElapsed=0;
   knightRuntime.royalOnslaughtOriginX=player.position.x;
   knightRuntime.royalOnslaughtOriginZ=player.position.z;
   knightRuntime.royalOnslaughtCaptureUntil=knightRuntime.royalOnslaughtStartedAt+3000;
+  knightRuntime.royalOnslaughtCaptureRemainingTime=3;
   knightRuntime.royalOnslaughtEligibleIds=new Set(
     zombies.filter(z=>z&&!z.userData.dead).map(z=>z.uuid)
   );
@@ -15011,7 +15008,7 @@ function knightRoyalOnslaughtStrike(){
     hitIds.add(target.uuid);
     const escalation=1+index*.13;
     knightRoyalOnslaughtDashFx(startPos,player.position,index);
-    knightRoyalOnslaughtSigilFx(startPos,0.9*knightTitanVisualScale(),180);
+    if(index<20 || index%3===0) knightRoyalOnslaughtSigilFx(startPos,0.9*knightTitanVisualScale(),180);
     knightSwordTrail(player.position,yaw,index%3,1.35*knightTitanVisualScale()*escalation);
     spawnKnightGuardBurst(target.position,1.75*knightTitanVisualScale()*escalation,index%2?KNIGHT_IVORY:KNIGHT_GOLD);
     knightShockRing(target.position,2.2*knightTitanCombatScale()*Math.min(1.55,escalation),index%2?KNIGHT_STEEL:KNIGHT_GOLD,.22+index*.025);
@@ -15092,14 +15089,14 @@ function knightRoyalOnslaughtLivingEligible(){
   return zombies.filter(z=>z&&!z.userData.dead&&eligible.has(z.uuid));
 }
 function knightRoyalOnslaughtCaptureClosed(){
-  return performance.now() >= (knightRuntime.royalOnslaughtCaptureUntil||0);
+  return (knightRuntime.royalOnslaughtCaptureRemainingTime||0)<=0;
 }
 function knightRoyalOnslaughtActiveElapsed(){
-  if(!(knightRuntime.aegisWindow>0)||!knightRuntime.royalOnslaughtStartedAt) return 0;
-  return Math.max(0,(performance.now()-knightRuntime.royalOnslaughtStartedAt)/1000);
+  if(!(knightRuntime.aegisWindow>0)) return 0;
+  return Math.max(0,knightRuntime.royalOnslaughtElapsed||0);
 }
 function knightRoyalOnslaughtCaptureRemaining(){
-  return Math.max(0,((knightRuntime.royalOnslaughtCaptureUntil||0)-performance.now())/1000);
+  return Math.max(0,knightRuntime.royalOnslaughtCaptureRemainingTime||0);
 }
 function knightRoyalOnslaughtPruneEligibility(){
   const eligible=knightRuntime.royalOnslaughtEligibleIds;
@@ -15116,6 +15113,8 @@ function knightRoyalOnslaughtPruneEligibility(){
 }
 function knightUpdateAegis(dt){
   if(knightRuntime.aegisWindow>0){
+    knightRuntime.royalOnslaughtElapsed=(knightRuntime.royalOnslaughtElapsed||0)+dt;
+    knightRuntime.royalOnslaughtCaptureRemainingTime=Math.max(0,(knightRuntime.royalOnslaughtCaptureRemainingTime||0)-dt);
     knightRoyalOnslaughtPruneEligibility();
     knightRoyalOnslaughtUpdateMarkers(dt);
     if(knightRuntime.aegisRing){
@@ -15178,7 +15177,9 @@ function knightEndAegis(success){
   if(knightRuntime.royalOnslaughtBossDamage) knightRuntime.royalOnslaughtBossDamage.clear();
   knightRuntime.royalOnslaughtBossDamage=null;
   knightRuntime.royalOnslaughtCaptureUntil=0;
+  knightRuntime.royalOnslaughtCaptureRemainingTime=0;
   knightRuntime.royalOnslaughtStartedAt=0;
+  knightRuntime.royalOnslaughtElapsed=0;
   knightRuntime.royalOnslaughtStrikeIndex=0;
   knightRuntime.royalOnslaughtStrikeTimer=0;
   knightRuntime.royalOnslaughtTargetCursor=0;
