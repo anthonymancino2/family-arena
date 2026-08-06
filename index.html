@@ -1,3 +1,5 @@
+<!-- V22.13.86 Royal Onslaught Bullet Time: while Royal Onslaught is active, every existing enemy and any enemy spawned during the sequence runs at 20% normal movement, attack, special-action, and animation speed. Existing and newly fired enemy projectiles also travel and animate at 20% speed, creating a Matrix-style bullet-time impression while the Knight's six-hit presentation remains readable. Duration, damage, invulnerability, boss caps, cooldown, targeting, and Mage Primary-slot routing are unchanged. -->
+<!-- V22.13.85 Royal Onslaught Spectacle Polish: upgrades the six-hit Knight ultimate with visible dash lanes, alternating sword/shield strike identities, escalating impact scale, improved unique-target selection, and a crown-shaped royal finisher. Optional effects are short-lived and capped for dense iPhone battles. Damage, invulnerability, six-strike count, boss cap, cooldown, Guardian Titan restrictions, and Mage Primary-slot routing are unchanged. -->
 <!-- V22.13.84 Royal Onslaught + Mage Primary Slots: replaces the reactive Aegis Counter with Royal Onslaught, a fast active Knight ultimate that chains six invulnerable royal dashes through nearby enemies and finishes with a crown shockwave. The move uses the former Aegis loadout ID for save compatibility but no longer waits for an incoming hit. Mage Fire & Ice and Rapid Fire & Ice are now explicit Primary-slot choices; Arcane Lance and Giant Fireball remain Secondary choices. -->
 <!-- V22.13.83 Knight Balance and iPhone Performance Guard: adds adaptive Knight effect budgeting during Guardian Titan, ten-clone, and Judgment overlap; lowers only optional Judgment rain density under heavy load; prevents delayed clone asset callbacks from repopulating cleared summons; and tightens repeated-round cleanup of Knight-only effects. Damage, hitboxes, clone count/duration/cooldown, Judgment timing and damage, Titan rules, Shield Toss stun, and enemy projectile behavior are unchanged. -->
 <!-- V22.13.82 Full Knight Consistency Pass: synchronizes the visible build identity, corrects stale Knight shop descriptions to match current round-scaled cooldowns and approved behavior, removes the obsolete Judgment Valor wording, expands legacy loadout sanitation for retired Knight systems including Banner Spear aliases, and standardizes current Guardian Titan terminology in live code comments. Combat damage, timing, effects, unlock levels, Titan restrictions, and balance are unchanged. -->
@@ -1368,7 +1370,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.84 - Royal Onslaught + Mage Primary Slots';
+const GAME_VERSION='22.13.86 - Royal Onslaught Bullet Time';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2338,7 +2340,11 @@ function spawnEnemyShot(z){
   spawnBurst(g.position.x,g.position.y,g.position.z,9,FX_MAT_ENEMY_SHOT,2.6);
 }
 const ENEMY_SHOT_TAIL_MAX_LEN = 1.7;
+function knightRoyalOnslaughtEnemyTimeScale(){
+  return knightRuntime&&knightRuntime.aegisWindow>0?0.20:1;
+}
 function updateEnemyProjectiles(dt){
+  dt*=knightRoyalOnslaughtEnemyTimeScale();
   for(let i=enemyProjectiles.length-1;i>=0;i--){
     const p=enemyProjectiles[i];
     p.life-=dt; p.age+=dt;
@@ -2691,7 +2697,7 @@ const KNIGHT_DEFENSIVE_WHIRLWIND = {id:'knight_whirlwind', name:'Defensive Whirl
 const KNIGHT_GUARDIAN_QUAKE = {id:'knight_guardian_quake', name:'Guardian Titan', price:760, avatar:'knight', unlockLevel:12,
   desc:'Hold the Ability button to begin Guardian Charge and automatically flow into Earth Shatter when the charge finishes. Releasing before the charge ends cancels the Earth Shatter follow-up. Steer the charge with the normal movement controls. After the sequence, the Knight remains in Titan form for 15 seconds. Cooldown begins after Titan mode ends and scales with the current round tier.'};
 const KNIGHT_AEGIS_COUNTER = {id:'knight_aegis_counter', name:'Royal Onslaught', price:880, avatar:'knight', unlockLevel:14,
-  desc:'Fast active ultimate. Become invulnerable and chain six royal sword-and-shield dashes through nearby enemies, then finish with a large crown shockwave. No counter timing or waiting is required. Boss damage is capped. 18-second cooldown.'};
+  desc:'Fast active ultimate. Enter royal bullet time, reducing every enemy and enemy projectile to 20% movement and attack speed while you chain six invulnerable sword-and-shield dashes, then finish with a large crown shockwave. Enemies that spawn during the move are slowed immediately. Boss damage is capped. 18-second cooldown.'};
 const KNIGHT_ROYAL_GUARD_CLONES = {id:'knight_royal_guard_clones', name:'Knights of the Round', price:0, avatar:'knight', unlockLevel:10,
   desc:'Knight signature move. Summon invincible Knight clones that draw enemy attention and use only the Knight moves currently unlocked. Each clone deals 10% of the player\'s damage. Rounds 10–15 summon 2 clones for 8 seconds with a 10-second cooldown; Rounds 16–20 summon 5 for 15 seconds with a 5-second cooldown; Round 21 onward summons 10 for 30 seconds with a 1.5-second cooldown.'};
 const KNIGHT_JUDGMENT_ULTIMATE = {id:'knight_judgment', name:'Judgment of the King', price:920, avatar:'knight', unlockLevel:18,
@@ -14631,6 +14637,7 @@ function triggerKnightAegisCounter(){
   knightRuntime.royalOnslaughtStrikeTimer=0;
   knightRuntime.royalOnslaughtStrikeIndex=0;
   knightRuntime.royalOnslaughtBossDamage=new Map();
+  knightRuntime.royalOnslaughtHitIds=new Set();
   knightRuntime.royalOnslaughtTargets=zombies
     .filter(z=>z&&!z.userData.dead&&!z.userData.spawnPending)
     .sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position))
@@ -14657,8 +14664,53 @@ function triggerKnightAegisCounter(){
   knightPlayClip(['melee','slash'],'1H_Melee_Attack_Slice_Horizontal',.20,.12);
   triggerCombatShake(8,140);
   if(navigator.vibrate) navigator.vibrate([24,18,42]);
-  toast('ROYAL ONSLAUGHT!');
+  toast('ROYAL ONSLAUGHT — BULLET TIME!');
   updateHoodedHud();
+}
+function knightRoyalOnslaughtDashFx(from,to,index){
+  if(!scene||!from||!to) return;
+  const visual=knightTitanVisualScale();
+  const a=new THREE.Vector3(from.x,.24*visual,from.z);
+  const b=new THREE.Vector3(to.x,.24*visual,to.z);
+  const dir=b.clone().sub(a), len=dir.length();
+  if(len<.2) return;
+  const mid=a.clone().add(b).multiplyScalar(.5);
+  const lane=new THREE.Mesh(
+    new THREE.PlaneGeometry(Math.min(len,18),(.22+index*.035)*visual),
+    knightMat(index%2?KNIGHT_IVORY:KNIGHT_GOLD,.52)
+  );
+  lane.rotation.x=-Math.PI/2;
+  lane.rotation.z=-Math.atan2(dir.z,dir.x);
+  lane.position.copy(mid);
+  scene.add(lane);
+  const edge=new THREE.Mesh(
+    new THREE.PlaneGeometry(Math.min(len,18),(.055+index*.012)*visual),
+    knightMat(KNIGHT_STEEL,.72)
+  );
+  edge.rotation.copy(lane.rotation); edge.position.copy(mid); edge.position.y+=.012;
+  scene.add(edge);
+  const ttl=Math.max(110,220-index*12);
+  setTimeout(()=>{
+    for(const m of [lane,edge]) if(m&&m.parent){scene.remove(m);disposeGroup(m);}
+  },ttl);
+}
+function knightRoyalOnslaughtCrownFinisherFx(center,visual,combat){
+  const g=new THREE.Group();
+  const crownRadius=3.2*combat;
+  const matGold=knightMat(KNIGHT_GOLD,.76), matIvory=knightMat(KNIGHT_IVORY,.62);
+  const base=new THREE.Mesh(new THREE.RingGeometry(crownRadius*.72,crownRadius,52),matGold);
+  base.rotation.x=-Math.PI/2; base.position.y=.06; g.add(base);
+  for(let i=0;i<8;i++){
+    const a=i*Math.PI/4;
+    const h=(i%2?2.5:3.5)*visual;
+    const spike=new THREE.Mesh(new THREE.ConeGeometry(.28*visual,h,5),i%2?matIvory:matGold);
+    spike.position.set(Math.sin(a)*crownRadius*.82,h*.5,Math.cos(a)*crownRadius*.82);
+    spike.rotation.z=-Math.sin(a)*.18;
+    spike.rotation.x=Math.cos(a)*.18;
+    g.add(spike);
+  }
+  g.position.set(center.x,.02,center.z); scene.add(g);
+  setTimeout(()=>{if(g.parent){scene.remove(g);disposeGroup(g);}},520);
 }
 function knightRoyalOnslaughtDamage(target,index){
   if(!target||target.userData.dead) return;
@@ -14683,11 +14735,15 @@ function knightRoyalOnslaughtDamage(target,index){
 function knightRoyalOnslaughtStrike(){
   const index=knightRuntime.royalOnslaughtStrikeIndex||0;
   let target=(knightRuntime.royalOnslaughtTargets||[])[index];
-  if(!target||target.userData.dead){
-    target=zombies.filter(z=>z&&!z.userData.dead&&!z.userData.spawnPending)
+  const hitIds=knightRuntime.royalOnslaughtHitIds||(knightRuntime.royalOnslaughtHitIds=new Set());
+  if(!target||target.userData.dead||hitIds.has(target.uuid)){
+    const candidates=zombies.filter(z=>z&&!z.userData.dead&&!z.userData.spawnPending&&!hitIds.has(z.uuid))
+      .sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position));
+    target=candidates[0]||zombies.filter(z=>z&&!z.userData.dead&&!z.userData.spawnPending)
       .sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position))[0];
   }
   if(target){
+    const startPos=player.position.clone();
     const dx=target.position.x-player.position.x,dz=target.position.z-player.position.z;
     const yaw=Math.atan2(dx,dz);
     player.rotation.y=yaw;
@@ -14695,10 +14751,13 @@ function knightRoyalOnslaughtStrike(){
     const stop=1.15*knightTitanCombatScale();
     player.position.x=target.position.x-dx/dist*stop;
     player.position.z=target.position.z-dz/dist*stop;
-    knightSwordTrail(player.position,yaw,index%3,1.35*knightTitanVisualScale());
-    spawnKnightGuardBurst(target.position,1.75*knightTitanVisualScale(),index%2?KNIGHT_IVORY:KNIGHT_GOLD);
-    knightShockRing(target.position,2.2*knightTitanCombatScale(),index%2?KNIGHT_STEEL:KNIGHT_GOLD,.22);
-    spawnBurst(target.position.x,target.position.y+.8,target.position.z,16,FX_MAT_SPARK,4.2);
+    hitIds.add(target.uuid);
+    const escalation=1+index*.13;
+    knightRoyalOnslaughtDashFx(startPos,player.position,index);
+    knightSwordTrail(player.position,yaw,index%3,1.35*knightTitanVisualScale()*escalation);
+    spawnKnightGuardBurst(target.position,1.75*knightTitanVisualScale()*escalation,index%2?KNIGHT_IVORY:KNIGHT_GOLD);
+    knightShockRing(target.position,2.2*knightTitanCombatScale()*Math.min(1.55,escalation),index%2?KNIGHT_STEEL:KNIGHT_GOLD,.22+index*.025);
+    spawnBurst(target.position.x,target.position.y+.8,target.position.z,Math.min(24,14+index*2),FX_MAT_SPARK,4.2+index*.45);
     knightRoyalOnslaughtDamage(target,index);
     knightPlayClip(index%2?['melee','chop']:['melee','slash'],index%2?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal',.16,.10);
     triggerCombatShake(9+index,100);
@@ -14714,6 +14773,7 @@ function knightRoyalOnslaughtFinish(){
   knightShockRing(player.position,radius*.72,KNIGHT_IVORY,.38);
   knightShockRing(player.position,radius*.46,KNIGHT_STEEL,.28);
   spawnKnightGuardBurst(player.position,4.6*visual,KNIGHT_GOLD);
+  knightRoyalOnslaughtCrownFinisherFx(player.position,visual,combat);
   spawnBurst(player.position.x,player.position.y+.6*visual,player.position.z,34,FX_MAT_SPARK,7.5);
   for(const z of zombies){
     if(!z||z.userData.dead||z.userData.spawnPending) continue;
@@ -14765,6 +14825,8 @@ function knightEndAegis(success){
   knightRuntime.aegisRecovery=success?.28:.08;
   if(success&&wasActive) knightRoyalOnslaughtFinish();
   knightRuntime.royalOnslaughtTargets=[];
+  if(knightRuntime.royalOnslaughtHitIds) knightRuntime.royalOnslaughtHitIds.clear();
+  knightRuntime.royalOnslaughtHitIds=null;
   knightRuntime.royalOnslaughtStrikeIndex=0;
   knightRuntime.royalOnslaughtStrikeTimer=0;
 }
@@ -20912,8 +20974,9 @@ function update(dt){
   // Zombies chase + contact damage — frozen in place while free roaming.
   if(!freeMode){
     zombies.forEach(z=>{
-      if(z.userData.kayMixer) z.userData.kayMixer.update(dt);
-      z.userData.kayActionLock=Math.max(0,(z.userData.kayActionLock||0)-dt);
+      const enemyDt=dt*knightRoyalOnslaughtEnemyTimeScale();
+      if(z.userData.kayMixer) z.userData.kayMixer.update(enemyDt);
+      z.userData.kayActionLock=Math.max(0,(z.userData.kayActionLock||0)-enemyDt);
       if(z.userData.dead || z.userData.spawnPending) return;
 
       const target=chooseEnemyTarget(z,dt);
@@ -20921,18 +20984,18 @@ function update(dt){
       let dx=target.position.x-z.position.x,dz=target.position.z-z.position.z;
       let dist=Math.hypot(dx,dz);
       const type=z.userData.archetype||'walker';
-      z.userData.attackCooldown=Math.max(0,(z.userData.attackCooldown||0)-dt);
-      z.userData.specialTimer=Math.max(0,(z.userData.specialTimer||0)-dt);
+      z.userData.attackCooldown=Math.max(0,(z.userData.attackCooldown||0)-enemyDt);
+      z.userData.specialTimer=Math.max(0,(z.userData.specialTimer||0)-enemyDt);
 
       // Let impact recoil win over chase movement for a split second.
       if((z.userData.hitStun||0)>0){
-        z.userData.hitStun=Math.max(0,z.userData.hitStun-dt);
-        const nx=z.position.x+(z.userData.knockbackX||0)*dt;
-        const nz=z.position.z+(z.userData.knockbackZ||0)*dt;
+        z.userData.hitStun=Math.max(0,z.userData.hitStun-enemyDt);
+        const nx=z.position.x+(z.userData.knockbackX||0)*enemyDt;
+        const nz=z.position.z+(z.userData.knockbackZ||0)*enemyDt;
         const pushed=resolveCollision(nx,nz,z.position.y);
         z.position.x=pushed.x;z.position.z=pushed.z;
-        z.userData.knockbackX=(z.userData.knockbackX||0)*Math.max(0,1-dt*9);
-        z.userData.knockbackZ=(z.userData.knockbackZ||0)*Math.max(0,1-dt*9);
+        z.userData.knockbackX=(z.userData.knockbackX||0)*Math.max(0,1-enemyDt*9);
+        z.userData.knockbackZ=(z.userData.knockbackZ||0)*Math.max(0,1-enemyDt*9);
         if(z.userData.playKayClip) z.userData.playKayClip('Hit_A',true,true,.12);
         return;
       }
@@ -20970,8 +21033,8 @@ function update(dt){
         let ml=Math.hypot(mx,mz)||1;mx/=ml;mz/=ml;
 
         const statusSpeedMult=(z.userData.slowTimer||0)>0?(z.userData.slowMult||.18):1;
-        let nx=z.position.x+mx*z.userData.speed*statusSpeedMult*dt*moveDir;
-        let nz=z.position.z+mz*z.userData.speed*statusSpeedMult*dt*moveDir;
+        let nx=z.position.x+mx*z.userData.speed*statusSpeedMult*enemyDt*moveDir;
+        let nz=z.position.z+mz*z.userData.speed*statusSpeedMult*enemyDt*moveDir;
         let resolved=resolveCollision(nx,nz,z.position.y);
         let moved=Math.hypot(resolved.x-z.position.x,resolved.z-z.position.z);
 
@@ -20980,24 +21043,24 @@ function update(dt){
           const base=Math.atan2(mx,mz);
           const turn=(z.id%2?1:-1)*(.7+Math.min(1.0,(z.userData.stuckTimer||0)*.35));
           const ax=Math.sin(base+turn),az=Math.cos(base+turn);
-          const alt=resolveCollision(z.position.x+ax*z.userData.speed*statusSpeedMult*dt,z.position.z+az*z.userData.speed*statusSpeedMult*dt,z.position.y);
+          const alt=resolveCollision(z.position.x+ax*z.userData.speed*statusSpeedMult*enemyDt,z.position.z+az*z.userData.speed*statusSpeedMult*enemyDt,z.position.y);
           const altMoved=Math.hypot(alt.x-z.position.x,alt.z-z.position.z);
           if(altMoved>moved){resolved=alt;moved=altMoved;}
         }
 
         z.position.x=resolved.x;z.position.z=resolved.z;
-        if(moved<.008 && dist>1.5) z.userData.stuckTimer=(z.userData.stuckTimer||0)+dt;
-        else{z.userData.stuckTimer=Math.max(0,(z.userData.stuckTimer||0)-dt*2);z.userData.lastSafePosition=z.position.clone();}
+        if(moved<.008 && dist>1.5) z.userData.stuckTimer=(z.userData.stuckTimer||0)+enemyDt;
+        else{z.userData.stuckTimer=Math.max(0,(z.userData.stuckTimer||0)-enemyDt*2);z.userData.lastSafePosition=z.position.clone();}
         if(z.userData.stuckTimer>2.5) recoverStuckEnemy(z,target);
 
         const desiredYaw=Math.atan2(dx,dz);
         let yawDelta=((desiredYaw-z.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI;
-        z.rotation.y+=yawDelta*Math.min(1,dt*9);
+        z.rotation.y+=yawDelta*Math.min(1,enemyDt*9);
         setEnemyMoveClip(z,'Running_A');
       }else{
         const desiredYaw=Math.atan2(dx,dz);
         let yawDelta=((desiredYaw-z.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI;
-        z.rotation.y+=yawDelta*Math.min(1,dt*9);
+        z.rotation.y+=yawDelta*Math.min(1,enemyDt*9);
         if(type!=='spitter') setEnemyMoveClip(z,'Idle');
       }
 
