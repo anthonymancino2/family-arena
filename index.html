@@ -1,3 +1,5 @@
+<!-- V22.13.81 Knights of the Round Final Polish: gives royal clones a distinct crown-and-aura identity, uses stable one-ring/two-ring army formation slots to reduce overlap, strengthens readable attack/departure cues, and throttles optional clone effects when 10 knights are active for iPhone performance. Clone count, duration, cooldown, invincibility, aggro priority, inherited moves, return rules, and 10% damage are unchanged. -->
+<!-- V22.13.80 Shield Toss Three-Second Stun: Shield Toss now applies a full 3.0-second stun on contact to every enemy class, including normal enemies, Brutes, and bosses. Stun resistance is bypassed for this move so all surviving targets receive the same duration. Damage, boss caps, knockback, range, ricochet, cooldown, return behavior, Titan scaling, and visuals are unchanged. -->
 <!-- V22.13.79 Shield Toss Final Polish: strengthens the shield-first launch read, adds a cleaner directional departure flare, gives bosses and Brutes unmistakable localized stun feedback, refines the return wake, and upgrades the guarded catch with a compact royal lock-in burst. Damage, full universal stun, range, ricochet, cooldown, boss caps, Titan scaling, collision, and return timing are unchanged. -->
 <!-- V22.13.78 Guardian Titan Reset Guard: centralizes Guardian Titan shutdown so round transitions, death/reset, avatar changes, and new runs always restore normal player scale, helper-effect scale, Titan hit/impact tracking, charge/shatter sequence state, input ownership, and normal camera-fog presentation. Natural Titan expiration still starts the approved tiered cooldown; forced cleanup never carries a stale pending cooldown into the next state. Also updates the HUD abbreviation to G. TITAN. Combat balance and visuals are unchanged. -->
 <!-- V22.13.77 Guardian Titan Camera Cap: renames Guardian Quake to Guardian Titan in visible Knight unlock/loadout text and caps the automatic third-person Titan pullback so starting from zoom tiers 7-8 it stays between the normal wide views and bird's-eye instead of jumping excessively far away. Charge/Earth Shatter behavior, Titan size, 5x damage, 15-second duration, defense, Primary/Secondary access, cooldown timing, boss caps, and Shield Toss universal stun are unchanged. -->
@@ -1363,7 +1365,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.79 - Shield Toss Final Polish';
+const GAME_VERSION='22.13.80 - Shield Toss Three-Second Stun';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2564,7 +2566,7 @@ const CHARACTER_COMBAT = {
       royal_vanguard:{name:'Royal Vanguard Combo', price:420, slot:'primary', kind:'knight_vanguard', cooldown:0.24, damage:1.0, radius:4.8, range:4.8, arc:3.15, auto:true,
         desc:'An upgraded three-step Primary chain combining Guarded Thrust, Cleaving Guard, and Shield Bash. Hold FIRE to automatically continue through the piercing thrust, wide crowd-clearing sweep, and heavy shield-bash finisher; release to stop. Individual taps still advance one step at a time. Stronger and more versatile than Royal Sword Combo, but each step is more committed.'},
       shield_toss:{name:'Shield Toss', price:380, slot:'secondary', kind:'knight_shield_toss', cooldown:0.18, damage:1.6, radius:1.15,
-        desc:'Throws the shield on a controlled path with one slight ricochet, staggering everything it touches before returning to your hand. You lose one Magical Armor charge while the shield is away.'},
+        desc:'Throws the shield on a controlled path with one slight ricochet. Every surviving enemy it touches—normal, Brute, or boss—is stunned for 3 seconds before the shield returns to your hand. You lose one Magical Armor charge while the shield is away.'},
       defensive_whirlwind:{name:'Defensive Whirlwind', price:420, slot:'secondary', kind:'knight_whirlwind_secondary', cooldown:0, damage:0, radius:3.25,
         desc:'Activate a moving sword-and-shield whirlwind that repeatedly damages and pushes enemies away while deflecting weak projectiles. Duration starts at 3.8 seconds and increases by 0.5 seconds each round through Round 24; from Round 25 onward it remains active indefinitely. Cooldown is 8 seconds in Rounds 1–10, 3 seconds in Rounds 11–15, 1.5 seconds in Rounds 16–20, and zero from Round 21 onward.'}
     }
@@ -11984,7 +11986,7 @@ const KNIGHT_CFG = {
   guardianQuakeGiant:{sizeMult:5, damageMult:5, buffDuration:15, moveMult:0.85, hitboxRadius:3.2, knockMultNormal:3.25, knockMultBrute:1.65, knockMinNormal:8.5, knockMinBrute:4.6},
   aegis:{cooldown:11, window:0.85, recovery:0.22, counterRadius:3.6,
     counterDamage:3.4, bruteMult:0.7, bossMult:0.3, bossCapFraction:0.06, counterStun:1.6},
-  shieldToss:{cooldown:4.0, speed:15, range:9.5, damage:1.6, stun:0.5,
+  shieldToss:{cooldown:4.0, speed:15, range:9.5, damage:1.6, stun:3.0,
     bruteMult:0.75, bossMult:0.35, hitCooldown:0.35},
   ultimate:{
     fieldRadius:29.4, markCap:0, columnsPerTick:0, tickInterval:0.32,
@@ -15532,6 +15534,11 @@ function knightRoyalCloneDepartureFx(origin,index){
   const color=index%2?KNIGHT_STEEL:KNIGHT_GOLD;
   spawnKnightGuardBurst(origin,1.45,color);
   knightShockRing(origin,1.25,color,.24);
+  if(knightRoyalCloneOptionalFx(index,2)&&knightFxBudget(1)){
+    const beam=new THREE.Mesh(new THREE.CylinderGeometry(.08,.32,2.8,12,1,true),knightMat(color,.18));
+    beam.position.set(origin.x,(origin.y||0)+1.4,origin.z);knightBaseOpacity(beam);
+    pushKnightFx(beam,{life:.34,grow:.28,from:.72,spin:index%2?-2.2:2.2});
+  }
   if(knightFxBudget(2)){
     const crown=new THREE.Group();
     const bar=new THREE.Mesh(new THREE.PlaneGeometry(.72,.11),knightMat(color,.68));crown.add(bar);
@@ -15559,7 +15566,7 @@ function knightClonePlayClip(c,words,fallback){
   }catch(e){}
 }
 function knightCloneMotionTrailFx(c,returning){
-  if(!c||!knightFxBudget(1))return;
+  if(!c||!knightRoyalCloneOptionalFx(c.userData.cloneIndex||0,returning?2:1)||!knightFxBudget(1))return;
   const color=(c.userData.cloneIndex||0)%2?KNIGHT_STEEL:KNIGHT_GOLD;
   const ring=new THREE.Mesh(
     new THREE.RingGeometry(.38,.68,24),
@@ -15571,6 +15578,42 @@ function knightCloneMotionTrailFx(c,returning){
   pushKnightFx(ring,{life:.24,grow:.70,from:.72,spin:returning?-4:4});
 }
 
+function knightRoyalCloneOptionalFx(index,importance=1){
+  // Ten clones can otherwise multiply every optional trail and burst. Keep all
+  // combat logic active while sampling only cosmetic extras at the highest tier.
+  const count=Math.max(1,knightRoyalClones.length||knightRoyalCloneConfig().count||1);
+  if(count<=5)return true;
+  const stride=importance>=2?2:3;
+  return ((index||0)+Math.floor(performance.now()/220))%stride===0;
+}
+function knightRoyalCloneFormationSlot(index,count,formationScale,rotation=0){
+  count=Math.max(1,count||1);
+  const twoRings=count>=8;
+  let ringIndex=0,ringCount=count,radius=3.15;
+  if(twoRings){
+    const inner=Math.ceil(count*.4);
+    if(index<inner){ringIndex=index;ringCount=inner;radius=2.75;}
+    else{ringIndex=index-inner;ringCount=count-inner;radius=4.35;}
+  }else if(count>=5){radius=3.65;}
+  else if(count<=2){radius=2.7;}
+  const phase=twoRings&&index>=Math.ceil(count*.4)?Math.PI/Math.max(1,ringCount):0;
+  const a=rotation+phase+(ringIndex/Math.max(1,ringCount))*Math.PI*2;
+  return {x:Math.cos(a)*radius*formationScale,z:Math.sin(a)*radius*formationScale,a};
+}
+function decorateKnightRoyalClone(wrap,index){
+  if(!wrap)return;
+  const color=index%2?KNIGHT_STEEL:KNIGHT_GOLD;
+  const aura=new THREE.Mesh(new THREE.RingGeometry(.34,.55,24),knightMat(color,.22));
+  aura.rotation.x=-Math.PI/2;aura.position.y=.035;aura.userData.isRoyalCloneDecoration=true;wrap.add(aura);
+  const crest=new THREE.Group();
+  const bar=new THREE.Mesh(new THREE.PlaneGeometry(.34,.055),knightMat(color,.62));crest.add(bar);
+  for(let i=0;i<3;i++){
+    const p=new THREE.Mesh(new THREE.ConeGeometry(.045,.16,5),knightMat(KNIGHT_IVORY,.70));
+    p.position.set((i-1)*.095,.085,0);crest.add(p);
+  }
+  crest.position.set(0,1.92,0);crest.userData.isRoyalCloneDecoration=true;wrap.add(crest);
+  wrap.userData.royalAura=aura;wrap.userData.royalCrest=crest;
+}
 function tintKnightRoyalClone(root,index){
   root.traverse(o=>{
     if(!o.isMesh||!o.material)return;
@@ -15621,7 +15664,7 @@ function knightCloneDamageBase(){
   return Math.max(1,Number(primary&&primary.damage)||1.35)*playerStats.power*.10;
 }
 function knightCloneStrikeFx(c,target,kind){
-  if(!c||!target||!knightFxBudget(2))return;
+  if(!c||!target||!knightRoyalCloneOptionalFx(c.userData.cloneIndex||0,2)||!knightFxBudget(2))return;
   const yaw=Math.atan2(target.position.x-c.position.x,target.position.z-c.position.z);
   const pos={x:c.position.x,y:c.position.y,z:c.position.z};
   if(kind==='defensive_whirlwind'){
@@ -15706,9 +15749,9 @@ function triggerKnightRoyalGuardClones(){
       const box=new THREEAsset.Box3().setFromObject(root),size=box.getSize(new THREEAsset.Vector3());
       root.scale.setScalar(1.48/Math.max(.001,size.y));
       const box2=new THREEAsset.Box3().setFromObject(root);root.position.y-=box2.min.y;
-      tintKnightRoyalClone(root,i);wrap.add(root);
-      const a=(i/cfg.count)*Math.PI*2,rr=(2+(i%3)*.45)*formationScale;
-      wrap.position.set(player.position.x+Math.cos(a)*rr,player.position.y,player.position.z+Math.sin(a)*rr);
+      tintKnightRoyalClone(root,i);wrap.add(root);decorateKnightRoyalClone(wrap,i);
+      const slot=knightRoyalCloneFormationSlot(i,cfg.count,formationScale,-Math.PI/2);
+      wrap.position.set(player.position.x+slot.x,player.position.y,player.position.z+slot.z);
       Object.assign(wrap.userData,{
         isKnightRoyalClone:true,invincible:true,hp:Infinity,maxHp:Infinity,dead:false,cloneIndex:i,life:cfg.duration,
         attackCooldown:.18+i*.06,moveIndex:i,unlockedMoves:knightCloneAvailableMoves(),farTimer:0,returning:false,
@@ -15716,10 +15759,10 @@ function triggerKnightRoyalGuardClones(){
       });
       for(const clip of gltf.animations)wrap.userData.kayClips[clip.name]=clip;
       scene.add(wrap);knightRoyalClones.push(wrap);
-      knightRoyalCloneArrivalFx(wrap.position,i);
+      if(knightRoyalCloneOptionalFx(i,2))knightRoyalCloneArrivalFx(wrap.position,i);
       const arrivalScale=Math.min(1.35,formationScale);
       spawnKnightGuardBurst(wrap.position,1.45*arrivalScale,i%2?KNIGHT_STEEL:KNIGHT_GOLD);
-      knightShockRing(wrap.position,1.15*arrivalScale,i%2?KNIGHT_STEEL:KNIGHT_GOLD,.22);
+      if(knightRoyalCloneOptionalFx(i,1))knightShockRing(wrap.position,1.15*arrivalScale,i%2?KNIGHT_STEEL:KNIGHT_GOLD,.22);
     },i*105);
   });
   toast('KNIGHTS · '+cfg.count+' CLONES');
@@ -15738,6 +15781,8 @@ function updateKnightRoyalClones(dt){
       removeKnightRoyalClone(c);continue;
     }
     if(c.userData.kayMixer)c.userData.kayMixer.update(dt);
+    if(c.userData.royalCrest){c.userData.royalCrest.rotation.y=-c.rotation.y;c.userData.royalCrest.position.y=1.92+Math.sin(now*3+(c.userData.cloneIndex||0))*.035;}
+    if(c.userData.royalAura)c.userData.royalAura.rotation.z=now*((c.userData.cloneIndex||0)%2?-0.7:0.7);
     c.userData.attackCooldown=Math.max(0,(c.userData.attackCooldown||0)-dt);
     c.userData.motionFxTimer=Math.max(0,(c.userData.motionFxTimer||0)-dt);
 
@@ -15758,15 +15803,17 @@ function updateKnightRoyalClones(dt){
 
     let desired;
     if(c.userData.returning){
-      const i=c.userData.cloneIndex||0,a=now*.28+(i/Math.max(1,knightRoyalClones.length))*Math.PI*2;
-      desired=new THREE.Vector3(player.position.x+Math.cos(a)*2.4*formationScale,player.position.y,player.position.z+Math.sin(a)*2.4*formationScale);
-      if(playerDist<4*formationScale){c.userData.returning=false;c.userData.farTimer=0;}
+      const i=c.userData.cloneIndex||0;
+      const slot=knightRoyalCloneFormationSlot(i,Math.max(1,knightRoyalClones.length),formationScale,now*.18);
+      desired=new THREE.Vector3(player.position.x+slot.x,player.position.y,player.position.z+slot.z);
+      if(playerDist<5.2*formationScale){c.userData.returning=false;c.userData.farTimer=0;}
     }else if(target){
       const toward=target.position.clone().sub(c.position);toward.y=0;const d=toward.length();
       if(d>1.8){toward.normalize();desired=c.position.clone().addScaledVector(toward,Math.min(3,d-1.45));desired.y=player.position.y;}
     }else{
-      const i=c.userData.cloneIndex||0,a=now*.34+(i/Math.max(1,knightRoyalClones.length))*Math.PI*2;
-      desired=new THREE.Vector3(player.position.x+Math.cos(a)*3.2*formationScale,player.position.y,player.position.z+Math.sin(a)*3.2*formationScale);
+      const i=c.userData.cloneIndex||0;
+      const slot=knightRoyalCloneFormationSlot(i,Math.max(1,knightRoyalClones.length),formationScale,now*.14);
+      desired=new THREE.Vector3(player.position.x+slot.x,player.position.y,player.position.z+slot.z);
     }
 
     if(desired){
