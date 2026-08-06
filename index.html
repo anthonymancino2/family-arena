@@ -1,3 +1,4 @@
+<!-- V22.13.97 Royal Onslaught Trail Removal + Freeze Guard: completely removes the Royal Onslaught ground dash-lane/trail geometry and its delayed cleanup path, then isolates each strike inside a runtime safety boundary so one visual or target-state failure cannot stop the entire gameplay update loop between strikes. Damage, capture window, bullet time, elimination behavior, cooldown scaling, and remaining impact visuals are unchanged. -->
 <!-- V22.13.96 Royal Onslaught Freeze Fix: replaces wall-clock capture/elapsed timing with gameplay-delta timing so pause truly freezes Royal Onslaught instead of letting it finish in the background, removes the per-sigil 16ms interval introduced in the visual flare pass, and caps the most expensive repeated sigil effects during long sequences. Damage, elimination rules, bullet time, cooldown scaling, camera behavior, and core visuals are unchanged. -->
 <!-- V22.13.95 Royal Onslaught Visual Flare: significantly upgrades Royal Onslaught presentation with a richer bullet-time veil, larger activation sigils, brighter multi-layer dash lanes, route-space flare shards, heavier endpoint impact columns, and a more spectacular crown finisher while preserving the verified damage rules, target capture/elimination behavior, cooldown scaling, and iPhone-safe caps. -->
 <!-- V22.13.94 Royal Onslaught Live Balance + Camera Verification: keeps every Onslaught dash endpoint inside the playable arena, caps long-sequence camera shake, accelerates boss-only continuation slightly after the minimum 20 hits, stabilizes the Knight at a safe readable final position near arena edges, reconfirms the elevated round-start camera reset, and preserves projectile visibility/performance during extended bullet time. Damage rules, capture window, elimination requirement, non-boss one-hit behavior, cooldown scaling, and invulnerability are unchanged. -->
@@ -1382,7 +1383,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.96 - Royal Onslaught Freeze Fix';
+const GAME_VERSION='22.13.97 - Royal Onslaught Trail Removal Freeze Guard';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -14827,52 +14828,6 @@ function triggerKnightAegisCounter(){
   toast('ROYAL ONSLAUGHT — BULLET TIME!');
   updateHoodedHud();
 }
-function knightRoyalOnslaughtDashFx(from,to,index){
-  if(!scene||!from||!to) return;
-  // Extended boss sequences can run well beyond 20 hits. Keep every hit and
-  // animation, but thin only optional lane geometry after hit 30 on mobile.
-  if(index>=30 && isMobile && index%2===1) return;
-  const visual=knightTitanVisualScale();
-  const a=new THREE.Vector3(from.x,.24*visual,from.z);
-  const b=new THREE.Vector3(to.x,.24*visual,to.z);
-  const dir=b.clone().sub(a), len=dir.length();
-  if(len<.2) return;
-  const laneLen=Math.min(len,18);
-  const mid=a.clone().add(b).multiplyScalar(.5);
-  const width=(.24+Math.min(index,24)*.028)*visual;
-  const mats=[
-    knightMat(index%2?KNIGHT_IVORY:KNIGHT_GOLD,.58),
-    knightMat(KNIGHT_STEEL,.76),
-    knightMat(KNIGHT_GOLD,.24)
-  ];
-  const lane=new THREE.Mesh(new THREE.PlaneGeometry(laneLen,width),mats[0]);
-  lane.rotation.x=-Math.PI/2;
-  lane.rotation.z=-Math.atan2(dir.z,dir.x);
-  lane.position.copy(mid);
-  scene.add(lane);
-  const edge=new THREE.Mesh(new THREE.PlaneGeometry(laneLen,Math.max(.08,width*.28)),mats[1]);
-  edge.rotation.copy(lane.rotation); edge.position.copy(mid); edge.position.y+=.012;
-  scene.add(edge);
-  const glow=new THREE.Mesh(new THREE.PlaneGeometry(laneLen,width*1.55),mats[2]);
-  glow.rotation.copy(lane.rotation); glow.position.copy(mid); glow.position.y+=.006;
-  scene.add(glow);
-  const shardCount=(isMobile&&index>25)?3:5;
-  const created=[];
-  for(let i=0;i<shardCount;i++){
-    const t=(i+1)/(shardCount+1);
-    const px=from.x+(to.x-from.x)*t;
-    const pz=from.z+(to.z-from.z)*t;
-    const shard=new THREE.Mesh(new THREE.PlaneGeometry(.22*visual,.9*visual),knightMat(i%2?KNIGHT_IVORY:KNIGHT_GOLD,.44));
-    shard.rotation.y=Math.atan2(dir.x,dir.z)+i*.2;
-    shard.position.set(px,.62*visual,pz);
-    scene.add(shard);
-    created.push(shard);
-  }
-  const ttl=Math.max(120,250-index*8);
-  setTimeout(()=>{
-    for(const m of [lane,edge,glow,...created]) if(m&&m.parent){scene.remove(m);disposeGroup(m);}
-  },ttl);
-}
 function knightRoyalOnslaughtCrownFinisherFx(center,visual,combat){
   const g=new THREE.Group();
   const crownRadius=3.2*combat;
@@ -15006,9 +14961,7 @@ function knightRoyalOnslaughtStrike(){
     player.position.x=safe.x;
     player.position.z=safe.z;
     hitIds.add(target.uuid);
-    const escalation=1+index*.13;
-    knightRoyalOnslaughtDashFx(startPos,player.position,index);
-    if(index<20 || index%3===0) knightRoyalOnslaughtSigilFx(startPos,0.9*knightTitanVisualScale(),180);
+    const escalation=1+Math.min(index,24)*.08;
     knightSwordTrail(player.position,yaw,index%3,1.35*knightTitanVisualScale()*escalation);
     spawnKnightGuardBurst(target.position,1.75*knightTitanVisualScale()*escalation,index%2?KNIGHT_IVORY:KNIGHT_GOLD);
     knightShockRing(target.position,2.2*knightTitanCombatScale()*Math.min(1.55,escalation),index%2?KNIGHT_STEEL:KNIGHT_GOLD,.22+index*.025);
@@ -15136,7 +15089,15 @@ function knightUpdateAegis(dt){
     // sequence and allow newly spawned enemies to join the eligible set.
     if((needsMinimum||needsElimination) && knightRuntime.royalOnslaughtStrikeTimer<=0){
       const before=knightRuntime.royalOnslaughtStrikeIndex||0;
-      knightRoyalOnslaughtStrike();
+      try{
+        knightRoyalOnslaughtStrike();
+      }catch(err){
+        // A single target or optional visual failure must never terminate the
+        // shared gameplay update loop. Advance safely and continue the move.
+        console.error('Royal Onslaught strike recovered:',err);
+        knightRuntime.royalOnslaughtStrikeIndex=before+1;
+        knightRuntime.royalOnslaughtTargetCursor=(knightRuntime.royalOnslaughtTargetCursor||0)+1;
+      }
       // If target selection ever returns nothing while captured survivors still
       // exist, immediately apply the verified completion strike path instead
       // of allowing bullet time to hang forever.
