@@ -1,3 +1,4 @@
+<!-- V22.13.99 Royal Onslaught Shadow Trail: adds lightweight avatar afterimage clones during Royal Onslaught dashes. Each dash now leaves several short-lived Knight shadow images at roughly 15% opacity between the start and end of the dash, creating a super-speed silhouette without restoring the removed ground trail. Gameplay, damage, cooldowns, capture rules, and version-label synchronization are unchanged. -->
 <!-- V22.13.98 Version Label Synchronization: synchronizes the static browser title and all visible landing-page/build labels to V22.13.98 using the centralized GAME_VERSION value. Gameplay, Royal Onslaught behavior, visuals, cooldowns, and balance are unchanged. -->
 <!-- V22.13.97 Royal Onslaught Trail Removal + Freeze Guard: completely removes the Royal Onslaught ground dash-lane/trail geometry and its delayed cleanup path, then isolates each strike inside a runtime safety boundary so one visual or target-state failure cannot stop the entire gameplay update loop between strikes. Damage, capture window, bullet time, elimination behavior, cooldown scaling, and remaining impact visuals are unchanged. -->
 <!-- V22.13.96 Royal Onslaught Freeze Fix: replaces wall-clock capture/elapsed timing with gameplay-delta timing so pause truly freezes Royal Onslaught instead of letting it finish in the background, removes the per-sigil 16ms interval introduced in the visual flare pass, and caps the most expensive repeated sigil effects during long sequences. Damage, elimination rules, bullet time, cooldown scaling, camera behavior, and core visuals are unchanged. -->
@@ -187,7 +188,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.98</title>
+<title>Family Arena V22.13.99</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1384,7 +1385,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.98 - Version Label Synchronization';
+const GAME_VERSION='22.13.99 - Royal Onslaught Shadow Trail';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -14729,6 +14730,54 @@ function knightRoyalOnslaughtImpactColumn(pos,scale=1,color=KNIGHT_GOLD,ttl=220)
   scene.add(g);
   setTimeout(()=>{ if(g.parent){scene.remove(g);disposeGroup(g);} },ttl);
 }
+
+function knightRoyalOnslaughtShadowTrail(from,to,yaw,count=4){
+  if(!scene||!player||!from||!to) return;
+  const shadowCount=Math.max(1,Math.min(5,count));
+  for(let i=0;i<shadowCount;i++){
+    const t=(i+1)/(shadowCount+1);
+    const ghost=player.clone(true);
+    ghost.traverse(obj=>{
+      if(!obj.isMesh) return;
+      if(obj.material){
+        const mats=Array.isArray(obj.material)?obj.material:[obj.material];
+        const cloned=mats.map(m=>{
+          const c=m&&m.clone?m.clone():m;
+          if(c){
+            c.transparent=true;
+            c.opacity=0.15;
+            if('depthWrite' in c) c.depthWrite=false;
+          }
+          return c;
+        });
+        obj.material=Array.isArray(obj.material)?cloned:cloned[0];
+      }
+      obj.castShadow=false;
+      obj.receiveShadow=false;
+    });
+    ghost.position.set(from.x+(to.x-from.x)*t, player.position.y, from.z+(to.z-from.z)*t);
+    ghost.rotation.copy(player.rotation);
+    ghost.rotation.y=yaw;
+    ghost.scale.copy(player.scale);
+    ghost.userData={shadowTrail:true};
+    scene.add(ghost);
+    const born=performance.now();
+    const ttl=110+i*30;
+    const fade=()=>{
+      if(!ghost.parent) return;
+      const p=(performance.now()-born)/ttl;
+      ghost.traverse(obj=>{
+        if(!obj.isMesh||!obj.material) return;
+        const mats=Array.isArray(obj.material)?obj.material:[obj.material];
+        for(const m of mats){ if(m&&m.opacity!==undefined) m.opacity=Math.max(0,0.15*(1-p)); }
+      });
+      if(p>=1){ if(ghost.parent){scene.remove(ghost);disposeGroup(ghost);} return; }
+      requestAnimationFrame(fade);
+    };
+    requestAnimationFrame(fade);
+  }
+}
+
 function knightRoyalOnslaughtActivationPulse(pos,color=KNIGHT_GOLD){
   if(!scene||!pos) return;
   knightShockRing(pos,7.0*knightTitanCombatScale(),color,.36);
@@ -14961,6 +15010,7 @@ function knightRoyalOnslaughtStrike(){
     const safe=knightRoyalOnslaughtSafePosition(desiredX,desiredZ,player.position.y);
     player.position.x=safe.x;
     player.position.z=safe.z;
+    knightRoyalOnslaughtShadowTrail(startPos,player.position,yaw,isMobile?3:4);
     hitIds.add(target.uuid);
     const escalation=1+Math.min(index,24)*.08;
     knightSwordTrail(player.position,yaw,index%3,1.35*knightTitanVisualScale()*escalation);
