@@ -1,3 +1,6 @@
+<!-- V22.13.90 Royal Onslaught Non-Boss One-Hit: every non-boss enemy struck by Royal Onslaught is now instantly defeated, whether hit as a designated endpoint, crossed during a ghost-pass route, reached by the completion sweep, or caught by the crown finisher. Bosses retain repeated controlled damage and remain the only enemies that can survive an Onslaught hit. The minimum-20 expanding elimination sequence, 3-second capture window, bullet time, cooldown scaling, camera angle, Guardian Titan restrictions, and Mage Primary routing are unchanged. -->
+<!-- V22.13.89 Royal Onslaught Elimination Sequence: Royal Onslaught now begins with a minimum 20 designated strikes, then automatically extends beyond 20 until every enemy captured at activation or spawned during the first 3 seconds has been eliminated. Route-contact enemies still take full strike damage without increasing the designated sequence count. The move waits for the 3-second capture window to close before finishing, and captured bosses can now be defeated through repeated Onslaught strikes instead of being trapped behind the former total-damage cap. Bullet time, cooldown scaling, round-based target skipping, invulnerability, camera angle, Guardian Titan restrictions, and Mage Primary routing remain unchanged. -->
+<!-- V22.13.88 Royal Onslaught Spawn Window + Round Camera Angle: Royal Onslaught now locks in every enemy present at activation plus every enemy created during the following 3 seconds. Eligible enemies are prioritized as endpoint targets and any eligible survivor not contacted during the 20-strike route receives one full completion-sweep strike before the crown finisher, guaranteeing map-wide coverage without increasing the designated 20-hit count. The default camera pitch now resets to a steeper third-person top-down angle at game/round load while remaining below bird's-eye. Bullet time, cooldown scaling, damage rules, boss caps, ghost-pass route damage, Guardian Titan restrictions, and Mage Primary routing remain unchanged. -->
 <!-- V22.13.87 Royal Onslaught Twenty-Hit Map Clear: expands Royal Onslaught from 6 to 20 designated strikes, adds round-scaled target skipping that reaches five skipped enemies between endpoint targets at Round 20, and damages every enemy crossed by each ghost-pass dash without counting route contacts toward the 20-strike sequence. Bullet time remains at 20% enemy/projectile speed. Cooldown now uses the same round-scaled curve as Judgment of the King, reaching zero at Round 45. Boss caps, invulnerability, Mage Primary routing, and Guardian Titan restrictions remain unchanged. -->
 <!-- V22.13.86 Royal Onslaught Bullet Time: while Royal Onslaught is active, every existing enemy and any enemy spawned during the sequence runs at 20% normal movement, attack, special-action, and animation speed. Existing and newly fired enemy projectiles also travel and animate at 20% speed, creating a Matrix-style bullet-time impression while the Knight's six-hit presentation remains readable. Duration, damage, invulnerability, boss caps, cooldown, targeting, and Mage Primary-slot routing are unchanged. -->
 <!-- V22.13.85 Royal Onslaught Spectacle Polish: upgrades the six-hit Knight ultimate with visible dash lanes, alternating sword/shield strike identities, escalating impact scale, improved unique-target selection, and a crown-shaped royal finisher. Optional effects are short-lived and capped for dense iPhone battles. Damage, invulnerability, six-strike count, boss cap, cooldown, Guardian Titan restrictions, and Mage Primary-slot routing are unchanged. -->
@@ -1371,7 +1374,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.87 - Royal Onslaught Twenty-Hit Map Clear';
+const GAME_VERSION='22.13.90 - Royal Onslaught Non-Boss One-Hit';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2397,7 +2400,7 @@ const LEVEL_UNLOCKS = [
   {level:8,  id:'knight_shield_toss', name:'Shield Toss', desc:'Throw and recall the royal shield from the Secondary slot, stunning every surviving enemy class for 3 seconds on contact.', avatar:'knight'},
   {level:10, id:'knight_royal_guard_clones', name:'Knights of the Round', desc:'Summon invincible Knight copies that inherit the moves unlocked so far and draw enemy attention.', avatar:'knight'},
   {level:12, id:'knight_guardian_quake', name:'Guardian Titan', desc:'Guardian Charge and Earth Shatter combine into one hold-controlled Titan Ability with movement steering, followed by a 15-second Titan form.', avatar:'knight'},
-  {level:14, id:'knight_aegis_counter', name:'Royal Onslaught', desc:'Enter royal bullet time and chain a 20-strike map-clearing assault through the enemy army.', avatar:'knight'},
+  {level:14, id:'knight_aegis_counter', name:'Royal Onslaught', desc:'Enter royal bullet time for at least 20 designated strikes, instantly defeating every non-boss enemy touched, then continue until every captured enemy is eliminated.', avatar:'knight'},
   {level:18, id:'knight_judgment', name:'Judgment of the King', desc:'Judgment becomes an equipable ultimate-tier move in the Ability slot.', avatar:'knight'}
 ];
 let reachedLevelUnlocks = new Set();
@@ -2505,7 +2508,7 @@ let runNoUltimateRounds = 0;
 let runPrimaryOnlyRounds = 0;
 let runRoundScoreBreakdown = [];
 let gameRunning = false;
-let camYaw = 0, camPitch = 0.35, camDist = 7;
+let camYaw = 0, camPitch = 0.56, camDist = 7;
 const fogBase = {near:20, far:55}; // theme's own fog, before zoom scaling
 let camMode = 3; // 1=POV, 2..8 = third-person pulling steadily back, 9 = bird's eye
 // Modes 2-4 keep their original framing exactly; 5-8 are the new
@@ -10020,6 +10023,12 @@ function spawnZombie(){
   addContactShadow(z, 0.45*spec.scale);
   scene.add(z);
   zombies.push(z);
+  // Royal Onslaught includes all enemies created during its first 3 seconds,
+  // even while their spawn warning is still resolving.
+  if(knightRuntime && knightRuntime.royalOnslaughtEligibleIds &&
+     performance.now() <= (knightRuntime.royalOnslaughtCaptureUntil||0)){
+    knightRuntime.royalOnslaughtEligibleIds.add(z.uuid);
+  }
   const warnMat=new THREE.MeshBasicMaterial({color:archetype==='brute'?0xff7a35:0xffd84a,transparent:true,opacity:.9,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
   const warn=new THREE.Mesh(new THREE.RingGeometry(.45,.85,28),warnMat);warn.rotation.x=-Math.PI/2;warn.position.set(z.position.x,.07,z.position.z);scene.add(warn);fx.push({kind:'spawnWarning',mesh:warn,life:.72,maxLife:.72,spin:7});
   setTimeout(()=>{
@@ -10096,6 +10105,10 @@ function startRound(){
   roundCompletionStartedAt = 0;
   roundTimerFrozenElapsed = null;
   clearZombies();
+  // Begin every map/round from a more readable elevated third-person angle.
+  // This is intentionally steeper than the old near-horizontal framing but
+  // remains well below the dedicated bird's-eye camera mode.
+  if(camMode!==1 && camMode!==BIRD_MODE) camPitch=0.56;
   applyTheme(round);
   // Rounds 1-3 add one zombie at a time (4, 5, 6). From round 4 on, the
   // target jumps by 10 every round — but see MAX_CONCURRENT_ZOMBIES
@@ -11064,7 +11077,7 @@ function setupControls(){
   document.getElementById('lookFwdBtn').addEventListener('touchstart', e=>{
     e.preventDefault();
     camYaw = player.rotation.y;
-    camPitch = 0.35;
+    camPitch = 0.56;
   });
   // Two dedicated buttons instead of one tap/hold button — each zoom
   // step fires immediately in its own direction, no waiting on a hold
@@ -14633,12 +14646,18 @@ function triggerKnightAegisCounter(){
   if(knightRuntime.aegisCooldown>0||knightRuntime.aegisWindow>0||knightRuntime.aegisRecovery>0) return;
   markUltimateUsed();
   knightRuntime.aegisCooldown=knightJudgmentCooldownForRound();
-  knightRuntime.aegisWindow=5.15;
+  knightRuntime.aegisWindow=9999;
   knightRuntime.aegisRecovery=0;
   knightRuntime.royalOnslaughtStrikeTimer=0;
   knightRuntime.royalOnslaughtStrikeIndex=0;
   knightRuntime.royalOnslaughtBossDamage=new Map();
   knightRuntime.royalOnslaughtHitIds=new Set();
+  knightRuntime.royalOnslaughtDamagedIds=new Set();
+  knightRuntime.royalOnslaughtStartedAt=performance.now();
+  knightRuntime.royalOnslaughtCaptureUntil=knightRuntime.royalOnslaughtStartedAt+3000;
+  knightRuntime.royalOnslaughtEligibleIds=new Set(
+    zombies.filter(z=>z&&!z.userData.dead).map(z=>z.uuid)
+  );
   knightRuntime.royalOnslaughtTargets=zombies
     .filter(z=>z&&!z.userData.dead&&!z.userData.spawnPending)
     .sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position));
@@ -14740,7 +14759,8 @@ function knightRoyalOnslaughtPathDamage(from,to,index,endpoint){
   }
 }
 function knightRoyalOnslaughtSelectTarget(){
-  const living=zombies.filter(z=>z&&!z.userData.dead&&!z.userData.spawnPending);
+  const eligible=knightRuntime.royalOnslaughtEligibleIds;
+  const living=zombies.filter(z=>z&&!z.userData.dead&&!z.userData.spawnPending&&(!eligible||eligible.has(z.uuid)));
   if(!living.length) return null;
   living.sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position));
   const skip=knightRoyalOnslaughtSkipCountForRound();
@@ -14752,15 +14772,21 @@ function knightRoyalOnslaughtSelectTarget(){
 }
 function knightRoyalOnslaughtDamage(target,index){
   if(!target||target.userData.dead) return;
+  if(knightRuntime.royalOnslaughtDamagedIds) knightRuntime.royalOnslaughtDamagedIds.add(target.uuid);
   const cls=knightEnemyClass(target);
   const maxHp=Math.max(1,target.userData.maxHp||target.userData.hp||1);
   let damage=(2.15+index*.18)*playerStats.power;
   if(cls==='boss'){
-    const cap=maxHp*.32;
+    // Bosses are the only enemy class allowed to survive an Onslaught hit.
+    // Keep each boss hit controlled, but do not impose a total cast cap that
+    // could make the elimination sequence impossible to finish.
+    damage=Math.max(damage*.45,maxHp*.065);
     const used=knightRuntime.royalOnslaughtBossDamage.get(target.uuid)||0;
-    damage=Math.min(maxHp*.065,Math.max(0,cap-used));
     knightRuntime.royalOnslaughtBossDamage.set(target.uuid,used+damage);
-  }else if(cls==='brute') damage*=.82;
+  }else{
+    // Every non-boss touched by any valid Onslaught strike is defeated in one hit.
+    damage=Math.max(damage,(target.userData.hp||maxHp)+maxHp+1);
+  }
   applyBulletDamage(target,damage);
   if(!target.userData.dead){
     target.userData.hitStun=Math.max(target.userData.hitStun||0,cls==='boss'?.55:(cls==='brute'?1.15:1.8));
@@ -14798,6 +14824,24 @@ function knightRoyalOnslaughtStrike(){
   knightRuntime.royalOnslaughtStrikeIndex=index+1;
   if(navigator.vibrate) navigator.vibrate(18);
 }
+function knightRoyalOnslaughtCompletionSweep(){
+  const eligible=knightRuntime.royalOnslaughtEligibleIds;
+  const damaged=knightRuntime.royalOnslaughtDamagedIds;
+  if(!eligible) return;
+  let visualCount=0;
+  for(const z of zombies){
+    if(!z||z.userData.dead||!eligible.has(z.uuid)||(damaged&&damaged.has(z.uuid))) continue;
+    // One normal Onslaught strike guarantees that every enemy captured in the
+    // activation + 3-second spawn window is attacked, without adding to the
+    // designated 20 endpoint-hit counter.
+    knightRoyalOnslaughtDamage(z,19);
+    if(visualCount<12){
+      spawnKnightGuardBurst(z.position,1.35*knightTitanVisualScale(),visualCount%2?KNIGHT_IVORY:KNIGHT_GOLD);
+      knightShockRing(z.position,1.55*knightTitanCombatScale(),KNIGHT_STEEL,.16);
+      visualCount++;
+    }
+  }
+}
 function knightRoyalOnslaughtFinish(){
   if(!player) return;
   const combat=knightTitanCombatScale(), visual=knightTitanVisualScale();
@@ -14815,10 +14859,12 @@ function knightRoyalOnslaughtFinish(){
     const cls=knightEnemyClass(z), maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
     let damage=3.4*playerStats.power;
     if(cls==='boss'){
-      const cap=maxHp*.32, used=knightRuntime.royalOnslaughtBossDamage.get(z.uuid)||0;
-      damage=Math.min(maxHp*.08,Math.max(0,cap-used));
+      damage=Math.max(damage*.45,maxHp*.08);
+      const used=knightRuntime.royalOnslaughtBossDamage.get(z.uuid)||0;
       knightRuntime.royalOnslaughtBossDamage.set(z.uuid,used+damage);
-    }else if(cls==='brute') damage*=.8;
+    }else{
+      damage=Math.max(damage,(z.userData.hp||maxHp)+maxHp+1);
+    }
     applyBulletDamage(z,damage);
     if(!z.userData.dead){
       z.userData.hitStun=Math.max(z.userData.hitStun||0,cls==='boss'?.65:(cls==='brute'?1.35:2.0));
@@ -14832,9 +14878,16 @@ function knightRoyalOnslaughtFinish(){
   triggerCombatShake(18,280);
   if(navigator.vibrate) navigator.vibrate([65,24,110]);
 }
+function knightRoyalOnslaughtLivingEligible(){
+  const eligible=knightRuntime.royalOnslaughtEligibleIds;
+  if(!eligible) return [];
+  return zombies.filter(z=>z&&!z.userData.dead&&eligible.has(z.uuid));
+}
+function knightRoyalOnslaughtCaptureClosed(){
+  return performance.now() >= (knightRuntime.royalOnslaughtCaptureUntil||0);
+}
 function knightUpdateAegis(dt){
   if(knightRuntime.aegisWindow>0){
-    knightRuntime.aegisWindow=Math.max(0,knightRuntime.aegisWindow-dt);
     if(knightRuntime.aegisRing){
       knightRuntime.aegisRing.position.set(player.position.x,.08,player.position.z);
       knightRuntime.aegisRing.rotation.y+=dt*3.8;
@@ -14842,11 +14895,24 @@ function knightUpdateAegis(dt){
       knightRuntime.aegisRing.scale.setScalar(pulse);
     }
     knightRuntime.royalOnslaughtStrikeTimer=(knightRuntime.royalOnslaughtStrikeTimer||0)-dt;
-    if((knightRuntime.royalOnslaughtStrikeIndex||0)<20 && knightRuntime.royalOnslaughtStrikeTimer<=0){
+    const strikeIndex=knightRuntime.royalOnslaughtStrikeIndex||0;
+    const captureClosed=knightRoyalOnslaughtCaptureClosed();
+    const livingEligible=knightRoyalOnslaughtLivingEligible();
+    const needsMinimum=strikeIndex<20;
+    const needsElimination=captureClosed&&livingEligible.length>0;
+
+    // Twenty strikes are the minimum, not the maximum. Once the capture
+    // window closes, keep selecting designated endpoints until no captured
+    // enemy remains alive. During the open window, continue the minimum
+    // sequence and allow newly spawned enemies to join the eligible set.
+    if((needsMinimum||needsElimination) && knightRuntime.royalOnslaughtStrikeTimer<=0){
       knightRoyalOnslaughtStrike();
       knightRuntime.royalOnslaughtStrikeTimer=.24;
     }
-    if(knightRuntime.aegisWindow<=0) knightEndAegis(true);
+
+    if(captureClosed && !needsMinimum && livingEligible.length===0){
+      knightEndAegis(true);
+    }
   }
   if(knightRuntime.aegisRecovery>0) knightRuntime.aegisRecovery=Math.max(0,knightRuntime.aegisRecovery-dt);
 }
@@ -14860,6 +14926,12 @@ function knightEndAegis(success){
   knightRuntime.royalOnslaughtTargets=[];
   if(knightRuntime.royalOnslaughtHitIds) knightRuntime.royalOnslaughtHitIds.clear();
   knightRuntime.royalOnslaughtHitIds=null;
+  if(knightRuntime.royalOnslaughtEligibleIds) knightRuntime.royalOnslaughtEligibleIds.clear();
+  knightRuntime.royalOnslaughtEligibleIds=null;
+  if(knightRuntime.royalOnslaughtDamagedIds) knightRuntime.royalOnslaughtDamagedIds.clear();
+  knightRuntime.royalOnslaughtDamagedIds=null;
+  knightRuntime.royalOnslaughtCaptureUntil=0;
+  knightRuntime.royalOnslaughtStartedAt=0;
   knightRuntime.royalOnslaughtStrikeIndex=0;
   knightRuntime.royalOnslaughtStrikeTimer=0;
   knightRuntime.royalOnslaughtTargetCursor=0;
@@ -20598,7 +20670,7 @@ function playerTakeHit(sourceType='normal'){
       spawnKnightGuardBurst(player.position,2.2,KNIGHT_GOLD);
       return;
     }
-    // Royal Onslaught grants invulnerability for its 20-strike bullet-time sequence.
+    // Royal Onslaught grants invulnerability for its minimum-20-hit elimination sequence.
     if(knightRuntime.aegisWindow>0){
       spawnKnightGuardBurst(player.position,2.0,KNIGHT_GOLD);
       return;
