@@ -1,3 +1,4 @@
+<!-- V22.14.00 Royal Onslaught Dash Attack + Afterimages: replaces the instant point-to-point teleport with a short visible dash phase followed by an endpoint attack phase. During each dash, skinned Knight afterimages appear at increasing opacity behind the player. Damage is applied only when the endpoint strike visibly lands, while route-contact damage still applies during the dash path. The removed ground trail remains permanently absent. -->
 <!-- V22.13.99 Royal Onslaught Shadow Trail: adds lightweight avatar afterimage clones during Royal Onslaught dashes. Each dash now leaves several short-lived Knight shadow images at roughly 15% opacity between the start and end of the dash, creating a super-speed silhouette without restoring the removed ground trail. Gameplay, damage, cooldowns, capture rules, and version-label synchronization are unchanged. -->
 <!-- V22.13.98 Version Label Synchronization: synchronizes the static browser title and all visible landing-page/build labels to V22.13.98 using the centralized GAME_VERSION value. Gameplay, Royal Onslaught behavior, visuals, cooldowns, and balance are unchanged. -->
 <!-- V22.13.97 Royal Onslaught Trail Removal + Freeze Guard: completely removes the Royal Onslaught ground dash-lane/trail geometry and its delayed cleanup path, then isolates each strike inside a runtime safety boundary so one visual or target-state failure cannot stop the entire gameplay update loop between strikes. Damage, capture window, bullet time, elimination behavior, cooldown scaling, and remaining impact visuals are unchanged. -->
@@ -188,7 +189,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.99</title>
+<title>Family Arena V22.14.00</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1385,7 +1386,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.99 - Royal Onslaught Shadow Trail';
+const GAME_VERSION='22.14.00 - Royal Onslaught Dash Attack Afterimages';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12095,6 +12096,7 @@ function createFreshKnightRuntime(){
     aegisCooldown:0, aegisWindow:0, aegisRecovery:0, aegisRing:null,
     royalOnslaughtStartedAt:0, royalOnslaughtCaptureUntil:0, royalOnslaughtElapsed:0, royalOnslaughtCaptureRemainingTime:0,
     royalOnslaughtStrikeIndex:0, royalOnslaughtStrikeTimer:0,
+    royalOnslaughtDash:null, royalOnslaughtCloneSkinned:null,
     royalOnslaughtTargetCursor:0, royalOnslaughtEligibleIds:null,
     royalOnslaughtHitIds:null, royalOnslaughtDamagedIds:null,
     royalOnslaughtBossDamage:null, royalOnslaughtTargets:[], royalOnslaughtOriginX:0, royalOnslaughtOriginZ:0,
@@ -14731,51 +14733,39 @@ function knightRoyalOnslaughtImpactColumn(pos,scale=1,color=KNIGHT_GOLD,ttl=220)
   setTimeout(()=>{ if(g.parent){scene.remove(g);disposeGroup(g);} },ttl);
 }
 
-function knightRoyalOnslaughtShadowTrail(from,to,yaw,count=4){
-  if(!scene||!player||!from||!to) return;
-  const shadowCount=Math.max(1,Math.min(5,count));
-  for(let i=0;i<shadowCount;i++){
-    const t=(i+1)/(shadowCount+1);
-    const ghost=player.clone(true);
-    ghost.traverse(obj=>{
-      if(!obj.isMesh) return;
-      if(obj.material){
-        const mats=Array.isArray(obj.material)?obj.material:[obj.material];
-        const cloned=mats.map(m=>{
-          const c=m&&m.clone?m.clone():m;
-          if(c){
-            c.transparent=true;
-            c.opacity=0.15;
-            if('depthWrite' in c) c.depthWrite=false;
-          }
-          return c;
-        });
-        obj.material=Array.isArray(obj.material)?cloned:cloned[0];
-      }
-      obj.castShadow=false;
-      obj.receiveShadow=false;
-    });
-    ghost.position.set(from.x+(to.x-from.x)*t, player.position.y, from.z+(to.z-from.z)*t);
-    ghost.rotation.copy(player.rotation);
-    ghost.rotation.y=yaw;
-    ghost.scale.copy(player.scale);
-    ghost.userData={shadowTrail:true};
-    scene.add(ghost);
-    const born=performance.now();
-    const ttl=110+i*30;
-    const fade=()=>{
-      if(!ghost.parent) return;
-      const p=(performance.now()-born)/ttl;
-      ghost.traverse(obj=>{
-        if(!obj.isMesh||!obj.material) return;
-        const mats=Array.isArray(obj.material)?obj.material:[obj.material];
-        for(const m of mats){ if(m&&m.opacity!==undefined) m.opacity=Math.max(0,0.15*(1-p)); }
+function knightRoyalOnslaughtSpawnAfterimage(pos,yaw,opacity=.15){
+  if(!scene||!player||!pos) return;
+  const cloneSkinned=knightRuntime.royalOnslaughtCloneSkinned;
+  const source=player.userData&&player.userData.kayRoot;
+  if(!cloneSkinned||!source) return;
+  let root;
+  try{ root=cloneSkinned(source); }catch(_){ return; }
+  const ghost=new THREE.Group();
+  ghost.add(root);
+  ghost.position.set(pos.x,player.position.y,pos.z);
+  ghost.rotation.y=yaw;
+  ghost.scale.copy(player.scale);
+  ghost.userData.shadowTrail=true;
+  root.traverse(obj=>{
+    if(!obj.isMesh) return;
+    if(obj.material){
+      const mats=Array.isArray(obj.material)?obj.material:[obj.material];
+      const cloned=mats.map(m=>{
+        const c=m&&m.clone?m.clone():m;
+        if(c){
+          c.transparent=true;
+          c.opacity=opacity;
+          if('depthWrite' in c) c.depthWrite=false;
+        }
+        return c;
       });
-      if(p>=1){ if(ghost.parent){scene.remove(ghost);disposeGroup(ghost);} return; }
-      requestAnimationFrame(fade);
-    };
-    requestAnimationFrame(fade);
-  }
+      obj.material=Array.isArray(obj.material)?cloned:cloned[0];
+    }
+    obj.castShadow=false;
+    obj.receiveShadow=false;
+  });
+  scene.add(ghost);
+  setTimeout(()=>{ if(ghost.parent){scene.remove(ghost);disposeGroup(ghost);} },190);
 }
 
 function knightRoyalOnslaughtActivationPulse(pos,color=KNIGHT_GOLD){
@@ -14829,6 +14819,12 @@ function triggerKnightAegisCounter(){
   if(!gameRunning||!knightIsActive()) return;
   if(knightRuntime.aegisCooldown>0||knightRuntime.aegisWindow>0||knightRuntime.aegisRecovery>0) return;
   markUltimateUsed();
+  // Reuse the already cached Knight asset's SkeletonUtils clone function so
+  // the afterimages are true posed avatar silhouettes rather than broken
+  // shallow clones of a skinned mesh.
+  getKayKitAssetPromise('knight').then(({cloneSkinned})=>{
+    if(knightRuntime.aegisWindow>0) knightRuntime.royalOnslaughtCloneSkinned=cloneSkinned;
+  }).catch(()=>{});
   knightRuntime.aegisCooldown=knightJudgmentCooldownForRound();
   knightRuntime.aegisWindow=9999;
   knightRuntime.aegisRecovery=0;
@@ -14994,43 +14990,87 @@ function knightRoyalOnslaughtStabilizeFinalPosition(){
   if(d>edgeLimit){safe.x=safe.x/d*edgeLimit;safe.z=safe.z/d*edgeLimit;}
   player.position.x=safe.x;player.position.z=safe.z;
 }
-function knightRoyalOnslaughtStrike(){
-  const index=knightRuntime.royalOnslaughtStrikeIndex||0;
-  let target=knightRoyalOnslaughtSelectTarget();
+function knightRoyalOnslaughtImpactStrike(dash){
+  if(!dash||!player) return;
+  const {target,index,yaw,startPos}=dash;
   const hitIds=knightRuntime.royalOnslaughtHitIds||(knightRuntime.royalOnslaughtHitIds=new Set());
-  if(target){
-    const startPos=player.position.clone();
-    const dx=target.position.x-player.position.x,dz=target.position.z-player.position.z;
-    const yaw=Math.atan2(dx,dz);
-    player.rotation.y=yaw;
-    const dist=Math.hypot(dx,dz)||1;
-    const stop=1.15*knightTitanCombatScale();
-    const desiredX=target.position.x-dx/dist*stop;
-    const desiredZ=target.position.z-dz/dist*stop;
-    const safe=knightRoyalOnslaughtSafePosition(desiredX,desiredZ,player.position.y);
-    player.position.x=safe.x;
-    player.position.z=safe.z;
-    knightRoyalOnslaughtShadowTrail(startPos,player.position,yaw,isMobile?3:4);
+  const escalation=1+Math.min(index,24)*.08;
+  if(target&&!target.userData.dead){
     hitIds.add(target.uuid);
-    const escalation=1+Math.min(index,24)*.08;
-    knightSwordTrail(player.position,yaw,index%3,1.35*knightTitanVisualScale()*escalation);
-    spawnKnightGuardBurst(target.position,1.75*knightTitanVisualScale()*escalation,index%2?KNIGHT_IVORY:KNIGHT_GOLD);
-    knightShockRing(target.position,2.2*knightTitanCombatScale()*Math.min(1.55,escalation),index%2?KNIGHT_STEEL:KNIGHT_GOLD,.22+index*.025);
-    knightRoyalOnslaughtImpactColumn(target.position,1.05*knightTitanVisualScale()*Math.min(1.7,escalation),index%2?KNIGHT_IVORY:KNIGHT_GOLD,210);
-    spawnBurst(target.position.x,target.position.y+.8,target.position.z,Math.min(30,16+Math.floor(index*.8)),FX_MAT_SPARK,4.8+index*.2);
-    knightRoyalOnslaughtPathDamage(startPos,player.position,index,target);
+    // The attack animation happens at the destination, after the dash is
+    // visible, so Royal Onslaught reads as dash -> strike instead of teleport.
+    knightPlayClip(index%2?['melee','chop']:['melee','slash'],index%2?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal',.24,.12);
+    knightSwordTrail(player.position,yaw,index%3,1.55*knightTitanVisualScale()*escalation);
+    spawnKnightGuardBurst(target.position,1.9*knightTitanVisualScale()*escalation,index%2?KNIGHT_IVORY:KNIGHT_GOLD);
+    knightShockRing(target.position,2.35*knightTitanCombatScale()*Math.min(1.55,escalation),index%2?KNIGHT_STEEL:KNIGHT_GOLD,.24+index*.022);
+    knightRoyalOnslaughtImpactColumn(target.position,1.12*knightTitanVisualScale()*Math.min(1.7,escalation),index%2?KNIGHT_IVORY:KNIGHT_GOLD,230);
+    spawnBurst(target.position.x,target.position.y+.8,target.position.z,Math.min(30,18+Math.floor(index*.7)),FX_MAT_SPARK,5.0+index*.18);
     knightRoyalOnslaughtDamage(target,index);
     if(target.userData.dead) knightRoyalOnslaughtClearMarker(target);
     const endpointCrown=new THREE.Mesh(new THREE.ConeGeometry(.22*knightTitanVisualScale(),.72*knightTitanVisualScale(),5),knightMat(KNIGHT_GOLD,.82));
     endpointCrown.position.set(target.position.x,target.position.y+1.65*knightTitanVisualScale(),target.position.z);
     endpointCrown.rotation.z=Math.PI;scene.add(endpointCrown);
     setTimeout(()=>{if(endpointCrown.parent){scene.remove(endpointCrown);disposeGroup(endpointCrown);}},180);
-    knightPlayClip(index%2?['melee','chop']:['melee','slash'],index%2?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal',.16,.10);
-    triggerCombatShake(Math.min(14,9+index*.22),Math.min(115,92+index*.7));
+    triggerCombatShake(Math.min(14,9+index*.20),Math.min(120,96+index*.6));
   }
   knightRuntime.royalOnslaughtStrikeIndex=index+1;
+  const survivors=knightRoyalOnslaughtLivingEligible();
+  const bossOnly=(knightRuntime.royalOnslaughtStrikeIndex||0)>=20&&survivors.length>0&&survivors.every(z=>knightEnemyClass(z)==='boss');
+  knightRuntime.royalOnslaughtStrikeTimer=bossOnly?.13:.17;
   if(navigator.vibrate) navigator.vibrate(18);
 }
+function knightRoyalOnslaughtStrike(){
+  if(knightRuntime.royalOnslaughtDash) return;
+  const index=knightRuntime.royalOnslaughtStrikeIndex||0;
+  const target=knightRoyalOnslaughtSelectTarget();
+  if(!target){
+    knightRuntime.royalOnslaughtStrikeIndex=index+1;
+    knightRuntime.royalOnslaughtStrikeTimer=.10;
+    return;
+  }
+  const startPos=player.position.clone();
+  const dx=target.position.x-player.position.x,dz=target.position.z-player.position.z;
+  const yaw=Math.atan2(dx,dz);
+  player.rotation.y=yaw;
+  const dist=Math.hypot(dx,dz)||1;
+  const stop=1.15*knightTitanCombatScale();
+  const desiredX=target.position.x-dx/dist*stop;
+  const desiredZ=target.position.z-dz/dist*stop;
+  const safe=knightRoyalOnslaughtSafePosition(desiredX,desiredZ,player.position.y);
+  knightRuntime.royalOnslaughtDash={
+    target,index,yaw,startPos,
+    fromX:startPos.x,fromZ:startPos.z,toX:safe.x,toZ:safe.z,
+    elapsed:0,duration:.14,nextEcho:0
+  };
+  // Start with a committed attack-ready pose while the body dashes in.
+  knightPlayClip(['melee','slash'],'1H_Melee_Attack_Slice_Horizontal',.20,.10);
+}
+function knightRoyalOnslaughtUpdateDash(dt){
+  const d=knightRuntime.royalOnslaughtDash;
+  if(!d||!player) return false;
+  d.elapsed+=dt;
+  const raw=Math.min(1,d.elapsed/d.duration);
+  const p=1-Math.pow(1-raw,2.4);
+  player.position.x=d.fromX+(d.toX-d.fromX)*p;
+  player.position.z=d.fromZ+(d.toZ-d.fromZ)*p;
+  player.rotation.y=d.yaw;
+  const thresholds=[.18,.42,.68,.86];
+  const opacities=[.15,.22,.30,.40];
+  while(d.nextEcho<thresholds.length&&raw>=thresholds[d.nextEcho]){
+    knightRoyalOnslaughtSpawnAfterimage(player.position,d.yaw,opacities[d.nextEcho]);
+    d.nextEcho++;
+  }
+  if(raw>=1){
+    // Route-contact enemies take their normal Onslaught hit along the path,
+    // but only the endpoint strike advances the designated sequence.
+    knightRoyalOnslaughtPathDamage(d.startPos,player.position,d.index,d.target);
+    knightRuntime.royalOnslaughtDash=null;
+    knightRoyalOnslaughtImpactStrike(d);
+    return false;
+  }
+  return true;
+}
+
 function knightRoyalOnslaughtCompletionSweep(){
   const eligible=knightRuntime.royalOnslaughtEligibleIds;
   const damaged=knightRuntime.royalOnslaughtDamagedIds;
@@ -15127,44 +15167,29 @@ function knightUpdateAegis(dt){
       const pulse=1+Math.sin(performance.now()*.015)*.10;
       knightRuntime.aegisRing.scale.setScalar(pulse);
     }
-    knightRuntime.royalOnslaughtStrikeTimer=(knightRuntime.royalOnslaughtStrikeTimer||0)-dt;
-    const strikeIndex=knightRuntime.royalOnslaughtStrikeIndex||0;
-    const captureClosed=knightRoyalOnslaughtCaptureClosed();
-    const livingEligible=knightRoyalOnslaughtLivingEligible();
-    const needsMinimum=strikeIndex<20;
-    const needsElimination=captureClosed&&livingEligible.length>0;
-
-    // Twenty strikes are the minimum, not the maximum. Once the capture
-    // window closes, keep selecting designated endpoints until no captured
-    // enemy remains alive. During the open window, continue the minimum
-    // sequence and allow newly spawned enemies to join the eligible set.
-    if((needsMinimum||needsElimination) && knightRuntime.royalOnslaughtStrikeTimer<=0){
-      const before=knightRuntime.royalOnslaughtStrikeIndex||0;
-      try{
-        knightRoyalOnslaughtStrike();
-      }catch(err){
-        // A single target or optional visual failure must never terminate the
-        // shared gameplay update loop. Advance safely and continue the move.
-        console.error('Royal Onslaught strike recovered:',err);
-        knightRuntime.royalOnslaughtStrikeIndex=before+1;
-        knightRuntime.royalOnslaughtTargetCursor=(knightRuntime.royalOnslaughtTargetCursor||0)+1;
-      }
-      // If target selection ever returns nothing while captured survivors still
-      // exist, immediately apply the verified completion strike path instead
-      // of allowing bullet time to hang forever.
-      if(captureClosed && livingEligible.length>0 && (knightRuntime.royalOnslaughtStrikeIndex||0)===before+1){
-        const still=knightRoyalOnslaughtLivingEligible();
-        if(still.length && !still.some(z=>!z.userData.spawnPending)){
-          for(const z of still) z.userData.spawnPending=false;
+    const dashing=knightRoyalOnslaughtUpdateDash(dt);
+    if(!dashing){
+      knightRuntime.royalOnslaughtStrikeTimer=(knightRuntime.royalOnslaughtStrikeTimer||0)-dt;
+      const strikeIndex=knightRuntime.royalOnslaughtStrikeIndex||0;
+      const captureClosed=knightRoyalOnslaughtCaptureClosed();
+      const livingEligible=knightRoyalOnslaughtLivingEligible();
+      const needsMinimum=strikeIndex<20;
+      const needsElimination=captureClosed&&livingEligible.length>0;
+      if((needsMinimum||needsElimination)&&knightRuntime.royalOnslaughtStrikeTimer<=0&&!knightRuntime.royalOnslaughtDash){
+        try{ knightRoyalOnslaughtStrike(); }
+        catch(err){
+          console.error('Royal Onslaught strike recovered:',err);
+          knightRuntime.royalOnslaughtDash=null;
+          knightRuntime.royalOnslaughtStrikeIndex=strikeIndex+1;
+          knightRuntime.royalOnslaughtTargetCursor=(knightRuntime.royalOnslaughtTargetCursor||0)+1;
+          knightRuntime.royalOnslaughtStrikeTimer=.10;
         }
       }
-      const survivorsNow=knightRoyalOnslaughtLivingEligible();
-      const bossOnlyAfterMinimum=(knightRuntime.royalOnslaughtStrikeIndex||0)>=20 && survivorsNow.length>0 && survivorsNow.every(z=>knightEnemyClass(z)==='boss');
-      knightRuntime.royalOnslaughtStrikeTimer=bossOnlyAfterMinimum?.18:.24;
-    }
-
-    if(captureClosed && !needsMinimum && livingEligible.length===0){
-      knightEndAegis(true);
+      const afterStrikeIndex=knightRuntime.royalOnslaughtStrikeIndex||0;
+      const afterLiving=knightRoyalOnslaughtLivingEligible();
+      if(captureClosed&&afterStrikeIndex>=20&&afterLiving.length===0&&!knightRuntime.royalOnslaughtDash){
+        knightEndAegis(true);
+      }
     }
   }
   if(knightRuntime.aegisRecovery>0) knightRuntime.aegisRecovery=Math.max(0,knightRuntime.aegisRecovery-dt);
@@ -15194,6 +15219,8 @@ function knightEndAegis(success){
   knightRuntime.royalOnslaughtElapsed=0;
   knightRuntime.royalOnslaughtStrikeIndex=0;
   knightRuntime.royalOnslaughtStrikeTimer=0;
+  knightRuntime.royalOnslaughtDash=null;
+  knightRuntime.royalOnslaughtCloneSkinned=null;
   knightRuntime.royalOnslaughtTargetCursor=0;
   knightRuntime.royalOnslaughtOriginX=0;
   knightRuntime.royalOnslaughtOriginZ=0;
