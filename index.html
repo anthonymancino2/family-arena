@@ -1,3 +1,5 @@
+<!-- V22.13.79 Shield Toss Final Polish: strengthens the shield-first launch read, adds a cleaner directional departure flare, gives bosses and Brutes unmistakable localized stun feedback, refines the return wake, and upgrades the guarded catch with a compact royal lock-in burst. Damage, full universal stun, range, ricochet, cooldown, boss caps, Titan scaling, collision, and return timing are unchanged. -->
+<!-- V22.13.78 Guardian Titan Reset Guard: centralizes Guardian Titan shutdown so round transitions, death/reset, avatar changes, and new runs always restore normal player scale, helper-effect scale, Titan hit/impact tracking, charge/shatter sequence state, input ownership, and normal camera-fog presentation. Natural Titan expiration still starts the approved tiered cooldown; forced cleanup never carries a stale pending cooldown into the next state. Also updates the HUD abbreviation to G. TITAN. Combat balance and visuals are unchanged. -->
 <!-- V22.13.77 Guardian Titan Camera Cap: renames Guardian Quake to Guardian Titan in visible Knight unlock/loadout text and caps the automatic third-person Titan pullback so starting from zoom tiers 7-8 it stays between the normal wide views and bird's-eye instead of jumping excessively far away. Charge/Earth Shatter behavior, Titan size, 5x damage, 15-second duration, defense, Primary/Secondary access, cooldown timing, boss caps, and Shield Toss universal stun are unchanged. -->
 <!-- V22.13.76 Guardian Titan Readability Performance Guard: caps rapid Titan knockback-impact effect groups during dense multi-enemy hits, suppresses optional Titan footsteps when the shared Knight effect budget is already crowded, and keeps launch feedback localized so Primary, Shield Toss, and Defensive Whirlwind remain readable on iPhone. Damage, hitboxes, reach, stun, knockback force, Titan duration, defense, camera, cooldowns, and allowed combat slots are unchanged. -->
 <!-- V22.13.75 Guardian Titan Primary Secondary Consistency: verifies the Knight attacks intentionally allowed during the 15-second Titan buff. Royal Sword Combo and Royal Vanguard effects now sit at giant body/weapon height, Shield Bash movement and shield-face presentation scale with Titan reach, and impact sparks align with enlarged contact points. Shield Toss and Defensive Whirlwind retain their existing Titan-scaled range, collision, radius, and visuals. No signature or ultimate move is enabled during Titan mode; damage, boss caps, cooldowns, defense, and duration are unchanged. -->
@@ -166,7 +168,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.76</title>
+<title>Family Arena V22.13.79</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1361,7 +1363,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.77 - Guardian Titan Camera Cap';
+const GAME_VERSION='22.13.79 - Shield Toss Final Polish';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -13213,12 +13215,57 @@ function knightShieldTossHitFx(z,returning,heavy){
   );
 }
 
+function knightShieldTossStunFx(z,cls,duration){
+  if(!z||cls==='normal'||!knightFxBudget(2)) return;
+  const g=new THREE.Group();
+  const isBoss=cls==='boss';
+  const y=isBoss?2.65:2.15;
+
+  // A compact, unmistakable stun crown that stays over the struck target.
+  const crown=new THREE.Mesh(
+    new THREE.RingGeometry(isBoss?.34:.27,isBoss?.62:.49,28),
+    knightMat(KNIGHT_GOLD,isBoss?.86:.72)
+  );
+  crown.rotation.x=-Math.PI/2;
+  crown.position.y=y;
+  g.add(crown);
+
+  const inner=new THREE.Mesh(
+    new THREE.RingGeometry(isBoss?.14:.11,isBoss?.31:.24,24),
+    knightMat(KNIGHT_IVORY,.88)
+  );
+  inner.rotation.x=-Math.PI/2;
+  inner.position.y=y+.03;
+  g.add(inner);
+
+  const bars=isBoss?6:4;
+  for(let i=0;i<bars;i++){
+    const a=i/bars*Math.PI*2;
+    const bar=new THREE.Mesh(
+      new THREE.BoxGeometry(isBoss?.11:.09,isBoss?.36:.28,.055),
+      knightMat(i%2?KNIGHT_STEEL:KNIGHT_GOLD,.82)
+    );
+    bar.position.set(Math.cos(a)*(isBoss?.48:.38),y+.16,Math.sin(a)*(isBoss?.48:.38));
+    bar.rotation.z=-a;
+    g.add(bar);
+  }
+
+  g.position.set(z.position.x,z.position.y,z.position.z);
+  knightBaseOpacity(g);
+  pushKnightFx(g,{
+    life:Math.min(.72,Math.max(.42,(duration||.4)*.32)),
+    grow:isBoss?.28:.20,
+    from:.72,
+    spin:isBoss?7.4:6.0
+  });
+}
+
 function knightShieldTossReturnTrailFx(t){
   if(!t||!t.mesh||!knightFxBudget(2)) return;
   const g=new THREE.Group();
 
   const wake=new THREE.Mesh(
-    new THREE.PlaneGeometry(.72,1.9),
+    new THREE.PlaneGeometry(.78,2.15),
     knightMat(KNIGHT_IVORY,.34)
   );
   wake.rotation.x=-Math.PI/2;
@@ -13226,7 +13273,7 @@ function knightShieldTossReturnTrailFx(t){
   g.add(wake);
 
   const arc=new THREE.Mesh(
-    new THREE.RingGeometry(.48,.78,28,1,-1.1,2.2),
+    new THREE.RingGeometry(.46,.84,30,1,-1.08,2.16),
     knightMat(KNIGHT_GOLD,.48)
   );
   arc.rotation.x=-Math.PI/2;
@@ -13236,7 +13283,7 @@ function knightShieldTossReturnTrailFx(t){
   g.position.copy(t.mesh.position);
   g.rotation.y=Math.atan2(t.dirX||0,t.dirZ||1);
   knightBaseOpacity(g);
-  pushKnightFx(g,{life:.22,grow:.28,from:.88,spin:-5.5});
+  pushKnightFx(g,{life:.24,grow:.32,from:.86,spin:-5.8});
 }
 
 function knightShieldTossTrailFx(t){
@@ -13321,6 +13368,7 @@ function knightShieldToss(w){
   knightRuntime.resistTimer=Math.max(knightRuntime.resistTimer||0,.16);
   spawnKnightGuardBurst(player.position,1.85*titanVisual,KNIGHT_GOLD);
   knightShockRing(player.position,1.55*titanVisual,KNIGHT_IVORY,.22);
+  knightRuntime.frontGuardTimer=Math.max(knightRuntime.frontGuardTimer||0,.32);
   if(knightFxBudget(2)){
     const launch=new THREE.Group();
     const crown=new THREE.Mesh(new THREE.RingGeometry(.34,.74,28),knightMat(KNIGHT_GOLD,.72));
@@ -13329,6 +13377,11 @@ function knightShieldToss(w){
       const ray=new THREE.Mesh(new THREE.PlaneGeometry(.08,1.1),knightMat(i%2?KNIGHT_IVORY:KNIGHT_STEEL,.54));
       ray.rotation.x=-Math.PI/2; ray.rotation.z=i*Math.PI/2; launch.add(ray);
     }
+    const arrow=new THREE.Mesh(new THREE.RingGeometry(.20,.58,24,1,-.72,1.44),knightMat(KNIGHT_IVORY,.74));
+    arrow.rotation.x=-Math.PI/2;
+    arrow.rotation.z=-yaw;
+    arrow.position.set(Math.sin(yaw)*.52,.07,Math.cos(yaw)*.52);
+    launch.add(arrow);
     launch.position.set(player.position.x,player.position.y+.10,player.position.z);
     knightBaseOpacity(launch);
     pushKnightFx(launch,{life:.34,grow:.92,from:.70,spin:5.6});
@@ -13423,13 +13476,24 @@ function knightUpdateShieldToss(dt){
     }
 
     if(l<tossCatchRadius){
-      spawnKnightGuardBurst(player.position,1.85,KNIGHT_GOLD);
-      knightShockRing(player.position,1.48,KNIGHT_IVORY,.22);
-      knightShockRing(player.position,1.08,KNIGHT_GOLD,.18);
+      spawnKnightGuardBurst(player.position,1.85*tossVisual,KNIGHT_GOLD);
+      knightShockRing(player.position,1.48*tossVisual,KNIGHT_IVORY,.22);
+      knightShockRing(player.position,1.08*tossVisual,KNIGHT_GOLD,.18);
+      if(knightFxBudget(2)){
+        const lock=new THREE.Group();
+        const seal=new THREE.Mesh(new THREE.RingGeometry(.24,.62,28),knightMat(KNIGHT_GOLD,.78));
+        seal.rotation.x=-Math.PI/2; lock.add(seal);
+        const core=new THREE.Mesh(new THREE.RingGeometry(.10,.28,22),knightMat(KNIGHT_IVORY,.88));
+        core.rotation.x=-Math.PI/2; core.position.y=.02; lock.add(core);
+        lock.position.set(player.position.x,player.position.y+.12*tossVisual,player.position.z);
+        lock.scale.setScalar(tossVisual);
+        knightBaseOpacity(lock);
+        pushKnightFx(lock,{life:.30,grow:.52,from:.68,spin:8.2});
+      }
       knightPlayClip(['shield'],'1H_Melee_Attack_Chop',.15,.12);
-      knightRuntime.frontGuardTimer=Math.max(knightRuntime.frontGuardTimer||0,.30);
+      knightRuntime.frontGuardTimer=Math.max(knightRuntime.frontGuardTimer||0,.36);
       knightRuntime.resistTimer=Math.max(knightRuntime.resistTimer||0,.30);
-      triggerCombatShake(6,95);
+      triggerCombatShake(7,105);
       knightEndShieldToss(true);
       return;
     }
@@ -13455,6 +13519,7 @@ function knightUpdateShieldToss(dt){
     const cls=knightEnemyClass(z);
     const heavy=cls!=='normal';
     knightShieldTossHitFx(z,t.returning,heavy);
+    knightShieldTossStunFx(z,cls,c.stun);
 
     // Heavy targets visibly disturb the shield's rotation, then it recovers.
     if(heavy){
@@ -14248,6 +14313,46 @@ function knightSyncAvatarScale(){
   if(player.userData.locator) player.userData.locator.scale.setScalar(inverse);
   if(player.userData.contactShadow) player.userData.contactShadow.scale.setScalar(inverse);
 }
+function knightRestoreGuardianTitanPresentation(){
+  // Forced cleanup can happen while gameplay is paused or between screens,
+  // before the normal camera update runs again. Restore all inherited player
+  // presentation immediately so no giant scale, helper scale, or Titan fog
+  // survives into the next round/avatar/run.
+  knightSyncAvatarScale();
+  if(scene&&scene.fog){
+    const normalReach=camMode===BIRD_MODE?46:(CAM_DISTS[camMode]||0);
+    const fs=Math.min(8.0,1+Math.max(0,normalReach-9.5)*0.072);
+    scene.fog.near=fogBase.near*fs;
+    scene.fog.far=fogBase.far*fs;
+  }
+}
+function knightResetGuardianTitanState(applyCooldown=false){
+  const wasActive=!!(knightRuntime.guardianQuakeSequence||knightRuntime.guardianQuakeCombo||
+    knightRuntime.guardianGiantBuffTimer>0||knightRuntime.chargeTimer>0||knightRuntime.shatterPhase>0);
+  const pending=knightRuntime.guardianGiantCooldownPending||knightGuardianQuakeCooldownDuration();
+  knightRuntime.guardianQuakeCombo=false;
+  knightRuntime.guardianQuakeFollowup=false;
+  knightRuntime.guardianQuakeSequence=false;
+  knightRuntime.guardianGiantBuffTimer=0;
+  knightRuntime.guardianGiantDamagePool=0;
+  knightRuntime.guardianGiantCooldownPending=0;
+  knightRuntime.chargeTimer=0;
+  knightRuntime.chargeHits=null;
+  knightRuntime.chargeFxTimer=0;
+  knightRuntime.chargeStartBlend=0;
+  knightRuntime.shatterPhase=0;
+  knightRuntime.shatterTimer=0;
+  knightRuntime.guardianTitanStepTimer=0;
+  knightRuntime.guardianTitanLastX=null;
+  knightRuntime.guardianTitanLastZ=null;
+  knightRuntime.guardianTitanImpactWindowStart=0;
+  knightRuntime.guardianTitanImpactCount=0;
+  if(applyCooldown&&wasActive){
+    knightRuntime.chargeCooldown=Math.max(knightRuntime.chargeCooldown||0,pending);
+    knightRuntime.shatterCooldown=Math.max(knightRuntime.shatterCooldown||0,pending);
+  }
+  knightRestoreGuardianTitanPresentation();
+}
 function knightStartGuardianGiantBuff(){
   knightRuntime.guardianQuakeCombo=false;
   knightRuntime.guardianQuakeSequence=false;
@@ -14259,16 +14364,7 @@ function knightStartGuardianGiantBuff(){
   updateHoodedHud();
 }
 function knightEndGuardianGiantBuff(applyCooldown=true){
-  knightRuntime.guardianGiantBuffTimer=0;
-  knightRuntime.guardianGiantDamagePool=0;
-  knightRuntime.guardianQuakeSequence=false;
-  if(applyCooldown){
-    const cd=knightRuntime.guardianGiantCooldownPending||knightGuardianQuakeCooldownDuration();
-    knightRuntime.chargeCooldown=Math.max(knightRuntime.chargeCooldown||0,cd);
-    knightRuntime.shatterCooldown=Math.max(knightRuntime.shatterCooldown||0,cd);
-  }
-  knightRuntime.guardianGiantCooldownPending=0;
-  knightSyncAvatarScale();
+  knightResetGuardianTitanState(applyCooldown);
   updateHoodedHud();
 }
 function updateKnightGuardianGiant(dt){
@@ -15777,14 +15873,7 @@ function clearKnightRoundSpecials(resetCooldowns=true){
   knightRuntime.whirlwindTimer=0;
   knightRuntime.whirlwindPulse=0;
   knightRuntime.whirlwindSource=null;
-  knightRuntime.shatterPhase=0;
-  knightRuntime.shatterTimer=0;
-  knightRuntime.chargeTimer=0;
-  knightRuntime.chargeHits=null;
-  knightRuntime.guardianQuakeSequence=false;
-  knightRuntime.guardianGiantBuffTimer=0;
-  knightRuntime.guardianGiantCooldownPending=0;
-  knightRuntime.guardianGiantDamagePool=0;
+  knightResetGuardianTitanState(false);
   knightRuntime.hitStop=0;
   knightRuntime.bufferedAttack=0;
   knightRuntime.comboStep=0;
@@ -15833,7 +15922,7 @@ function knightAbilityCooldownInfo(){
 
     case 'knight_guardian_quake':
       return {
-        label:knightRuntime.shatterPhase>0?'SHATTER':(knightRuntime.guardianGiantBuffTimer>0?'TITAN':'G. QUAKE'),
+        label:knightRuntime.shatterPhase>0?'SHATTER':(knightRuntime.guardianGiantBuffTimer>0?'TITAN':'G. TITAN'),
         cd:Math.max(knightRuntime.chargeCooldown||0,knightRuntime.shatterCooldown||0),
         active:knightRuntime.chargeTimer>0||knightRuntime.shatterPhase>0||knightRuntime.guardianGiantBuffTimer>0,
         activeTime:knightRuntime.guardianGiantBuffTimer>0
