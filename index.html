@@ -1,3 +1,10 @@
+<!-- V22.13.77 Guardian Titan Camera Cap: renames Guardian Quake to Guardian Titan in visible Knight unlock/loadout text and caps the automatic third-person Titan pullback so starting from zoom tiers 7-8 it stays between the normal wide views and bird's-eye instead of jumping excessively far away. Charge/Earth Shatter behavior, Titan size, 5x damage, 15-second duration, defense, Primary/Secondary access, cooldown timing, boss caps, and Shield Toss universal stun are unchanged. -->
+<!-- V22.13.76 Guardian Titan Readability Performance Guard: caps rapid Titan knockback-impact effect groups during dense multi-enemy hits, suppresses optional Titan footsteps when the shared Knight effect budget is already crowded, and keeps launch feedback localized so Primary, Shield Toss, and Defensive Whirlwind remain readable on iPhone. Damage, hitboxes, reach, stun, knockback force, Titan duration, defense, camera, cooldowns, and allowed combat slots are unchanged. -->
+<!-- V22.13.75 Guardian Titan Primary Secondary Consistency: verifies the Knight attacks intentionally allowed during the 15-second Titan buff. Royal Sword Combo and Royal Vanguard effects now sit at giant body/weapon height, Shield Bash movement and shield-face presentation scale with Titan reach, and impact sparks align with enlarged contact points. Shield Toss and Defensive Whirlwind retain their existing Titan-scaled range, collision, radius, and visuals. No signature or ultimate move is enabled during Titan mode; damage, boss caps, cooldowns, defense, and duration are unchanged. -->
+<!-- V22.13.74 Guardian Titan Combat Slots: Guardian Quake remains the only special move active during its charge, Earth Shatter, and 15-second Titan state. Primary and Secondary attacks remain fully usable during the post-quake Titan buff with existing Titan reach, visuals, 5x damage, and knockback scaling. Other equipped Knight Abilities and the Knights of the Round signature summon cannot be newly activated until Titan mode ends; specials already active before Guardian Quake are not forcibly cancelled. -->
+<!-- V22.13.73 Guardian Titan Summon Consistency: verifies Knights of the Round and Judgment of the King during Guardian Quake Titan mode. Royal clones remain normal-sized but now summon and orbit outside the 5x Knight body with Titan-aware formation spacing, return distance, and capped arrival effects. Judgment remains arena-centered, movement-safe, and compatible before, during, or after Titan mode without changing damage, boss caps, cooldowns, duration, camera, or Titan state. -->
+<!-- V22.13.72 Guardian Titan Aegis Consistency: completes the next Titan full-moveset verification increment for Aegis Counter. The guard timing field, block flash, counter slash, shock rings, radial hit area, impact sparks, and feedback now scale with the approved Titan combat/visual limits while boss damage caps and all counter balance remain unchanged. Also removes the stale Auto/Manual wording from Guardian Quake progression text. -->
+<!-- V22.13.71 Guardian Quake Manual Steering: removes the separate AUTO/MANUAL toggle from the gameplay HUD. Guardian Charge now always uses the player's movement steering while held. Guardian Quake timing, Titan size, damage, defense, cooldown behavior, camera/fog safeguards, boss caps, impact polish, and Shield Toss universal stun are unchanged. -->
 <!-- V22.13.70 Guardian Titan Impact Polish: Titan-mode Knight hits now add scale-matched ground shock rings, directional launch streaks, compact dust/debris, and movement-weight footsteps. Effects are capped and localized for iPhone performance and gameplay visibility. Size, damage, duration, defense, cooldown timing, camera/fog behavior, boss caps, knockback rules, and Shield Toss universal stun are unchanged. -->
 <!-- V22.13.69 Shield Toss Universal Stun: Shield Toss now applies its full stun duration to every enemy class, including Brutes and bosses. Damage, boss damage resistance/caps, knockback resistance, flight path, return behavior, cooldown, Titan scaling, and visuals are unchanged. -->
 <!-- V22.13.68 Guardian Titan Knockback: when Guardian Quake leaves the Knight in giant Titan mode, attacks now launch much smaller enemies backward with a heavy visible knockback. Titan-sized hits strongly punt normal enemies and still push brutes, while bosses remain resistant. The giant-size, defense, camera, and full-moveset behavior are unchanged. -->
@@ -159,7 +166,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.70</title>
+<title>Family Arena V22.13.76</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1102,35 +1109,6 @@
   }
 
 
-  .abilityModeBtn{
-    position:absolute;
-    right:calc(108px + env(safe-area-inset-right));
-    bottom:calc(116px + env(safe-area-inset-bottom));
-    z-index:24;
-    min-width:58px;
-    height:34px;
-    padding:0 9px;
-    border-radius:12px;
-    border:2px solid rgba(159,223,255,.85);
-    background:rgba(8,18,29,.88);
-    color:#9fdfff;
-    font-size:9px;
-    font-weight:900;
-    letter-spacing:.04em;
-    pointer-events:auto;
-    touch-action:manipulation;
-  }
-  .abilityModeBtn.manual{
-    color:#ffd35a;
-    border-color:rgba(255,211,90,.9);
-  }
-  .abilityModeBtn.hidden{display:none!important;}
-  @media (orientation:landscape) and (max-height:500px){
-    .abilityModeBtn{
-      right:calc(112px + env(safe-area-inset-right));
-      bottom:calc(88px + env(safe-area-inset-bottom));
-    }
-  }
 
 </style>
 </head>
@@ -1286,7 +1264,6 @@
         </div>
         <div class="dashBtn" id="dashBtn">DASH</div>
         <div class="abilityBtn hidden" id="abilityBtn">ABILITY</div>
-        <button class="abilityModeBtn hidden" id="abilityModeBtn" type="button">AUTO</button>
         <div class="laserBtn hidden" id="laserBtn" style="--charge:100%">LASER</div>
         <div class="ultimateBtn hidden" id="ultimateBtn" style="--charge:0%">ECLIPSE</div>
         <div class="soulMeter" id="soulMeter">SOULS 0/25</div>
@@ -1384,7 +1361,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.70 - Guardian Titan Impact Polish';
+const GAME_VERSION='22.13.77 - Guardian Titan Camera Cap';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2405,7 +2382,7 @@ const LEVEL_UNLOCKS = [
   {level:6,  id:'knight_defensive_whirlwind', name:'Defensive Whirlwind', desc:'The controlled sword-and-shield rotation becomes equipable in the Secondary slot.', avatar:'knight'},
   {level:8,  id:'knight_shield_toss', name:'Shield Toss', desc:'Throw and recall the royal shield from the Secondary slot.', avatar:'knight'},
   {level:10, id:'knight_royal_guard_clones', name:'Knights of the Round', desc:'Summon invincible Knight copies that inherit the moves unlocked so far and draw enemy attention.', avatar:'knight'},
-  {level:12, id:'knight_guardian_quake', name:'Guardian Quake', desc:'Guardian Charge and Earth Shatter combine into one hold-controlled Ability with Auto and Manual steering.', avatar:'knight'},
+  {level:12, id:'knight_guardian_quake', name:'Guardian Titan', desc:'Guardian Charge and Earth Shatter combine into one hold-controlled Titan Ability with movement steering, followed by a 15-second Titan form.', avatar:'knight'},
   {level:14, id:'knight_aegis_counter', name:'Aegis Counter', desc:'The signature guard-and-counter becomes equipable in the Ability slot.', avatar:'knight'},
   {level:18, id:'knight_judgment', name:'Judgment of the King', desc:'Judgment becomes an equipable ultimate-tier move in the Ability slot.', avatar:'knight'}
 ];
@@ -2704,8 +2681,8 @@ const SKYFALL_BARRAGE = {id:'skyfall_barrage', name:'Skyfall Barrage', price:780
   desc:'Ultimate-tier damage. For 7 seconds, giant translucent arrows rain onto enemy clusters with clear landing markers and strong area damage. Boss damage is capped at 25% per cast. Uses a 25-second cooldown.'};
 const KNIGHT_DEFENSIVE_WHIRLWIND = {id:'knight_whirlwind', name:'Defensive Whirlwind', price:420, avatar:'knight', unlockLevel:6,
   desc:'A controlled sword-and-shield rotation for 3.8 seconds. You can still move slowly, weak enemy projectiles are deflected, and enemies are pushed outward with repeated moderate damage before you settle into a guard stance. 14-second cooldown.'};
-const KNIGHT_GUARDIAN_QUAKE = {id:'knight_guardian_quake', name:'Guardian Quake', price:760, avatar:'knight', unlockLevel:12,
-  desc:'Hold the Ability button to begin Guardian Charge and automatically flow into Earth Shatter when the charge finishes. Releasing before the charge ends cancels the Earth Shatter follow-up. AUTO mode steers toward the nearest living enemy; MANUAL mode uses normal movement controls. If a future charge duration becomes infinite, it is capped at 20 seconds. 16-second cooldown.'};
+const KNIGHT_GUARDIAN_QUAKE = {id:'knight_guardian_quake', name:'Guardian Titan', price:760, avatar:'knight', unlockLevel:12,
+  desc:'Hold the Ability button to begin Guardian Charge and automatically flow into Earth Shatter when the charge finishes. Releasing before the charge ends cancels the Earth Shatter follow-up. Steer the charge with the normal movement controls. After the sequence, the Knight remains in Titan form for 15 seconds. Cooldown begins after Titan mode ends and scales with the current round tier.'};
 const KNIGHT_AEGIS_COUNTER = {id:'knight_aegis_counter', name:'Aegis Counter', price:780, avatar:'knight', unlockLevel:14,
   desc:'The signature counter. Enter a brief guard window with a clear timing ring; if you are struck the hit is negated and you immediately release a heavy sword-and-shield counterattack that scales by enemy type with a boss cap. A failed guard always ends safely. 11-second cooldown.'};
 const KNIGHT_ROYAL_GUARD_CLONES = {id:'knight_royal_guard_clones', name:'Knights of the Round', price:0, avatar:'knight', unlockLevel:10,
@@ -11084,18 +11061,6 @@ function setupControls(){
   }, {passive:false});
   const dashBtnEl=document.getElementById('dashBtn');
   dashBtnEl.addEventListener('touchstart',e=>{e.preventDefault();doDash();});
-  const abilityModeBtnEl=document.getElementById('abilityModeBtn');
-  if(abilityModeBtnEl){
-    const toggleGuardianMode=e=>{
-      e.preventDefault();
-      e.stopPropagation();
-      knightGuardianQuakeMode=knightGuardianQuakeMode==='auto'?'manual':'auto';
-      abilityModeBtnEl.textContent=knightGuardianQuakeMode.toUpperCase();
-      abilityModeBtnEl.classList.toggle('manual',knightGuardianQuakeMode==='manual');
-    };
-    abilityModeBtnEl.addEventListener('click',toggleGuardianMode,{passive:false});
-    abilityModeBtnEl.addEventListener('touchstart',toggleGuardianMode,{passive:false});
-  }
   const abilityBtnEl=document.getElementById('abilityBtn');
   let equippedAbilityHoldInterval=null;
   const activateEquippedAbilityNow=()=>{
@@ -11139,7 +11104,16 @@ function setupControls(){
   const ultimateBtnEl=document.getElementById('ultimateBtn');
   const activateUltimate=e=>{
     if(e){ e.preventDefault(); e.stopPropagation(); }
-    if(state.avatarType==='mage') triggerArcaneEchoes(); else if(state.avatarType==='rogue') triggerArcherMirrorClones(); else if(state.avatarType==='knight') triggerKnightRoyalGuardClones(); else if(state.avatarType==='barbarian') triggerPrimalRage(); else if(state.avatarType==='hooded') triggerShadowEclipse();
+    if(state.avatarType==='mage') triggerArcaneEchoes();
+    else if(state.avatarType==='rogue') triggerArcherMirrorClones();
+    else if(state.avatarType==='knight'){
+      // Guardian Quake is the active special during its sequence and Titan state.
+      // Keep normal Primary/Secondary combat available, but prevent chaining the
+      // separate Knights of the Round signature until Titan mode is over.
+      if(knightGuardianGiantActive()) return;
+      triggerKnightRoyalGuardClones();
+    }else if(state.avatarType==='barbarian') triggerPrimalRage();
+    else if(state.avatarType==='hooded') triggerShadowEclipse();
   };
   if(window.PointerEvent) ultimateBtnEl.addEventListener('pointerdown',activateUltimate,{passive:false});
   else ultimateBtnEl.addEventListener('touchstart',activateUltimate,{passive:false});
@@ -11818,13 +11792,6 @@ function updateHoodedHud(){
       }
     }
   }
-  const abilityModeBtn=document.getElementById('abilityModeBtn');
-  if(abilityModeBtn){
-    const showMode=equippedAbilityId==='knight_guardian_quake';
-    abilityModeBtn.classList.toggle('hidden',!showMode);
-    abilityModeBtn.textContent=knightGuardianQuakeMode.toUpperCase();
-    abilityModeBtn.classList.toggle('manual',knightGuardianQuakeMode==='manual');
-  }
   const obsoleteLaserBtn=document.getElementById('laserBtn');
   if(obsoleteLaserBtn) obsoleteLaserBtn.classList.add('hidden');
 }
@@ -12054,7 +12021,7 @@ function createFreshKnightRuntime(){
     shatterCooldown:0, shatterPhase:0, shatterTimer:0, shatterBaseY:0,
     chargeCooldown:0, chargeTimer:0, chargeYaw:0, chargeHits:null,
     guardianQuakeSequence:false, guardianGiantBuffTimer:0, guardianGiantCooldownPending:0, guardianGiantDamagePool:0,
-    guardianTitanStepTimer:0, guardianTitanLastX:null, guardianTitanLastZ:null,
+    guardianTitanStepTimer:0, guardianTitanLastX:null, guardianTitanLastZ:null, guardianTitanImpactWindowStart:0, guardianTitanImpactCount:0,
     aegisCooldown:0, aegisWindow:0, aegisRecovery:0, aegisRing:null,
     shieldTossCooldown:0, shieldToss:null, shieldAway:false,
     resistTimer:0, frontGuardTimer:0,
@@ -12064,7 +12031,6 @@ function createFreshKnightRuntime(){
 }
 let knightRuntime = createFreshKnightRuntime();
 let knightGuardianQuakeHeld=false;
-let knightGuardianQuakeMode='auto';
 let knightRoyalClones=[];
 let knightRoyalCloneCooldown=0;
 let knightRoyalCloneCycleDuration=0;
@@ -12522,6 +12488,17 @@ function knightGroundCracks(origin,radius,count=6,color=KNIGHT_STEEL){
 
 function knightTitanImpactFx(z,cls,force,fromX,fromZ){
   if(!knightGuardianGiantActive()||!z||cls==='boss'||!knightFxBudget(5)) return;
+  // Dense Titan swings can launch many enemies in the same instant. Preserve
+  // strong feedback on the first contacts while preventing stacked rings,
+  // streaks and debris from obscuring the battlefield or spiking mobile load.
+  const now=(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
+  if(!knightRuntime.guardianTitanImpactWindowStart||now-knightRuntime.guardianTitanImpactWindowStart>240){
+    knightRuntime.guardianTitanImpactWindowStart=now;
+    knightRuntime.guardianTitanImpactCount=0;
+  }
+  const impactCap=cls==='brute'?4:6;
+  if((knightRuntime.guardianTitanImpactCount||0)>=impactCap) return;
+  knightRuntime.guardianTitanImpactCount=(knightRuntime.guardianTitanImpactCount||0)+1;
   const x=z.position.x,zp=z.position.z;
   const dx=x-fromX,dz=zp-fromZ,len=Math.hypot(dx,dz)||1;
   const nx=dx/len,nz=dz/len;
@@ -12560,7 +12537,7 @@ function knightTitanImpactFx(z,cls,force,fromX,fromZ){
 }
 
 function knightTitanFootstepFx(){
-  if(!player||!knightGuardianGiantActive()||!knightFxBudget(3)) return;
+  if(!player||!knightGuardianGiantActive()||!knightFxBudget(3)||fx.length>KNIGHT_CFG.fxCap*.72) return;
   const p=player.position;
   const radius=2.25;
   const g=new THREE.Group();
@@ -12716,7 +12693,7 @@ function knightRoyalCombo(w){
     knightAddDiscipline();
     spawnBurst(
       pos.x+fx1*(step===2?1.62:1.18)*titanCombat,
-      pos.y+1.02,
+      pos.y+1.02*titanVisual,
       pos.z+fz1*(step===2?1.62:1.18)*titanCombat,
       step===2?20:12,
       FX_MAT_SPARK,
@@ -12757,6 +12734,7 @@ function knightGuardedThrust(w){
   const fx=Math.sin(yaw),fz=Math.cos(yaw);
   const pos={x:player.position.x,y:player.position.y,z:player.position.z};
   const range=w.range||4.4;
+  const titanVisual=knightTitanVisualScale();
 
   // Brief guarded anticipation, then a sharp committed release.
   knightPlayClip(['melee','attack'],'1H_Melee_Attack_Stab',.20,.16);
@@ -12766,18 +12744,18 @@ function knightGuardedThrust(w){
     const guard=new THREE.Group();
 
     const shieldArc=new THREE.Mesh(
-      new THREE.RingGeometry(.42,.92,26,1,-1.15,2.3),
+      new THREE.RingGeometry(.42*titanVisual,.92*titanVisual,26,1,-1.15,2.3),
       knightMat(KNIGHT_STEEL,.62)
     );
-    shieldArc.position.set(0,1.0,.5);
+    shieldArc.position.set(0,1.0*titanVisual,.5*titanVisual);
     shieldArc.rotation.y=yaw;
     guard.add(shieldArc);
 
     const center=new THREE.Mesh(
-      new THREE.CircleGeometry(.34,22),
+      new THREE.CircleGeometry(.34*titanVisual,22),
       knightMat(KNIGHT_GOLD,.72)
     );
-    center.position.set(0,1.0,.54);
+    center.position.set(0,1.0*titanVisual,.54*titanVisual);
     center.rotation.y=yaw;
     guard.add(center);
 
@@ -12791,34 +12769,34 @@ function knightGuardedThrust(w){
     const g=new THREE.Group();
 
     const core=new THREE.Mesh(
-      new THREE.PlaneGeometry(.24,range*1.04),
+      new THREE.PlaneGeometry(.24*titanVisual,range*1.04),
       knightMat(KNIGHT_IVORY,.96)
     );
     core.rotation.x=-Math.PI/2;
-    core.position.set(0,.96,range*.5);
+    core.position.set(0,.96*titanVisual,range*.5);
     g.add(core);
 
     const mid=new THREE.Mesh(
-      new THREE.PlaneGeometry(.66,range*.98),
+      new THREE.PlaneGeometry(.66*titanVisual,range*.98),
       knightMat(KNIGHT_GOLD,.50)
     );
     mid.rotation.x=-Math.PI/2;
-    mid.position.set(0,.94,range*.47);
+    mid.position.set(0,.94*titanVisual,range*.47);
     g.add(mid);
 
     const aura=new THREE.Mesh(
-      new THREE.PlaneGeometry(1.28,range*.88),
+      new THREE.PlaneGeometry(1.28*titanVisual,range*.88),
       knightMat(KNIGHT_STEEL,.20)
     );
     aura.rotation.x=-Math.PI/2;
-    aura.position.set(0,.92,range*.42);
+    aura.position.set(0,.92*titanVisual,range*.42);
     g.add(aura);
 
     const tip=new THREE.Mesh(
-      new THREE.CircleGeometry(.42,24),
+      new THREE.CircleGeometry(.42*titanVisual,24),
       knightMat(KNIGHT_IVORY,.9)
     );
-    tip.position.set(0,.98,range*.92);
+    tip.position.set(0,.98*titanVisual,range*.92);
     tip.rotation.x=-Math.PI/2;
     g.add(tip);
 
@@ -12844,7 +12822,7 @@ function knightGuardedThrust(w){
     knightAddDiscipline();
     spawnBurst(
       pos.x+fx*range*.76,
-      pos.y+1.0,
+      pos.y+1.0*titanVisual,
       pos.z+fz*range*.76,
       14,
       FX_MAT_SPARK,
@@ -12876,6 +12854,7 @@ function knightCleavingGuard(w){
   const pos={x:player.position.x,y:player.position.y,z:player.position.z};
   const radius=w.radius||3.2;
   const arc=w.arc||3.0;
+  const titanVisual=knightTitanVisualScale();
 
   // Faster anticipation with a controlled shield-forward recovery.
   knightPlayClip(['melee','slash'],'1H_Melee_Attack_Slice_Horizontal',.19,.15);
@@ -12910,7 +12889,7 @@ function knightCleavingGuard(w){
     guardArc.position.y=.05;
     g.add(guardArc);
 
-    g.position.set(pos.x,pos.y+.32,pos.z);
+    g.position.set(pos.x,pos.y+.32*titanVisual,pos.z);
     knightBaseOpacity(g);
     pushKnightFx(g,{life:.38,grow:.46,from:.88,spin:3.8});
   }
@@ -12934,7 +12913,7 @@ function knightCleavingGuard(w){
     const fx=Math.sin(yaw),fz=Math.cos(yaw);
     spawnBurst(
       pos.x+fx*1.2,
-      pos.y+1.0,
+      pos.y+1.0*titanVisual,
       pos.z+fz*1.2,
       16,
       FX_MAT_SPARK,
@@ -12966,7 +12945,7 @@ function knightCleavingGuard(w){
 
   // Shield remains between the Knight and the crowd during recovery.
   knightRuntime.resistTimer=Math.max(knightRuntime.resistTimer,.46);
-  spawnKnightGuardBurst(player.position,2.05,KNIGHT_STEEL);
+  spawnKnightGuardBurst(player.position,2.05*titanVisual,KNIGHT_STEEL);
 
   // Small planted pivot instead of a forward slide.
   const side=.10;
@@ -12984,22 +12963,25 @@ function knightShieldBash(w){
   knightAutoFace(6);
   const yaw=player.rotation.y;
   const fx=Math.sin(yaw),fz=Math.cos(yaw);
+  const titanCombat=knightTitanCombatScale();
+  const titanVisual=knightTitanVisualScale();
+  const lungeScale=Math.min(2.2,titanCombat);
 
   // Faster, more controlled anticipation and recovery.
   knightPlayClip(['shield'],'1H_Melee_Attack_Chop',.18,.14);
 
   // Two-stage disciplined lunge: quick set, then shield-first commitment.
   const first=resolveCollision(
-    player.position.x+fx*.38,
-    player.position.z+fz*.38,
+    player.position.x+fx*.38*lungeScale,
+    player.position.z+fz*.38*lungeScale,
     player.position.y
   );
   player.position.x=first.x;
   player.position.z=first.z;
 
   const second=resolveCollision(
-    player.position.x+fx*.92,
-    player.position.z+fz*.92,
+    player.position.x+fx*.92*lungeScale,
+    player.position.z+fz*.92*lungeScale,
     player.position.y
   );
   player.position.x=second.x;
@@ -13042,6 +13024,7 @@ function knightShieldBash(w){
 
     g.position.set(pos.x,pos.y,pos.z);
     g.rotation.y=yaw;
+    g.scale.setScalar(titanVisual);
     knightBaseOpacity(g);
     pushKnightFx(g,{life:.32,grow:.62,from:.76});
   }
@@ -13062,8 +13045,8 @@ function knightShieldBash(w){
   // Localized metal sparks and ground dust at the shield face.
   spawnBurst(
     pos.x+fx*1.0,
-    pos.y+1.0,
-    pos.z+fz*1.0,
+    pos.y+1.0*titanVisual,
+    pos.z+fz*1.0*titanCombat,
     hits?18:10,
     FX_MAT_SPARK,
     hits?4.8:3.0
@@ -14234,6 +14217,13 @@ function knightGuardianGiantActive(){
 function knightGuardianGiantHitRadius(){
   return knightGuardianGiantActive()?KNIGHT_CFG.guardianQuakeGiant.hitboxRadius:0;
 }
+function knightTitanCameraThirdPersonDistance(baseDist){
+  // Titan mode should pull back enough to keep the 5x Knight readable, but
+  // if the player was already on the widest standard zoom tiers (7-8) it
+  // must stay clearly short of a bird's-eye jump.
+  const widened=Math.max(22, Math.max(baseDist + 8, baseDist * 1.7));
+  return Math.min(42, widened);
+}
 function knightTitanCombatScale(){
   // Gameplay reach grows with the five-times-larger Titan body without
   // turning every attack into a full-map wipe.
@@ -14300,6 +14290,8 @@ function updateKnightGuardianGiant(dt){
     knightRuntime.guardianTitanStepTimer=0;
     knightRuntime.guardianTitanLastX=null;
     knightRuntime.guardianTitanLastZ=null;
+    knightRuntime.guardianTitanImpactWindowStart=0;
+    knightRuntime.guardianTitanImpactCount=0;
   }
   knightSyncAvatarScale();
 }
@@ -14364,25 +14356,7 @@ function knightUpdateGuardianCharge(dt){
   knightRuntime.chargeTimer-=dt;
   knightRuntime.frontGuardTimer=Math.max(knightRuntime.frontGuardTimer,0.1);
 
-  if(knightRuntime.guardianQuakeCombo&&knightGuardianQuakeMode==='auto'){
-    let target=null;
-    let best=Infinity;
-    for(const z of zombies){
-      if(!z||!z.userData||z.userData.dead||z.userData.spawnPending||!z.parent) continue;
-      const d=player.position.distanceToSquared(z.position);
-      if(d<best){best=d;target=z;}
-    }
-    if(target){
-      const desired=Math.atan2(
-        target.position.x-player.position.x,
-        target.position.z-player.position.z
-      );
-      let diff=((desired-knightRuntime.chargeYaw+Math.PI)%(Math.PI*2))-Math.PI;
-      if(diff<-Math.PI) diff+=Math.PI*2;
-      const maxTurn=c.steerRate*2.4*dt;
-      knightRuntime.chargeYaw+=Math.max(-maxTurn,Math.min(maxTurn,diff));
-    }
-  }else if(typeof moveVec!=='undefined'&&(moveVec.x||moveVec.y)){
+  if(typeof moveVec!=='undefined'&&(moveVec.x||moveVec.y)){
     const desired=Math.atan2(
       Math.sin(camYaw)*(-moveVec.y)-Math.cos(camYaw)*moveVec.x,
       Math.cos(camYaw)*(-moveVec.y)+Math.sin(camYaw)*moveVec.x
@@ -14532,6 +14506,7 @@ function triggerKnightAegisCounter(){
   if(!gameRunning||!knightIsActive()) return;
   if(knightRuntime.aegisCooldown>0||knightRuntime.aegisWindow>0||knightRuntime.aegisRecovery>0) return;
   const c=KNIGHT_CFG.aegis;
+  const titanVisual=knightTitanVisualScale();
   markUltimateUsed();
   knightRuntime.aegisCooldown=c.cooldown;
   knightRuntime.aegisWindow=c.window;
@@ -14567,13 +14542,14 @@ function triggerKnightAegisCounter(){
     }
 
     g.position.set(player.position.x,.12,player.position.z);
+    g.scale.setScalar(titanVisual);
     knightBaseOpacity(g);
     g.userData.baseOpacity=1;
     knightRuntime.aegisRing=g;
     scene.add(g);
   }
 
-  spawnKnightGuardBurst(player.position,1.65,KNIGHT_STEEL);
+  spawnKnightGuardBurst(player.position,1.65*titanVisual,KNIGHT_STEEL);
   if(navigator.vibrate) navigator.vibrate(12);
 }
 function knightUpdateAegis(dt){
@@ -14585,7 +14561,7 @@ function knightUpdateAegis(dt){
       // Clear visual timing ring: it closes in as the window runs out.
       const p=knightRuntime.aegisWindow/c.window;
       ring.position.set(player.position.x,.12,player.position.z);
-      ring.scale.setScalar(0.48+p*.92);
+      ring.scale.setScalar(knightTitanVisualScale()*(0.48+p*.92));
       ring.rotation.y+=dt*2.8;
       ring.traverse(o=>{
         if(o.material&&'opacity' in o.material){
@@ -14610,6 +14586,9 @@ function knightEndAegis(success){
   knightRuntime.aegisRecovery=success?KNIGHT_CFG.aegis.recovery:0.12;
   if(!success||!player) return;
   const c=KNIGHT_CFG.aegis;
+  const titanCombat=knightTitanCombatScale();
+  const titanVisual=knightTitanVisualScale();
+  const counterRadius=c.counterRadius*titanCombat;
   const pos={x:player.position.x,y:player.position.y,z:player.position.z};
   const yaw=player.rotation.y;
   const fx=Math.sin(yaw),fz=Math.cos(yaw);
@@ -14645,32 +14624,33 @@ function knightEndAegis(success){
 
     blockFx.position.set(pos.x,pos.y,pos.z);
     blockFx.rotation.y=yaw;
+    blockFx.scale.setScalar(titanVisual);
     knightBaseOpacity(blockFx);
     pushKnightFx(blockFx,{life:.28,grow:.88,from:.58,spin:5.5});
   }
 
   // Heavier counter slash follow-through.
-  knightSwordTrail(pos,yaw,2,1.48);
+  knightSwordTrail(pos,yaw,2,1.48*titanVisual);
   if(knightFxBudget(1)){
     const echo={x:pos.x-fx*.08,y:pos.y+.06,z:pos.z-fz*.08};
-    knightSwordTrail(echo,yaw-.05,2,1.18);
+    knightSwordTrail(echo,yaw-.05,2,1.18*titanVisual);
   }
 
-  knightShockRing(pos,c.counterRadius,KNIGHT_GOLD,.42);
-  knightShockRing(pos,c.counterRadius*.72,KNIGHT_IVORY,.28);
-  spawnKnightGuardBurst(pos,c.counterRadius,KNIGHT_STEEL);
+  knightShockRing(pos,counterRadius,KNIGHT_GOLD,.42);
+  knightShockRing(pos,counterRadius*.72,KNIGHT_IVORY,.28);
+  spawnKnightGuardBurst(pos,c.counterRadius*titanVisual,KNIGHT_STEEL);
 
   const hits=knightRadial(
     pos,
-    c.counterRadius,
+    counterRadius,
     c.counterDamage,
     {knock:8,stun:c.counterStun,bruteMult:c.bruteMult,bossMult:c.bossMult,bossCapFraction:c.bossCapFraction}
   );
 
   spawnBurst(
-    pos.x+fx*1.05,
-    pos.y+1.0,
-    pos.z+fz*1.05,
+    pos.x+fx*1.05*titanCombat,
+    pos.y+1.0*titanVisual,
+    pos.z+fz*1.05*titanCombat,
     hits?18:10,
     FX_MAT_SPARK,
     hits?4.8:3.2
@@ -14914,6 +14894,9 @@ function triggerKingsJudgment(){
   if(!gameRunning||!knightIsActive()||knightRuntime.ultPhase>0) return;
   if((knightRuntime.ultCooldown||0)>0){ toast(`Judgment ready in ${Math.ceil(knightRuntime.ultCooldown)}s`); return; }
   const c=KNIGHT_CFG.ultimate;
+  const judgmentTitanActive=knightGuardianGiantActive();
+  // Judgment never changes or ends Titan state; keep the current avatar scale synchronized.
+  knightSyncAvatarScale();
   const center=knightJudgmentCenter();
   const radius=knightJudgmentFieldRadius();
   markUltimateUsed();
@@ -14933,10 +14916,10 @@ function triggerKingsJudgment(){
   knightSpawnJudgmentSword();
   knightPlayClip(['melee','chop'],'1H_Melee_Attack_Chop',.5,.25);
   document.body.style.filter='brightness(.93) saturate(1.16) contrast(1.05)';
-  spawnKnightGuardBurst(center,Math.max(5.2,radius*.22),KNIGHT_GOLD);
+  spawnKnightGuardBurst(center,Math.max(5.2,radius*.22)*(judgmentTitanActive?1.08:1),KNIGHT_GOLD);
   knightJudgmentHeatPulse(center,radius,.06,true);
   for(let i=0;i<28;i++) knightJudgmentRainStrike(center,radius,0.10);
-  triggerCombatShake(14,300);
+  triggerCombatShake(judgmentTitanActive?16:14,300);
   if(navigator.vibrate) navigator.vibrate([80,40,130]);
   toast('JUDGMENT OF THE KING');
   updateHoodedHud();
@@ -15603,6 +15586,11 @@ function knightClonePerformMove(c,target){
     knightCloneStrikeFx(c,target,kind);applyBulletDamage(target,base);c.userData.attackCooldown=.56;
   }
 }
+function knightRoyalCloneFormationScale(){
+  // Clones stay normal-sized in Titan mode, but their formation must clear the
+  // enlarged player body so they do not spawn or orbit inside the giant Knight.
+  return knightGuardianGiantActive()?1.85:1;
+}
 function triggerKnightRoyalGuardClones(){
   if(!gameRunning||!knightRoyalCloneUnlocked()||knightRoyalCloneCooldown>0)return false;
   const cfg=knightRoyalCloneConfig();
@@ -15610,8 +15598,10 @@ function triggerKnightRoyalGuardClones(){
   markUltimateUsed();
   clearKnightRoyalClones();
   knightRoyalCloneCooldown=cfg.cooldown;knightRoyalCloneCycleDuration=cfg.cooldown;
+  const formationScale=knightRoyalCloneFormationScale();
   knightRoyalSummonSealFx(player.position,cfg.count);
-  spawnKnightGuardBurst(player.position,Math.min(5.2,2.8+cfg.count*.18),KNIGHT_GOLD);
+  // Keep the spectacle readable but capped; Titan mode changes spacing, not clone size.
+  spawnKnightGuardBurst(player.position,Math.min(7.2,(2.8+cfg.count*.18)*Math.min(1.35,formationScale)),KNIGHT_GOLD);
   triggerCombatShake(13,210);
   getKayKitAssetPromise('knight').then(({gltf,THREEAsset,cloneSkinned})=>{
     for(let i=0;i<cfg.count;i++)setTimeout(()=>{
@@ -15621,7 +15611,7 @@ function triggerKnightRoyalGuardClones(){
       root.scale.setScalar(1.48/Math.max(.001,size.y));
       const box2=new THREEAsset.Box3().setFromObject(root);root.position.y-=box2.min.y;
       tintKnightRoyalClone(root,i);wrap.add(root);
-      const a=(i/cfg.count)*Math.PI*2,rr=2+(i%3)*.45;
+      const a=(i/cfg.count)*Math.PI*2,rr=(2+(i%3)*.45)*formationScale;
       wrap.position.set(player.position.x+Math.cos(a)*rr,player.position.y,player.position.z+Math.sin(a)*rr);
       Object.assign(wrap.userData,{
         isKnightRoyalClone:true,invincible:true,hp:Infinity,maxHp:Infinity,dead:false,cloneIndex:i,life:cfg.duration,
@@ -15631,8 +15621,9 @@ function triggerKnightRoyalGuardClones(){
       for(const clip of gltf.animations)wrap.userData.kayClips[clip.name]=clip;
       scene.add(wrap);knightRoyalClones.push(wrap);
       knightRoyalCloneArrivalFx(wrap.position,i);
-      spawnKnightGuardBurst(wrap.position,1.45,i%2?KNIGHT_STEEL:KNIGHT_GOLD);
-      knightShockRing(wrap.position,1.15,i%2?KNIGHT_STEEL:KNIGHT_GOLD,.22);
+      const arrivalScale=Math.min(1.35,formationScale);
+      spawnKnightGuardBurst(wrap.position,1.45*arrivalScale,i%2?KNIGHT_STEEL:KNIGHT_GOLD);
+      knightShockRing(wrap.position,1.15*arrivalScale,i%2?KNIGHT_STEEL:KNIGHT_GOLD,.22);
     },i*105);
   });
   toast('KNIGHTS · '+cfg.count+' CLONES');
@@ -15654,8 +15645,9 @@ function updateKnightRoyalClones(dt){
     c.userData.attackCooldown=Math.max(0,(c.userData.attackCooldown||0)-dt);
     c.userData.motionFxTimer=Math.max(0,(c.userData.motionFxTimer||0)-dt);
 
+    const formationScale=knightRoyalCloneFormationScale();
     const playerDist=Math.hypot(c.position.x-player.position.x,c.position.z-player.position.z);
-    if(playerDist>11)c.userData.farTimer=(c.userData.farTimer||0)+dt;
+    if(playerDist>11*formationScale)c.userData.farTimer=(c.userData.farTimer||0)+dt;
     else{c.userData.farTimer=0;c.userData.returning=false;}
     if(c.userData.farTimer>=10)c.userData.returning=true;
 
@@ -15671,19 +15663,19 @@ function updateKnightRoyalClones(dt){
     let desired;
     if(c.userData.returning){
       const i=c.userData.cloneIndex||0,a=now*.28+(i/Math.max(1,knightRoyalClones.length))*Math.PI*2;
-      desired=new THREE.Vector3(player.position.x+Math.cos(a)*2.4,player.position.y,player.position.z+Math.sin(a)*2.4);
-      if(playerDist<4){c.userData.returning=false;c.userData.farTimer=0;}
+      desired=new THREE.Vector3(player.position.x+Math.cos(a)*2.4*formationScale,player.position.y,player.position.z+Math.sin(a)*2.4*formationScale);
+      if(playerDist<4*formationScale){c.userData.returning=false;c.userData.farTimer=0;}
     }else if(target){
       const toward=target.position.clone().sub(c.position);toward.y=0;const d=toward.length();
       if(d>1.8){toward.normalize();desired=c.position.clone().addScaledVector(toward,Math.min(3,d-1.45));desired.y=player.position.y;}
     }else{
       const i=c.userData.cloneIndex||0,a=now*.34+(i/Math.max(1,knightRoyalClones.length))*Math.PI*2;
-      desired=new THREE.Vector3(player.position.x+Math.cos(a)*3.2,player.position.y,player.position.z+Math.sin(a)*3.2);
+      desired=new THREE.Vector3(player.position.x+Math.cos(a)*3.2*formationScale,player.position.y,player.position.z+Math.sin(a)*3.2*formationScale);
     }
 
     if(desired){
       const dist=c.position.distanceTo(desired);
-      if(dist>18)c.position.copy(desired);
+      if(dist>18*formationScale)c.position.copy(desired);
       else{
         const step=Math.min(1,dt*(c.userData.returning?7.5:5.4));
         const nx=THREE.MathUtils.lerp(c.position.x,desired.x,step),nz=THREE.MathUtils.lerp(c.position.z,desired.z,step);
@@ -15858,6 +15850,10 @@ function knightAbilityCooldownInfo(){
 }
 function triggerKnightEquippedAbility(){
   if(!knightIsActive()) return;
+  // Guardian Quake owns the special/Ability slot for the entire transformation.
+  // Primary and Secondary routing is intentionally untouched so both remain
+  // usable during the 15-second post-quake Titan combat window.
+  if(knightGuardianGiantActive() && equippedAbilityId!=='knight_guardian_quake') return;
   if(equippedAbilityId==='knight_guardian_quake') triggerKnightGuardianQuake();
   else if(equippedAbilityId==='knight_aegis_counter') triggerKnightAegisCounter();
   else if(equippedAbilityId==='knight_judgment') triggerKingsJudgment();
@@ -20566,7 +20562,7 @@ function update(dt){
   } else {
     player.visible = true;
     const baseDist = CAM_DISTS[camMode] || CAM_DISTS[3];
-    const dist = guardianTitanCamera ? Math.max(22,baseDist*3.2) : baseDist;
+    const dist = guardianTitanCamera ? knightTitanCameraThirdPersonDistance(baseDist) : baseDist;
     const cx = player.position.x - Math.sin(camYaw)*dist;
     const cz = player.position.z - Math.cos(camYaw)*dist;
     // Close tiers keep the original eye height. Past 'Wide' the camera has
@@ -20592,7 +20588,7 @@ function update(dt){
     // moved the camera 22-100 units away, producing the nearly solid white view.
     const baseReach = camMode === BIRD_MODE ? 46 : (CAM_DISTS[camMode] || 0);
     const reach = guardianTitanCamera
-      ? (camMode===BIRD_MODE ? 66.7 : Math.max(22,baseReach*3.2))
+      ? (camMode===BIRD_MODE ? 66.7 : knightTitanCameraThirdPersonDistance(baseReach))
       : baseReach;
     const fs = Math.min(8.0, 1 + Math.max(0, reach - 9.5)*0.072);
     scene.fog.near = fogBase.near * fs;
