@@ -1,3 +1,4 @@
+<!-- V22.13.98 Version Label Synchronization: synchronizes the static browser title and all visible landing-page/build labels to V22.13.98 using the centralized GAME_VERSION value. Gameplay, Royal Onslaught behavior, visuals, cooldowns, and balance are unchanged. -->
 <!-- V22.13.97 Royal Onslaught Trail Removal + Freeze Guard: completely removes the Royal Onslaught ground dash-lane/trail geometry and its delayed cleanup path, then isolates each strike inside a runtime safety boundary so one visual or target-state failure cannot stop the entire gameplay update loop between strikes. Damage, capture window, bullet time, elimination behavior, cooldown scaling, and remaining impact visuals are unchanged. -->
 <!-- V22.13.96 Royal Onslaught Freeze Fix: replaces wall-clock capture/elapsed timing with gameplay-delta timing so pause truly freezes Royal Onslaught instead of letting it finish in the background, removes the per-sigil 16ms interval introduced in the visual flare pass, and caps the most expensive repeated sigil effects during long sequences. Damage, elimination rules, bullet time, cooldown scaling, camera behavior, and core visuals are unchanged. -->
 <!-- V22.13.95 Royal Onslaught Visual Flare: significantly upgrades Royal Onslaught presentation with a richer bullet-time veil, larger activation sigils, brighter multi-layer dash lanes, route-space flare shards, heavier endpoint impact columns, and a more spectacular crown finisher while preserving the verified damage rules, target capture/elimination behavior, cooldown scaling, and iPhone-safe caps. -->
@@ -186,7 +187,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.13.79</title>
+<title>Family Arena V22.13.98</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1383,7 +1384,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.97 - Royal Onslaught Trail Removal Freeze Guard';
+const GAME_VERSION='22.13.98 - Version Label Synchronization';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
