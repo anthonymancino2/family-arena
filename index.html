@@ -1,3 +1,5 @@
+<!-- V22.13.93 Royal Onslaught Combat + Cleanup Verification: hardens captured-enemy tracking through spawn warnings and removal, rotates designated targets fairly so bosses and survivors cannot be ignored, guarantees measurable boss progress on every endpoint strike, restores bullet time/markers/atmosphere on pause, round completion, reset, avatar change, or interruption, replaces the meaningless 9999-second active HUD with elapsed-strike/capture status, and caps optional extended-sequence visuals without changing damage rules, capture window, elimination requirement, cooldown scaling, or invulnerability. -->
+<!-- V22.13.92 Royal Onslaught Target Tracking + Bullet-Time Atmosphere: visibly marks every enemy captured at activation or during the three-second spawn window, distinguishes designated endpoint impacts from steel route-contact hits, adds a restrained royal bullet-time screen tint and activation/restoration pulses, strengthens slowed enemy-projectile trails, and cleans all temporary markers reliably. Damage, non-boss one-hit rules, boss elimination sequence, capture window, cooldown scaling, and camera behavior are unchanged. -->
 <!-- V22.13.91 Whirlwind Button Countdown: adds a large live remaining-time readout directly inside the Defensive Whirlwind Secondary button while active. The timer updates in tenths of a second and shows infinity from Round 25 onward. Whirlwind duration, cooldown scaling, damage, knockback, projectile deflection, movement penalty, and all Royal Onslaught behavior are unchanged. -->
 <!-- V22.13.90 Royal Onslaught Non-Boss One-Hit: every non-boss enemy struck by Royal Onslaught is now instantly defeated, whether hit as a designated endpoint, crossed during a ghost-pass route, reached by the completion sweep, or caught by the crown finisher. Bosses retain repeated controlled damage and remain the only enemies that can survive an Onslaught hit. The minimum-20 expanding elimination sequence, 3-second capture window, bullet time, cooldown scaling, camera angle, Guardian Titan restrictions, and Mage Primary routing are unchanged. -->
 <!-- V22.13.89 Royal Onslaught Elimination Sequence: Royal Onslaught now begins with a minimum 20 designated strikes, then automatically extends beyond 20 until every enemy captured at activation or spawned during the first 3 seconds has been eliminated. Route-contact enemies still take full strike damage without increasing the designated sequence count. The move waits for the 3-second capture window to close before finishing, and captured bosses can now be defeated through repeated Onslaught strikes instead of being trapped behind the former total-damage cap. Bullet time, cooldown scaling, round-based target skipping, invulnerability, camera angle, Guardian Titan restrictions, and Mage Primary routing remain unchanged. -->
@@ -1377,7 +1379,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.13.91 - Whirlwind Button Countdown';
+const GAME_VERSION='22.13.93 - Royal Onslaught Combat Cleanup Verification';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2364,6 +2366,15 @@ function updateEnemyProjectiles(dt){
       // genuinely grows out of the shot rather than popping in at full
       // size — it can never be "longer than where this shot has been."
       p.tail.scale.y=Math.max(0.0001, Math.min(ENEMY_SHOT_TAIL_MAX_LEN, p.age*p.speed));
+      const bulletTime=knightRoyalOnslaughtEnemyTimeScale()<1;
+      p.tail.scale.x=bulletTime?1.55:1;
+      p.tail.scale.z=bulletTime?1.55:1;
+      for(const child of p.tail.children){
+        if(child.material&&'opacity' in child.material){
+          const base=child===p.tail.children[0]?.85:.92;
+          child.material.opacity=bulletTime?base:(child===p.tail.children[0]?.42:.75);
+        }
+      }
     }
     // A few loose sparks along the path on top of the solid tail —
     // cheap extra texture, not the thing doing the "growing streak" job.
@@ -2704,7 +2715,7 @@ const KNIGHT_DEFENSIVE_WHIRLWIND = {id:'knight_whirlwind', name:'Defensive Whirl
 const KNIGHT_GUARDIAN_QUAKE = {id:'knight_guardian_quake', name:'Guardian Titan', price:760, avatar:'knight', unlockLevel:12,
   desc:'Hold the Ability button to begin Guardian Charge and automatically flow into Earth Shatter when the charge finishes. Releasing before the charge ends cancels the Earth Shatter follow-up. Steer the charge with the normal movement controls. After the sequence, the Knight remains in Titan form for 15 seconds. Cooldown begins after Titan mode ends and scales with the current round tier.'};
 const KNIGHT_AEGIS_COUNTER = {id:'knight_aegis_counter', name:'Royal Onslaught', price:880, avatar:'knight', unlockLevel:14,
-  desc:'Map-clearing active ultimate. Enter royal bullet time, reducing every enemy and enemy projectile to 20% speed while you chain 20 invulnerable sword-and-shield dashes. Enemies crossed along each route take full strike damage without consuming a sequence hit. Endpoint targeting skips progressively more enemies as rounds rise, reaching five skipped enemies between targets at Round 20. Finishes with a large crown shockwave. Cooldown scales down by round to 0 at Round 45; boss damage remains capped.'};
+  desc:'Map-clearing active ultimate. Enter royal bullet time, reducing every enemy and enemy projectile to 20% speed while you chain at least 20 invulnerable sword-and-shield dashes, continuing until every captured enemy is eliminated. Enemies crossed along each route take full strike damage without consuming a sequence hit. Endpoint targeting skips progressively more enemies as rounds rise, reaching five skipped enemies between targets at Round 20. Finishes with a large crown shockwave. Cooldown scales down by round to 0 at Round 45; boss damage remains capped.'};
 const KNIGHT_ROYAL_GUARD_CLONES = {id:'knight_royal_guard_clones', name:'Knights of the Round', price:0, avatar:'knight', unlockLevel:10,
   desc:'Knight signature move. Summon invincible Knight clones that draw enemy attention and use only the Knight moves currently unlocked. Each clone deals 10% of the player\'s damage. Rounds 10–15 summon 2 clones for 8 seconds with a 10-second cooldown; Rounds 16–20 summon 5 for 15 seconds with a 5-second cooldown; Round 21 onward summons 10 for 30 seconds with a 1.5-second cooldown.'};
 const KNIGHT_JUDGMENT_ULTIMATE = {id:'knight_judgment', name:'Judgment of the King', price:920, avatar:'knight', unlockLevel:18,
@@ -10031,6 +10042,7 @@ function spawnZombie(){
   if(knightRuntime && knightRuntime.royalOnslaughtEligibleIds &&
      performance.now() <= (knightRuntime.royalOnslaughtCaptureUntil||0)){
     knightRuntime.royalOnslaughtEligibleIds.add(z.uuid);
+    if(typeof knightRoyalOnslaughtMarkEnemy==='function') knightRoyalOnslaughtMarkEnemy(z);
   }
   const warnMat=new THREE.MeshBasicMaterial({color:archetype==='brute'?0xff7a35:0xffd84a,transparent:true,opacity:.9,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
   const warn=new THREE.Mesh(new THREE.RingGeometry(.45,.85,28),warnMat);warn.rotation.x=-Math.PI/2;warn.position.set(z.position.x,.07,z.position.z);scene.add(warn);fx.push({kind:'spawnWarning',mesh:warn,life:.72,maxLife:.72,spin:7});
@@ -12075,6 +12087,11 @@ function createFreshKnightRuntime(){
     guardianQuakeSequence:false, guardianGiantBuffTimer:0, guardianGiantCooldownPending:0, guardianGiantDamagePool:0,
     guardianTitanStepTimer:0, guardianTitanLastX:null, guardianTitanLastZ:null, guardianTitanImpactWindowStart:0, guardianTitanImpactCount:0,
     aegisCooldown:0, aegisWindow:0, aegisRecovery:0, aegisRing:null,
+    royalOnslaughtStartedAt:0, royalOnslaughtCaptureUntil:0,
+    royalOnslaughtStrikeIndex:0, royalOnslaughtStrikeTimer:0,
+    royalOnslaughtTargetCursor:0, royalOnslaughtEligibleIds:null,
+    royalOnslaughtHitIds:null, royalOnslaughtDamagedIds:null,
+    royalOnslaughtBossDamage:null, royalOnslaughtTargets:[],
     shieldTossCooldown:0, shieldToss:null, shieldAway:false,
     resistTimer:0, frontGuardTimer:0,
     ultPhase:0, ultTimer:0, ultMarks:[], ultTickTimer:0, ultMarkIndex:0,
@@ -14649,6 +14666,65 @@ function knightEndGuardianCharge(allowFollowup=true){
   }
 }
 /* ------------------------------------------------------------- ABILITY 4 */
+function knightRoyalOnslaughtAtmosphere(active){
+  let veil=document.getElementById('royalOnslaughtVeil');
+  if(active){
+    if(!veil){
+      veil=document.createElement('div');
+      veil.id='royalOnslaughtVeil';
+      veil.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:18;background:radial-gradient(circle at center,rgba(255,220,105,.025) 0%,rgba(35,55,95,.12) 72%,rgba(8,14,30,.18) 100%);mix-blend-mode:screen;opacity:0;transition:opacity .28s ease;';
+      document.body.appendChild(veil);
+      requestAnimationFrame(()=>{if(veil) veil.style.opacity='1';});
+    }
+  }else if(veil){
+    veil.style.opacity='0';
+    setTimeout(()=>{if(veil&&veil.parentNode) veil.parentNode.removeChild(veil);},320);
+  }
+}
+function knightRoyalOnslaughtActivationPulse(pos,color=KNIGHT_GOLD){
+  if(!scene||!pos) return;
+  knightShockRing(pos,6.2*knightTitanCombatScale(),color,.32);
+  knightShockRing(pos,3.9*knightTitanCombatScale(),KNIGHT_IVORY,.22);
+}
+function knightRoyalOnslaughtMarkEnemy(z){
+  if(!z||z.userData.dead||z.userData.royalOnslaughtMarker||!scene) return;
+  const s=Math.max(.8,z.userData.baseScale||1);
+  const g=new THREE.Group();
+  const outer=new THREE.Mesh(new THREE.RingGeometry(.52*s,.72*s,28),knightMat(KNIGHT_GOLD,.58));
+  outer.rotation.x=-Math.PI/2; outer.position.y=.05; g.add(outer);
+  const inner=new THREE.Mesh(new THREE.RingGeometry(.24*s,.34*s,24),knightMat(KNIGHT_IVORY,.48));
+  inner.rotation.x=-Math.PI/2; inner.position.y=.065; g.add(inner);
+  const crown=new THREE.Mesh(new THREE.ConeGeometry(.12*s,.35*s,4),knightMat(KNIGHT_GOLD,.70));
+  crown.position.y=2.05*s; crown.rotation.z=Math.PI; g.add(crown);
+  g.position.copy(z.position); scene.add(g);
+  z.userData.royalOnslaughtMarker=g;
+}
+function knightRoyalOnslaughtClearMarker(z){
+  if(!z||!z.userData) return;
+  const g=z.userData.royalOnslaughtMarker;
+  if(g){if(g.parent) scene.remove(g);disposeGroup(g);}
+  z.userData.royalOnslaughtMarker=null;
+}
+function knightRoyalOnslaughtUpdateMarkers(dt){
+  knightRoyalOnslaughtPruneEligibility();
+  const eligible=knightRuntime&&knightRuntime.royalOnslaughtEligibleIds;
+  for(const z of zombies){
+    if(!z) continue;
+    if(eligible&&eligible.has(z.uuid)&&!z.userData.dead){
+      knightRoyalOnslaughtMarkEnemy(z);
+      const g=z.userData.royalOnslaughtMarker;
+      if(g){
+        g.position.x=z.position.x;g.position.z=z.position.z;
+        g.rotation.y+=dt*1.8;
+        const p=1+Math.sin(performance.now()*.008+z.id)*.08;
+        g.scale.setScalar(p);
+      }
+    }else knightRoyalOnslaughtClearMarker(z);
+  }
+}
+function knightRoyalOnslaughtClearAllMarkers(){
+  for(const z of zombies) knightRoyalOnslaughtClearMarker(z);
+}
 function triggerKnightAegisCounter(){
   if(!gameRunning||!knightIsActive()) return;
   if(knightRuntime.aegisCooldown>0||knightRuntime.aegisWindow>0||knightRuntime.aegisRecovery>0) return;
@@ -14692,11 +14768,17 @@ function triggerKnightAegisCounter(){
   knightPlayClip(['melee','slash'],'1H_Melee_Attack_Slice_Horizontal',.20,.12);
   triggerCombatShake(8,140);
   if(navigator.vibrate) navigator.vibrate([24,18,42]);
+  knightRoyalOnslaughtAtmosphere(true);
+  knightRoyalOnslaughtActivationPulse(player.position,KNIGHT_GOLD);
+  knightRoyalOnslaughtUpdateMarkers(0);
   toast('ROYAL ONSLAUGHT — BULLET TIME!');
   updateHoodedHud();
 }
 function knightRoyalOnslaughtDashFx(from,to,index){
   if(!scene||!from||!to) return;
+  // Extended boss sequences can run well beyond 20 hits. Keep every hit and
+  // animation, but thin only optional lane geometry after hit 30 on mobile.
+  if(index>=30 && isMobile && index%2===1) return;
   const visual=knightTitanVisualScale();
   const a=new THREE.Vector3(from.x,.24*visual,from.z);
   const b=new THREE.Vector3(to.x,.24*visual,to.z);
@@ -14762,8 +14844,10 @@ function knightRoyalOnslaughtPathDamage(from,to,index,endpoint){
     if(!z||z===endpoint||z.userData.dead||z.userData.spawnPending) continue;
     if(knightRoyalOnslaughtSegmentDistanceSq(z.position,from,to)>radiusSq) continue;
     knightRoyalOnslaughtDamage(z,index);
-    spawnKnightGuardBurst(z.position,1.1*knightTitanVisualScale(),index%2?KNIGHT_IVORY:KNIGHT_GOLD);
-    knightShockRing(z.position,1.35*knightTitanCombatScale(),KNIGHT_STEEL,.14);
+    // Route contacts use restrained steel feedback so they read differently
+    // from the gold/ivory designated endpoint impacts.
+    spawnKnightGuardBurst(z.position,.9*knightTitanVisualScale(),KNIGHT_STEEL);
+    knightShockRing(z.position,1.15*knightTitanCombatScale(),KNIGHT_STEEL,.12);
   }
 }
 function knightRoyalOnslaughtSelectTarget(){
@@ -14788,7 +14872,10 @@ function knightRoyalOnslaughtDamage(target,index){
     // Bosses are the only enemy class allowed to survive an Onslaught hit.
     // Keep each boss hit controlled, but do not impose a total cast cap that
     // could make the elimination sequence impossible to finish.
-    damage=Math.max(damage*.45,maxHp*.065);
+    // Every endpoint must make visible health progress, even against bosses
+    // with unusually large health pools or resistance. This prevents a boss
+    // from stalling the elimination sequence indefinitely.
+    damage=Math.max(damage*.45,maxHp*.065,(target.userData.hp||maxHp)*.055);
     const used=knightRuntime.royalOnslaughtBossDamage.get(target.uuid)||0;
     knightRuntime.royalOnslaughtBossDamage.set(target.uuid,used+damage);
   }else{
@@ -14826,6 +14913,11 @@ function knightRoyalOnslaughtStrike(){
     spawnBurst(target.position.x,target.position.y+.8,target.position.z,Math.min(24,14+Math.floor(index*.7)),FX_MAT_SPARK,4.2+index*.18);
     knightRoyalOnslaughtPathDamage(startPos,player.position,index,target);
     knightRoyalOnslaughtDamage(target,index);
+    if(target.userData.dead) knightRoyalOnslaughtClearMarker(target);
+    const endpointCrown=new THREE.Mesh(new THREE.ConeGeometry(.22*knightTitanVisualScale(),.72*knightTitanVisualScale(),5),knightMat(KNIGHT_GOLD,.82));
+    endpointCrown.position.set(target.position.x,target.position.y+1.65*knightTitanVisualScale(),target.position.z);
+    endpointCrown.rotation.z=Math.PI;scene.add(endpointCrown);
+    setTimeout(()=>{if(endpointCrown.parent){scene.remove(endpointCrown);disposeGroup(endpointCrown);}},180);
     knightPlayClip(index%2?['melee','chop']:['melee','slash'],index%2?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal',.16,.10);
     triggerCombatShake(9+index,100);
   }
@@ -14894,8 +14986,30 @@ function knightRoyalOnslaughtLivingEligible(){
 function knightRoyalOnslaughtCaptureClosed(){
   return performance.now() >= (knightRuntime.royalOnslaughtCaptureUntil||0);
 }
+function knightRoyalOnslaughtActiveElapsed(){
+  if(!(knightRuntime.aegisWindow>0)||!knightRuntime.royalOnslaughtStartedAt) return 0;
+  return Math.max(0,(performance.now()-knightRuntime.royalOnslaughtStartedAt)/1000);
+}
+function knightRoyalOnslaughtCaptureRemaining(){
+  return Math.max(0,((knightRuntime.royalOnslaughtCaptureUntil||0)-performance.now())/1000);
+}
+function knightRoyalOnslaughtPruneEligibility(){
+  const eligible=knightRuntime.royalOnslaughtEligibleIds;
+  if(!eligible) return;
+  const liveIds=new Set();
+  for(const z of zombies){
+    if(!z||!z.uuid) continue;
+    liveIds.add(z.uuid);
+    if(z.userData&&z.userData.dead) knightRoyalOnslaughtClearMarker(z);
+  }
+  for(const id of Array.from(eligible)){
+    if(!liveIds.has(id)) eligible.delete(id);
+  }
+}
 function knightUpdateAegis(dt){
   if(knightRuntime.aegisWindow>0){
+    knightRoyalOnslaughtPruneEligibility();
+    knightRoyalOnslaughtUpdateMarkers(dt);
     if(knightRuntime.aegisRing){
       knightRuntime.aegisRing.position.set(player.position.x,.08,player.position.z);
       knightRuntime.aegisRing.rotation.y+=dt*3.8;
@@ -14914,7 +15028,17 @@ function knightUpdateAegis(dt){
     // enemy remains alive. During the open window, continue the minimum
     // sequence and allow newly spawned enemies to join the eligible set.
     if((needsMinimum||needsElimination) && knightRuntime.royalOnslaughtStrikeTimer<=0){
+      const before=knightRuntime.royalOnslaughtStrikeIndex||0;
       knightRoyalOnslaughtStrike();
+      // If target selection ever returns nothing while captured survivors still
+      // exist, immediately apply the verified completion strike path instead
+      // of allowing bullet time to hang forever.
+      if(captureClosed && livingEligible.length>0 && (knightRuntime.royalOnslaughtStrikeIndex||0)===before+1){
+        const still=knightRoyalOnslaughtLivingEligible();
+        if(still.length && !still.some(z=>!z.userData.spawnPending)){
+          for(const z of still) z.userData.spawnPending=false;
+        }
+      }
       knightRuntime.royalOnslaughtStrikeTimer=.24;
     }
 
@@ -14929,6 +15053,9 @@ function knightEndAegis(success){
   if(ring){ if(ring.parent) scene.remove(ring); disposeGroup(ring); knightRuntime.aegisRing=null; }
   const wasActive=knightRuntime.aegisWindow>0 || (knightRuntime.royalOnslaughtStrikeIndex||0)>0;
   knightRuntime.aegisWindow=0;
+  knightRoyalOnslaughtClearAllMarkers();
+  knightRoyalOnslaughtAtmosphere(false);
+  if(wasActive&&player) knightRoyalOnslaughtActivationPulse(player.position,KNIGHT_IVORY);
   knightRuntime.aegisRecovery=success?.28:.08;
   if(success&&wasActive) knightRoyalOnslaughtFinish();
   knightRuntime.royalOnslaughtTargets=[];
@@ -14938,6 +15065,8 @@ function knightEndAegis(success){
   knightRuntime.royalOnslaughtEligibleIds=null;
   if(knightRuntime.royalOnslaughtDamagedIds) knightRuntime.royalOnslaughtDamagedIds.clear();
   knightRuntime.royalOnslaughtDamagedIds=null;
+  if(knightRuntime.royalOnslaughtBossDamage) knightRuntime.royalOnslaughtBossDamage.clear();
+  knightRuntime.royalOnslaughtBossDamage=null;
   knightRuntime.royalOnslaughtCaptureUntil=0;
   knightRuntime.royalOnslaughtStartedAt=0;
   knightRuntime.royalOnslaughtStrikeIndex=0;
@@ -16099,10 +16228,11 @@ function updateKnightSystems(dt){
 function clearKnightRoundSpecials(resetCooldowns=true){
   knightClearJudgment();
   knightEndShieldToss(false);
-  if(knightRuntime.aegisRing){
-    if(knightRuntime.aegisRing.parent) scene.remove(knightRuntime.aegisRing);
-    disposeGroup(knightRuntime.aegisRing);
-    knightRuntime.aegisRing=null;
+  if(knightRuntime.aegisWindow>0 || knightRuntime.aegisRing || knightRuntime.royalOnslaughtEligibleIds){
+    knightEndAegis(false);
+  }else{
+    knightRoyalOnslaughtClearAllMarkers();
+    knightRoyalOnslaughtAtmosphere(false);
   }
   knightRuntime.aegisWindow=0;
   knightRuntime.aegisRecovery=0;
@@ -16173,9 +16303,17 @@ function knightAbilityCooldownInfo(){
               ? knightRuntime.chargeTimer
               : (knightRuntime.shatterPhase>0?knightRuntime.shatterTimer:undefined))
       };
-    case 'knight_aegis_counter':
-      return {label:'ONSLAUGHT', cd:knightRuntime.aegisCooldown,
-        active:knightRuntime.aegisWindow>0, activeTime:knightRuntime.aegisWindow};
+    case 'knight_aegis_counter': {
+      const active=knightRuntime.aegisWindow>0;
+      const captureLeft=active?knightRoyalOnslaughtCaptureRemaining():0;
+      const hits=knightRuntime.royalOnslaughtStrikeIndex||0;
+      return {
+        label:active?(captureLeft>0?'CAPTURE '+captureLeft.toFixed(1)+'s':'HIT '+hits):'ONSLAUGHT',
+        cd:knightRuntime.aegisCooldown,
+        active,
+        activeTime:active?knightRoyalOnslaughtActiveElapsed():undefined
+      };
+    }
     default: return null;
   }
 }
