@@ -1,3 +1,4 @@
+<!-- V22.14.02 Royal Onslaught Afterimage Freeze Fix: removes expensive live SkeletonUtils avatar cloning from every dash, which could stall iPhone Safari before the endpoint attack. Royal Onslaught now uses lightweight pooled low-poly Knight silhouette echoes managed by the main FX update loop. The dash-to-impact sequence, damage, target capture, bullet time, elimination rules, cooldown scaling, and removed-ground-trail rule are unchanged. -->
 <!-- V22.14.01 Royal Onslaught Dash Visual Verification: strengthens visible point-to-point dashing without ground trails, improves endpoint sword/shield hit readability, makes skinned Knight afterimages easier to see with progressive 15%-to-75% opacity echoes, and limits optional echo density during very long sequences for iPhone stability. Damage, target capture, bullet time, elimination rules, cooldown scaling, and camera behavior are unchanged. -->
 <!-- V22.14.00 Royal Onslaught Dash Attack + Afterimages: replaces the instant point-to-point teleport with a short visible dash phase followed by an endpoint attack phase. During each dash, skinned Knight afterimages appear at increasing opacity behind the player. Damage is applied only when the endpoint strike visibly lands, while route-contact damage still applies during the dash path. The removed ground trail remains permanently absent. -->
 <!-- V22.13.99 Royal Onslaught Shadow Trail: adds lightweight avatar afterimage clones during Royal Onslaught dashes. Each dash now leaves several short-lived Knight shadow images at roughly 15% opacity between the start and end of the dash, creating a super-speed silhouette without restoring the removed ground trail. Gameplay, damage, cooldowns, capture rules, and version-label synchronization are unchanged. -->
@@ -190,7 +191,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.01</title>
+<title>Family Arena V22.14.02</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1387,7 +1388,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.01 - Royal Onslaught Dash Visual Verification';
+const GAME_VERSION='22.14.02 - Royal Onslaught Afterimage Freeze Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -11467,6 +11468,15 @@ function updateFx(dt){
       f.mesh.traverse(o=>{if(o.material)o.material.opacity=Math.max(0,(1-p)*.92);});
     } else if(f.kind==='afterimage'){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);f.mesh.scale.setScalar(1+(1-q)*.18);f.mesh.traverse(o=>{if(o.material)o.material.opacity=.28*q;});
+    } else if(f.kind==='royalAfterimage'){
+      f.life-=dt;
+      const q=Math.max(0,f.life/f.maxLife);
+      f.mesh.position.y += dt*.08;
+      f.mesh.traverse(o=>{
+        if(!o.material) return;
+        const mats=Array.isArray(o.material)?o.material:[o.material];
+        mats.forEach(m=>{ if(m&&m.opacity!==undefined) m.opacity=Math.min(m.opacity,(f.baseOpacity||.15)*q); });
+      });
     } else if(f.kind==='soul'){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);if(player)f.mesh.position.lerp(new THREE.Vector3(player.position.x,player.position.y+1,player.position.z),Math.min(1,dt*7));f.mesh.scale.setScalar(.7+.5*Math.sin((1-q)*Math.PI));if(f.mesh.material)f.mesh.material.opacity=q;
     } else if(f.kind==='heroAura'){
@@ -14736,56 +14746,30 @@ function knightRoyalOnslaughtImpactColumn(pos,scale=1,color=KNIGHT_GOLD,ttl=220)
 
 function knightRoyalOnslaughtSpawnAfterimage(pos,yaw,opacity=.15){
   if(!scene||!player||!pos) return;
-  const cloneSkinned=knightRuntime.royalOnslaughtCloneSkinned;
-  const source=player.userData&&player.userData.kayRoot;
-  if(!cloneSkinned||!source) return;
-  let root;
-  try{
-    source.updateMatrixWorld(true);
-    root=cloneSkinned(source);
-  }catch(_){ return; }
-  const ghost=new THREE.Group();
-  ghost.add(root);
-  ghost.position.set(pos.x,player.position.y,pos.z);
-  ghost.rotation.y=yaw;
-  ghost.scale.copy(player.scale);
-  ghost.userData.shadowTrail=true;
-  root.traverse(obj=>{
-    if(!obj.isMesh) return;
-    if(obj.material){
-      const mats=Array.isArray(obj.material)?obj.material:[obj.material];
-      const cloned=mats.map(m=>{
-        const c=m&&m.clone?m.clone():m;
-        if(c){
-          c.transparent=true;
-          c.opacity=opacity;
-          if('depthWrite' in c) c.depthWrite=false;
-          if('emissive' in c&&c.emissive){ c.emissive.setHex(0xffd86a); }
-          if('emissiveIntensity' in c) c.emissiveIntensity=Math.max(.18,c.emissiveIntensity||0);
-        }
-        return c;
-      });
-      obj.material=Array.isArray(obj.material)?cloned:cloned[0];
-    }
-    obj.castShadow=false;
-    obj.receiveShadow=false;
-    obj.renderOrder=6;
-  });
-  scene.add(ghost);
-  const born=performance.now();
-  const ttl=210;
-  const fade=()=>{
-    if(!ghost.parent) return;
-    const p=Math.min(1,(performance.now()-born)/ttl);
-    ghost.traverse(obj=>{
-      if(!obj.isMesh||!obj.material) return;
-      const mats=Array.isArray(obj.material)?obj.material:[obj.material];
-      for(const m of mats){ if(m&&m.opacity!==undefined) m.opacity=Math.max(0,opacity*(1-p)); }
-    });
-    if(p>=1){ if(ghost.parent){scene.remove(ghost);disposeGroup(ghost);} return; }
-    requestAnimationFrame(fade);
-  };
-  requestAnimationFrame(fade);
+  // Do NOT clone the live skinned avatar here. Skeleton cloning during every
+  // dash caused Safari stalls before the endpoint strike. This is a cheap
+  // low-poly Knight silhouette that reads as an avatar echo at speed.
+  const s=Math.max(.8,player.userData.avatarScale||1);
+  const g=new THREE.Group();
+  const mat=(hex,a)=>new THREE.MeshBasicMaterial({color:hex,transparent:true,opacity:a,depthWrite:false,side:THREE.DoubleSide});
+  const bodyMat=mat(0xd9e2ea,opacity);
+  const goldMat=mat(KNIGHT_GOLD,opacity*.95);
+  const steelMat=mat(KNIGHT_STEEL,opacity*.9);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.24*s,7,5),bodyMat);
+  head.position.y=1.22*s; g.add(head);
+  const torso=new THREE.Mesh(new THREE.BoxGeometry(.42*s,.64*s,.28*s),steelMat);
+  torso.position.y=.78*s; g.add(torso);
+  const shield=new THREE.Mesh(new THREE.CylinderGeometry(.28*s,.28*s,.07*s,10),goldMat);
+  shield.rotation.z=Math.PI/2; shield.position.set(-.31*s,.82*s,.03*s); g.add(shield);
+  const sword=new THREE.Mesh(new THREE.BoxGeometry(.07*s,.78*s,.07*s),bodyMat);
+  sword.position.set(.31*s,.86*s,.02*s); sword.rotation.z=-.45; g.add(sword);
+  const helm=new THREE.Mesh(new THREE.BoxGeometry(.38*s,.14*s,.34*s),goldMat);
+  helm.position.y=1.38*s; g.add(helm);
+  g.position.set(pos.x,player.position.y,pos.z);
+  g.rotation.y=yaw;
+  g.userData.shadowTrail=true;
+  scene.add(g);
+  fx.push({kind:'royalAfterimage',mesh:g,life:.19,maxLife:.19,baseOpacity:opacity,dispose:true});
 }
 
 function knightRoyalOnslaughtActivationPulse(pos,color=KNIGHT_GOLD){
@@ -14839,12 +14823,6 @@ function triggerKnightAegisCounter(){
   if(!gameRunning||!knightIsActive()) return;
   if(knightRuntime.aegisCooldown>0||knightRuntime.aegisWindow>0||knightRuntime.aegisRecovery>0) return;
   markUltimateUsed();
-  // Reuse the already cached Knight asset's SkeletonUtils clone function so
-  // the afterimages are true posed avatar silhouettes rather than broken
-  // shallow clones of a skinned mesh.
-  getKayKitAssetPromise('knight').then(({cloneSkinned})=>{
-    if(knightRuntime.aegisWindow>0) knightRuntime.royalOnslaughtCloneSkinned=cloneSkinned;
-  }).catch(()=>{});
   knightRuntime.aegisCooldown=knightJudgmentCooldownForRound();
   knightRuntime.aegisWindow=9999;
   knightRuntime.aegisRecovery=0;
@@ -15245,7 +15223,6 @@ function knightEndAegis(success){
   knightRuntime.royalOnslaughtStrikeIndex=0;
   knightRuntime.royalOnslaughtStrikeTimer=0;
   knightRuntime.royalOnslaughtDash=null;
-  knightRuntime.royalOnslaughtCloneSkinned=null;
   knightRuntime.royalOnslaughtTargetCursor=0;
   knightRuntime.royalOnslaughtOriginX=0;
   knightRuntime.royalOnslaughtOriginZ=0;
