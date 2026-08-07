@@ -1,3 +1,4 @@
+<!-- V22.14.01 Royal Onslaught Dash Visual Verification: strengthens visible point-to-point dashing without ground trails, improves endpoint sword/shield hit readability, makes skinned Knight afterimages easier to see with progressive 15%-to-75% opacity echoes, and limits optional echo density during very long sequences for iPhone stability. Damage, target capture, bullet time, elimination rules, cooldown scaling, and camera behavior are unchanged. -->
 <!-- V22.14.00 Royal Onslaught Dash Attack + Afterimages: replaces the instant point-to-point teleport with a short visible dash phase followed by an endpoint attack phase. During each dash, skinned Knight afterimages appear at increasing opacity behind the player. Damage is applied only when the endpoint strike visibly lands, while route-contact damage still applies during the dash path. The removed ground trail remains permanently absent. -->
 <!-- V22.13.99 Royal Onslaught Shadow Trail: adds lightweight avatar afterimage clones during Royal Onslaught dashes. Each dash now leaves several short-lived Knight shadow images at roughly 15% opacity between the start and end of the dash, creating a super-speed silhouette without restoring the removed ground trail. Gameplay, damage, cooldowns, capture rules, and version-label synchronization are unchanged. -->
 <!-- V22.13.98 Version Label Synchronization: synchronizes the static browser title and all visible landing-page/build labels to V22.13.98 using the centralized GAME_VERSION value. Gameplay, Royal Onslaught behavior, visuals, cooldowns, and balance are unchanged. -->
@@ -189,7 +190,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.00</title>
+<title>Family Arena V22.14.01</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1386,7 +1387,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.00 - Royal Onslaught Dash Attack Afterimages';
+const GAME_VERSION='22.14.01 - Royal Onslaught Dash Visual Verification';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -14739,7 +14740,10 @@ function knightRoyalOnslaughtSpawnAfterimage(pos,yaw,opacity=.15){
   const source=player.userData&&player.userData.kayRoot;
   if(!cloneSkinned||!source) return;
   let root;
-  try{ root=cloneSkinned(source); }catch(_){ return; }
+  try{
+    source.updateMatrixWorld(true);
+    root=cloneSkinned(source);
+  }catch(_){ return; }
   const ghost=new THREE.Group();
   ghost.add(root);
   ghost.position.set(pos.x,player.position.y,pos.z);
@@ -14756,6 +14760,8 @@ function knightRoyalOnslaughtSpawnAfterimage(pos,yaw,opacity=.15){
           c.transparent=true;
           c.opacity=opacity;
           if('depthWrite' in c) c.depthWrite=false;
+          if('emissive' in c&&c.emissive){ c.emissive.setHex(0xffd86a); }
+          if('emissiveIntensity' in c) c.emissiveIntensity=Math.max(.18,c.emissiveIntensity||0);
         }
         return c;
       });
@@ -14763,9 +14769,23 @@ function knightRoyalOnslaughtSpawnAfterimage(pos,yaw,opacity=.15){
     }
     obj.castShadow=false;
     obj.receiveShadow=false;
+    obj.renderOrder=6;
   });
   scene.add(ghost);
-  setTimeout(()=>{ if(ghost.parent){scene.remove(ghost);disposeGroup(ghost);} },190);
+  const born=performance.now();
+  const ttl=210;
+  const fade=()=>{
+    if(!ghost.parent) return;
+    const p=Math.min(1,(performance.now()-born)/ttl);
+    ghost.traverse(obj=>{
+      if(!obj.isMesh||!obj.material) return;
+      const mats=Array.isArray(obj.material)?obj.material:[obj.material];
+      for(const m of mats){ if(m&&m.opacity!==undefined) m.opacity=Math.max(0,opacity*(1-p)); }
+    });
+    if(p>=1){ if(ghost.parent){scene.remove(ghost);disposeGroup(ghost);} return; }
+    requestAnimationFrame(fade);
+  };
+  requestAnimationFrame(fade);
 }
 
 function knightRoyalOnslaughtActivationPulse(pos,color=KNIGHT_GOLD){
@@ -14999,9 +15019,10 @@ function knightRoyalOnslaughtImpactStrike(dash){
     hitIds.add(target.uuid);
     // The attack animation happens at the destination, after the dash is
     // visible, so Royal Onslaught reads as dash -> strike instead of teleport.
-    knightPlayClip(index%2?['melee','chop']:['melee','slash'],index%2?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal',.24,.12);
-    knightSwordTrail(player.position,yaw,index%3,1.55*knightTitanVisualScale()*escalation);
-    spawnKnightGuardBurst(target.position,1.9*knightTitanVisualScale()*escalation,index%2?KNIGHT_IVORY:KNIGHT_GOLD);
+    knightPlayClip(index%2?['melee','chop']:['melee','slash'],index%2?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal',.30,.16);
+    spawnKnightGuardBurst(player.position,1.15*knightTitanVisualScale(),index%2?KNIGHT_STEEL:KNIGHT_GOLD);
+    knightSwordTrail(player.position,yaw,index%3,1.75*knightTitanVisualScale()*escalation);
+    spawnKnightGuardBurst(target.position,2.05*knightTitanVisualScale()*escalation,index%2?KNIGHT_IVORY:KNIGHT_GOLD);
     knightShockRing(target.position,2.35*knightTitanCombatScale()*Math.min(1.55,escalation),index%2?KNIGHT_STEEL:KNIGHT_GOLD,.24+index*.022);
     knightRoyalOnslaughtImpactColumn(target.position,1.12*knightTitanVisualScale()*Math.min(1.7,escalation),index%2?KNIGHT_IVORY:KNIGHT_GOLD,230);
     spawnBurst(target.position.x,target.position.y+.8,target.position.z,Math.min(30,18+Math.floor(index*.7)),FX_MAT_SPARK,5.0+index*.18);
@@ -15040,10 +15061,10 @@ function knightRoyalOnslaughtStrike(){
   knightRuntime.royalOnslaughtDash={
     target,index,yaw,startPos,
     fromX:startPos.x,fromZ:startPos.z,toX:safe.x,toZ:safe.z,
-    elapsed:0,duration:.14,nextEcho:0
+    elapsed:0,duration:.18,nextEcho:0
   };
   // Start with a committed attack-ready pose while the body dashes in.
-  knightPlayClip(['melee','slash'],'1H_Melee_Attack_Slice_Horizontal',.20,.10);
+  knightPlayClip(['melee','slash'],'1H_Melee_Attack_Slice_Horizontal',.24,.12);
 }
 function knightRoyalOnslaughtUpdateDash(dt){
   const d=knightRuntime.royalOnslaughtDash;
@@ -15054,8 +15075,12 @@ function knightRoyalOnslaughtUpdateDash(dt){
   player.position.x=d.fromX+(d.toX-d.fromX)*p;
   player.position.z=d.fromZ+(d.toZ-d.fromZ)*p;
   player.rotation.y=d.yaw;
-  const thresholds=[.18,.42,.68,.86];
-  const opacities=[.15,.22,.30,.40];
+  // Progressive silhouette chain: faintest echo first, strongest echo nearest
+  // the live 100%-opacity Knight. Long mobile sequences trim only one optional
+  // echo after hit 30 to keep the move stable without changing gameplay.
+  const longMobile=isMobile&&d.index>=30;
+  const thresholds=longMobile?[.20,.48,.78,.92]:[.14,.32,.52,.72,.88];
+  const opacities=longMobile?[.15,.32,.50,.68]:[.15,.30,.45,.60,.75];
   while(d.nextEcho<thresholds.length&&raw>=thresholds[d.nextEcho]){
     knightRoyalOnslaughtSpawnAfterimage(player.position,d.yaw,opacities[d.nextEcho]);
     d.nextEcho++;
