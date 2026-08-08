@@ -1,3 +1,4 @@
+<!-- V22.14.19 Avatar Scale Pass: approved hierarchy applied globally: Archer, Hooded Rogue, and Mage are reduced to the small tier; Knight remains the larger medium tier; Barbarian is doubled from its prior 1.08 scale to 2.16. Royal Onslaught systems from V22.14.18 are preserved. -->
 <!-- V22.14.18 Royal Onslaught Clone Attack Readability: adds a lightweight airborne impact cue to successful Royal Onslaught clone endpoint hits so the 30-clone army visibly reads as attacking rather than only dashing. Effects are frame-throttled, short-lived, and never create ground rings, floor trails, or white ground washes. Clone speed remains one-half of the player's dash speed; damage, targeting, capture rules, bullet time, and cooldown scaling are unchanged. -->
 <!-- V22.14.17 Royal Onslaught Clone Formation + Visibility: improves the 30 detailed Royal Onslaught clones' spawn and combat spacing, reduces visual stacking by widening lane offsets and boss approach angles, and gives the player a subtle leader glow during the move so the real Knight remains easy to identify. Clone speed stays at half the player's dash speed; damage, targeting, capture rules, bullet time, and cooldown scaling are unchanged. -->
 <!-- V22.14.16 Royal Onslaught Half-Speed Clones: changes the 30 detailed Royal Onslaught clones from two-thirds of the player's dash speed to exactly one-half of the player's dash speed. Player dash remains 0.18 seconds; clone dash duration is now 0.36 seconds. Clone visuals, damage, targeting, capture rules, bullet time, and cooldown scaling are unchanged. -->
@@ -207,7 +208,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.18</title>
+<title>Family Arena V22.14.19</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1404,7 +1405,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.18 - Royal Onslaught Clone Attack Readability';
+const GAME_VERSION='22.14.19 - Avatar Scale Pass';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1777,7 +1778,11 @@ const HERO_PASSIVES = {
 function passiveForAvatar(type=state.avatarType){ return HERO_PASSIVES[type] || HERO_PASSIVES.rogue; }
 
 // Uniform scale applied on top of each avatar's own build — every value
-const AVATAR_SCALE = { rogue:1.0, hooded:1.0, mage:1.0, knight:1.18, barbarian:1.08 };
+// Approved avatar size hierarchy:
+// Archer / Hooded Rogue / Mage = small
+// Knight = medium (larger than those three)
+// Barbarian = largest, exactly 2x its previous 1.08 scale
+const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:0.88, knight:1.18, barbarian:2.16 };
 const FREE_AVATAR_TYPES = [...AVATAR_TYPES];
 // TESTING ONLY: sET this back to false to re-lock Bunny/Dog/all 15 heroes
 // behind crystals. Everything else about the unlock system (CATALOG
