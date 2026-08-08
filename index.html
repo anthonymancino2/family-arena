@@ -1,3 +1,4 @@
+<!-- V22.14.06 Royal Onslaught Stability Reset: removes all Royal Onslaught-specific activation overlays, guard bursts, impact columns, speed echoes, and other optional custom VFX from the live activation/strike path. The move now relies on the real Knight dash, attack animations, and small capped spark impacts while preserving bullet time, targeting, capture rules, damage, elimination behavior, and cooldown scaling. -->
 <!-- V22.14.05 Royal Onslaught Marker Freeze Fix: removes the per-enemy 3D target-marker system that could create hundreds of meshes at activation on late rounds. Royal Onslaught now keeps target capture purely in data and concentrates spectacle around the Knight, dash impacts, bullet-time atmosphere, and finisher. Damage, capture window, elimination rules, cooldown scaling, and bullet-time behavior are unchanged. -->
 <!-- V22.14.04 Royal Onslaught Flash FX Safe: removes all live avatar-clone afterimage work from Royal Onslaught and replaces it with capped vertical speed echoes, sword/shield energy streaks, and brighter endpoint bursts that use simple temporary geometry only. No white ground trail or broad ground wash is used. Damage, targeting, bullet time, capture/elimination behavior, cooldown scaling, and dash timing are unchanged. -->
 <!-- V22.14.03 Royal Onslaught Ground FX Removed + Clone Restored: removes the persistent/large Royal Onslaught ground-ring and ground-sigil presentation that was producing the white floor effect, while restoring the prior true skinned Knight avatar afterimages from V22.14.01. The previously removed white dash trail remains permanently absent. Damage, targeting, bullet time, capture/elimination rules, and cooldown scaling are unchanged. -->
@@ -194,7 +195,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.05</title>
+<title>Family Arena V22.14.06</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1391,7 +1392,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.05 - Royal Onslaught Marker Freeze Fix';
+const GAME_VERSION='22.14.06 - Royal Onslaught Stability Reset';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -14811,7 +14812,7 @@ function triggerKnightAegisCounter(){
   knightRuntime.aegisCooldown=knightJudgmentCooldownForRound();
   knightRuntime.aegisWindow=9999;
   knightRuntime.aegisRecovery=0;
-  knightRuntime.royalOnslaughtStrikeTimer=0;
+  knightRuntime.royalOnslaughtStrikeTimer=.08;
   knightRuntime.royalOnslaughtStrikeIndex=0;
   knightRuntime.royalOnslaughtBossDamage=new Map();
   knightRuntime.royalOnslaughtHitIds=new Set();
@@ -14834,13 +14835,12 @@ function triggerKnightAegisCounter(){
   // Ground crown/ring removed: it created the large white floor effect.
   knightRuntime.aegisRing=null;
 
-  spawnKnightGuardBurst(player.position,2.4*visual,KNIGHT_GOLD);
+  // Stability reset: activation performs no custom scene/DOM VFX. The first
+  // dash begins on the next gameplay ticks so iPhone Safari is not hit with
+  // a large synchronous allocation spike on button-down.
   knightPlayClip(['melee','slash'],'1H_Melee_Attack_Slice_Horizontal',.20,.12);
-  triggerCombatShake(8,140);
-  if(navigator.vibrate) navigator.vibrate([24,18,42]);
-  knightRoyalOnslaughtAtmosphere(true);
-  knightRoyalOnslaughtActivationPulse(player.position,KNIGHT_GOLD);
-  toast('ROYAL ONSLAUGHT — BULLET TIME!');
+  if(navigator.vibrate) navigator.vibrate(22);
+  toast('ROYAL ONSLAUGHT!');
   updateHoodedHud();
 }
 function knightRoyalOnslaughtCrownFinisherFx(center,visual,combat){
@@ -14892,9 +14892,6 @@ function knightRoyalOnslaughtPathDamage(from,to,index,endpoint){
     if(!z||z===endpoint||z.userData.dead||z.userData.spawnPending) continue;
     if(knightRoyalOnslaughtSegmentDistanceSq(z.position,from,to)>radiusSq) continue;
     knightRoyalOnslaughtDamage(z,index);
-    // Route contacts use restrained steel feedback so they read differently
-    // from the gold/ivory designated endpoint impacts.
-    spawnKnightGuardBurst(z.position,.9*knightTitanVisualScale(),KNIGHT_STEEL);
   }
 }
 function knightRoyalOnslaughtSelectTarget(){
@@ -14967,21 +14964,12 @@ function knightRoyalOnslaughtImpactStrike(dash){
     // The attack animation happens at the destination, after the dash is
     // visible, so Royal Onslaught reads as dash -> strike instead of teleport.
     knightPlayClip(index%2?['melee','chop']:['melee','slash'],index%2?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal',.30,.16);
-    spawnKnightGuardBurst(player.position,1.15*knightTitanVisualScale(),index%2?KNIGHT_STEEL:KNIGHT_GOLD);
-    knightSwordTrail(player.position,yaw,index%3,1.75*knightTitanVisualScale()*escalation);
-    spawnKnightGuardBurst(target.position,2.05*knightTitanVisualScale()*escalation,index%2?KNIGHT_IVORY:KNIGHT_GOLD);
-    knightRoyalOnslaughtImpactColumn(target.position,1.12*knightTitanVisualScale()*Math.min(1.7,escalation),index%2?KNIGHT_IVORY:KNIGHT_GOLD,230);
-    if(!isMobile||index<26||index%2===0){
-      knightRoyalOnslaughtImpactColumn({x:target.position.x,y:target.position.y+.18,z:target.position.z},.72*knightTitanVisualScale(),KNIGHT_STEEL,150);
-    }
-    spawnBurst(target.position.x,target.position.y+.8,target.position.z,Math.min(26,18+Math.floor(index*.5)),FX_MAT_SPARK,4.8+Math.min(index,24)*.12);
+    // Keep only a small capped impact flash in the live strike path until the
+    // activation freeze is fully eliminated.
+    spawnBurst(target.position.x,target.position.y+.8,target.position.z,isMobile?7:10,FX_MAT_SPARK,3.2);
     knightRoyalOnslaughtDamage(target,index);
     if(target.userData.dead) knightRoyalOnslaughtClearMarker(target);
-    const endpointCrown=new THREE.Mesh(new THREE.ConeGeometry(.22*knightTitanVisualScale(),.72*knightTitanVisualScale(),5),knightMat(KNIGHT_GOLD,.82));
-    endpointCrown.position.set(target.position.x,target.position.y+1.65*knightTitanVisualScale(),target.position.z);
-    endpointCrown.rotation.z=Math.PI;scene.add(endpointCrown);
-    setTimeout(()=>{if(endpointCrown.parent){scene.remove(endpointCrown);disposeGroup(endpointCrown);}},180);
-    triggerCombatShake(Math.min(14,9+index*.20),Math.min(120,96+index*.6));
+    if(index%4===3) triggerCombatShake(5,70);
   }
   knightRuntime.royalOnslaughtStrikeIndex=index+1;
   const survivors=knightRoyalOnslaughtLivingEligible();
@@ -15024,13 +15012,8 @@ function knightRoyalOnslaughtUpdateDash(dt){
   player.position.x=d.fromX+(d.toX-d.fromX)*p;
   player.position.z=d.fromZ+(d.toZ-d.fromZ)*p;
   player.rotation.y=d.yaw;
-  // Cheap speed echoes: three simple vertical energy snapshots per dash on
-  // mobile, four elsewhere. No cloned avatar, no animation loop, no ground trail.
-  const thresholds=isMobile?[.24,.54,.82]:[.18,.42,.66,.86];
-  while(d.nextEcho<thresholds.length&&raw>=thresholds[d.nextEcho]){
-    knightRoyalOnslaughtSpeedEcho(player.position,d.yaw,d.index+d.nextEcho);
-    d.nextEcho++;
-  }
+  // No per-dash custom VFX in this stability build. The moving Knight model
+  // itself provides the speed read while we isolate the remaining freeze.
   if(raw>=1){
     // Route-contact enemies take their normal Onslaught hit along the path,
     // but only the endpoint strike advances the designated sequence.
@@ -15053,10 +15036,6 @@ function knightRoyalOnslaughtCompletionSweep(){
     // activation + 3-second spawn window is attacked, without adding to the
     // designated 20 endpoint-hit counter.
     knightRoyalOnslaughtDamage(z,19);
-    if(visualCount<12){
-      spawnKnightGuardBurst(z.position,1.35*knightTitanVisualScale(),visualCount%2?KNIGHT_IVORY:KNIGHT_GOLD);
-      visualCount++;
-    }
   }
 }
 function knightRoyalOnslaughtFinish(){
@@ -15064,10 +15043,7 @@ function knightRoyalOnslaughtFinish(){
   knightRoyalOnslaughtStabilizeFinalPosition();
   const combat=knightTitanCombatScale(), visual=knightTitanVisualScale();
   const radius=7.5*combat;
-  knightRoyalOnslaughtActivationPulse(player.position,KNIGHT_GOLD);
-  spawnKnightGuardBurst(player.position,4.6*visual,KNIGHT_GOLD);
-  knightRoyalOnslaughtCrownFinisherFx(player.position,visual,combat);
-  spawnBurst(player.position.x,player.position.y+.6*visual,player.position.z,42,FX_MAT_SPARK,8.4);
+  spawnBurst(player.position.x,player.position.y+.6*visual,player.position.z,isMobile?16:24,FX_MAT_SPARK,5.2);
   for(const z of zombies){
     if(!z||z.userData.dead||z.userData.spawnPending) continue;
     const d=Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z);
@@ -15168,7 +15144,6 @@ function knightEndAegis(success){
   knightRuntime.aegisWindow=0;
   knightRoyalOnslaughtClearAllMarkers();
   knightRoyalOnslaughtAtmosphere(false);
-  if(wasActive&&player) knightRoyalOnslaughtActivationPulse(player.position,KNIGHT_IVORY);
   knightRuntime.aegisRecovery=success?.28:.08;
   if(success&&wasActive) knightRoyalOnslaughtFinish();
   knightRuntime.royalOnslaughtTargets=[];
