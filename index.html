@@ -1,3 +1,4 @@
+<!-- V22.14.07 Royal Onslaught Stability Verification: hardens the stripped Royal Onslaught activation and strike handoff by removing an unused activation-time enemy sort, iterating route damage over a stable enemy snapshot so one-hit removals cannot disturb traversal, validating dash timing/state every frame, and adding a forced dash-completion watchdog. No new Royal Onslaught VFX are added; damage, capture, bullet time, elimination rules, and cooldown scaling are unchanged. -->
 <!-- V22.14.06 Royal Onslaught Stability Reset: removes all Royal Onslaught-specific activation overlays, guard bursts, impact columns, speed echoes, and other optional custom VFX from the live activation/strike path. The move now relies on the real Knight dash, attack animations, and small capped spark impacts while preserving bullet time, targeting, capture rules, damage, elimination behavior, and cooldown scaling. -->
 <!-- V22.14.05 Royal Onslaught Marker Freeze Fix: removes the per-enemy 3D target-marker system that could create hundreds of meshes at activation on late rounds. Royal Onslaught now keeps target capture purely in data and concentrates spectacle around the Knight, dash impacts, bullet-time atmosphere, and finisher. Damage, capture window, elimination rules, cooldown scaling, and bullet-time behavior are unchanged. -->
 <!-- V22.14.04 Royal Onslaught Flash FX Safe: removes all live avatar-clone afterimage work from Royal Onslaught and replaces it with capped vertical speed echoes, sword/shield energy streaks, and brighter endpoint bursts that use simple temporary geometry only. No white ground trail or broad ground wash is used. Damage, targeting, bullet time, capture/elimination behavior, cooldown scaling, and dash timing are unchanged. -->
@@ -195,7 +196,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.06</title>
+<title>Family Arena V22.14.07</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1392,7 +1393,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.06 - Royal Onslaught Stability Reset';
+const GAME_VERSION='22.14.07 - Royal Onslaught Stability Verification';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -14826,9 +14827,10 @@ function triggerKnightAegisCounter(){
   knightRuntime.royalOnslaughtEligibleIds=new Set(
     zombies.filter(z=>z&&!z.userData.dead).map(z=>z.uuid)
   );
-  knightRuntime.royalOnslaughtTargets=zombies
-    .filter(z=>z&&!z.userData.dead&&!z.userData.spawnPending)
-    .sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position));
+  // Target candidates are selected live per strike. Do not build/sort a second
+  // large enemy list on the same frame as activation; the eligible UUID set is
+  // the single source of truth for the 3-second capture group.
+  knightRuntime.royalOnslaughtTargets=[];
   knightRuntime.royalOnslaughtTargetCursor=0;
 
   const visual=knightTitanVisualScale();
@@ -14888,8 +14890,12 @@ function knightRoyalOnslaughtSegmentDistanceSq(point,a,b){
 function knightRoyalOnslaughtPathDamage(from,to,index,endpoint){
   const radius=1.25*knightTitanCombatScale();
   const radiusSq=radius*radius;
-  for(const z of zombies){
-    if(!z||z===endpoint||z.userData.dead||z.userData.spawnPending) continue;
+  // One-hit Onslaught damage can remove enemies while this pass is running.
+  // Traverse a stable snapshot so array mutation cannot skip entries or corrupt
+  // the first-hit -> second-hit handoff.
+  const routeEnemies=Array.from(zombies);
+  for(const z of routeEnemies){
+    if(!z||z===endpoint||!z.userData||z.userData.dead||z.userData.spawnPending) continue;
     if(knightRoyalOnslaughtSegmentDistanceSq(z.position,from,to)>radiusSq) continue;
     knightRoyalOnslaughtDamage(z,index);
   }
@@ -15006,20 +15012,32 @@ function knightRoyalOnslaughtStrike(){
 function knightRoyalOnslaughtUpdateDash(dt){
   const d=knightRuntime.royalOnslaughtDash;
   if(!d||!player) return false;
-  d.elapsed+=dt;
+  const safeDt=Number.isFinite(dt)?Math.max(0,Math.min(dt,.10)):0;
+  if(!Number.isFinite(d.elapsed)) d.elapsed=0;
+  if(!Number.isFinite(d.duration)||d.duration<=0) d.duration=.18;
+  d.elapsed+=safeDt;
   const raw=Math.min(1,d.elapsed/d.duration);
   const p=1-Math.pow(1-raw,2.4);
-  player.position.x=d.fromX+(d.toX-d.fromX)*p;
-  player.position.z=d.fromZ+(d.toZ-d.fromZ)*p;
-  player.rotation.y=d.yaw;
-  // No per-dash custom VFX in this stability build. The moving Knight model
-  // itself provides the speed read while we isolate the remaining freeze.
-  if(raw>=1){
-    // Route-contact enemies take their normal Onslaught hit along the path,
-    // but only the endpoint strike advances the designated sequence.
-    knightRoyalOnslaughtPathDamage(d.startPos,player.position,d.index,d.target);
+  if(Number.isFinite(d.fromX)&&Number.isFinite(d.toX)) player.position.x=d.fromX+(d.toX-d.fromX)*p;
+  if(Number.isFinite(d.fromZ)&&Number.isFinite(d.toZ)) player.position.z=d.fromZ+(d.toZ-d.fromZ)*p;
+  if(Number.isFinite(d.yaw)) player.rotation.y=d.yaw;
+  // No per-dash custom VFX in this stability build. A watchdog also forces the
+  // dash to resolve if a browser frame spike ever leaves it alive too long.
+  const forceComplete=d.elapsed>=Math.max(.65,d.duration+.45);
+  if(raw>=1||forceComplete){
+    try{
+      knightRoyalOnslaughtPathDamage(d.startPos,player.position,d.index,d.target);
+    }catch(err){
+      console.error('Royal Onslaught route damage recovered:',err);
+    }
     knightRuntime.royalOnslaughtDash=null;
-    knightRoyalOnslaughtImpactStrike(d);
+    try{
+      knightRoyalOnslaughtImpactStrike(d);
+    }catch(err){
+      console.error('Royal Onslaught endpoint recovered:',err);
+      knightRuntime.royalOnslaughtStrikeIndex=(d.index||0)+1;
+      knightRuntime.royalOnslaughtStrikeTimer=.10;
+    }
     return false;
   }
   return true;
