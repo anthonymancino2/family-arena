@@ -1,3 +1,4 @@
+<!-- V22.14.10 Royal Onslaught Knights Swarm: Royal Onslaught now summons ten Knights of the Round clones as one synchronized reveal. The ten clones immediately join the same captured-enemy elimination mission using the player Royal Onslaught damage rules, including one-hit non-boss kills, repeated boss damage, route-contact damage, shared bullet time, and the same activation plus three-second capture pool. Clone construction is spread across a few animation frames and revealed together to avoid an activation freeze; clone hit VFX reuse the existing capped airborne effects and add no ground trails or white floor effects. -->
 <!-- V22.14.09 Royal Onslaught Air Shockwave: adds highly visible torso-height concentric shockwave rings to every designated Royal Onslaught endpoint hit, with larger milestone shockwaves on hits 5, 10, 15, 20 and every fifth hit after. Effects remain airborne, capped, short-lived, and use no white ground geometry. Gameplay and stability guards are unchanged. -->
 <!-- V22.14.08 Royal Onslaught Safe Hit Flare: adds capped airborne-only hit spectacle to Royal Onslaught endpoint strikes using small vertical sword/shield energy flashes and compact sparks. No ground rings, floor trails, avatar clones, mass target markers, or activation geometry are added. Damage, targeting, bullet time, capture/elimination behavior, cooldown scaling, and stability guards are unchanged. -->
 <!-- V22.14.07 Royal Onslaught Stability Verification: hardens the stripped Royal Onslaught activation and strike handoff by removing an unused activation-time enemy sort, iterating route damage over a stable enemy snapshot so one-hit removals cannot disturb traversal, validating dash timing/state every frame, and adding a forced dash-completion watchdog. No new Royal Onslaught VFX are added; damage, capture, bullet time, elimination rules, and cooldown scaling are unchanged. -->
@@ -198,7 +199,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.09</title>
+<title>Family Arena V22.14.10</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1395,7 +1396,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.09 - Royal Onslaught Air Shockwave';
+const GAME_VERSION='22.14.10 - Royal Onslaught Knights Swarm';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2430,7 +2431,7 @@ const LEVEL_UNLOCKS = [
   {level:8,  id:'knight_shield_toss', name:'Shield Toss', desc:'Throw and recall the royal shield from the Secondary slot, stunning every surviving enemy class for 3 seconds on contact.', avatar:'knight'},
   {level:10, id:'knight_royal_guard_clones', name:'Knights of the Round', desc:'Summon invincible Knight copies that inherit the moves unlocked so far and draw enemy attention.', avatar:'knight'},
   {level:12, id:'knight_guardian_quake', name:'Guardian Titan', desc:'Guardian Charge and Earth Shatter combine into one hold-controlled Titan Ability with movement steering, followed by a 15-second Titan form.', avatar:'knight'},
-  {level:14, id:'knight_aegis_counter', name:'Royal Onslaught', desc:'Enter royal bullet time for at least 20 designated strikes, instantly defeating every non-boss enemy touched, then continue until every captured enemy is eliminated.', avatar:'knight'},
+  {level:14, id:'knight_aegis_counter', name:'Royal Onslaught', desc:'Enter royal bullet time with ten Knights of the Round joining the attack. Non-boss enemies touched are instantly defeated and the captured group is pursued until eliminated.', avatar:'knight'},
   {level:18, id:'knight_judgment', name:'Judgment of the King', desc:'Judgment becomes an equipable ultimate-tier move in the Ability slot.', avatar:'knight'}
 ];
 let reachedLevelUnlocks = new Set();
@@ -14834,6 +14835,7 @@ function triggerKnightAegisCounter(){
   // the single source of truth for the 3-second capture group.
   knightRuntime.royalOnslaughtTargets=[];
   knightRuntime.royalOnslaughtTargetCursor=0;
+  summonKnightRoyalOnslaughtSwarm();
 
   const visual=knightTitanVisualScale();
   // Ground crown/ring removed: it created the large white floor effect.
@@ -15265,6 +15267,7 @@ function knightEndAegis(success){
   if(ring){ if(ring.parent) scene.remove(ring); disposeGroup(ring); knightRuntime.aegisRing=null; }
   const wasActive=knightRuntime.aegisWindow>0 || (knightRuntime.royalOnslaughtStrikeIndex||0)>0;
   knightRuntime.aegisWindow=0;
+  clearKnightRoyalOnslaughtSwarm();
   knightRoyalOnslaughtClearAllMarkers();
   knightRoyalOnslaughtAtmosphere(false);
   knightRuntime.aegisRecovery=success?.28:.08;
@@ -16263,6 +16266,133 @@ function knightRoyalCloneFormationScale(){
   // enlarged player body so they do not spawn or orbit inside the giant Knight.
   return knightGuardianGiantActive()?1.85:1;
 }
+
+function clearKnightRoyalOnslaughtSwarm(){
+  for(const c of [...knightRoyalClones]){
+    if(c&&c.userData&&c.userData.isRoyalOnslaughtClone) removeKnightRoyalClone(c);
+  }
+  for(const z of zombies){
+    if(z&&z.userData&&z.userData.royalOnslaughtCloneReservedBy) z.userData.royalOnslaughtCloneReservedBy=null;
+  }
+}
+function summonKnightRoyalOnslaughtSwarm(){
+  if(!player||state.avatarType!=='knight') return;
+  // Royal Onslaught owns this temporary army. Replace any prior Round clones,
+  // but do not charge or alter the normal Knights of the Round signature cooldown.
+  clearKnightRoyalClones();
+  const summonEpoch=knightRoyalCloneSummonEpoch;
+  getKayKitAssetPromise('knight').then(({gltf,THREEAsset,cloneSkinned})=>{
+    if(summonEpoch!==knightRoyalCloneSummonEpoch||!player||!gameRunning||knightRuntime.aegisWindow<=0) return;
+    const pending=[];
+    let nextIndex=0;
+    const buildBatch=()=>{
+      if(summonEpoch!==knightRoyalCloneSummonEpoch||!player||!gameRunning||knightRuntime.aegisWindow<=0){
+        for(const c of pending) disposeGroup(c);
+        return;
+      }
+      // Build only two expensive skinned clones per render frame, then reveal
+      // all ten together once ready. This preserves the "all at once" entrance
+      // without repeating the activation freezes caused by large same-frame allocations.
+      const end=Math.min(10,nextIndex+2);
+      for(;nextIndex<end;nextIndex++){
+        const i=nextIndex;
+        const wrap=new THREE.Group(),root=cloneSkinned(gltf.scene);root.rotation.y=0;
+        const box=new THREEAsset.Box3().setFromObject(root),size=box.getSize(new THREEAsset.Vector3());
+        root.scale.setScalar(1.48/Math.max(.001,size.y));
+        const box2=new THREEAsset.Box3().setFromObject(root);root.position.y-=box2.min.y;
+        tintKnightRoyalClone(root,i);wrap.add(root);
+        const slot=knightRoyalCloneFormationSlot(i,10,1,-Math.PI/2);
+        wrap.position.set(player.position.x+slot.x,player.position.y,player.position.z+slot.z);
+        Object.assign(wrap.userData,{
+          isKnightRoyalClone:true,isRoyalOnslaughtClone:true,invincible:true,hp:Infinity,maxHp:Infinity,dead:false,
+          cloneIndex:i,life:9999,attackCooldown:0,moveIndex:0,farTimer:0,returning:false,
+          onslaughtStrikeIndex:i,onslaughtStrikeCooldown:0,onslaughtDash:null,
+          kayMixer:new THREEAsset.AnimationMixer(root),kayClips:{}
+        });
+        for(const clip of gltf.animations)wrap.userData.kayClips[clip.name]=clip;
+        pending.push(wrap);
+      }
+      if(nextIndex<10){ requestAnimationFrame(buildBatch); return; }
+      if(summonEpoch!==knightRoyalCloneSummonEpoch||!player||!gameRunning||knightRuntime.aegisWindow<=0){
+        for(const c of pending) disposeGroup(c);return;
+      }
+      // One synchronized reveal. No arrival rings, floor sigils, or clone trails.
+      for(const c of pending){ scene.add(c);knightRoyalClones.push(c); }
+      if(navigator.vibrate) navigator.vibrate([18,12,30]);
+    };
+    requestAnimationFrame(buildBatch);
+  }).catch(()=>{});
+}
+function knightRoyalOnslaughtCloneTarget(c){
+  const eligible=knightRuntime.royalOnslaughtEligibleIds;
+  if(!eligible||!c) return null;
+  let best=null,bestD=Infinity,fallback=null,fallbackD=Infinity;
+  for(const z of zombies){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending||!eligible.has(z.uuid)) continue;
+    const d=c.position.distanceToSquared(z.position);
+    if(d<fallbackD){fallback=z;fallbackD=d;}
+    const reserved=z.userData.royalOnslaughtCloneReservedBy;
+    if(reserved&&reserved!==c.uuid) continue;
+    if(d<bestD){best=z;bestD=d;}
+  }
+  const target=best||fallback;
+  if(target) target.userData.royalOnslaughtCloneReservedBy=c.uuid;
+  return target;
+}
+function knightRoyalOnslaughtCloneBeginDash(c,target){
+  if(!c||!target||target.userData.dead) return false;
+  const from=c.position.clone();
+  const dx=target.position.x-c.position.x,dz=target.position.z-c.position.z;
+  const dist=Math.hypot(dx,dz)||1;
+  c.rotation.y=Math.atan2(dx,dz);
+  const stop=1.05;
+  const desiredX=target.position.x-dx/dist*stop;
+  const desiredZ=target.position.z-dz/dist*stop;
+  const safe=knightRoyalOnslaughtSafePosition(desiredX,desiredZ,c.position.y);
+  c.userData.onslaughtDash={
+    target,start:from,end:new THREE.Vector3(safe.x,c.position.y,safe.z),elapsed:0,duration:.18,
+    index:c.userData.onslaughtStrikeIndex||0
+  };
+  knightClonePlayClip(c,['melee','slash'],'1H_Melee_Attack_Slice_Horizontal');
+  return true;
+}
+function updateKnightRoyalOnslaughtClone(c,dt){
+  if(!c||!c.parent) return;
+  if(c.userData.kayMixer)c.userData.kayMixer.update(dt);
+  if(knightRuntime.aegisWindow<=0){ removeKnightRoyalClone(c); return; }
+  c.userData.onslaughtStrikeCooldown=Math.max(0,(c.userData.onslaughtStrikeCooldown||0)-dt);
+  const dash=c.userData.onslaughtDash;
+  if(dash){
+    dash.elapsed+=dt;
+    const p=Math.min(1,dash.elapsed/Math.max(.001,dash.duration));
+    const eased=1-Math.pow(1-p,2.2);
+    c.position.lerpVectors(dash.start,dash.end,eased);
+    if(p>=1){
+      const target=dash.target;
+      // Same route-contact rule and same damage function used by the player.
+      try{ knightRoyalOnslaughtPathDamage(dash.start,dash.end,dash.index,target); }catch(e){}
+      if(target&&target.userData){
+        target.userData.royalOnslaughtCloneReservedBy=null;
+        if(!target.userData.dead){
+          try{ knightRoyalOnslaughtDamage(target,dash.index); }catch(e){}
+          if(!target.userData.dead){
+            try{knightRoyalOnslaughtSafeHitFx(target,dash.index);knightRoyalOnslaughtAirShockwave(target,dash.index);}catch(e){}
+          }else{
+            try{knightRoyalOnslaughtSafeHitFx(target,dash.index);knightRoyalOnslaughtAirShockwave(target,dash.index);}catch(e){}
+          }
+        }
+      }
+      knightClonePlayClip(c,(dash.index%2)?['melee','chop']:['melee','slash'],(dash.index%2)?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal');
+      c.userData.onslaughtStrikeIndex=(dash.index||0)+1;
+      c.userData.onslaughtStrikeCooldown=.06;
+      c.userData.onslaughtDash=null;
+    }
+    return;
+  }
+  if(c.userData.onslaughtStrikeCooldown>0) return;
+  const target=knightRoyalOnslaughtCloneTarget(c);
+  if(target) knightRoyalOnslaughtCloneBeginDash(c,target);
+}
 function triggerKnightRoyalGuardClones(){
   if(!gameRunning||!knightRoyalCloneUnlocked()||knightRoyalCloneCooldown>0)return false;
   const cfg=knightRoyalCloneConfig();
@@ -16309,6 +16439,10 @@ function updateKnightRoyalClones(dt){
   const now=performance.now()*.001;
   for(const c of [...knightRoyalClones]){
     if(!c||!c.parent)continue;
+    if(c.userData&&c.userData.isRoyalOnslaughtClone){
+      updateKnightRoyalOnslaughtClone(c,dt);
+      continue;
+    }
     c.userData.life-=dt;
     if(c.userData.life<=0){
       knightRoyalCloneDepartureFx(c.position,c.userData.cloneIndex||0);
