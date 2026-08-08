@@ -1,3 +1,5 @@
+<!-- V22.14.22 Royal Onslaught Clone Performance: preserves all 30 full-detail Knight clones and half-player dash speed while reducing expensive per-frame work. Clone animation mixers now update on alternating frames while dashing and at a lower cadence while waiting; target acquisition is staggered so idle clones do not all rescan the entire enemy list on the same frame. Damage, path-contact checks, target reservation, hit VFX, and visuals are preserved. -->
+<!-- V22.14.21 Selection Preview Full-Body Fit: preserves the approved gameplay-relative avatar size hierarchy in the Build Your Avatar screen while adding a maximum preview fit so oversized characters, especially Barbarian, remain fully visible head-to-toe inside the preview card. This affects selection-screen framing only, not gameplay scale. -->
 <!-- V22.14.20 Selection Preview True Scale: the Build Your Avatar 3D preview now preserves each avatar's approved AVATAR_SCALE instead of normalizing every model to the same 1.75-unit preview height. A common preview reference factor keeps the models readable while preserving the same relative size hierarchy used during gameplay. -->
 <!-- V22.14.19 Avatar Scale Pass: approved hierarchy applied globally: Archer, Hooded Rogue, and Mage are reduced to the small tier; Knight remains the larger medium tier; Barbarian is doubled from its prior 1.08 scale to 2.16. Royal Onslaught systems from V22.14.18 are preserved. -->
 <!-- V22.14.18 Royal Onslaught Clone Attack Readability: adds a lightweight airborne impact cue to successful Royal Onslaught clone endpoint hits so the 30-clone army visibly reads as attacking rather than only dashing. Effects are frame-throttled, short-lived, and never create ground rings, floor trails, or white ground washes. Clone speed remains one-half of the player's dash speed; damage, targeting, capture rules, bullet time, and cooldown scaling are unchanged. -->
@@ -209,7 +211,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.20</title>
+<title>Family Arena V22.14.22</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1406,7 +1408,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.20 - Selection Preview True Scale';
+const GAME_VERSION='22.14.22 - Royal Onslaught Clone Performance';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2276,7 +2278,14 @@ async function updateAvatarPreview(characterId){
     // flattening every character to an identical height.
     const previewReference=1.48;
     const gameplayScale=AVATAR_SCALE[characterId]||1;
-    root.scale.setScalar((previewReference/Math.max(.001,size.y))*gameplayScale);
+
+    // Keep the approved gameplay-relative hierarchy, but never allow a model
+    // to become so large that its head/feet are cropped by the preview camera.
+    const relativeScale=(previewReference/Math.max(.001,size.y))*gameplayScale;
+    const fullBodyMaxHeight=2.12;
+    const fullBodyFitScale=fullBodyMaxHeight/Math.max(.001,size.y);
+    root.scale.setScalar(Math.min(relativeScale,fullBodyFitScale));
+
     const box2=new THREEAsset.Box3().setFromObject(root);
     root.position.y-=box2.min.y;
     root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
@@ -16354,6 +16363,7 @@ function summonKnightRoyalOnslaughtSwarm(){
           cloneIndex:i,life:9999,attackCooldown:0,moveIndex:0,farTimer:0,returning:false,
           onslaughtStrikeIndex:i,onslaughtStrikeCooldown:0,onslaughtDash:null,
           onslaughtLaneAngle:(i/30)*Math.PI*2,onslaughtReservedTargetId:null,
+          onslaughtAnimAccum:0,onslaughtAnimFrame:i%3,
           kayMixer:new THREEAsset.AnimationMixer(root),kayClips:{}
         });
         for(const clip of gltf.animations)wrap.userData.kayClips[clip.name]=clip;
@@ -16520,10 +16530,21 @@ function knightRoyalOnslaughtCloneBeginDash(c,target){
 }
 function updateKnightRoyalOnslaughtClone(c,dt){
   if(!c||!c.parent) return;
-  if(c.userData.kayMixer)c.userData.kayMixer.update(dt);
   if(knightRuntime.aegisWindow<=0){ removeKnightRoyalClone(c); return; }
-  c.userData.onslaughtStrikeCooldown=Math.max(0,(c.userData.onslaughtStrikeCooldown||0)-dt);
+
+  // Full-detail skinned Knights are retained. The expensive mixer is decimated
+  // rather than removed: dashing clones animate at ~1/2 render cadence and
+  // waiting clones at ~1/3 cadence, while accumulated dt keeps motion timing correct.
+  c.userData.onslaughtAnimAccum=(c.userData.onslaughtAnimAccum||0)+dt;
+  c.userData.onslaughtAnimFrame=((c.userData.onslaughtAnimFrame||0)+1)%6;
   const dash=c.userData.onslaughtDash;
+  const animModulo=dash?2:3;
+  if(c.userData.kayMixer && (c.userData.onslaughtAnimFrame%animModulo)===0){
+    c.userData.kayMixer.update(c.userData.onslaughtAnimAccum);
+    c.userData.onslaughtAnimAccum=0;
+  }
+
+  c.userData.onslaughtStrikeCooldown=Math.max(0,(c.userData.onslaughtStrikeCooldown||0)-dt);
   if(dash){
     dash.elapsed+=dt;
     const p=Math.min(1,dash.elapsed/Math.max(.001,dash.duration));
@@ -16531,7 +16552,7 @@ function updateKnightRoyalOnslaughtClone(c,dt){
     c.position.lerpVectors(dash.start,dash.end,eased);
     if(p>=1){
       const target=dash.target;
-      // Same route-contact rule and same damage function used by the player.
+      // Combat remains exact even though visual animation updates are cheaper.
       try{ knightRoyalOnslaughtPathDamage(dash.start,dash.end,dash.index,target); }catch(e){}
       if(target&&target.userData){
         if(target.userData.royalOnslaughtCloneReservedBy===c.uuid) target.userData.royalOnslaughtCloneReservedBy=null;
@@ -16548,10 +16569,17 @@ function updateKnightRoyalOnslaughtClone(c,dt){
     }
     return;
   }
+
   if(c.userData.onslaughtStrikeCooldown>0) return;
+
+  // Stagger full enemy-list scans across the army. This is intentionally a
+  // tiny delay (max ~0.04 s) and does not alter damage or clone dash speed.
+  const idx=c.userData.cloneIndex||0;
+  const phase=(idx%6)*.008;
+  c.userData.onslaughtStrikeCooldown=phase;
   const target=knightRoyalOnslaughtCloneTarget(c);
   if(target) knightRoyalOnslaughtCloneBeginDash(c,target);
-  else c.userData.onslaughtStrikeCooldown=.045+(c.userData.cloneIndex%6)*.012;
+  else c.userData.onslaughtStrikeCooldown=.055+phase;
 }
 function triggerKnightRoyalGuardClones(){
   if(!gameRunning||!knightRoyalCloneUnlocked()||knightRoyalCloneCooldown>0)return false;
