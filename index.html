@@ -1,3 +1,4 @@
+<!-- V22.14.14 Royal Onslaught Full Clone Visual Restore: restores the 30 Royal Onslaught support Knights to the previous full detailed Knight clone appearance from V22.14.12 while retaining the one-per-frame construction and synchronized reveal safeguards. The stripped shadow-army visual is removed. Damage, targeting, bullet time, capture/elimination rules, cooldown scaling, and airborne hit effects are unchanged. -->
 <!-- V22.14.13 Royal Onslaught Shadow Army: replaces the 30 Royal Onslaught support Knights with deliberately stripped-down shadow/afterimage Knights. They retain real Royal Onslaught targeting and damage, but no longer load, clone, animate, or render the detailed skinned Knight avatar. -->
 <!-- V22.14.12 Royal Onslaught Thirty-Knight Swarm: expands the temporary Royal Onslaught army from 10 to 30 Knights. Expensive skinned clone construction is spread one clone per render frame and all 30 are revealed together only after preparation, while target sectors, non-boss reservations, boss encirclement, and hit VFX throttling are scaled for the larger army. Damage, one-hit non-boss rules, boss elimination behavior, capture window, bullet time, cooldown scaling, and no-ground-effect safeguards are unchanged. -->
 <!-- V22.14.11 Royal Onslaught Army Coordination: coordinates the player-plus-thirty-clone Royal Onslaught swarm across the arena. Clones now prefer separate angular sectors and never intentionally double-reserve a living non-boss target; when only bosses remain they may converge, but approach from clone-specific angles around the boss for a multi-direction assault. Reservations are cleared safely on hit/removal, and the simultaneous reveal gets one lightweight airborne spark cue without ground effects. Damage, one-hit non-boss rules, boss elimination behavior, capture window, bullet time, cooldown scaling, and freeze guards are unchanged. -->
@@ -202,7 +203,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.13</title>
+<title>Family Arena V22.14.14</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1399,7 +1400,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.13 - Royal Onslaught Shadow Army';
+const GAME_VERSION='22.14.14 - Royal Onslaught Full Clone Visual Restore';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -16278,70 +16279,56 @@ function clearKnightRoyalOnslaughtSwarm(){
     if(z&&z.userData&&z.userData.royalOnslaughtCloneReservedBy) z.userData.royalOnslaughtCloneReservedBy=null;
   }
 }
-function knightRoyalOnslaughtCreateShadowKnight(index){
-  // Cheap "living afterimage" Knight. No GLTF, skeleton, mixer, textures,
-  // detailed armor, or cloned avatar materials.
-  const g=new THREE.Group();
-  const shadow=new THREE.MeshBasicMaterial({color:0x182033,transparent:true,opacity:.46,depthWrite:false});
-  const glow=new THREE.MeshBasicMaterial({color:0xd7bd68,transparent:true,opacity:.24,depthWrite:false});
-
-  const torso=new THREE.Mesh(new THREE.CylinderGeometry(.24,.34,.86,5),shadow);
-  torso.position.y=.78; g.add(torso);
-  const head=new THREE.Mesh(new THREE.SphereGeometry(.21,5,4),shadow);
-  head.position.y=1.34; g.add(head);
-  const helm=new THREE.Mesh(new THREE.ConeGeometry(.23,.30,5),shadow);
-  helm.position.y=1.58; g.add(helm);
-
-  const shield=new THREE.Mesh(new THREE.CylinderGeometry(.27,.27,.045,7),shadow);
-  shield.rotation.z=Math.PI/2; shield.position.set(-.31,.90,.02); g.add(shield);
-  const sword=new THREE.Mesh(new THREE.BoxGeometry(.045,.72,.045),glow);
-  sword.position.set(.30,.94,.01); sword.rotation.z=-.30; g.add(sword);
-
-  // One tiny floating crest keeps the silhouettes readable in bullet time.
-  const crest=new THREE.Mesh(new THREE.BoxGeometry(.20,.035,.035),glow);
-  crest.position.set(0,1.70,0); g.add(crest);
-
-  g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;}});
-  return g;
-}
 function summonKnightRoyalOnslaughtSwarm(){
   if(!player||state.avatarType!=='knight') return;
+  // Royal Onslaught owns this temporary army. Replace any prior Round clones,
+  // but do not charge or alter the normal Knights of the Round signature cooldown.
   clearKnightRoyalClones();
   const summonEpoch=knightRoyalCloneSummonEpoch;
-  const pending=[];
-  let nextIndex=0;
-  const buildBatch=()=>{
-    if(summonEpoch!==knightRoyalCloneSummonEpoch||!player||!gameRunning||knightRuntime.aegisWindow<=0){
-      for(const c of pending) disposeGroup(c);
-      return;
-    }
-    // These are tiny primitive-only shadow Knights, so five per frame is safe
-    // while still avoiding a single 30-object activation spike.
-    const end=Math.min(30,nextIndex+5);
-    for(;nextIndex<end;nextIndex++){
-      const i=nextIndex;
-      const wrap=knightRoyalOnslaughtCreateShadowKnight(i);
-      const slot=knightRoyalCloneFormationSlot(i,30,1,-Math.PI/2);
-      wrap.position.set(player.position.x+slot.x,player.position.y,player.position.z+slot.z);
-      Object.assign(wrap.userData,{
-        isKnightRoyalClone:true,isRoyalOnslaughtClone:true,isRoyalOnslaughtShadow:true,
-        invincible:true,hp:Infinity,maxHp:Infinity,dead:false,
-        cloneIndex:i,life:9999,attackCooldown:0,moveIndex:0,farTimer:0,returning:false,
-        onslaughtStrikeIndex:i,onslaughtStrikeCooldown:0,onslaughtDash:null,
-        onslaughtLaneAngle:(i/30)*Math.PI*2,onslaughtReservedTargetId:null,
-        kayMixer:null,kayClips:{}
-      });
-      pending.push(wrap);
-    }
-    if(nextIndex<30){requestAnimationFrame(buildBatch);return;}
-    if(summonEpoch!==knightRoyalCloneSummonEpoch||!player||!gameRunning||knightRuntime.aegisWindow<=0){
-      for(const c of pending) disposeGroup(c);return;
-    }
-    for(const c of pending){scene.add(c);knightRoyalClones.push(c);}
-    try{spawnBurst(player.position.x,player.position.y+1.2,player.position.z,8,FX_MAT_SPARK,2.8);}catch(e){}
-    if(navigator.vibrate) navigator.vibrate([18,12,30]);
-  };
-  requestAnimationFrame(buildBatch);
+  getKayKitAssetPromise('knight').then(({gltf,THREEAsset,cloneSkinned})=>{
+    if(summonEpoch!==knightRoyalCloneSummonEpoch||!player||!gameRunning||knightRuntime.aegisWindow<=0) return;
+    const pending=[];
+    let nextIndex=0;
+    const buildBatch=()=>{
+      if(summonEpoch!==knightRoyalCloneSummonEpoch||!player||!gameRunning||knightRuntime.aegisWindow<=0){
+        for(const c of pending) disposeGroup(c);
+        return;
+      }
+      // Build only one expensive skinned clone per render frame, then reveal
+      // all 30 together once ready. This preserves the "all at once" entrance
+      // while avoiding a large same-frame allocation spike on iPhone Safari.
+      const end=Math.min(30,nextIndex+1);
+      for(;nextIndex<end;nextIndex++){
+        const i=nextIndex;
+        const wrap=new THREE.Group(),root=cloneSkinned(gltf.scene);root.rotation.y=0;
+        const box=new THREEAsset.Box3().setFromObject(root),size=box.getSize(new THREEAsset.Vector3());
+        root.scale.setScalar(1.48/Math.max(.001,size.y));
+        const box2=new THREEAsset.Box3().setFromObject(root);root.position.y-=box2.min.y;
+        tintKnightRoyalClone(root,i);wrap.add(root);
+        const slot=knightRoyalCloneFormationSlot(i,30,1,-Math.PI/2);
+        wrap.position.set(player.position.x+slot.x,player.position.y,player.position.z+slot.z);
+        Object.assign(wrap.userData,{
+          isKnightRoyalClone:true,isRoyalOnslaughtClone:true,invincible:true,hp:Infinity,maxHp:Infinity,dead:false,
+          cloneIndex:i,life:9999,attackCooldown:0,moveIndex:0,farTimer:0,returning:false,
+          onslaughtStrikeIndex:i,onslaughtStrikeCooldown:0,onslaughtDash:null,
+          onslaughtLaneAngle:(i/30)*Math.PI*2,onslaughtReservedTargetId:null,
+          kayMixer:new THREEAsset.AnimationMixer(root),kayClips:{}
+        });
+        for(const clip of gltf.animations)wrap.userData.kayClips[clip.name]=clip;
+        pending.push(wrap);
+      }
+      if(nextIndex<30){ requestAnimationFrame(buildBatch); return; }
+      if(summonEpoch!==knightRoyalCloneSummonEpoch||!player||!gameRunning||knightRuntime.aegisWindow<=0){
+        for(const c of pending) disposeGroup(c);return;
+      }
+      // One synchronized reveal. Keep it airborne/lightweight: no arrival rings,
+      // floor sigils, clone trails, or per-clone geometry bursts.
+      for(const c of pending){ scene.add(c);knightRoyalClones.push(c); }
+      try{spawnBurst(player.position.x,player.position.y+1.2,player.position.z,12,FX_MAT_SPARK,3.2);}catch(e){}
+      if(navigator.vibrate) navigator.vibrate([18,12,30]);
+    };
+    requestAnimationFrame(buildBatch);
+  }).catch(()=>{});
 }
 function knightRoyalOnslaughtAngleDelta(a,b){
   let d=(a-b)%(Math.PI*2);
@@ -16421,7 +16408,7 @@ function knightRoyalOnslaughtCloneBeginDash(c,target){
     target,start:from,end:new THREE.Vector3(safe.x,c.position.y,safe.z),elapsed:0,duration:.18,
     index:c.userData.onslaughtStrikeIndex||0
   };
-  if(!c.userData.isRoyalOnslaughtShadow) knightClonePlayClip(c,['melee','slash'],'1H_Melee_Attack_Slice_Horizontal');
+  knightClonePlayClip(c,['melee','slash'],'1H_Melee_Attack_Slice_Horizontal');
   return true;
 }
 function updateKnightRoyalOnslaughtClone(c,dt){
@@ -16455,7 +16442,7 @@ function updateKnightRoyalOnslaughtClone(c,dt){
           }
         }
       }
-      if(!c.userData.isRoyalOnslaughtShadow) knightClonePlayClip(c,(dash.index%2)?['melee','chop']:['melee','slash'],(dash.index%2)?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal');
+      knightClonePlayClip(c,(dash.index%2)?['melee','chop']:['melee','slash'],(dash.index%2)?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal');
       c.userData.onslaughtStrikeIndex=(dash.index||0)+1;
       c.userData.onslaughtStrikeCooldown=.06;
       c.userData.onslaughtDash=null;
