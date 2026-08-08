@@ -1,3 +1,7 @@
+<!-- V22.14.31 Knights of the Round Two-Third Player Speed: regular Knights of the Round companion clones now move at two-thirds of the Knight player's current gameplay movement speed rather than using the old fixed interpolation rates. The calculation follows the player's speed stat, avatar movement multiplier, and Knight movement multiplier. Royal Onslaught clones remain at their separately approved two-thirds-of-player Onslaught dash speed. Damage, durations, clone counts, targeting, and cooldown rules are unchanged. -->
+<!-- V22.14.30 Royal Onslaught Two-Third Clone Speed: keeps the player's approved 0.36-second Royal Onslaught dash and changes the 30 clone dashes from 0.72 seconds (50% player speed) to 0.54 seconds, which is exactly two-thirds of the player's movement speed over the same distance. Damage, targeting, bullet time, capture rules, clone count, visuals, and cooldown scaling are unchanged. -->
+<!-- V22.14.29 Royal Onslaught Long-Sequence Pacing Pass: keeps the slower approved dash speeds but tightens idle gaps between endpoint attacks and the next target handoff. Player dash remains 0.36s, clone dash remains 0.72s (50% of player speed). Strike cooldowns between successful hits are reduced so long 20+ hit chains feel continuous without speeding up the actual travel motion. Damage, targeting, bullet time, clone count, capture rules, and cooldown scaling are unchanged. -->
+<!-- V22.14.28 Royal Onslaught Bullet-Time Recovery Guard: centralizes the 80% enemy/projectile slowdown check and adds a forced recovery scrub when Royal Onslaught ends or Knight round/reset cleanup runs. Projectile tail width/opacity is immediately normalized, the atmosphere is removed, and stale Onslaught timing flags are cleared. Current half-speed player traversal, clone half-of-player speed rule, damage, 30-clone behavior, targeting, visuals, and cooldown scaling are preserved. -->
 <!-- V22.14.27 Royal Onslaught Half Speed: slows the overall Royal Onslaught traversal for readability. Player dash duration is doubled from 0.18s to 0.36s, cutting player dash speed in half. Clones preserve the previously approved 50%-of-player-speed rule, so clone dash duration doubles from 0.36s to 0.72s. Damage, targeting, bullet time, capture rules, clone count, and cooldown scaling are unchanged. -->
 <!-- V22.14.26 Royal Onslaught Repeat Activation Guard: adds a defensive preflight reset before every Royal Onslaught activation so stale clones, target reservations, capture data, delayed clone summons, and old target references cannot leak into the next use. Damage, 30-clone behavior, half-player clone speed, visuals, bullet-time behavior, and cooldown rules remain unchanged. -->
 <!-- V22.14.25 Royal Onslaught Cleanup Pass: hardened end/reset cleanup for clone target reservations, clone dash references, enemy targeting references, temporary Knight effects, capture collections, leader glow, and delayed clone summons. Gameplay/damage rules are unchanged. -->
@@ -216,7 +220,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.27</title>
+<title>Family Arena V22.14.31</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1429,7 +1433,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.27 - Royal Onslaught Half Speed';
+const GAME_VERSION='22.14.31 - Round Table Two Third Player Speed';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2482,8 +2486,30 @@ function spawnEnemyShot(z){
   spawnBurst(g.position.x,g.position.y,g.position.z,9,FX_MAT_ENEMY_SHOT,2.6);
 }
 const ENEMY_SHOT_TAIL_MAX_LEN = 1.7;
+function knightRoyalOnslaughtBulletTimeActive(){
+  return !!(knightRuntime && Number(knightRuntime.aegisWindow)>0);
+}
 function knightRoyalOnslaughtEnemyTimeScale(){
-  return knightRuntime&&knightRuntime.aegisWindow>0?0.20:1;
+  return knightRoyalOnslaughtBulletTimeActive()?0.20:1;
+}
+function knightRoyalOnslaughtRestoreBulletTime(){
+  // Slow motion is calculated from live state each frame, so resetting
+  // aegisWindow restores enemy movement/attack timing immediately. This scrub
+  // also normalizes projectile presentation on the same frame instead of
+  // waiting for the next projectile update.
+  if(knightRuntime) knightRuntime.aegisWindow=0;
+  try{ knightRoyalOnslaughtAtmosphere(false); }catch(_err){}
+  try{
+    for(const p of enemyProjectiles){
+      if(!p||!p.tail) continue;
+      p.tail.scale.x=1;
+      p.tail.scale.z=1;
+      for(const child of p.tail.children||[]){
+        if(!child||!child.material||!('opacity' in child.material)) continue;
+        child.material.opacity=(child===p.tail.children[0])?.42:.75;
+      }
+    }
+  }catch(_err){}
 }
 function updateEnemyProjectiles(dt){
   dt*=knightRoyalOnslaughtEnemyTimeScale();
@@ -15228,7 +15254,7 @@ function knightRoyalOnslaughtImpactStrike(dash){
   knightRuntime.royalOnslaughtStrikeIndex=index+1;
   const survivors=knightRoyalOnslaughtLivingEligible();
   const bossOnly=(knightRuntime.royalOnslaughtStrikeIndex||0)>=20&&survivors.length>0&&survivors.every(z=>knightEnemyClass(z)==='boss');
-  knightRuntime.royalOnslaughtStrikeTimer=bossOnly?.13:.17;
+  knightRuntime.royalOnslaughtStrikeTimer=bossOnly?.07:.09;
   if(navigator.vibrate) navigator.vibrate(18);
 }
 function knightRoyalOnslaughtStrike(){
@@ -15237,7 +15263,7 @@ function knightRoyalOnslaughtStrike(){
   const target=knightRoyalOnslaughtSelectTarget();
   if(!target){
     knightRuntime.royalOnslaughtStrikeIndex=index+1;
-    knightRuntime.royalOnslaughtStrikeTimer=.10;
+    knightRuntime.royalOnslaughtStrikeTimer=.06;
     return;
   }
   const startPos=player.position.clone();
@@ -15404,10 +15430,11 @@ function knightUpdateAegis(dt){
   if(knightRuntime.aegisRecovery>0) knightRuntime.aegisRecovery=Math.max(0,knightRuntime.aegisRecovery-dt);
 }
 function knightEndAegis(success){
+  knightRoyalOnslaughtRestoreBulletTime();
   const ring=knightRuntime.aegisRing;
   if(ring){ if(ring.parent) scene.remove(ring); disposeGroup(ring); knightRuntime.aegisRing=null; }
-  const wasActive=knightRuntime.aegisWindow>0 || (knightRuntime.royalOnslaughtStrikeIndex||0)>0;
-  knightRuntime.aegisWindow=0;
+  const wasActive=(knightRuntime.royalOnslaughtStrikeIndex||0)>0 ||
+    !!knightRuntime.royalOnslaughtEligibleIds;
   clearKnightRoyalOnslaughtSwarm();
   knightRoyalOnslaughtClearAllMarkers();
   knightRoyalOnslaughtAtmosphere(false);
@@ -16667,7 +16694,7 @@ function knightRoyalOnslaughtCloneBeginDash(c,target){
   c.rotation.y=Math.atan2(dx,dz);
   const safe=knightRoyalOnslaughtSafePosition(desiredX,desiredZ,c.position.y);
   c.userData.onslaughtDash={
-    target,start:from,end:new THREE.Vector3(safe.x,c.position.y,safe.z),elapsed:0,duration:.72,
+    target,start:from,end:new THREE.Vector3(safe.x,c.position.y,safe.z),elapsed:0,duration:.54,
     index:c.userData.onslaughtStrikeIndex||0
   };
   knightClonePlayClip(c,['melee','slash'],'1H_Melee_Attack_Slice_Horizontal');
@@ -16709,7 +16736,7 @@ function updateKnightRoyalOnslaughtClone(c,dt){
       }
       knightClonePlayClip(c,(dash.index%2)?['melee','chop']:['melee','slash'],(dash.index%2)?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal');
       c.userData.onslaughtStrikeIndex=(dash.index||0)+1;
-      c.userData.onslaughtStrikeCooldown=.06;
+      c.userData.onslaughtStrikeCooldown=.03;
       c.userData.onslaughtDash=null;
     }
     return;
@@ -16724,7 +16751,7 @@ function updateKnightRoyalOnslaughtClone(c,dt){
   c.userData.onslaughtStrikeCooldown=phase;
   const target=knightRoyalOnslaughtCloneTarget(c);
   if(target) knightRoyalOnslaughtCloneBeginDash(c,target);
-  else c.userData.onslaughtStrikeCooldown=.055+phase;
+  else c.userData.onslaughtStrikeCooldown=.035+phase;
 }
 function triggerKnightRoyalGuardClones(){
   if(!gameRunning||!knightRoyalCloneUnlocked()||knightRoyalCloneCooldown>0)return false;
@@ -16766,6 +16793,16 @@ function triggerKnightRoyalGuardClones(){
   if(navigator.vibrate)navigator.vibrate([28,18,52]);
   return true;
 }
+
+function knightRoundTableMoveSpeed(){
+  // Match the same movement-speed ingredients used by the live Knight player.
+  // Knights of the Round move at exactly 2/3 of that current speed.
+  const speedStat=(playerStats&&Number.isFinite(playerStats.speed))?playerStats.speed:1;
+  const characterMoveMult=(combatForAvatar().baseMoveMult||1);
+  const playerMoveSpeed=PLAYER_SPEED*characterMoveMult*knightMoveMultiplier()*(1+(speedStat-1)*0.15);
+  return Math.max(0,playerMoveSpeed*(2/3));
+}
+
 function updateKnightRoyalClones(dt){
   if(knightRoyalCloneCooldown>0)knightRoyalCloneCooldown=Math.max(0,knightRoyalCloneCooldown-dt);
   if(!player)return;
@@ -16821,8 +16858,12 @@ function updateKnightRoyalClones(dt){
       const dist=c.position.distanceTo(desired);
       if(dist>18*formationScale)c.position.copy(desired);
       else{
-        const step=Math.min(1,dt*(c.userData.returning?7.5:5.4));
-        const nx=THREE.MathUtils.lerp(c.position.x,desired.x,step),nz=THREE.MathUtils.lerp(c.position.z,desired.z,step);
+        const moveSpeed=knightRoundTableMoveSpeed();
+        const dx=desired.x-c.position.x,dz=desired.z-c.position.z;
+        const planar=Math.hypot(dx,dz);
+        const travel=Math.min(planar,moveSpeed*dt);
+        const nx=planar>1e-5?c.position.x+(dx/planar)*travel:c.position.x;
+        const nz=planar>1e-5?c.position.z+(dz/planar)*travel:c.position.z;
         const r=resolveCollision(nx,nz,c.position.y);
         c.position.x=r.x;c.position.z=r.z;c.position.y=player.position.y;
         if(dist>.55&&c.userData.motionFxTimer<=0){
@@ -16909,6 +16950,7 @@ function updateKnightSystems(dt){
 }
 
 function clearKnightRoundSpecials(resetCooldowns=true){
+  knightRoyalOnslaughtRestoreBulletTime();
   knightClearJudgment();
   knightEndShieldToss(false);
   if(knightRuntime.aegisWindow>0 || knightRuntime.aegisRing || knightRuntime.royalOnslaughtEligibleIds){
