@@ -1,3 +1,4 @@
+<!-- V22.14.18 Royal Onslaught Clone Attack Readability: adds a lightweight airborne impact cue to successful Royal Onslaught clone endpoint hits so the 30-clone army visibly reads as attacking rather than only dashing. Effects are frame-throttled, short-lived, and never create ground rings, floor trails, or white ground washes. Clone speed remains one-half of the player's dash speed; damage, targeting, capture rules, bullet time, and cooldown scaling are unchanged. -->
 <!-- V22.14.17 Royal Onslaught Clone Formation + Visibility: improves the 30 detailed Royal Onslaught clones' spawn and combat spacing, reduces visual stacking by widening lane offsets and boss approach angles, and gives the player a subtle leader glow during the move so the real Knight remains easy to identify. Clone speed stays at half the player's dash speed; damage, targeting, capture rules, bullet time, and cooldown scaling are unchanged. -->
 <!-- V22.14.16 Royal Onslaught Half-Speed Clones: changes the 30 detailed Royal Onslaught clones from two-thirds of the player's dash speed to exactly one-half of the player's dash speed. Player dash remains 0.18 seconds; clone dash duration is now 0.36 seconds. Clone visuals, damage, targeting, capture rules, bullet time, and cooldown scaling are unchanged. -->
 <!-- V22.14.15 Royal Onslaught Clone Visibility + Speed Fix: keeps the full detailed 30-clone visual, accelerates swarm preparation so all 30 reveal early enough to be seen during Royal Onslaught, and sets clone dash speed to exactly two-thirds of the player's Royal Onslaught dash speed by using a 0.27-second clone dash versus the player's 0.18-second dash. Damage, targeting, capture rules, bullet time, and cooldown scaling are unchanged. -->
@@ -206,7 +207,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.17</title>
+<title>Family Arena V22.14.18</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1403,7 +1404,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.17 - Royal Onslaught Clone Formation Visibility';
+const GAME_VERSION='22.14.18 - Royal Onslaught Clone Attack Readability';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2438,7 +2439,7 @@ const LEVEL_UNLOCKS = [
   {level:8,  id:'knight_shield_toss', name:'Shield Toss', desc:'Throw and recall the royal shield from the Secondary slot, stunning every surviving enemy class for 3 seconds on contact.', avatar:'knight'},
   {level:10, id:'knight_royal_guard_clones', name:'Knights of the Round', desc:'Summon invincible Knight copies that inherit the moves unlocked so far and draw enemy attention.', avatar:'knight'},
   {level:12, id:'knight_guardian_quake', name:'Guardian Titan', desc:'Guardian Charge and Earth Shatter combine into one hold-controlled Titan Ability with movement steering, followed by a 15-second Titan form.', avatar:'knight'},
-  {level:14, id:'knight_aegis_counter', name:'Royal Onslaught', desc:'Enter royal bullet time with ten Knights of the Round joining the attack. Non-boss enemies touched are instantly defeated and the captured group is pursued until eliminated.', avatar:'knight'},
+  {level:14, id:'knight_aegis_counter', name:'Royal Onslaught', desc:'Enter royal bullet time with thirty Knights of the Round joining the attack. Non-boss enemies touched are instantly defeated and the captured group is pursued until eliminated.', avatar:'knight'},
   {level:18, id:'knight_judgment', name:'Judgment of the King', desc:'Judgment becomes an equipable ultimate-tier move in the Ability slot.', avatar:'knight'}
 ];
 let reachedLevelUnlocks = new Set();
@@ -16412,6 +16413,71 @@ function knightRoyalOnslaughtCloneTarget(c){
   c.userData.onslaughtReservedTargetId=boss?boss.uuid:null;
   return boss;
 }
+
+function knightRoyalOnslaughtCloneHitFx(target,index,cloneIndex){
+  if(!scene||!target||!target.position) return;
+
+  // Thirty clones can land at nearly the same moment. Throttle only the
+  // optional visuals, never damage or targeting.
+  const now=performance.now();
+  const state=knightRoyalOnslaughtCloneHitFx.state||(knightRoyalOnslaughtCloneHitFx.state={window:now,count:0,active:[]});
+  if(now-state.window>90){state.window=now;state.count=0;}
+  const cap=isMobile?5:8;
+  if(state.count>=cap) return;
+  state.count++;
+
+  while(state.active.length>=10){
+    const old=state.active.shift();
+    if(old&&old.parent){scene.remove(old);disposeGroup(old);}
+  }
+
+  const g=new THREE.Group();
+  const visual=1.0;
+  const main=(cloneIndex%3===0)?KNIGHT_GOLD:((cloneIndex%3===1)?KNIGHT_IVORY:KNIGHT_STEEL);
+
+  // One upright shield shock-ring at torso height.
+  const ring=new THREE.Mesh(
+    new THREE.RingGeometry(.34*visual,.62*visual,20),
+    knightMat(main,.66)
+  );
+  ring.position.y=1.02;
+  g.add(ring);
+
+  // Two short crossing slash flashes make the contact read as an attack.
+  for(let i=0;i<2;i++){
+    const slash=new THREE.Mesh(
+      new THREE.PlaneGeometry(.10,1.40),
+      knightMat(i?KNIGHT_IVORY:main,.58)
+    );
+    slash.position.y=1.02;
+    slash.rotation.z=i?-.78:.78;
+    slash.rotation.y=(cloneIndex*.37+i*.9)%Math.PI;
+    g.add(slash);
+  }
+
+  // Every fifth clone hit gets one extra vertical accent, still airborne.
+  if(((index+1)%5)===0 || (cloneIndex%5)===0){
+    const spike=new THREE.Mesh(
+      new THREE.PlaneGeometry(.12,1.75),
+      knightMat(KNIGHT_GOLD,.52)
+    );
+    spike.position.y=1.15;
+    g.add(spike);
+  }
+
+  g.position.set(target.position.x,target.position.y||0,target.position.z);
+  if(camera) g.lookAt(camera.position.x,g.position.y+1,camera.position.z);
+  scene.add(g);
+  state.active.push(g);
+
+  const ttl=135;
+  setTimeout(()=>{
+    const p=state.active.indexOf(g);
+    if(p>=0) state.active.splice(p,1);
+    if(g.parent){scene.remove(g);disposeGroup(g);}
+  },ttl);
+}
+
 function knightRoyalOnslaughtCloneBeginDash(c,target){
   if(!c||!target||target.userData.dead) return false;
   const from=c.position.clone();
@@ -16461,16 +16527,8 @@ function updateKnightRoyalOnslaughtClone(c,dt){
         c.userData.onslaughtReservedTargetId=null;
         if(!target.userData.dead){
           try{ knightRoyalOnslaughtDamage(target,dash.index); }catch(e){}
-          if(!target.userData.dead){
-            if((c.userData.cloneIndex%5)===0 || ((dash.index+1)%5)===0){
-            try{knightRoyalOnslaughtSafeHitFx(target,dash.index);knightRoyalOnslaughtAirShockwave(target,dash.index);}catch(e){}
-          }
-          }else{
-            if((c.userData.cloneIndex%5)===0 || ((dash.index+1)%5)===0){
-              try{knightRoyalOnslaughtSafeHitFx(target,dash.index);knightRoyalOnslaughtAirShockwave(target,dash.index);}catch(e){}
-            }
-          }
         }
+        try{knightRoyalOnslaughtCloneHitFx(target,dash.index,c.userData.cloneIndex||0);}catch(e){}
       }
       knightClonePlayClip(c,(dash.index%2)?['melee','chop']:['melee','slash'],(dash.index%2)?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal');
       c.userData.onslaughtStrikeIndex=(dash.index||0)+1;
