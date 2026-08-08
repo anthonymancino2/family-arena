@@ -1,3 +1,4 @@
+<!-- V22.14.11 Royal Onslaught Army Coordination: coordinates the player-plus-ten-clone Royal Onslaught swarm across the arena. Clones now prefer separate angular sectors and never intentionally double-reserve a living non-boss target; when only bosses remain they may converge, but approach from clone-specific angles around the boss for a multi-direction assault. Reservations are cleared safely on hit/removal, and the simultaneous reveal gets one lightweight airborne spark cue without ground effects. Damage, one-hit non-boss rules, boss elimination behavior, capture window, bullet time, cooldown scaling, and freeze guards are unchanged. -->
 <!-- V22.14.10 Royal Onslaught Knights Swarm: Royal Onslaught now summons ten Knights of the Round clones as one synchronized reveal. The ten clones immediately join the same captured-enemy elimination mission using the player Royal Onslaught damage rules, including one-hit non-boss kills, repeated boss damage, route-contact damage, shared bullet time, and the same activation plus three-second capture pool. Clone construction is spread across a few animation frames and revealed together to avoid an activation freeze; clone hit VFX reuse the existing capped airborne effects and add no ground trails or white floor effects. -->
 <!-- V22.14.09 Royal Onslaught Air Shockwave: adds highly visible torso-height concentric shockwave rings to every designated Royal Onslaught endpoint hit, with larger milestone shockwaves on hits 5, 10, 15, 20 and every fifth hit after. Effects remain airborne, capped, short-lived, and use no white ground geometry. Gameplay and stability guards are unchanged. -->
 <!-- V22.14.08 Royal Onslaught Safe Hit Flare: adds capped airborne-only hit spectacle to Royal Onslaught endpoint strikes using small vertical sword/shield energy flashes and compact sparks. No ground rings, floor trails, avatar clones, mass target markers, or activation geometry are added. Damage, targeting, bullet time, capture/elimination behavior, cooldown scaling, and stability guards are unchanged. -->
@@ -199,7 +200,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.10</title>
+<title>Family Arena V22.14.11</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1396,7 +1397,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.10 - Royal Onslaught Knights Swarm';
+const GAME_VERSION='22.14.11 - Royal Onslaught Army Coordination';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -16307,6 +16308,7 @@ function summonKnightRoyalOnslaughtSwarm(){
           isKnightRoyalClone:true,isRoyalOnslaughtClone:true,invincible:true,hp:Infinity,maxHp:Infinity,dead:false,
           cloneIndex:i,life:9999,attackCooldown:0,moveIndex:0,farTimer:0,returning:false,
           onslaughtStrikeIndex:i,onslaughtStrikeCooldown:0,onslaughtDash:null,
+          onslaughtLaneAngle:(i/10)*Math.PI*2,onslaughtReservedTargetId:null,
           kayMixer:new THREEAsset.AnimationMixer(root),kayClips:{}
         });
         for(const clip of gltf.animations)wrap.userData.kayClips[clip.name]=clip;
@@ -16316,38 +16318,88 @@ function summonKnightRoyalOnslaughtSwarm(){
       if(summonEpoch!==knightRoyalCloneSummonEpoch||!player||!gameRunning||knightRuntime.aegisWindow<=0){
         for(const c of pending) disposeGroup(c);return;
       }
-      // One synchronized reveal. No arrival rings, floor sigils, or clone trails.
+      // One synchronized reveal. Keep it airborne/lightweight: no arrival rings,
+      // floor sigils, clone trails, or per-clone geometry bursts.
       for(const c of pending){ scene.add(c);knightRoyalClones.push(c); }
+      try{spawnBurst(player.position.x,player.position.y+1.2,player.position.z,12,FX_MAT_SPARK,3.2);}catch(e){}
       if(navigator.vibrate) navigator.vibrate([18,12,30]);
     };
     requestAnimationFrame(buildBatch);
   }).catch(()=>{});
 }
+function knightRoyalOnslaughtAngleDelta(a,b){
+  let d=(a-b)%(Math.PI*2);
+  if(d>Math.PI)d-=Math.PI*2;
+  if(d<-Math.PI)d+=Math.PI*2;
+  return Math.abs(d);
+}
 function knightRoyalOnslaughtCloneTarget(c){
   const eligible=knightRuntime.royalOnslaughtEligibleIds;
-  if(!eligible||!c) return null;
-  let best=null,bestD=Infinity,fallback=null,fallbackD=Infinity;
+  if(!eligible||!c||!player) return null;
+  const lane=Number.isFinite(c.userData.onslaughtLaneAngle)?c.userData.onslaughtLaneAngle:0;
+  const nonBoss=[],bosses=[];
   for(const z of zombies){
     if(!z||!z.userData||z.userData.dead||z.userData.spawnPending||!eligible.has(z.uuid)) continue;
-    const d=c.position.distanceToSquared(z.position);
-    if(d<fallbackD){fallback=z;fallbackD=d;}
+    const cls=knightEnemyClass(z);
+    if(cls==='boss') bosses.push(z); else nonBoss.push(z);
+  }
+
+  // Non-bosses are one-hit kills, so clones never deliberately double-book one.
+  // Sector preference spreads the ten Knights around the whole arena instead of
+  // collapsing into the same nearest cluster.
+  let best=null,bestScore=Infinity;
+  for(const z of nonBoss){
     const reserved=z.userData.royalOnslaughtCloneReservedBy;
     if(reserved&&reserved!==c.uuid) continue;
-    if(d<bestD){best=z;bestD=d;}
+    const dx=z.position.x-player.position.x,dz=z.position.z-player.position.z;
+    const ang=Math.atan2(dx,dz);
+    const sectorPenalty=knightRoyalOnslaughtAngleDelta(ang,lane)*12;
+    const distancePenalty=Math.sqrt(c.position.distanceToSquared(z.position));
+    const score=sectorPenalty+distancePenalty;
+    if(score<bestScore){best=z;bestScore=score;}
   }
-  const target=best||fallback;
-  if(target) target.userData.royalOnslaughtCloneReservedBy=c.uuid;
-  return target;
+  if(best){
+    best.userData.royalOnslaughtCloneReservedBy=c.uuid;
+    c.userData.onslaughtReservedTargetId=best.uuid;
+    return best;
+  }
+
+  // If all remaining non-bosses are already being handled, wait rather than
+  // wasting multiple clones on the same one-hit target. Bosses are the only
+  // targets that intentionally allow coordinated multi-Knight convergence.
+  if(nonBoss.length) return null;
+  if(!bosses.length) return null;
+  let boss=null,bossScore=Infinity;
+  for(const z of bosses){
+    const dx=z.position.x-player.position.x,dz=z.position.z-player.position.z;
+    const ang=Math.atan2(dx,dz);
+    const score=knightRoyalOnslaughtAngleDelta(ang,lane)*3+Math.sqrt(c.position.distanceToSquared(z.position));
+    if(score<bossScore){boss=z;bossScore=score;}
+  }
+  c.userData.onslaughtReservedTargetId=boss?boss.uuid:null;
+  return boss;
 }
 function knightRoyalOnslaughtCloneBeginDash(c,target){
   if(!c||!target||target.userData.dead) return false;
   const from=c.position.clone();
+  const cls=knightEnemyClass(target);
+  let desiredX,desiredZ;
+  if(cls==='boss'){
+    // Surround bosses from ten different compass angles so the army reads as
+    // a coordinated encirclement instead of ten bodies stacking on one point.
+    const a=Number.isFinite(c.userData.onslaughtLaneAngle)?c.userData.onslaughtLaneAngle:0;
+    const stop=1.55;
+    desiredX=target.position.x-Math.sin(a)*stop;
+    desiredZ=target.position.z-Math.cos(a)*stop;
+  }else{
+    const dx=target.position.x-c.position.x,dz=target.position.z-c.position.z;
+    const dist=Math.hypot(dx,dz)||1;
+    const stop=1.05;
+    desiredX=target.position.x-dx/dist*stop;
+    desiredZ=target.position.z-dz/dist*stop;
+  }
   const dx=target.position.x-c.position.x,dz=target.position.z-c.position.z;
-  const dist=Math.hypot(dx,dz)||1;
   c.rotation.y=Math.atan2(dx,dz);
-  const stop=1.05;
-  const desiredX=target.position.x-dx/dist*stop;
-  const desiredZ=target.position.z-dz/dist*stop;
   const safe=knightRoyalOnslaughtSafePosition(desiredX,desiredZ,c.position.y);
   c.userData.onslaughtDash={
     target,start:from,end:new THREE.Vector3(safe.x,c.position.y,safe.z),elapsed:0,duration:.18,
@@ -16372,7 +16424,8 @@ function updateKnightRoyalOnslaughtClone(c,dt){
       // Same route-contact rule and same damage function used by the player.
       try{ knightRoyalOnslaughtPathDamage(dash.start,dash.end,dash.index,target); }catch(e){}
       if(target&&target.userData){
-        target.userData.royalOnslaughtCloneReservedBy=null;
+        if(target.userData.royalOnslaughtCloneReservedBy===c.uuid) target.userData.royalOnslaughtCloneReservedBy=null;
+        c.userData.onslaughtReservedTargetId=null;
         if(!target.userData.dead){
           try{ knightRoyalOnslaughtDamage(target,dash.index); }catch(e){}
           if(!target.userData.dead){
@@ -16392,6 +16445,7 @@ function updateKnightRoyalOnslaughtClone(c,dt){
   if(c.userData.onslaughtStrikeCooldown>0) return;
   const target=knightRoyalOnslaughtCloneTarget(c);
   if(target) knightRoyalOnslaughtCloneBeginDash(c,target);
+  else c.userData.onslaughtStrikeCooldown=.035+(c.userData.cloneIndex%3)*.012;
 }
 function triggerKnightRoyalGuardClones(){
   if(!gameRunning||!knightRoyalCloneUnlocked()||knightRoyalCloneCooldown>0)return false;
