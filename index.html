@@ -1,3 +1,5 @@
+<!-- V22.14.24 Ability Menu HUD Layer Fix: gameplay combat controls (including the purple ultimate/KNIGHTS button and its meter) are now forced beneath pause, round-clear, and shop/ability popup overlays. This is a visual stacking fix only; combat behavior is unchanged. -->
+<!-- V22.14.23 Auto Sync Before Play: tapping the home Play button now performs the cloud score sync first and attempts a cache-busted check of the current page so a newer deployed HTML build can replace the running page before mode/avatar selection. If already current (or offline), Play continues normally. A session handoff flag resumes automatically after a successful update reload. Manual Sync Game remains available. -->
 <!-- V22.14.22 Royal Onslaught Clone Performance: preserves all 30 full-detail Knight clones and half-player dash speed while reducing expensive per-frame work. Clone animation mixers now update on alternating frames while dashing and at a lower cadence while waiting; target acquisition is staggered so idle clones do not all rescan the entire enemy list on the same frame. Damage, path-contact checks, target reservation, hit VFX, and visuals are preserved. -->
 <!-- V22.14.21 Selection Preview Full-Body Fit: preserves the approved gameplay-relative avatar size hierarchy in the Build Your Avatar screen while adding a maximum preview fit so oversized characters, especially Barbarian, remain fully visible head-to-toe inside the preview card. This affects selection-screen framing only, not gameplay scale. -->
 <!-- V22.14.20 Selection Preview True Scale: the Build Your Avatar 3D preview now preserves each avatar's approved AVATAR_SCALE instead of normalizing every model to the same 1.75-unit preview height. A common preview reference factor keeps the models readable while preserving the same relative size hierarchy used during gameplay. -->
@@ -211,7 +213,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.22</title>
+<title>Family Arena V22.14.24</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1157,6 +1159,22 @@
 
 
 
+
+/* V22.14.24 — popup menus must cover every live combat control.
+   The purple Ultimate / KNIGHTS button previously used z-index:45 while
+   level-up/shop overlays had no z-index, so it painted through the menu. */
+#screenGame .levelUpOverlay,
+#screenGame .shopOverlay{
+  z-index:130;
+}
+#screenGame .pauseOverlay{
+  z-index:140;
+}
+#screenGame .levelUpOverlay.show,
+#screenGame .shopOverlay.show,
+#screenGame .pauseOverlay.show{
+  isolation:isolate;
+}
 </style>
 </head>
 <body>
@@ -1408,7 +1426,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.22 - Royal Onslaught Clone Performance';
+const GAME_VERSION='22.14.24 - Ability Menu HUD Layer Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2041,15 +2059,82 @@ function addName(){
 }
 document.getElementById('newName').addEventListener('blur', addName);
 
+async function autoSyncBeforePlay(){
+  const playBtn=document.getElementById('btnGoModes');
+  const status=document.getElementById('homeSyncStatus');
+  if(playBtn&&playBtn.dataset.syncing==='1') return;
+  if(playBtn){playBtn.dataset.syncing='1';playBtn.disabled=true;playBtn.textContent='Syncing…';}
+  if(status)status.textContent='Syncing game and checking for latest version…';
+
+  // Preserve the existing cloud record sync, but do not make Play depend on
+  // network availability.
+  try{
+    const [all,survivalRows]=await Promise.all([
+      Cloud.fetchAllRoundBests(),
+      Cloud.fetchSurvivalLeaderboard()
+    ]);
+    if(all){
+      cloudRoundBestsCache=Object.assign({},cloudRoundBestsCache,all);
+      saveCloudRoundBestsCache();
+    }
+    if(survivalRows){
+      cloudSurvivalLeaderboardCache=survivalRows;
+      saveCloudSurvivalLeaderboardCache();
+    }
+  }catch(err){console.warn('Auto Play cloud sync skipped:',err);}
+
+  // Check the exact deployed HTML URL with a cache-buster. If the deployed
+  // GAME_VERSION differs, reload that fresh response before entering selection.
+  try{
+    const u=new URL(window.location.href);
+    u.searchParams.set('_familyArenaUpdate',Date.now().toString());
+    const res=await fetch(u.toString(),{cache:'no-store',credentials:'same-origin'});
+    if(res.ok){
+      const html=await res.text();
+      const match=html.match(/const\s+GAME_VERSION\s*=\s*['"]([^'"]+)['"]/);
+      const remoteVersion=match&&match[1];
+      if(remoteVersion&&remoteVersion!==GAME_VERSION){
+        if(status)status.textContent='New game version found · updating…';
+        try{
+          if('caches' in window){
+            const keys=await caches.keys();
+            await Promise.all(keys.map(key=>caches.delete(key)));
+          }
+        }catch(_err){}
+        sessionStorage.setItem('familyArenaResumePlay','1');
+        window.location.replace(u.toString());
+        return;
+      }
+    }
+  }catch(err){console.warn('Latest-version check skipped:',err);}
+
+  if(status)status.textContent='Game synced · latest version ready';
+  if(playBtn){playBtn.dataset.syncing='0';playBtn.disabled=false;playBtn.textContent='Play';}
+  refreshCrystalPills();
+  show('screenModes');
+}
+
 document.getElementById('btnGoModes').onclick = ()=>{
   if(!state.currentName){
     const names = Store.listProfiles();
     if(names.length){ state.currentName = names[0]; loadAvatarFromProfile(); }
     else { alert('Add a player name first.'); return; }
   }
-  refreshCrystalPills();
-  show('screenModes');
+  autoSyncBeforePlay();
 };
+
+// When Play discovered and loaded a newer deployed build, continue the user's
+// original action automatically instead of making them tap Play a second time.
+if(sessionStorage.getItem('familyArenaResumePlay')==='1'){
+  sessionStorage.removeItem('familyArenaResumePlay');
+  setTimeout(()=>{
+    if(!state.currentName){
+      const names=Store.listProfiles();
+      if(names.length){state.currentName=names[0];loadAvatarFromProfile();}
+    }
+    if(state.currentName) autoSyncBeforePlay();
+  },120);
+}
 document.getElementById('btnGoShop').onclick = ()=>{
   if(!state.currentName){ alert('Pick a player first.'); return; }
   renderShop();
