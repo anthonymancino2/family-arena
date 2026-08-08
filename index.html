@@ -1,3 +1,4 @@
+<!-- V22.14.17 Royal Onslaught Clone Formation + Visibility: improves the 30 detailed Royal Onslaught clones' spawn and combat spacing, reduces visual stacking by widening lane offsets and boss approach angles, and gives the player a subtle leader glow during the move so the real Knight remains easy to identify. Clone speed stays at half the player's dash speed; damage, targeting, capture rules, bullet time, and cooldown scaling are unchanged. -->
 <!-- V22.14.16 Royal Onslaught Half-Speed Clones: changes the 30 detailed Royal Onslaught clones from two-thirds of the player's dash speed to exactly one-half of the player's dash speed. Player dash remains 0.18 seconds; clone dash duration is now 0.36 seconds. Clone visuals, damage, targeting, capture rules, bullet time, and cooldown scaling are unchanged. -->
 <!-- V22.14.15 Royal Onslaught Clone Visibility + Speed Fix: keeps the full detailed 30-clone visual, accelerates swarm preparation so all 30 reveal early enough to be seen during Royal Onslaught, and sets clone dash speed to exactly two-thirds of the player's Royal Onslaught dash speed by using a 0.27-second clone dash versus the player's 0.18-second dash. Damage, targeting, capture rules, bullet time, and cooldown scaling are unchanged. -->
 <!-- V22.14.14 Royal Onslaught Full Clone Visual Restore: restores the 30 Royal Onslaught support Knights to the previous full detailed Knight clone appearance from V22.14.12 while retaining the one-per-frame construction and synchronized reveal safeguards. The stripped shadow-army visual is removed. Damage, targeting, bullet time, capture/elimination rules, cooldown scaling, and airborne hit effects are unchanged. -->
@@ -205,7 +206,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.16</title>
+<title>Family Arena V22.14.17</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1402,7 +1403,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.16 - Royal Onslaught Half Speed Clones';
+const GAME_VERSION='22.14.17 - Royal Onslaught Clone Formation Visibility';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -14841,6 +14842,7 @@ function triggerKnightAegisCounter(){
   // the single source of truth for the 3-second capture group.
   knightRuntime.royalOnslaughtTargets=[];
   knightRuntime.royalOnslaughtTargetCursor=0;
+  knightRoyalOnslaughtLeaderGlow(false);
   summonKnightRoyalOnslaughtSwarm();
 
   const visual=knightTitanVisualScale();
@@ -15293,6 +15295,7 @@ function knightEndAegis(success){
   knightRuntime.royalOnslaughtElapsed=0;
   knightRuntime.royalOnslaughtStrikeIndex=0;
   knightRuntime.royalOnslaughtStrikeTimer=0;
+  knightRoyalOnslaughtLeaderGlow(true);
   knightRuntime.royalOnslaughtDash=null;
   knightRuntime.royalOnslaughtTargetCursor=0;
   knightRuntime.royalOnslaughtOriginX=0;
@@ -16281,6 +16284,31 @@ function clearKnightRoyalOnslaughtSwarm(){
     if(z&&z.userData&&z.userData.royalOnslaughtCloneReservedBy) z.userData.royalOnslaughtCloneReservedBy=null;
   }
 }
+
+function knightRoyalOnslaughtLeaderGlow(active){
+  if(!player) return;
+  let g=player.userData.royalOnslaughtLeaderGlow;
+  if(active){
+    if(!g){
+      g=new THREE.Group();
+      const mat=new THREE.MeshBasicMaterial({color:0xf5d978,transparent:true,opacity:.20,depthWrite:false});
+      const halo=new THREE.Mesh(new THREE.TorusGeometry(.46,.035,6,24),mat);
+      halo.rotation.x=Math.PI/2;
+      halo.position.y=1.35;
+      g.add(halo);
+      const crown=new THREE.Mesh(new THREE.ConeGeometry(.10,.26,4),mat);
+      crown.position.y=1.92;
+      crown.rotation.z=Math.PI;
+      g.add(crown);
+      player.add(g);
+      player.userData.royalOnslaughtLeaderGlow=g;
+    }
+    g.visible=true;
+  }else if(g){
+    g.visible=false;
+  }
+}
+
 function summonKnightRoyalOnslaughtSwarm(){
   if(!player||state.avatarType!=='knight') return;
   // Royal Onslaught owns this temporary army. Replace any prior Round clones,
@@ -16307,7 +16335,7 @@ function summonKnightRoyalOnslaughtSwarm(){
         root.scale.setScalar(1.48/Math.max(.001,size.y));
         const box2=new THREEAsset.Box3().setFromObject(root);root.position.y-=box2.min.y;
         tintKnightRoyalClone(root,i);wrap.add(root);
-        const slot=knightRoyalCloneFormationSlot(i,30,1,-Math.PI/2);
+        const slot=knightRoyalCloneFormationSlot(i,30,1.35,-Math.PI/2);
         wrap.position.set(player.position.x+slot.x,player.position.y,player.position.z+slot.z);
         Object.assign(wrap.userData,{
           isKnightRoyalClone:true,isRoyalOnslaughtClone:true,invincible:true,hp:Infinity,maxHp:Infinity,dead:false,
