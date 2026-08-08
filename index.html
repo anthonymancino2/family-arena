@@ -1,3 +1,4 @@
+<!-- V22.14.05 Royal Onslaught Marker Freeze Fix: removes the per-enemy 3D target-marker system that could create hundreds of meshes at activation on late rounds. Royal Onslaught now keeps target capture purely in data and concentrates spectacle around the Knight, dash impacts, bullet-time atmosphere, and finisher. Damage, capture window, elimination rules, cooldown scaling, and bullet-time behavior are unchanged. -->
 <!-- V22.14.04 Royal Onslaught Flash FX Safe: removes all live avatar-clone afterimage work from Royal Onslaught and replaces it with capped vertical speed echoes, sword/shield energy streaks, and brighter endpoint bursts that use simple temporary geometry only. No white ground trail or broad ground wash is used. Damage, targeting, bullet time, capture/elimination behavior, cooldown scaling, and dash timing are unchanged. -->
 <!-- V22.14.03 Royal Onslaught Ground FX Removed + Clone Restored: removes the persistent/large Royal Onslaught ground-ring and ground-sigil presentation that was producing the white floor effect, while restoring the prior true skinned Knight avatar afterimages from V22.14.01. The previously removed white dash trail remains permanently absent. Damage, targeting, bullet time, capture/elimination rules, and cooldown scaling are unchanged. -->
 <!-- V22.14.02 Royal Onslaught Afterimage Freeze Fix: removes expensive live SkeletonUtils avatar cloning from every dash, which could stall iPhone Safari before the endpoint attack. Royal Onslaught now uses lightweight pooled low-poly Knight silhouette echoes managed by the main FX update loop. The dash-to-impact sequence, damage, target capture, bullet time, elimination rules, cooldown scaling, and removed-ground-trail rule are unchanged. -->
@@ -193,7 +194,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.04</title>
+<title>Family Arena V22.14.05</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1390,7 +1391,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.04 - Royal Onslaught Flash FX Safe';
+const GAME_VERSION='22.14.05 - Royal Onslaught Marker Freeze Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -14784,42 +14785,23 @@ function knightRoyalOnslaughtActivationPulse(pos,color=KNIGHT_GOLD){
 }
 
 function knightRoyalOnslaughtMarkEnemy(z){
-  if(!z||z.userData.dead||z.userData.royalOnslaughtMarker||!scene) return;
-  const s=Math.max(.8,z.userData.baseScale||1);
-  const g=new THREE.Group();
-  const outer=new THREE.Mesh(new THREE.RingGeometry(.52*s,.72*s,28),knightMat(KNIGHT_GOLD,.58));
-  outer.rotation.x=-Math.PI/2; outer.position.y=.05; g.add(outer);
-  const inner=new THREE.Mesh(new THREE.RingGeometry(.24*s,.34*s,24),knightMat(KNIGHT_IVORY,.48));
-  inner.rotation.x=-Math.PI/2; inner.position.y=.065; g.add(inner);
-  const crown=new THREE.Mesh(new THREE.ConeGeometry(.12*s,.35*s,4),knightMat(KNIGHT_GOLD,.70));
-  crown.position.y=2.05*s; crown.rotation.z=Math.PI; g.add(crown);
-  g.position.copy(z.position); scene.add(g);
-  z.userData.royalOnslaughtMarker=g;
+  // Intentionally disabled. Creating one multi-mesh marker per captured enemy
+  // can allocate hundreds of Three.js objects at once on late rounds and lock
+  // iPhone Safari at activation. Eligibility remains tracked in the Set only.
+  return;
 }
 function knightRoyalOnslaughtClearMarker(z){
   if(!z||!z.userData) return;
   const g=z.userData.royalOnslaughtMarker;
-  if(g){if(g.parent) scene.remove(g);disposeGroup(g);}
+  if(g&&g.parent){scene.remove(g);disposeGroup(g);}
   z.userData.royalOnslaughtMarker=null;
 }
 function knightRoyalOnslaughtUpdateMarkers(dt){
+  // Data-only capture tracking; no per-enemy scene objects.
   knightRoyalOnslaughtPruneEligibility();
-  const eligible=knightRuntime&&knightRuntime.royalOnslaughtEligibleIds;
-  for(const z of zombies){
-    if(!z) continue;
-    if(eligible&&eligible.has(z.uuid)&&!z.userData.dead){
-      knightRoyalOnslaughtMarkEnemy(z);
-      const g=z.userData.royalOnslaughtMarker;
-      if(g){
-        g.position.x=z.position.x;g.position.z=z.position.z;
-        g.rotation.y+=dt*1.8;
-        const p=1+Math.sin(performance.now()*.008+z.id)*.08;
-        g.scale.setScalar(p);
-      }
-    }else knightRoyalOnslaughtClearMarker(z);
-  }
 }
 function knightRoyalOnslaughtClearAllMarkers(){
+  // Cleanup any legacy markers from earlier builds without creating new ones.
   for(const z of zombies) knightRoyalOnslaughtClearMarker(z);
 }
 function triggerKnightAegisCounter(){
@@ -14858,7 +14840,6 @@ function triggerKnightAegisCounter(){
   if(navigator.vibrate) navigator.vibrate([24,18,42]);
   knightRoyalOnslaughtAtmosphere(true);
   knightRoyalOnslaughtActivationPulse(player.position,KNIGHT_GOLD);
-  knightRoyalOnslaughtUpdateMarkers(0);
   toast('ROYAL ONSLAUGHT — BULLET TIME!');
   updateHoodedHud();
 }
