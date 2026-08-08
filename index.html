@@ -1,3 +1,6 @@
+<!-- V22.14.27 Royal Onslaught Half Speed: slows the overall Royal Onslaught traversal for readability. Player dash duration is doubled from 0.18s to 0.36s, cutting player dash speed in half. Clones preserve the previously approved 50%-of-player-speed rule, so clone dash duration doubles from 0.36s to 0.72s. Damage, targeting, bullet time, capture rules, clone count, and cooldown scaling are unchanged. -->
+<!-- V22.14.26 Royal Onslaught Repeat Activation Guard: adds a defensive preflight reset before every Royal Onslaught activation so stale clones, target reservations, capture data, delayed clone summons, and old target references cannot leak into the next use. Damage, 30-clone behavior, half-player clone speed, visuals, bullet-time behavior, and cooldown rules remain unchanged. -->
+<!-- V22.14.25 Royal Onslaught Cleanup Pass: hardened end/reset cleanup for clone target reservations, clone dash references, enemy targeting references, temporary Knight effects, capture collections, leader glow, and delayed clone summons. Gameplay/damage rules are unchanged. -->
 <!-- V22.14.24 Ability Menu HUD Layer Fix: gameplay combat controls (including the purple ultimate/KNIGHTS button and its meter) are now forced beneath pause, round-clear, and shop/ability popup overlays. This is a visual stacking fix only; combat behavior is unchanged. -->
 <!-- V22.14.23 Auto Sync Before Play: tapping the home Play button now performs the cloud score sync first and attempts a cache-busted check of the current page so a newer deployed HTML build can replace the running page before mode/avatar selection. If already current (or offline), Play continues normally. A session handoff flag resumes automatically after a successful update reload. Manual Sync Game remains available. -->
 <!-- V22.14.22 Royal Onslaught Clone Performance: preserves all 30 full-detail Knight clones and half-player dash speed while reducing expensive per-frame work. Clone animation mixers now update on alternating frames while dashing and at a lower cadence while waiting; target acquisition is staggered so idle clones do not all rescan the entire enemy list on the same frame. Damage, path-contact checks, target reservation, hit VFX, and visuals are preserved. -->
@@ -213,7 +216,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.24</title>
+<title>Family Arena V22.14.27</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1426,7 +1429,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.24 - Ability Menu HUD Layer Fix';
+const GAME_VERSION='22.14.27 - Royal Onslaught Half Speed';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -14925,6 +14928,30 @@ function knightRoyalOnslaughtClearAllMarkers(){
 function triggerKnightAegisCounter(){
   if(!gameRunning||!knightIsActive()) return;
   if(knightRuntime.aegisCooldown>0||knightRuntime.aegisWindow>0||knightRuntime.aegisRecovery>0) return;
+
+  // V22.14.26 repeat-activation preflight. A fresh Royal Onslaught must never
+  // inherit clone reservations, delayed summons, or captured-target state from
+  // a prior use.
+  try{ clearKnightRoyalOnslaughtSwarm(); }catch(_err){}
+  try{
+    knightRoyalOnslaughtClearAllMarkers();
+    for(const z of zombies){
+      if(!z||!z.userData) continue;
+      z.userData.royalOnslaughtCloneReservedBy=null;
+      if(z.userData.targetPlayer&&z.userData.targetPlayer.userData&&
+         z.userData.targetPlayer.userData.isRoyalOnslaughtClone){
+        z.userData.targetPlayer=null;
+        z.userData.targetRefresh=0;
+      }
+    }
+  }catch(_err){}
+  knightRuntime.royalOnslaughtEligibleIds=new Set();
+  knightRuntime.royalOnslaughtTargets=[];
+  knightRuntime.royalOnslaughtTargetCursor=0;
+  knightRuntime.royalOnslaughtHitIds=new Set();
+  knightRuntime.royalOnslaughtDamagedIds=new Set();
+  knightRuntime.royalOnslaughtBossDamage=new Map();
+
   markUltimateUsed();
   knightRuntime.aegisCooldown=knightJudgmentCooldownForRound();
   knightRuntime.aegisWindow=9999;
@@ -15225,7 +15252,7 @@ function knightRoyalOnslaughtStrike(){
   knightRuntime.royalOnslaughtDash={
     target,index,yaw,startPos,
     fromX:startPos.x,fromZ:startPos.z,toX:safe.x,toZ:safe.z,
-    elapsed:0,duration:.18,nextEcho:0
+    elapsed:0,duration:.36,nextEcho:0
   };
   // Start with a committed attack-ready pose while the body dashes in.
   knightPlayClip(['melee','slash'],'1H_Melee_Attack_Slice_Horizontal',.24,.12);
@@ -15235,7 +15262,7 @@ function knightRoyalOnslaughtUpdateDash(dt){
   if(!d||!player) return false;
   const safeDt=Number.isFinite(dt)?Math.max(0,Math.min(dt,.10)):0;
   if(!Number.isFinite(d.elapsed)) d.elapsed=0;
-  if(!Number.isFinite(d.duration)||d.duration<=0) d.duration=.18;
+  if(!Number.isFinite(d.duration)||d.duration<=0) d.duration=.36;
   d.elapsed+=safeDt;
   const raw=Math.min(1,d.elapsed/d.duration);
   const p=1-Math.pow(1-raw,2.4);
@@ -15406,6 +15433,19 @@ function knightEndAegis(success){
   knightRuntime.royalOnslaughtTargetCursor=0;
   knightRuntime.royalOnslaughtOriginX=0;
   knightRuntime.royalOnslaughtOriginZ=0;
+
+  // Final orphan scrub: only Knight spectacle effects are touched. Enemy
+  // projectiles and unrelated avatar/gameplay effects are intentionally left alone.
+  for(let i=fx.length-1;i>=0;i--){
+    const f=fx[i];
+    if(!f)continue;
+    const k=String(f.kind||'');
+    if(k==='knightFx'||k==='knightCleave'||k==='knightOnslaughtHit'||k==='knightAfterimage'){
+      if(f.mesh&&f.mesh.parent)f.mesh.parent.remove(f.mesh);
+      if(f.mesh)disposeGroup(f.mesh);
+      fx.splice(i,1);
+    }
+  }
 }
 
 /* ------------------------------------------------------ ULTIMATE: JUDGMENT */
@@ -16292,14 +16332,26 @@ function clearKnightRoyalClones(){
 }
 function removeKnightRoyalClone(c){
   if(!c)return;
+  // Release any enemy reserved by this clone before the clone is disposed.
+  const reservedId=c.userData&&c.userData.onslaughtReservedTargetId;
+  for(const z of zombies){
+    if(!z||!z.userData)continue;
+    if(z.userData.targetPlayer===c){
+      z.userData.targetPlayer=null;z.userData.targetRefresh=0;
+    }
+    if(z.userData.royalOnslaughtCloneReservedBy===c.uuid ||
+       (reservedId&&z.uuid===reservedId)){
+      z.userData.royalOnslaughtCloneReservedBy=null;
+    }
+  }
+  if(c.userData){
+    c.userData.onslaughtDash=null;
+    c.userData.onslaughtReservedTargetId=null;
+    c.userData.onslaughtAnimAccum=0;
+  }
   if(c.parent)c.parent.remove(c);
   disposeGroup(c);
   knightRoyalClones=knightRoyalClones.filter(x=>x!==c);
-  for(const z of zombies){
-    if(z&&z.userData&&z.userData.targetPlayer===c){
-      z.userData.targetPlayer=null;z.userData.targetRefresh=0;
-    }
-  }
 }
 function knightCloneAvailableMoves(){
   const level=avatarLevel(),moves=['royal_combo'];
@@ -16383,11 +16435,19 @@ function knightRoyalCloneFormationScale(){
 }
 
 function clearKnightRoyalOnslaughtSwarm(){
+  // Invalidate any delayed clone creation belonging to the ending Onslaught.
+  knightRoyalCloneSummonEpoch++;
   for(const c of [...knightRoyalClones]){
     if(c&&c.userData&&c.userData.isRoyalOnslaughtClone) removeKnightRoyalClone(c);
   }
   for(const z of zombies){
-    if(z&&z.userData&&z.userData.royalOnslaughtCloneReservedBy) z.userData.royalOnslaughtCloneReservedBy=null;
+    if(!z||!z.userData)continue;
+    z.userData.royalOnslaughtCloneReservedBy=null;
+    if(z.userData.targetPlayer&&z.userData.targetPlayer.userData&&
+       z.userData.targetPlayer.userData.isRoyalOnslaughtClone){
+      z.userData.targetPlayer=null;
+      z.userData.targetRefresh=0;
+    }
   }
 }
 
@@ -16607,7 +16667,7 @@ function knightRoyalOnslaughtCloneBeginDash(c,target){
   c.rotation.y=Math.atan2(dx,dz);
   const safe=knightRoyalOnslaughtSafePosition(desiredX,desiredZ,c.position.y);
   c.userData.onslaughtDash={
-    target,start:from,end:new THREE.Vector3(safe.x,c.position.y,safe.z),elapsed:0,duration:.36,
+    target,start:from,end:new THREE.Vector3(safe.x,c.position.y,safe.z),elapsed:0,duration:.72,
     index:c.userData.onslaughtStrikeIndex||0
   };
   knightClonePlayClip(c,['melee','slash'],'1H_Melee_Attack_Slice_Horizontal');
