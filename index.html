@@ -1,3 +1,4 @@
+<!-- V22.14.09 Royal Onslaught Air Shockwave: adds highly visible torso-height concentric shockwave rings to every designated Royal Onslaught endpoint hit, with larger milestone shockwaves on hits 5, 10, 15, 20 and every fifth hit after. Effects remain airborne, capped, short-lived, and use no white ground geometry. Gameplay and stability guards are unchanged. -->
 <!-- V22.14.08 Royal Onslaught Safe Hit Flare: adds capped airborne-only hit spectacle to Royal Onslaught endpoint strikes using small vertical sword/shield energy flashes and compact sparks. No ground rings, floor trails, avatar clones, mass target markers, or activation geometry are added. Damage, targeting, bullet time, capture/elimination behavior, cooldown scaling, and stability guards are unchanged. -->
 <!-- V22.14.07 Royal Onslaught Stability Verification: hardens the stripped Royal Onslaught activation and strike handoff by removing an unused activation-time enemy sort, iterating route damage over a stable enemy snapshot so one-hit removals cannot disturb traversal, validating dash timing/state every frame, and adding a forced dash-completion watchdog. No new Royal Onslaught VFX are added; damage, capture, bullet time, elimination rules, and cooldown scaling are unchanged. -->
 <!-- V22.14.06 Royal Onslaught Stability Reset: removes all Royal Onslaught-specific activation overlays, guard bursts, impact columns, speed echoes, and other optional custom VFX from the live activation/strike path. The move now relies on the real Knight dash, attack animations, and small capped spark impacts while preserving bullet time, targeting, capture rules, damage, elimination behavior, and cooldown scaling. -->
@@ -197,7 +198,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.08</title>
+<title>Family Arena V22.14.09</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1394,7 +1395,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.08 - Royal Onslaught Safe Hit Flare';
+const GAME_VERSION='22.14.09 - Royal Onslaught Air Shockwave';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -14961,6 +14962,52 @@ function knightRoyalOnslaughtStabilizeFinalPosition(){
   if(d>edgeLimit){safe.x=safe.x/d*edgeLimit;safe.z=safe.z/d*edgeLimit;}
   player.position.x=safe.x;player.position.z=safe.z;
 }
+
+function knightRoyalOnslaughtAirShockwave(target,index){
+  if(!scene||!target||!target.position||!camera) return;
+  const active=knightRoyalOnslaughtAirShockwave.active||(knightRoyalOnslaughtAirShockwave.active=[]);
+  while(active.length>=8){
+    const old=active.shift();
+    if(old&&old.parent){scene.remove(old);disposeGroup(old);}
+  }
+  const visual=Math.min(1.5,knightTitanVisualScale());
+  const milestone=((index+1)%5===0);
+  const g=new THREE.Group();
+  const main=(index%2===0)?KNIGHT_GOLD:KNIGHT_IVORY;
+  const rings=milestone?
+    [[.55,.76,.88],[.92,1.18,.62],[1.30,1.58,.42]]:
+    [[.46,.64,.78],[.78,1.00,.48]];
+  for(const [inner,outer,opacity] of rings){
+    const ring=new THREE.Mesh(
+      new THREE.RingGeometry(inner*visual,outer*visual,28),
+      knightMat(main,opacity)
+    );
+    ring.position.y=1.0*visual;
+    g.add(ring);
+  }
+  if(milestone){
+    for(let i=0;i<6;i++){
+      const a=i*Math.PI/3;
+      const spike=new THREE.Mesh(
+        new THREE.PlaneGeometry(.10*visual,1.25*visual),
+        knightMat(i%2?KNIGHT_IVORY:KNIGHT_GOLD,.50)
+      );
+      spike.position.set(Math.sin(a)*.82*visual,1.0*visual,Math.cos(a)*.82*visual);
+      spike.rotation.z=a;
+      g.add(spike);
+    }
+  }
+  g.position.set(target.position.x,target.position.y||0,target.position.z);
+  g.lookAt(camera.position.x,g.position.y+1.0*visual,camera.position.z);
+  scene.add(g);
+  active.push(g);
+  const ttl=milestone?190:150;
+  setTimeout(()=>{
+    const i=active.indexOf(g); if(i>=0) active.splice(i,1);
+    if(g.parent){scene.remove(g);disposeGroup(g);}
+  },ttl);
+}
+
 function knightRoyalOnslaughtSafeHitFx(target,index){
   if(!scene||!target||!target.position) return;
   const active=knightRoyalOnslaughtSafeHitFx.active||(knightRoyalOnslaughtSafeHitFx.active=[]);
@@ -15028,8 +15075,9 @@ function knightRoyalOnslaughtImpactStrike(dash){
     // The attack animation happens at the destination, after the dash is
     // visible, so Royal Onslaught reads as dash -> strike instead of teleport.
     knightPlayClip(index%2?['melee','chop']:['melee','slash'],index%2?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal',.30,.16);
-    // Safe hit-only spectacle: airborne flashes and compact sparks, with no floor geometry.
+    // Safe hit-only spectacle: airborne flashes, torso shockwave, and compact sparks.
     knightRoyalOnslaughtSafeHitFx(target,index);
+    knightRoyalOnslaughtAirShockwave(target,index);
     knightRoyalOnslaughtDamage(target,index);
     if(target.userData.dead) knightRoyalOnslaughtClearMarker(target);
     if(index%4===3) triggerCombatShake(5,70);
