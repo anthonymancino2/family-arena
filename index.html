@@ -1,3 +1,24 @@
+<!-- V22.14.64 Arcane Echo Formation + Combat Behavior
+Improves Arcane Echo squad behavior: wider rotating formation slots, target
+distribution across nearby enemies, 50%-speed pursuit/return movement, native
+fox Guard Run while repositioning, Guard while stationary, and additional heavy
+Secondary staggering. Echo loadout copying, full move damage, 50% attack speed,
+and invincibility remain unchanged.
+-->
+<!-- V22.14.63 Arcane Echo Loadout Clones
+Arcane Echoes now copy the player's currently equipped Mage Primary and Secondary
+moves. Echoes deal the copied moves' normal damage but move at exactly 50% of the
+player's current movement speed and use twice the player's move cooldowns (50%
+attack speed). Primary and Secondary have independent clone cooldowns and are
+staggered per Echo to avoid synchronized activation spikes. Echoes remain invincible.
+-->
+<!-- V22.14.62 Fox Mage Combat Animation Pass
+Tunes the Nine-Tailed Fox's native animation resources for Mage combat. Fallow is
+used as the native combat/action clip with faster playback profiles for Fire & Ice,
+Rapid Fire & Ice, Arcane Lance, Giant Fireball, and Arcane Echo attacks. Guard and
+Guard Run remain the idle/movement states, and combat actions crossfade back cleanly.
+The old Mage remains untouched as fallback.
+-->
 <!-- V22.14.61 Fox Mage Projectile Alignment
 Aligns Mage projectile origins to the Nine-Tailed Fox's actual compact body rather
 than the old human Mage hand/chest height. Fire & Ice, Arcane Lance and Giant
@@ -316,7 +337,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.61</title>
+<title>Family Arena V22.14.64</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1529,7 +1550,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <script>
 (function(){
 
-const GAME_VERSION='22.14.61 - Fox Mage Projectile Alignment';
+const GAME_VERSION='22.14.64 - Arcane Echo Formation Combat';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10158,6 +10179,8 @@ function buildNineTailedFoxPlayer(options={}){
     wrapper.userData.kayRoot=root;
     wrapper.userData.nineFoxFit=fit;
     wrapper.userData.nineFoxDashLean=0;
+    wrapper.userData.nineFoxCastLean=0;
+    wrapper.userData.nineFoxCastLeanTarget=0;
     wrapper.userData.nineFoxFitBaseScale=fit.scale.clone();
     wrapper.userData.nineFoxFitBasePosition=fit.position.clone();
 
@@ -10187,7 +10210,20 @@ function buildNineTailedFoxPlayer(options={}){
       const action=mixer.clipAction(clip);
       action.reset();
       action.enabled=true;
-      action.setEffectiveTimeScale(1);
+
+      // The bundled Fallow action is over four seconds long. At its original
+      // speed it feels disconnected from quick Mage casts, so keep the native
+      // animation but play it at combat-appropriate speeds.
+      let nativeTimeScale=1;
+      const req=String(requested||'').toLowerCase();
+      if(actual==='fallow'){
+        if(req.includes('rapid')) nativeTimeScale=5.2;
+        else if(req.includes('giant')) nativeTimeScale=2.15;
+        else if(req.includes('lance')) nativeTimeScale=3.15;
+        else if(req.includes('echo')) nativeTimeScale=4.4;
+        else nativeTimeScale=3.8;
+      }
+      action.setEffectiveTimeScale(nativeTimeScale);
       action.setEffectiveWeight(1);
 
       if(shouldLoop){
@@ -10198,7 +10234,8 @@ function buildNineTailedFoxPlayer(options={}){
         action.clampWhenFinished=true;
       }
 
-      const fade=(previous&&previous!==action)?.14:.08;
+      const combatAction=actual==='fallow';
+      const fade=combatAction?.075:((previous&&previous!==action)?.14:.08);
       action.fadeIn(fade).play();
       if(previous&&previous!==action)previous.fadeOut(fade);
 
@@ -10253,6 +10290,9 @@ function nineFoxRepairPresentation(resetLean=false){
 
   if(resetLean){
     player.userData.nineFoxDashLean=0;
+    player.userData.nineFoxCastLean=0;
+    player.userData.nineFoxCastLeanTarget=0;
+    player.userData.nineFoxCastLeanUntil=0;
     fit.rotation.x=0;
   }
 }
@@ -12468,14 +12508,41 @@ function triggerArcaneEchoes(){
         wrap.userData.hp=Infinity;
         wrap.userData.dead=false;
         wrap.userData.echoIndex=i;
-        wrap.userData.attackCooldown=.15+i*.08;
+        // Each copied move runs on its own half-speed cooldown. Stagger the
+        // initial timers so five Echoes do not cast heavy moves on one frame.
+        wrap.userData.primaryCooldown=.10+i*.09;
+        wrap.userData.secondaryCooldown=.38+i*.16;
+        wrap.userData.echoElementToggle=(i%2)===0;
         wrap.userData.contactCooldowns=new Map();
-        wrap.userData.kayMixer=new THREEAsset.AnimationMixer(root);wrap.userData.kayClips={};gltf.animations.forEach(c=>wrap.userData.kayClips[c.name]=c);
+        wrap.userData.kayMixer=new THREEAsset.AnimationMixer(root);
+        wrap.userData.kayClips={};
+        gltf.animations.forEach(c=>wrap.userData.kayClips[c.name]=c);
 
-        // Native fox echoes idle in Guard rather than relying on Mage clip names.
+        // Native fox echoes idle in Guard and briefly use Fallow when they fire.
         if(foxEchoMode){
           const guard=gltf.animations.find(c=>c.name==='guard')||gltf.animations[0];
-          if(guard)wrap.userData.kayMixer.clipAction(guard).play();
+          const run=gltf.animations.find(c=>c.name==='guard_run');
+          const fallow=gltf.animations.find(c=>c.name==='fallow');
+          if(guard){
+            const guardAction=wrap.userData.kayMixer.clipAction(guard);
+            guardAction.setLoop(THREEAsset.LoopRepeat,Infinity);
+            guardAction.play();
+            wrap.userData.foxGuardAction=guardAction;
+          }
+          if(run){
+            const runAction=wrap.userData.kayMixer.clipAction(run);
+            runAction.setLoop(THREEAsset.LoopRepeat,Infinity);
+            runAction.enabled=true;
+            wrap.userData.foxRunAction=runAction;
+          }
+          wrap.userData.foxMoveAnim='guard';
+          if(fallow){
+            const attackAction=wrap.userData.kayMixer.clipAction(fallow);
+            attackAction.setLoop(THREEAsset.LoopOnce,1);
+            attackAction.clampWhenFinished=false;
+            attackAction.setEffectiveTimeScale(4.4);
+            wrap.userData.foxAttackAction=attackAction;
+          }
         }
 
         scene.add(wrap);arcaneEchoes.push(wrap);spawnBurst(wrap.position.x,wrap.position.y+(foxEchoMode?.58:.7),wrap.position.z,14,FX_MAT_SPARK,3.0);updateHoodedHud();
@@ -12494,6 +12561,143 @@ function spawnArcaneEchoBolt(from,to){
   fx.push({kind:'lightning',mesh:line,life:.16,maxLife:.16});
   spawnBurst(to.x,to.y+.72,to.z,7,FX_MAT_SPARK,2.5);
 }
+
+function arcaneEchoCurrentMoveSpeed(){
+  const speedStat=(playerStats&&Number.isFinite(playerStats.speed))?playerStats.speed:1;
+  const characterMoveMult=(combatForAvatar().baseMoveMult||1);
+  const passiveMoveMult=(mageGameplayActive() && passiveState.mageSpeedBoostTimer>0)
+    ? MAGE_SPEED_BOOST_MULT
+    : 1;
+  const playerMoveSpeed=PLAYER_SPEED*characterMoveMult*passiveMoveMult*(1+(speedStat-1)*0.15);
+  return Math.max(0,playerMoveSpeed*.50);
+}
+
+function arcaneEchoCooldownFor(w){
+  if(!w)return Infinity;
+  // Twice the player's live cooldown = exactly 50% attack speed.
+  return Math.max(.08,attackCooldownFor(w)*2);
+}
+
+function arcaneEchoAnimateAttack(e,kind){
+  if(state.avatarType!=='ninefox'||!e||!e.userData.foxAttackAction)return;
+  const a=e.userData.foxAttackAction;
+  const guard=e.userData.foxGuardAction;
+  let speed=4.4;
+  if(kind==='giant_fireball')speed=2.15;
+  else if(kind==='arcane_lance')speed=3.15;
+  else if(kind==='elemental')speed=4.4;
+  a.reset().setEffectiveTimeScale(speed).fadeIn(.05).play();
+  if(guard)guard.fadeOut(.05);
+  setTimeout(()=>{
+    if(!e||!e.parent||!e.userData.foxGuardAction)return;
+    a.fadeOut(.08);
+    e.userData.foxGuardAction.reset().fadeIn(.08).play();
+  },kind==='giant_fireball'?360:220);
+}
+
+function arcaneEchoFireCopiedMove(e,w,target,isSecondary=false){
+  if(!e||!w||!target||target.userData.dead)return false;
+
+  // Avoid recreating the old Giant Fireball hitch when all five Echoes share it.
+  // They still use the move, but casts are staggered and the active count is capped.
+  if(w.kind==='giant_fireball'){
+    const active=bullets.reduce((n,b)=>n+(b.kind==='giant_fireball'?1:0),0);
+    if(active>=6)return false;
+  }
+
+  const yaw=Math.atan2(target.position.x-e.position.x,target.position.z-e.position.z);
+  e.rotation.y=yaw;
+  let dx=Math.sin(yaw),dz=Math.cos(yaw),dy=0;
+
+  let forward=.72,vertical=1.0;
+  if(state.avatarType==='ninefox'){
+    if(w.kind==='giant_fireball'){forward=1.20;vertical=.68;}
+    else if(w.kind==='arcane_lance'){forward=.90;vertical=.70;}
+    else{forward=.78;vertical=.72;}
+  }
+
+  const startX=e.position.x+dx*forward;
+  const startY=e.position.y+vertical;
+  const startZ=e.position.z+dz*forward;
+  const tx=target.position.x-startX;
+  const ty=(target.position.y+.8)-startY;
+  const tz=target.position.z-startZ;
+  const len=Math.hypot(tx,ty,tz)||1;
+  dx=tx/len;dy=ty/len;dz=tz/len;
+
+  let color=0xb86cff;
+  if(w.kind==='elemental'){
+    e.userData.echoElementToggle=!e.userData.echoElementToggle;
+    color=e.userData.echoElementToggle?0x66d9ff:0xff723d;
+  }else if(w.kind==='giant_fireball')color=0xff6b32;
+  else if(w.kind==='arcane_lance')color=0x70dfff;
+
+  const fake={
+    damage:w.damage,
+    splash:w.splash||0,
+    rangeMult:1,
+    kind:w.kind,
+    mat:new THREE.MeshBasicMaterial({color})
+  };
+  fireBullet(dx,dy,dz,startX,startY,startZ,fake);
+  const b=bullets[bullets.length-1];
+  if(!b)return false;
+
+  // Same move properties and same damage as the player's equipped move.
+  b.kind=w.kind;
+  b.splashMult=w.splashMult||1;
+  b.splashDamage=w.splashDamage||0;
+  b.directInstakill=!!w.directInstakill;
+  b.pierces=w.pierce||0;
+  b.userDataSource='arcaneEcho';
+
+  if(w.kind==='giant_fireball'){
+    const oldMesh=b.mesh;
+    const molten=createMageGiantFireballMeshFast();
+    molten.position.copy(oldMesh.position);
+    molten.quaternion.copy(oldMesh.quaternion);
+    scene.add(molten);
+    scene.remove(oldMesh);
+    disposeGroup(oldMesh);
+    b.mesh=molten;
+    b.speedMult=(b.speedMult||1)*.58;
+    b.boundaryPersistent=true;
+    b.hitRadius=2.35;
+    b.life=Infinity;
+    spawnBurst(startX,startY,startZ,4,FX_MAT_SPARK,2.6);
+  }else if(w.kind==='arcane_lance'){
+    b.mesh.scale.set(3.0,3.0,9.0);
+    b.pierces=2;
+    b.hitRadius=1.05;
+    b.castRunesUntil=performance.now()+550;
+  }
+
+  arcaneEchoAnimateAttack(e,w.kind);
+  return true;
+}
+
+
+function arcaneEchoSetMoveAnimation(e,moving){
+  if(state.avatarType!=='ninefox'||!e)return;
+  const desired=moving?'run':'guard';
+  if(e.userData.foxMoveAnim===desired)return;
+
+  const guard=e.userData.foxGuardAction;
+  const run=e.userData.foxRunAction;
+  const attack=e.userData.foxAttackAction;
+  if(attack&&attack.isRunning())return;
+
+  if(moving&&run){
+    run.reset().setEffectiveTimeScale(.82).fadeIn(.10).play();
+    if(guard)guard.fadeOut(.10);
+    e.userData.foxMoveAnim='run';
+  }else if(guard){
+    guard.reset().fadeIn(.10).play();
+    if(run)run.fadeOut(.10);
+    e.userData.foxMoveAnim='guard';
+  }
+}
+
 function updateArcaneEchoes(dt){
   if(arcaneEchoesUnlocked()&&arcaneEchoesInitialChargePending){
     arcaneEchoesInitialChargePending=false;arcaneEchoesCycleDuration=ARCANE_ECHO_INITIAL_CHARGE;arcaneEchoesCooldownTimer=ARCANE_ECHO_INITIAL_CHARGE;updateHoodedHud();
@@ -12501,6 +12705,14 @@ function updateArcaneEchoes(dt){
   if(arcaneEchoesCooldownTimer>0){arcaneEchoesCooldownTimer=Math.max(0,arcaneEchoesCooldownTimer-dt);updateHoodedHud();}
   if(!player)return;
   const now=performance.now()*.001;
+
+  // One shared target picture per frame prevents every Echo from selecting the
+  // exact same nearest enemy. Reservations bias the squad across the fight.
+  const echoLivingTargets=zombies
+    .filter(z=>z&&!z.userData.dead&&!z.userData.spawnPending&&z.visible&&z.parent)
+    .sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position));
+  const echoTargetReservations=new Map();
+
   for(const e of [...arcaneEchoes]){
     if(!e||e.userData.dead||!e.parent)continue;
     // Echoes now share the Knight-clone survivability rule: enemy damage never
@@ -12517,31 +12729,70 @@ function updateArcaneEchoes(dt){
       }
     }
     const i=e.userData.echoIndex||0;
-    const a=now*.35+(i/ARCANE_ECHO_COUNT)*Math.PI*2;
-    const orbitDesired=new THREE.Vector3(player.position.x+Math.cos(a)*2.25,player.position.y,player.position.z+Math.sin(a)*2.25);
 
-    let target=null,best=14*14;
-    for(const z of zombies){
-      if(!z||z.userData.dead||z.userData.spawnPending||!z.visible)continue;
+    // Wider five-point rotating formation. Alternate inner/outer depth slightly
+    // so tails and spell effects overlap less around the player.
+    const formationAngle=now*.22+(i/ARCANE_ECHO_COUNT)*Math.PI*2;
+    const formationRadius=2.55+(i%2)*.42;
+    const orbitDesired=new THREE.Vector3(
+      player.position.x+Math.cos(formationAngle)*formationRadius,
+      player.position.y,
+      player.position.z+Math.sin(formationAngle)*formationRadius
+    );
+
+    // Distributed targeting: prefer a nearby enemy that has not already been
+    // claimed by another Echo this frame. Bosses/brutes can accept two Echoes.
+    let target=null,bestScore=Infinity;
+    for(const z of echoLivingTargets){
       const d=e.position.distanceToSquared(z.position);
-      if(d<best){best=d;target=z;}
+      if(d>18*18)continue;
+      const reserved=echoTargetReservations.get(z)||0;
+      const type=z.userData.archetype||'walker';
+      const capacity=(type==='boss'||type==='brute')?2:1;
+      const reservationPenalty=reserved>=capacity?160:(reserved*20);
+      const slotBias=((echoLivingTargets.indexOf(z)-i+echoLivingTargets.length)%Math.max(1,echoLivingTargets.length))*.35;
+      const score=d+reservationPenalty+slotBias;
+      if(score<bestScore){bestScore=score;target=z;}
     }
+    if(target)echoTargetReservations.set(target,(echoTargetReservations.get(target)||0)+1);
 
-    // Echoes may step toward a target, but are leashed tightly to the Mage.
+    // Echoes pursue only enough to get into attack range, then hold spacing.
+    // Their leash remains tight so they reliably return to the player.
     let desired=orbitDesired;
     if(target){
       const toward=target.position.clone().sub(e.position);toward.y=0;
       const targetDist=toward.length();
-      if(targetDist>3.4){
+      if(targetDist>4.1){
         toward.normalize();
-        const candidate=e.position.clone().addScaledVector(toward,Math.min(2.2,targetDist-3.0));
+        const candidate=e.position.clone().addScaledVector(toward,Math.min(2.35,targetDist-3.65));
         const fromPlayer=candidate.clone().sub(player.position);fromPlayer.y=0;
-        if(fromPlayer.length()>5.5) candidate.copy(player.position).add(fromPlayer.normalize().multiplyScalar(5.5));
-        candidate.y=player.position.y;desired=candidate;
+        if(fromPlayer.length()>6.25){
+          candidate.copy(player.position).add(fromPlayer.normalize().multiplyScalar(6.25));
+        }
+        candidate.y=player.position.y;
+        desired=candidate;
       }
     }
     const dist=e.position.distanceTo(desired);
-    if(dist>9)e.position.copy(desired);else e.position.lerp(desired,Math.min(1,dt*(dist>4?9:5.5)));
+    if(dist>9){
+      e.position.copy(desired);
+    }else if(dist>.001){
+      const moveSpeed=arcaneEchoCurrentMoveSpeed();
+      const dx=desired.x-e.position.x,dz=desired.z-e.position.z;
+      const planar=Math.hypot(dx,dz);
+      const travel=Math.min(planar,moveSpeed*dt);
+      if(planar>1e-5){
+        const nx=e.position.x+(dx/planar)*travel;
+        const nz=e.position.z+(dz/planar)*travel;
+        const resolved=resolveCollision(nx,nz,e.position.y);
+        e.position.x=resolved.x;
+        e.position.z=resolved.z;
+      }
+      e.position.y=player.position.y;
+    }
+
+    const echoPlanarMove=Math.hypot(desired.x-e.position.x,desired.z-e.position.z);
+    arcaneEchoSetMoveAnimation(e,echoPlanarMove>.16);
 
     // Knight-clone-style contact behavior:
     // - Normal enemies are instantly defeated and never consume the Echo.
@@ -12571,18 +12822,40 @@ function updateArcaneEchoes(dt){
       killZombie(z);
     }
 
-    e.userData.attackCooldown=Math.max(0,(e.userData.attackCooldown||0)-dt);
+    e.userData.primaryCooldown=Math.max(0,(e.userData.primaryCooldown||0)-dt);
+    e.userData.secondaryCooldown=Math.max(0,(e.userData.secondaryCooldown||0)-dt);
+
     if(target&&!target.userData.dead&&target.parent){
       e.rotation.y=Math.atan2(target.position.x-e.position.x,target.position.z-e.position.z);
-      if(e.userData.attackCooldown<=0){
-        e.userData.attackCooldown=.72;
-        const dx=target.position.x-e.position.x,dz=target.position.z-e.position.z,dl=Math.hypot(dx,dz)||1;
-        const damage=Math.max(.08,(weaponForAvatar().damage||1)*playerStats.power*.10);
-        spawnArcaneEchoBolt(e.position,target.position);
-        applyBulletDamage(target,damage);
-        if(!target.userData.dead){target.userData.knockbackX=(dx/dl)*3.2;target.userData.knockbackZ=(dz/dl)*3.2;target.userData.hitStun=Math.max(target.userData.hitStun||0,.12);}
+
+      // Read the player's CURRENT loadout each time, so changing Primary or
+      // Secondary immediately changes every active Echo too.
+      const primary=weaponForAvatar();
+      const secondary=secondaryWeaponForAvatar();
+
+      // Secondary gets first chance when ready; otherwise Primary fires.
+      // Independent timers preserve each copied move's own cadence at 50%.
+      if(secondary && e.userData.secondaryCooldown<=0){
+        if(arcaneEchoFireCopiedMove(e,secondary,target,true)){
+          const baseSecondaryCooldown=arcaneEchoCooldownFor(secondary);
+          const heavySecondary=(secondary.kind==='giant_fireball'||secondary.kind==='arcane_lance');
+          // Extra per-Echo phase spacing for heavy visuals prevents five large
+          // casts from converging on the same render frame.
+          e.userData.secondaryCooldown=baseSecondaryCooldown+(heavySecondary?i*.16:i*.045);
+          e.userData.primaryCooldown=Math.max(e.userData.primaryCooldown,heavySecondary?.18:.10);
+        }else{
+          e.userData.secondaryCooldown=.18;
+        }
+      }else if(primary && e.userData.primaryCooldown<=0){
+        if(arcaneEchoFireCopiedMove(e,primary,target,false)){
+          e.userData.primaryCooldown=arcaneEchoCooldownFor(primary);
+        }else{
+          e.userData.primaryCooldown=.12;
+        }
       }
-    }else e.rotation.y=player.rotation.y;
+    }else{
+      e.rotation.y=player.rotation.y;
+    }
   }
 }
 
@@ -20842,9 +21115,23 @@ function performWeaponAttack(w, countsAsPrimary=true){
     spawnArcherMuzzleFan();spawnHeroIdentityAura();
   } else {
     if(player.userData.playKayClip){
-      const words=mageGameplayActive()?['magic']:['ranged','shoot'];
       const shotBlend=state.avatarType==='rogue'?0.16:0.25;
-      player.userData.playKayClip(findClipByWords(words,'1H_Ranged_Shoot'),true,true,shotBlend);
+      if(state.avatarType==='ninefox'&&mageGameplayActive()){
+        let foxCast='magic cast';
+        let castLean=.08;
+        if(w.kind==='giant_fireball'){foxCast='magic giant cast';castLean=.17;}
+        else if(w.kind==='arcane_lance'){foxCast='magic lance cast';castLean=.12;}
+        else if(w.kind==='elemental' && (w.auto||w.cooldown<=.10)){foxCast='magic rapid cast';castLean=.06;}
+        player.userData.nineFoxCastLeanTarget=castLean;
+        player.userData.nineFoxCastLeanUntil=performance.now()+(
+          w.kind==='giant_fireball'?430:(w.kind==='arcane_lance'?300:190)
+        );
+        player.userData.playKayClip(foxCast,true,true,
+          w.kind==='giant_fireball'?.42:(w.kind==='arcane_lance'?.28:.18));
+      }else{
+        const words=mageGameplayActive()?['magic']:['ranged','shoot'];
+        player.userData.playKayClip(findClipByWords(words,'1H_Ranged_Shoot'),true,true,shotBlend);
+      }
     }
     if(w.kind==='elemental'){
       mageElementToggle=!mageElementToggle;
@@ -22493,12 +22780,22 @@ function update(dt){
   // instead of snapping so dash reads like an accelerated run, not a glide.
   if(state.avatarType==='ninefox' && player.userData.nineFoxFit){
     const fit=player.userData.nineFoxFit;
-    const targetLean=(dashActive && onGround)?0.34:0;
-    const current=Number(player.userData.nineFoxDashLean)||0;
-    const blend=1-Math.exp(-dt*(dashActive?18:11));
-    const next=current+(targetLean-current)*blend;
-    player.userData.nineFoxDashLean=next;
-    fit.rotation.x=next;
+    const targetDashLean=(dashActive && onGround)?0.34:0;
+    const currentDash=Number(player.userData.nineFoxDashLean)||0;
+    const dashBlend=1-Math.exp(-dt*(dashActive?18:11));
+    const nextDash=currentDash+(targetDashLean-currentDash)*dashBlend;
+    player.userData.nineFoxDashLean=nextDash;
+
+    const castStillActive=(player.userData.nineFoxCastLeanUntil||0)>performance.now();
+    const targetCast=castStillActive?(Number(player.userData.nineFoxCastLeanTarget)||0):0;
+    const currentCast=Number(player.userData.nineFoxCastLean)||0;
+    const castBlend=1-Math.exp(-dt*(castStillActive?20:13));
+    const nextCast=currentCast+(targetCast-currentCast)*castBlend;
+    player.userData.nineFoxCastLean=nextCast;
+
+    // Dash takes precedence, but casting can add a smaller committed posture
+    // when the fox is stationary or merely running.
+    fit.rotation.x=Math.max(nextDash,nextCast);
   }
 
   // clamp to arena
