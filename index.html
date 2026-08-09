@@ -1,3 +1,8 @@
+<!-- V22.14.51 Nine-Tailed Fox Scale Fit
+Shrinks the Nine-Tailed Fox so it sits in the roster between the small hero sizes,
+and recenters the model in both gameplay and the avatar selection preview so the
+whole avatar is visible instead of filling the camera.
+-->
 <!-- V22.14.50 Nine-Tailed Fox Avatar
 Adds the uploaded Nine Tailed Fox as a separate selectable avatar using its native
 glTF skin/skeleton and bundled animation clips: guard, guard_run, fallow, and spawn.
@@ -250,7 +255,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.50</title>
+<title>Family Arena V22.14.51</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1463,7 +1468,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <script>
 (function(){
 
-const GAME_VERSION='22.14.50 - Nine Tailed Fox Avatar';
+const GAME_VERSION='22.14.51 - Nine Tailed Fox Scale Fit';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1846,7 +1851,7 @@ function passiveForAvatar(type=state.avatarType){ return HERO_PASSIVES[type] || 
 // Archer / Hooded Rogue / Mage = small
 // Knight = medium (larger than those three)
 // Barbarian = largest, exactly 2x its previous 1.08 scale
-const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:0.88, knight:1.18, barbarian:2.16, linear:0.88, ninefox:1.0 };
+const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:0.88, knight:1.18, barbarian:2.16, linear:0.88, ninefox:0.95 };
 const FREE_AVATAR_TYPES = [...AVATAR_TYPES];
 // TESTING ONLY: sET this back to false to re-lock Bunny/Dog/all 15 heroes
 // behind crystals. Everything else about the unlock system (CATALOG
@@ -2405,10 +2410,13 @@ async function updateAvatarPreview(characterId){
       root.rotation.y=0;
       const box=new THREEAsset.Box3().setFromObject(root);
       const size=box.getSize(new THREEAsset.Vector3());
-      const targetHeight=1.55;
+      const targetHeight=1.18;
       root.scale.setScalar(targetHeight/Math.max(.001,size.y));
 
       const box2=new THREEAsset.Box3().setFromObject(root);
+      const center2=box2.getCenter(new THREEAsset.Vector3());
+      root.position.x-=center2.x;
+      root.position.z-=center2.z;
       root.position.y-=box2.min.y;
       root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
 
@@ -10508,14 +10516,17 @@ function buildNineTailedFoxPlayer(options={}){
     const root=cloneSkinned(gltf.scene);
     root.rotation.y=0;
 
-    // Fit to a compact but clearly readable gameplay height. The tails make the
-    // model visually broad, so keep height slightly below the human avatars.
+    // Keep the fox clearly smaller than the oversized first pass. Target a
+    // compact on-map height that sits around the standard small heroes.
     const rawBox=new THREEAsset.Box3().setFromObject(root);
     const rawSize=rawBox.getSize(new THREEAsset.Vector3());
-    const targetHeight=1.34;
+    const targetHeight=1.20;
     root.scale.setScalar(targetHeight/Math.max(.001,rawSize.y));
 
     const placedBox=new THREEAsset.Box3().setFromObject(root);
+    const placedCenter=placedBox.getCenter(new THREEAsset.Vector3());
+    root.position.x-=placedCenter.x;
+    root.position.z-=placedCenter.z;
     root.position.y-=placedBox.min.y;
 
     root.traverse(o=>{
