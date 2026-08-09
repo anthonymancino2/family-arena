@@ -1,3 +1,4 @@
+<!-- V22.14.43 Linear Knee + Foot Sync: keeps the safe non-destructive knee deformation from V22.14.42 but reduces the bend amplitude and synchronizes the separate exported shoe/ankle meshes with each virtual knee. This prevents the exaggerated split-foot stride while preserving visible knee flex. Lighting and Linear's smaller ground marker are unchanged. -->
 <!-- V22.14.42 Linear Safe Joint Rig: keeps Linear's connected OBJ hierarchy intact and adds non-destructive runtime knee deformation to the original long leg meshes. Vertices below the knee line are rotated around a virtual knee pivot instead of splitting/re-parenting body pieces, avoiding the detached-limb regression from earlier builds. Lighting and Linear-only ground marker are unchanged. -->
 <!-- V22.14.41 Linear Ground Marker Fix: preserves the approved V22.14.40 Linear lighting and changes only Linear's player locator ring. Her marker is smaller, thinner, softer, and uses normal depth testing so it sits naturally on the ground instead of reading like a large glowing hoop. Other avatars retain their existing locator marker. -->
 <!-- V22.14.40 Linear Lighting Balanced: keeps the successful texture-aware lighting fix from V22.14.39 but reduces the emissive contribution so Linear no longer appears washed out or self-lit in bright outdoor maps. The goal is to match the surrounding scene brightness while preserving original GameCube texture color and normal shadow response. Rig stability remains unchanged. -->
@@ -231,7 +232,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.42</title>
+<title>Family Arena V22.14.43</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1444,7 +1445,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.42 - Linear Safe Joint Rig';
+const GAME_VERSION='22.14.43 - Linear Knee Foot Sync';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10042,6 +10043,46 @@ function linearCreateSafeKneeDeformer(mesh,kneeY){
   };
 }
 
+
+function linearCreateSafeFootFollower(THREEAsset,objects,kneeY){
+  const items=(objects||[]).filter(Boolean).map(o=>({
+    object:o,
+    basePosition:o.position.clone(),
+    baseQuaternion:o.quaternion.clone(),
+    baseScale:o.scale.clone()
+  }));
+  return {
+    angle:0,
+    apply(angle){
+      angle=Number.isFinite(angle)?Math.max(0,Math.min(.62,angle)):0;
+      this.angle=angle;
+      // Feet should follow the shin, but with slightly less rotation so the
+      // sole still plants naturally instead of pointing sharply downward.
+      const footAngle=angle*.72;
+      const q=new THREEAsset.Quaternion().setFromAxisAngle(
+        new THREEAsset.Vector3(1,0,0),footAngle
+      );
+      for(const item of items){
+        const o=item.object;
+        const p=item.basePosition.clone();
+
+        // Rotate the object's local origin around the same virtual knee line
+        // used by the vertex deformer. This moves the shoe with the lower leg
+        // without changing hierarchy or splitting geometry.
+        const ry=p.y-kneeY;
+        const c=Math.cos(footAngle),s=Math.sin(footAngle);
+        const rz=p.z;
+        p.y=kneeY + ry*c - rz*s;
+        p.z=ry*s + rz*c;
+
+        o.position.copy(p);
+        o.quaternion.copy(item.baseQuaternion).premultiply(q);
+        o.scale.copy(item.baseScale);
+      }
+    }
+  };
+}
+
 function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
   const root=cloneLinearModel(template);
   root.rotation.y=0;
@@ -10075,6 +10116,12 @@ function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
   // Virtual knee joints: the original OBJ remains whole and connected.
   const leftKneeDeformer=linearCreateSafeKneeDeformer(root.getObjectByName('Mesh_01'),-1120);
   const rightKneeDeformer=linearCreateSafeKneeDeformer(root.getObjectByName('Mesh_0066'),-1120);
+  const leftFootFollower=linearCreateSafeFootFollower(
+    THREEAsset,[root.getObjectByName('Mesh_03'),root.getObjectByName('Mesh_02')],-1120
+  );
+  const rightFootFollower=linearCreateSafeFootFollower(
+    THREEAsset,[root.getObjectByName('Mesh_0062'),root.getObjectByName('Mesh_0069')],-1120
+  );
 
   root.traverse(o=>{
     if(o.isMesh){
@@ -10139,21 +10186,21 @@ function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
         le=.26+Math.max(0,-s)*.34;
         re=.26+Math.max(0,s)*.34;
         ll=-s*.50; rl=s*.50;
-        lk=Math.max(0,Math.sin(phase+.35))*.82;
-        rk=Math.max(0,Math.sin(phase+Math.PI+.35))*.82;
+        lk=Math.max(0,Math.sin(phase+.35))*.42;
+        rk=Math.max(0,Math.sin(phase+Math.PI+.35))*.42;
         bob=Math.abs(Math.sin(phase))*.032;
         lean=.06;
       }else if(this.mode==='jump'){
         const p=Math.min(1,this.shotTime/Math.max(.001,this.shotDuration));
         la=-.42;ra=-.42;le=.42;re=.42;
-        ll=.18;rl=.18;lk=.58;rk=.58;
+        ll=.18;rl=.18;lk=.34;rk=.34;
         bob=.04+Math.sin(p*Math.PI)*.018;
         lean=-.03;
       }else if(this.mode==='land'){
         const p=Math.min(1,this.shotTime/Math.max(.001,this.shotDuration));
         const a=Math.sin(p*Math.PI);
         la=.22*a;ra=.22*a;le=.38*a;re=.38*a;
-        ll=.22*a;rl=.22*a;lk=.62*a;rk=.62*a;
+        ll=.22*a;rl=.22*a;lk=.36*a;rk=.36*a;
         bob=-.045*a;lean=.10*a;
       }else if(this.mode==='hit'){
         const p=Math.min(1,this.shotTime/Math.max(.001,this.shotDuration));
@@ -10197,6 +10244,8 @@ function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
       // whole-leg group while the long shin geometry visibly bends.
       if(leftKneeDeformer)leftKneeDeformer.apply(lk);
       if(rightKneeDeformer)rightKneeDeformer.apply(rk);
+      if(leftFootFollower)leftFootFollower.apply(lk);
+      if(rightFootFollower)rightFootFollower.apply(rk);
 
       if(this.mode!=='attack'&&this.mode!=='cast'){
         leftArm.rotation.z=0;rightArm.rotation.z=0;
@@ -10225,7 +10274,7 @@ function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
     }
   };
   anim.update(0);
-  return {root,anim,parts:{leftArm,rightArm,leftLeg,rightLeg},deformers:{leftKnee:leftKneeDeformer,rightKnee:rightKneeDeformer}};
+  return {root,anim,parts:{leftArm,rightArm,leftLeg,rightLeg},deformers:{leftKnee:leftKneeDeformer,rightKnee:rightKneeDeformer,leftFoot:leftFootFollower,rightFoot:rightFootFollower}};
 }
 
 function buildLinearPlayer(options={}){
