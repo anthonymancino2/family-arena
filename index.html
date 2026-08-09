@@ -201,7 +201,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.90</title>
+<title>Family Arena V22.14.91</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.90 - Onslaught Rebuilt Stable';
+const GAME_VERSION='22.14.91 - Onslaught Continuous Contact Hitbox';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -13542,7 +13542,7 @@ function createFreshKnightRuntime(){
     royalOnslaughtStrikeIndex:0, royalOnslaughtStrikeTimer:0,
     royalOnslaughtDash:null,
     royalOnslaughtTargetCursor:0, royalOnslaughtEligibleIds:null,
-    royalOnslaughtHitIds:null, royalOnslaughtDamagedIds:null,
+    royalOnslaughtHitIds:null, royalOnslaughtDamagedIds:null, royalOnslaughtPauseContactIds:null,
     royalOnslaughtBossDamage:null, royalOnslaughtTargets:[], royalOnslaughtOriginX:0, royalOnslaughtOriginZ:0,
     shieldTossCooldown:0, shieldToss:null, shieldAway:false,
     resistTimer:0, frontGuardTimer:0,
@@ -16348,18 +16348,99 @@ function knightRoyalOnslaughtSegmentDistanceSq(point,a,b){
   const dx=point.x-x,dz=point.z-z;
   return dx*dx+dz*dz;
 }
-function knightRoyalOnslaughtPathDamage(from,to,index,endpoint){
-  const radius=1.25*knightTitanCombatScale();
-  const radiusSq=radius*radius;
-  // One-hit Onslaught damage can remove enemies while this pass is running.
-  // Traverse a stable snapshot so array mutation cannot skip entries or corrupt
-  // the first-hit -> second-hit handoff.
-  const routeEnemies=Array.from(zombies);
-  for(const z of routeEnemies){
-    if(!z||z===endpoint||!z.userData||z.userData.dead||z.userData.spawnPending) continue;
-    if(knightRoyalOnslaughtSegmentDistanceSq(z.position,from,to)>radiusSq) continue;
-    knightRoyalOnslaughtDamage(z,index);
+
+const KNIGHT_ONSLAUGHT_BODY_CONTACT_RADIUS=1.75;
+const KNIGHT_ONSLAUGHT_ENDPOINT_CONTACT_RADIUS=2.20;
+
+function knightRoyalOnslaughtContactRadius(endpoint=false){
+  const base=endpoint
+    ? KNIGHT_ONSLAUGHT_ENDPOINT_CONTACT_RADIUS
+    : KNIGHT_ONSLAUGHT_BODY_CONTACT_RADIUS;
+  return base*Math.max(1,Math.min(1.8,knightTitanCombatScale()));
+}
+
+function knightRoyalOnslaughtRegisterContact(z,index,hitPoint,hitSet,major=false){
+  if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)return false;
+
+  // One contact per enemy per dash. This is particularly important for bosses:
+  // a boss standing inside Cloud for several render frames should count as one
+  // Onslaught contact, not 5-10 repeated boss damage events.
+  if(hitSet&&hitSet.has(z.uuid))return false;
+  if(hitSet)hitSet.add(z.uuid);
+
+  const pos=hitPoint||{
+    x:z.position.x,
+    y:z.position.y||0,
+    z:z.position.z
+  };
+
+  // Every physical contact is now an official Onslaught hit point.
+  knightRoyalOnslaughtProvenImpactWow(z,index);
+
+  // Direct hit + 5-unit lethal shockwave.
+  knightRoyalOnslaughtDamage(z,index);
+
+  return true;
+}
+
+function knightRoyalOnslaughtSweepBodyContacts(from,to,index,hitSet,endpointTarget=null){
+  if(!from||!to)return 0;
+  const radius=knightRoyalOnslaughtContactRadius(false);
+  const r2=radius*radius;
+  let contacts=0;
+
+  // Snapshot because direct Onslaught kills remove entries from zombies.
+  for(const z of Array.from(zombies)){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    if(hitSet&&hitSet.has(z.uuid))continue;
+
+    // Swept capsule: detects anything Cloud's body crossed between the prior
+    // and current frame, so high dash speed cannot tunnel through enemies.
+    if(knightRoyalOnslaughtSegmentDistanceSq(z.position,from,to)>r2)continue;
+
+    const hitPoint={
+      x:z.position.x,
+      y:z.position.y||0,
+      z:z.position.z
+    };
+    if(knightRoyalOnslaughtRegisterContact(z,index,hitPoint,hitSet,false))contacts++;
   }
+  return contacts;
+}
+
+function knightRoyalOnslaughtEndpointContacts(index,hitSet,preferredTarget=null){
+  if(!player)return 0;
+  const radius=knightRoyalOnslaughtContactRadius(true);
+  const r2=radius*radius;
+  let contacts=0;
+
+  // Endpoint overlap check is intentionally independent of the planned target.
+  // If Cloud visually lands inside two or three enemies, all of them count.
+  for(const z of Array.from(zombies)){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    if(hitSet&&hitSet.has(z.uuid))continue;
+
+    const dx=z.position.x-player.position.x;
+    const dz=z.position.z-player.position.z;
+    if(dx*dx+dz*dz>r2)continue;
+
+    if(knightRoyalOnslaughtRegisterContact(
+      z,index,
+      {x:z.position.x,y:z.position.y||0,z:z.position.z},
+      hitSet,
+      true
+    ))contacts++;
+  }
+
+  return contacts;
+}
+
+function knightRoyalOnslaughtPathDamage(from,to,index,endpoint){
+  // Compatibility/failsafe final sweep. The main hit detection now runs every
+  // frame through knightRoyalOnslaughtSweepBodyContacts().
+  const hitSet=(knightRuntime.royalOnslaughtDash&&knightRuntime.royalOnslaughtDash.contactHitIds)
+    || new Set();
+  knightRoyalOnslaughtSweepBodyContacts(from,to,index,hitSet,endpoint);
 }
 function knightRoyalOnslaughtSelectTarget(){
   const eligible=knightRuntime.royalOnslaughtEligibleIds;
@@ -16654,30 +16735,54 @@ function knightRoyalOnslaughtProvenImpactWow(target,index){
 }
 
 function knightRoyalOnslaughtImpactStrike(dash){
-  if(!dash||!player) return;
-  const {target,index,yaw,startPos}=dash;
+  if(!dash||!player)return;
+  const {target,index}=dash;
+  const hitSet=dash.contactHitIds||(dash.contactHitIds=new Set());
   const hitIds=knightRuntime.royalOnslaughtHitIds||(knightRuntime.royalOnslaughtHitIds=new Set());
-  const escalation=1+Math.min(index,24)*.08;
-  if(target&&!target.userData.dead){
+
+  // The endpoint itself is always an official impact point even if the planned
+  // target was already killed by Cloud's moving-body contact a frame earlier.
+  const endpointProxy={
+    position:new THREE.Vector3(player.position.x,player.position.y,player.position.z),
+    userData:{dead:false,spawnPending:false}
+  };
+  knightRoyalOnslaughtProvenImpactWow(endpointProxy,index);
+
+  // Final body-overlap capture around the landing position.
+  knightRoyalOnslaughtEndpointContacts(index,hitSet,target);
+
+  if(target&&target.userData&&!target.userData.dead&&!target.userData.spawnPending){
     hitIds.add(target.uuid);
-    // The attack animation happens at the destination, after the dash is
-    // visible, so Royal Onslaught reads as dash -> strike instead of teleport.
-    knightPlayClip(index%2?['melee','chop']:['melee','slash'],index%2?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal',.22,.08);
-    // One unmistakable official-hit shockwave using proven Knight effects.
-    knightRoyalOnslaughtProvenImpactWow(target,index);
-    knightRoyalOnslaughtDamage(target,index);
-    if(target.userData.dead) knightRoyalOnslaughtClearMarker(target);
-    if(index%4===3) triggerCombatShake(5,70);
+    if(!hitSet.has(target.uuid)){
+      knightRoyalOnslaughtRegisterContact(
+        target,index,
+        {x:target.position.x,y:target.position.y||0,z:target.position.z},
+        hitSet,
+        true
+      );
+    }
   }
+
+  // Attack motion remains after arrival.
+  knightPlayClip(
+    index%2?['melee','chop']:['melee','slash'],
+    index%2?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal',
+    .22,.08
+  );
+
   knightRuntime.royalOnslaughtStrikeIndex=index+1;
   const survivors=knightRoyalOnslaughtLivingEligible();
-  const bossOnly=(knightRuntime.royalOnslaughtStrikeIndex||0)>=20&&survivors.length>0&&survivors.every(z=>knightEnemyClass(z)==='boss');
+  const bossOnly=(knightRuntime.royalOnslaughtStrikeIndex||0)>=20 &&
+    survivors.length>0 &&
+    survivors.every(z=>knightEnemyClass(z)==='boss');
   knightRuntime.royalOnslaughtStrikeTimer=bossOnly?.07:.09;
-  if(navigator.vibrate) navigator.vibrate(18);
+
+  if(navigator.vibrate)navigator.vibrate(18);
 }
 function knightRoyalOnslaughtStrike(){
   if(knightRuntime.royalOnslaughtDash) return;
   const index=knightRuntime.royalOnslaughtStrikeIndex||0;
+  knightRuntime.royalOnslaughtPauseContactIds=new Set();
   const target=knightRoyalOnslaughtSelectTarget();
   if(!target){
     knightRuntime.royalOnslaughtStrikeIndex=index+1;
@@ -16700,6 +16805,8 @@ function knightRoyalOnslaughtStrike(){
   knightRuntime.royalOnslaughtDash={
     target,index,yaw,startPos,
     fromX:startPos.x,fromZ:startPos.z,toX:safe.x,toZ:safe.z,
+    lastContactX:startPos.x,lastContactZ:startPos.z,
+    contactHitIds:new Set(),
     elapsed:0,duration:.36,nextEcho:0
   };
   // Travel first, strike second. With the slower 0.36s dash, starting a slash
@@ -16718,15 +16825,49 @@ function knightRoyalOnslaughtUpdateDash(dt){
   if(Number.isFinite(d.fromX)&&Number.isFinite(d.toX)) player.position.x=d.fromX+(d.toX-d.fromX)*p;
   if(Number.isFinite(d.fromZ)&&Number.isFinite(d.toZ)) player.position.z=d.fromZ+(d.toZ-d.fromZ)*p;
   if(Number.isFinite(d.yaw)) player.rotation.y=d.yaw;
-  // No per-dash custom VFX in this stability build. A watchdog also forces the
-  // dash to resolve if a browser frame spike ever leaves it alive too long.
+
+  // TRUE moving-body hitbox. Sweep the actual distance Cloud traveled THIS
+  // frame, not just the ideal start/end route after the dash is over.
+  try{
+    const prev={
+      x:Number.isFinite(d.lastContactX)?d.lastContactX:player.position.x,
+      z:Number.isFinite(d.lastContactZ)?d.lastContactZ:player.position.z
+    };
+    const curr={x:player.position.x,z:player.position.z};
+    knightRoyalOnslaughtSweepBodyContacts(
+      prev,curr,d.index,
+      d.contactHitIds||(d.contactHitIds=new Set()),
+      d.target
+    );
+    d.lastContactX=player.position.x;
+    d.lastContactZ=player.position.z;
+  }catch(err){
+    console.error('Royal Onslaught continuous contact recovered:',err);
+  }
+
   const forceComplete=d.elapsed>=Math.max(.65,d.duration+.45);
   if(raw>=1||forceComplete){
     try{
-      knightRoyalOnslaughtPathDamage(d.startPos,player.position,d.index,d.target);
+      // First capture anything physically overlapping Cloud at the endpoint.
+      knightRoyalOnslaughtEndpointContacts(
+        d.index,
+        d.contactHitIds||(d.contactHitIds=new Set()),
+        d.target
+      );
+
+      // Final complete-route sweep is only a failsafe for an extreme dropped
+      // frame; normal hits were already registered continuously above.
+      knightRoyalOnslaughtSweepBodyContacts(
+        d.startPos,
+        {x:player.position.x,z:player.position.z},
+        d.index,
+        d.contactHitIds,
+        d.target
+      );
     }catch(err){
-      console.error('Royal Onslaught route damage recovered:',err);
+      console.error('Royal Onslaught endpoint contact recovered:',err);
     }
+
     knightRuntime.royalOnslaughtDash=null;
     try{
       knightRoyalOnslaughtImpactStrike(d);
@@ -16827,6 +16968,19 @@ function knightUpdateAegis(dt){
     }
     const dashing=knightRoyalOnslaughtUpdateDash(dt);
     if(!dashing){
+      // Even during the short endpoint pause, touching Cloud counts as a hit.
+      try{
+        const pauseHitSet=knightRuntime.royalOnslaughtPauseContactIds||
+          (knightRuntime.royalOnslaughtPauseContactIds=new Set());
+        knightRoyalOnslaughtEndpointContacts(
+          knightRuntime.royalOnslaughtStrikeIndex||0,
+          pauseHitSet,
+          null
+        );
+      }catch(err){
+        console.error('Royal Onslaught pause contact recovered:',err);
+      }
+
       knightRuntime.royalOnslaughtStrikeTimer=(knightRuntime.royalOnslaughtStrikeTimer||0)-dt;
       const strikeIndex=knightRuntime.royalOnslaughtStrikeIndex||0;
       const captureClosed=knightRoyalOnslaughtCaptureClosed();
@@ -16878,6 +17032,7 @@ function knightEndAegis(success){
   knightRuntime.royalOnslaughtElapsed=0;
   knightRuntime.royalOnslaughtStrikeIndex=0;
   knightRuntime.royalOnslaughtStrikeTimer=0;
+  knightRuntime.royalOnslaughtPauseContactIds=null;
   knightRoyalOnslaughtLeaderGlow(true);
   knightRuntime.royalOnslaughtDash=null;
   knightRuntime.royalOnslaughtTargetCursor=0;
