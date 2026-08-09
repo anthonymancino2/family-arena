@@ -1,3 +1,16 @@
+<!-- V22.14.66 Nine-Tailed Fox Replaces Mage
+Official replacement: Nine-Tailed Fox now occupies the Mage slot while keeping
+the stable mage gameplay/save identity. The separate fox test slot is removed.
+Legacy ninefox saves migrate to mage. Original KayKit Mage remains as automatic
+visual fallback if the native fox asset fails.
+-->
+<!-- V22.14.65 Fox-as-Mage Stability / Replacement Readiness
+Hardens the Nine-Tailed Fox Mage shadow test across run start/end, reruns, pause,
+round transitions and asynchronous Arcane Echo creation. Echo spawn generations
+prevent stale delayed clones from appearing after cleanup or avatar changes.
+Fresh runs and ended runs now explicitly remove Echoes; active round transitions
+still preserve them by design. The old Mage visual remains untouched as rollback.
+-->
 <!-- V22.14.64 Arcane Echo Formation + Combat Behavior
 Improves Arcane Echo squad behavior: wider rotating formation slots, target
 distribution across nearby enemies, 50%-speed pursuit/return movement, native
@@ -337,7 +350,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.64</title>
+<title>Family Arena V22.14.66</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1550,7 +1563,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <script>
 (function(){
 
-const GAME_VERSION='22.14.64 - Arcane Echo Formation Combat';
+const GAME_VERSION='22.14.66 - Nine-Tailed Fox Mage Replacement';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1889,19 +1902,18 @@ const SKINS = ['#ffe3c4','#f2c9a0','#c68a5a','#8d5a3c','#5a3826','#2b1d16'];
 const OUTFITS = ['#3fa9d6','#e0533d','#4caf50','#9b59b6','#f1c40f','#ecf0f1'];
 const HAIR_STYLES = ['short','medium','long'];
 const HAIR_STYLE_LABELS = {short:'Short', medium:'Medium', long:'Long'};
-const AVATAR_TYPES = ['rogue','hooded','mage','knight','barbarian','ninefox'];
+const AVATAR_TYPES = ['rogue','hooded','mage','knight','barbarian'];
 const AVATAR_TYPE_LABELS = {
   rogue:'🏹 Archer',
   hooded:'🥷 Hooded Rogue',
-  mage:'🔮 Mage',
+  mage:'🦊 Nine-Tailed Fox Mage',
   knight:'🛡️ Knight',
-  barbarian:'🪓 Barbarian',
-  ninefox:'🦊 Nine-Tailed Fox'
+  barbarian:'🪓 Barbarian'
 };
 const HERO_ROSTER_INFO = {
   rogue:{title:'Tempest Archer',role:'RANGED • EASY',desc:'The speed-focused ranged avatar: fast movement, long-lived piercing arrows, and precise crowd control. Every fifth defeat triggers Tailwind for a short burst of movement and firing speed.'},
   hooded:{title:'Shadow Rogue',role:'MELEE • HARD',desc:'Rapid close-range slashes, shadow clones, and evasive movement. Crossbow removed for a pure assassin silhouette.'},
-  mage:{title:'Arcane Mage',role:'RANGED • MEDIUM',desc:'Alternating elemental attacks and powerful area magic.'},
+  mage:{title:'Nine-Tailed Fox Mage',role:'RANGED • MEDIUM',desc:'Native-rigged fox using the complete Arcane Mage combat system, elemental magic, and Arcane Echo clones.'},
   knight:{title:'Knight of Dawn',role:'MELEE • DEFENDER',desc:'An armored royal defender. Sword-and-shield combos, Magical Armor, guarding and counterattacks. Strongest class for surviving while surrounded.'},
   barbarian:{title:'Fury Barbarian',role:'MELEE • MEDIUM',desc:'A durable heavy hitter with extended axe reach. Every third defeat erupts into a Shockwave; every fifth grants 3 seconds of Invincibility.'},
   ninefox:{title:'Nine-Tailed Fox',role:'MAGE SHADOW TEST • NATIVE RIG',desc:'Uses the complete Mage gameplay systems while remaining a separate test avatar. Native Guard, Guard Run, Fallow, and Spawn animations stay on the fox rig. The original Mage remains untouched as fallback. Model by Witsanu Superball, CC-BY-4.0.'}
@@ -1914,7 +1926,6 @@ const HERO_PASSIVES = {
   hooded:{name:'Shadowstep',icon:'💨',desc:'Defeating an enemy grants 20% movement speed for 2.5 seconds.',killMoveMult:1.20,killMoveDuration:2.5},
   knight:{name:'Royal Guardian',icon:'🛡️',desc:'Two regenerating Magical Armor charges, Royal Discipline stacks, Fortified Position, Last Stand, and a defensive Whirlwind every fifth defeat.',armorMax:2,armorRegenDelay:5,armorRegenInterval:3,whirlwindKills:5,whirlwindDuration:3,whirlwindRadius:3.25,whirlwindDamage:.72,whirlwindStun:.20,whirlwindPulse:.22,whirlwindKnockback:3.4,whirlwindSpinSpeed:22},
   barbarian:{name:'Relentless Fury',icon:'🔥',desc:'Every third defeat releases a ground Shockwave. Every fifth defeat grants 3 seconds of Invincibility.',shockwaveKills:3,shockwaveRadius:5.2,shockwaveDamage:1.25,shockwaveStun:.65,invincibleKills:5,invincibleDuration:3.0},
-  ninefox:{name:'Arcane Fox Test',icon:'🦊',desc:'Shadow-testing the full Mage gameplay system on the fox native rig.'},
   mage:{
     name:'Arcane Flow',icon:'✨',
     desc:'Every third normal cast releases a stunning shockwave. Every third defeat grants Arcane Haste for 3 seconds.',
@@ -1938,7 +1949,7 @@ function passiveForAvatar(type=state.avatarType){
 // Archer / Hooded Rogue / Mage = small
 // Knight = medium (larger than those three)
 // Barbarian = largest, exactly 2x its previous 1.08 scale
-const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:0.88, knight:1.18, barbarian:2.16, ninefox:1.0 };
+const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:1.0, knight:1.18, barbarian:2.16, ninefox:1.0 };
 const FREE_AVATAR_TYPES = [...AVATAR_TYPES];
 // TESTING ONLY: sET this back to false to re-lock Bunny/Dog/all 15 heroes
 // behind crystals. Everything else about the unlock system (CATALOG
@@ -2154,9 +2165,14 @@ function loadAvatarFromProfile(){
   state.skin = p.skin || 0;
   state.outfit = p.outfit || 0;
   state.hairStyle = p.hairStyle || 'short';
-  const savedType = p.avatarType || 'human';
+  let savedType = p.avatarType || 'rogue';
+  if(savedType==='ninefox'){
+    savedType='mage';
+    p.avatarType='mage';
+    Store.saveProfile(p);
+  }
   const isUnlocked = UNLOCK_ALL_AVATARS_FOR_TESTING || FREE_AVATAR_TYPES.includes(savedType) || (p.unlocked||[]).includes(savedType);
-  state.avatarType = isUnlocked ? savedType : 'human';
+  state.avatarType = isUnlocked ? savedType : 'rogue';
 }
 function saveAvatarToProfile(){
   if(!state.currentName) return;
@@ -2488,7 +2504,7 @@ async function updateAvatarPreview(characterId){
   const status=document.getElementById('avatarPreviewStatus');
   if(status) status.textContent='Loading '+AVATAR_TYPE_LABELS[characterId].replace(/^.\s/,'')+'…';
   try{
-    if(characterId==='ninefox'){
+    if(characterId==='mage'||characterId==='ninefox'){
       const {gltf,THREEAsset,cloneSkinned}=await getNineTailedFoxAssetPromise();
       if(requestId!==previewRequestId)return;
       if(previewRoot)previewScene.remove(previewRoot);
@@ -2520,7 +2536,7 @@ async function updateAvatarPreview(characterId){
       previewMixer=new THREEAsset.AnimationMixer(root);
       const idle=gltf.animations.find(c=>c.name==='guard')||gltf.animations[0];
       if(idle)previewMixer.clipAction(idle).play();
-      if(status)status.textContent='Nine-Tailed Fox · Native Rig';
+      if(status)status.textContent='Nine-Tailed Fox Mage · Native Rig';
       return;
     }
     const {gltf,THREEAsset,cloneSkinned}=await getKayKitAssetPromise(characterId);
@@ -2967,6 +2983,7 @@ let arcaneEchoes = [];
 let arcaneEchoesCooldownTimer = 0;
 let arcaneEchoesCycleDuration = 15;
 let arcaneEchoesInitialChargePending = true;
+let arcaneEchoSpawnGeneration = 0;
 const ARCANE_ECHO_COUNT = 5;
 const ARCANE_ECHO_INITIAL_CHARGE = 25;
 function arcaneEchoesCooldownForLevel(level=avatarLevel()){
@@ -10261,6 +10278,34 @@ function buildNineTailedFoxPlayer(options={}){
     if(!options.silent)toast('Nine-Tailed Fox loaded · native animations');
   }).catch(err=>{
     console.error('Nine-Tailed Fox load failed:',err);
+
+    // Automatic rollback visual. Gameplay remains Mage even if the fox asset
+    // fails, so a model-loading problem can never make the character unusable.
+    if(options.officialMage&&wrapper.parent){
+      getKayKitAssetPromise('mage').then(({gltf,THREEAsset,cloneSkinned})=>{
+        if(!wrapper.parent)return;
+        if(loadingMesh.parent)wrapper.remove(loadingMesh);
+        try{loadingMesh.geometry.dispose();loadingMesh.material.dispose();}catch(_){}
+        const legacyRoot=cloneSkinned(gltf.scene);
+        legacyRoot.rotation.y=0;
+        const box=new THREEAsset.Box3().setFromObject(legacyRoot);
+        const size=box.getSize(new THREEAsset.Vector3());
+        legacyRoot.scale.setScalar(1.48/Math.max(.001,size.y));
+        const box2=new THREEAsset.Box3().setFromObject(legacyRoot);
+        legacyRoot.position.y-=box2.min.y;
+        wrapper.add(legacyRoot);
+        wrapper.userData.kayRoot=legacyRoot;
+        wrapper.userData.legacyMageFallback=true;
+        wrapper.userData.kayMixer=new THREEAsset.AnimationMixer(legacyRoot);
+        wrapper.userData.kayClips={};
+        gltf.animations.forEach(c=>wrapper.userData.kayClips[c.name]=c);
+        const idle=gltf.animations.find(c=>/idle/i.test(c.name))||gltf.animations[0];
+        if(idle)wrapper.userData.kayMixer.clipAction(idle).play();
+        if(!options.silent)toast('Legacy Mage fallback active');
+      }).catch(fallbackErr=>console.error('Legacy Mage fallback failed:',fallbackErr));
+      return;
+    }
+
     if(!options.silent)toast('Nine-Tailed Fox load error: '+String(err&&err.message||err).slice(0,120));
   });
 
@@ -10269,7 +10314,7 @@ function buildNineTailedFoxPlayer(options={}){
 
 
 function nineFoxRepairPresentation(resetLean=false){
-  if(!player||state.avatarType!=='ninefox'||!player.userData.nineFoxFit)return;
+  if(!player||(state.avatarType!=='mage'&&(state.avatarType!=='mage'&&state.avatarType!=='ninefox'))||!player.userData.nineFoxFit)return;
   const fit=player.userData.nineFoxFit;
   const baseScale=player.userData.nineFoxFitBaseScale;
   const basePos=player.userData.nineFoxFitBasePosition;
@@ -10299,7 +10344,10 @@ function nineFoxRepairPresentation(resetLean=false){
 
 
 function buildKayKitPlayer(characterId, options={}){
-  if(characterId==='ninefox') return buildNineTailedFoxPlayer(options);
+  // The selectable Mage is now the fox. Zombie Mage variants intentionally
+  // retain the lightweight legacy model for crowd performance.
+  if((characterId==='mage'||characterId==='ninefox')&&!options.zombie)
+    return buildNineTailedFoxPlayer({...options,officialMage:true});
   const wrapper = new THREE.Group();
 
   // Compatibility pivots keep existing shooting and movement code safe.
@@ -10448,7 +10496,7 @@ function spawnPlayer(){
   // Localized visibility aid only: glowing ground ring, no screen tint.
   // Nine-Tailed Fox has a much smaller visual footprint than the human heroes,
   // so use a tighter locator instead of the oversized standard ring.
-  const foxGroundMarker=state.avatarType==='ninefox';
+  const foxGroundMarker=(state.avatarType==='mage'||state.avatarType==='ninefox');
   const locatorRing=new THREE.Mesh(
     new THREE.RingGeometry(foxGroundMarker?.30:.62,foxGroundMarker?.40:.82,32),
     new THREE.MeshBasicMaterial({
@@ -10682,11 +10730,22 @@ function clearZombies(){
 
 function startRound(){
   clearMageRoundSpecials(true,true);
-  if(state.avatarType==='ninefox'&&player){
+  if((state.avatarType==='mage'||state.avatarType==='ninefox')&&player){
     nineFoxRepairPresentation(true);
     player.userData.kayActionLock=0;
     player.userData.kayCurrentName='';
     if(player.userData.playKayClip)player.userData.playKayClip('Idle',true,false,0);
+    for(const e of arcaneEchoes){
+      if(!e||!e.parent)continue;
+      if(!Number.isFinite(e.position.x)||!Number.isFinite(e.position.y)||!Number.isFinite(e.position.z)){
+        e.position.copy(player.position);
+      }
+      e.userData.invincible=true;
+      e.userData.hp=Infinity;
+      e.userData.dead=false;
+      e.userData.primaryCooldown=Math.max(0,Number(e.userData.primaryCooldown)||0);
+      e.userData.secondaryCooldown=Math.max(0,Number(e.userData.secondaryCooldown)||0);
+    }
   }
   roundCompletionPending = false;
   roundCompletionStartedAt = 0;
@@ -10729,6 +10788,29 @@ function startRound(){
 // enemy model becomes invalid, clips outside the arena, or the spawn queue
 // gets out of sync. This repairs the live round instead of leaving the
 // player stranded with no enemies and no way to advance.
+let foxMageStabilityClock=0;
+function validateFoxMageRuntime(dt){
+  if((state.avatarType!=='mage'&&state.avatarType!=='ninefox')||!player)return;
+  foxMageStabilityClock+=dt;
+  if(foxMageStabilityClock<.75)return;
+  foxMageStabilityClock=0;
+
+  nineFoxRepairPresentation(false);
+
+  arcaneEchoes=arcaneEchoes.filter(e=>{
+    if(!e||!e.parent||e.userData.dead)return false;
+    if(e.userData.echoAvatarType && e.userData.echoAvatarType!=='mage' && e.userData.echoAvatarType!=='ninefox'){
+      scene.remove(e);disposeGroup(e);return false;
+    }
+    if(!Number.isFinite(e.position.x)||!Number.isFinite(e.position.y)||!Number.isFinite(e.position.z)){
+      e.position.copy(player.position);
+    }
+    e.userData.invincible=true;
+    e.userData.hp=Infinity;
+    return true;
+  });
+}
+
 let roundRecoveryClock = 0;
 function recoverRoundIfNeeded(dt){
   if(!gameRunning || freeMode || roundKillsDone >= roundKillTarget) return;
@@ -11346,11 +11428,6 @@ const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogu
   knight:[KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER, KNIGHT_JUDGMENT_ULTIMATE] };
 const REMOVED_WEAPON_IDS=['radiant_cleave','blade_cyclone','holy_wave','shield_bash','banner_spear','knight_banner_spear'];
 function sanitizeRemovedAbilitySelection(){
-  if(state.avatarType==='ninefox'){
-    const mageCombat=CHARACTER_COMBAT.mage;
-    if(currentPrimaryWeaponId && !mageCombat.weapons[currentPrimaryWeaponId]) currentPrimaryWeaponId=null;
-    if(currentWeaponId && !mageCombat.weapons[currentWeaponId]) currentWeaponId=null;
-  }
   if(equippedAbilityId==='tempest_domain'||equippedAbilityId==='arrow_storm'||
      equippedAbilityId==='knight_whirlwind'||equippedAbilityId==='knight_earth_shatter'||
      equippedAbilityId==='knight_guardian_charge'||equippedAbilityId==='banner_spear'||
@@ -11814,14 +11891,27 @@ function knightPauseSafety(){
 }
 function openPauseMenu(){
   knightPauseSafety();
-  if(state.avatarType==='ninefox')nineFoxRepairPresentation(true);
+  if((state.avatarType==='mage'||state.avatarType==='ninefox')){
+    nineFoxRepairPresentation(true);
+    for(const e of arcaneEchoes){
+      if(!e||!e.parent)continue;
+      e.userData.invincible=true;
+      e.userData.hp=Infinity;
+      if(e.userData.foxGuardAction){
+        if(e.userData.foxAttackAction)e.userData.foxAttackAction.stop();
+        if(e.userData.foxRunAction)e.userData.foxRunAction.stop();
+        e.userData.foxGuardAction.reset().play();
+        e.userData.foxMoveAnim='guard';
+      }
+    }
+  }
   if(!gameRunning) return;
   gameRunning = false;
   document.getElementById('pauseOverlay').classList.add('show');
 }
 function closePauseMenu(){
   document.getElementById('pauseOverlay').classList.remove('show');
-  if(state.avatarType==='ninefox'&&player){
+  if((state.avatarType==='mage'||state.avatarType==='ninefox')&&player){
     nineFoxRepairPresentation(true);
     player.userData.kayActionLock=0;
     player.userData.kayCurrentName='';
@@ -11839,6 +11929,10 @@ function rerunCurrentRound(){
   roundCompletionStartedAt=0;
   roundTimerFrozenElapsed=null;
   clearZombies();
+  clearArcaneEchoes();
+  arcaneEchoesCooldownTimer=0;
+  arcaneEchoesCycleDuration=arcaneEchoesCooldownForLevel();
+  arcaneEchoesInitialChargePending=true;
   bullets.forEach(b=>scene.remove(b.mesh)); bullets=[];
   enemyProjectiles.forEach(p=>{scene.remove(p.mesh);disposeGroup(p.mesh);if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}}); enemyProjectiles=[];
   roundKillsDone=0;
@@ -12440,9 +12534,21 @@ function updateHoodedHud(){
 }
 
 function clearArcaneEchoes(){
-  arcaneEchoes.forEach(e=>{ if(e&&e.parent){scene.remove(e);disposeGroup(e);} });
+  arcaneEchoSpawnGeneration++;
+  arcaneEchoes.forEach(e=>{
+    if(!e)return;
+    e.userData.dead=true;
+    if(e.userData.kayMixer)e.userData.kayMixer.stopAllAction();
+    if(e.parent){scene.remove(e);disposeGroup(e);}
+  });
   arcaneEchoes=[];
-  zombies.forEach(z=>{ if(z.userData.targetPlayer&&z.userData.targetPlayer.userData&&z.userData.targetPlayer.userData.isArcaneEcho){z.userData.targetPlayer=null;z.userData.targetRefresh=0;} });
+  zombies.forEach(z=>{
+    if(z.userData.targetPlayer&&z.userData.targetPlayer.userData&&z.userData.targetPlayer.userData.isArcaneEcho){
+      z.userData.targetPlayer=null;
+      z.userData.targetRefresh=0;
+    }
+  });
+  updateHoodedHud();
 }
 function tintArcaneEcho(root){
   root.traverse(o=>{
@@ -12466,17 +12572,21 @@ function triggerArcaneEchoes(){
   if(!gameRunning||!arcaneEchoesUnlocked())return;
   if(arcaneEchoesCooldownTimer>0){toast('Arcane Echoes ready in '+arcaneEchoesCooldownTimer.toFixed(1)+'s');return;}
   clearArcaneEchoes();
+  const echoGeneration=++arcaneEchoSpawnGeneration;
+  const echoAvatarType=state.avatarType;
   arcaneEchoesCycleDuration=arcaneEchoesCooldownForLevel();
   arcaneEchoesCooldownTimer=arcaneEchoesCycleDuration;
   updateHoodedHud();
   toast('ARCANE ECHOES!');
   navigator.vibrate&&navigator.vibrate([30,25,55]);
-  const foxEchoMode=state.avatarType==='ninefox';
+  const foxEchoMode=echoAvatarType==='mage'||echoAvatarType==='ninefox';
   const echoAssetPromise=foxEchoMode?getNineTailedFoxAssetPromise():getKayKitAssetPromise('mage');
   echoAssetPromise.then(({gltf,THREEAsset,cloneSkinned})=>{
+    if(echoGeneration!==arcaneEchoSpawnGeneration||state.avatarType!==echoAvatarType)return;
     for(let i=0;i<ARCANE_ECHO_COUNT;i++){
       setTimeout(()=>{
-        if(!player||!mageGameplayActive())return;
+        if(echoGeneration!==arcaneEchoSpawnGeneration)return;
+        if(!player||!player.parent||!mageGameplayActive()||state.avatarType!==echoAvatarType)return;
         const wrap=new THREE.Group();
         const root=cloneSkinned(gltf.scene);root.rotation.y=0;
 
@@ -12504,6 +12614,7 @@ function triggerArcaneEchoes(){
         const a=(i/ARCANE_ECHO_COUNT)*Math.PI*2;
         wrap.position.set(player.position.x+Math.cos(a)*1.8,player.position.y,player.position.z+Math.sin(a)*1.8);
         wrap.userData.isArcaneEcho=true;
+        wrap.userData.echoAvatarType=echoAvatarType;
         wrap.userData.invincible=true;
         wrap.userData.hp=Infinity;
         wrap.userData.dead=false;
@@ -12553,7 +12664,7 @@ function triggerArcaneEchoes(){
 function spawnArcaneEchoBolt(from,to){
   // Fox echoes use the native fox body height instead of the legacy human
   // Mage +1.0 origin. The normal Mage keeps its original bolt height.
-  const sourceY=from.y+(state.avatarType==='ninefox'?.70:1.0);
+  const sourceY=from.y+((state.avatarType==='mage'||state.avatarType==='ninefox')?.70:1.0);
   const points=[new THREE.Vector3(from.x,sourceY,from.z),new THREE.Vector3(to.x,to.y+.75,to.z)];
   const geometry=new THREE.BufferGeometry().setFromPoints(points);
   const material=new THREE.LineBasicMaterial({color:0xb86cff,transparent:true,opacity:.95,depthWrite:false,blending:THREE.AdditiveBlending});
@@ -12579,7 +12690,7 @@ function arcaneEchoCooldownFor(w){
 }
 
 function arcaneEchoAnimateAttack(e,kind){
-  if(state.avatarType!=='ninefox'||!e||!e.userData.foxAttackAction)return;
+  if((state.avatarType!=='mage'&&state.avatarType!=='ninefox')||!e||!e.userData.foxAttackAction)return;
   const a=e.userData.foxAttackAction;
   const guard=e.userData.foxGuardAction;
   let speed=4.4;
@@ -12610,7 +12721,7 @@ function arcaneEchoFireCopiedMove(e,w,target,isSecondary=false){
   let dx=Math.sin(yaw),dz=Math.cos(yaw),dy=0;
 
   let forward=.72,vertical=1.0;
-  if(state.avatarType==='ninefox'){
+  if((state.avatarType==='mage'||state.avatarType==='ninefox')){
     if(w.kind==='giant_fireball'){forward=1.20;vertical=.68;}
     else if(w.kind==='arcane_lance'){forward=.90;vertical=.70;}
     else{forward=.78;vertical=.72;}
@@ -12678,7 +12789,7 @@ function arcaneEchoFireCopiedMove(e,w,target,isSecondary=false){
 
 
 function arcaneEchoSetMoveAnimation(e,moving){
-  if(state.avatarType!=='ninefox'||!e)return;
+  if((state.avatarType!=='mage'&&state.avatarType!=='ninefox')||!e)return;
   const desired=moving?'run':'guard';
   if(e.userData.foxMoveAnim===desired)return;
 
@@ -20877,7 +20988,7 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
   let forwardOffset=.72;
   let verticalOffset=1.02;
   let foxLateralScale=1;
-  if(state.avatarType==='ninefox' && mageGameplayActive()){
+  if((state.avatarType==='mage'||state.avatarType==='ninefox') && mageGameplayActive()){
     if(w.kind==='giant_fireball'){
       // Extra forward clearance keeps the huge sphere from swallowing the fox.
       forwardOffset=1.34;
@@ -21116,7 +21227,7 @@ function performWeaponAttack(w, countsAsPrimary=true){
   } else {
     if(player.userData.playKayClip){
       const shotBlend=state.avatarType==='rogue'?0.16:0.25;
-      if(state.avatarType==='ninefox'&&mageGameplayActive()){
+      if((state.avatarType==='mage'||state.avatarType==='ninefox')&&mageGameplayActive()){
         let foxCast='magic cast';
         let castLean=.08;
         if(w.kind==='giant_fireball'){foxCast='magic giant cast';castLean=.17;}
@@ -22626,7 +22737,7 @@ function update(dt){
     player.userData.kayMixer.update(dt);
     player.userData.kayActionLock = Math.max(0, (player.userData.kayActionLock || 0) - dt);
   }
-  if(state.avatarType==='ninefox')nineFoxRepairPresentation(false);
+  if((state.avatarType==='mage'||state.avatarType==='ninefox'))nineFoxRepairPresentation(false);
 
   // camera
   const guardianTitanCamera=typeof knightGuardianGiantActive==='function' && knightGuardianGiantActive();
@@ -22778,7 +22889,7 @@ function update(dt){
   // keep the real guard_run skeletal animation active and layer a stronger
   // whole-body forward pitch on the non-animated fit wrapper. Blend it in/out
   // instead of snapping so dash reads like an accelerated run, not a glide.
-  if(state.avatarType==='ninefox' && player.userData.nineFoxFit){
+  if((state.avatarType==='mage'||state.avatarType==='ninefox') && player.userData.nineFoxFit){
     const fit=player.userData.nineFoxFit;
     const targetDashLean=(dashActive && onGround)?0.34:0;
     const currentDash=Number(player.userData.nineFoxDashLean)||0;
@@ -22878,6 +22989,7 @@ function update(dt){
   updateEnemyCountHud();
   updateEnemyRadar();
   recoverRoundIfNeeded(dt);
+  validateFoxMageRuntime(dt);
   // Final safety net: ENEMIES 0 must always transition to the upgrade menu.
   enforceRoundCompletionFailsafe();
   if(invincibleTimer > 0){
@@ -23067,6 +23179,10 @@ function startSurvival(){
   ownedAbilities = {};
   equippedAbilityId = null;
   rerunEndsAfterRound=false;
+  clearArcaneEchoes();
+  arcaneEchoesCooldownTimer=0;
+  arcaneEchoesCycleDuration=15;
+  arcaneEchoesInitialChargePending=true;
   clearMageRoundSpecials(true);
   blizzardCooldownTimer = 0;
   tempestDomainCooldownTimer = 0;
@@ -23116,6 +23232,8 @@ function startSurvival(){
 
 function endSurvival(){
   gameRunning = false;
+  clearArcaneEchoes();
+  if((state.avatarType==='mage'||state.avatarType==='ninefox')&&player)nineFoxRepairPresentation(true);
   if(typeof clearKnightRoundSpecials==='function') clearKnightRoundSpecials(true);
   const elapsedSec = (performance.now() - runStartTime) / 1000;
   const roundsCleared = Math.max(0, round - runStartRound);
