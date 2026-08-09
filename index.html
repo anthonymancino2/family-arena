@@ -1,3 +1,10 @@
+<!-- V22.14.57 Nine-Tailed Fox Native Animation Validation
+Hardens the fox's native animation lifecycle before Mage compatibility testing.
+Uses guard for idle, guard_run for ground movement/dash and aerial locomotion,
+fallow only for action/reaction requests, and spawn only for initial entry.
+Adds clean one-shot handoff, smoother crossfades, and presentation recovery so
+pause/round transitions cannot leave dash lean or visual scale in a bad state.
+-->
 <!-- V22.14.56 Nine-Tailed Fox Dash Run Lean
 Keeps the Nine-Tailed Fox in its native guard_run animation while dashing and adds
 a stronger whole-body forward lean during dash. The lean smoothly blends back out
@@ -281,7 +288,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.56</title>
+<title>Family Arena V22.14.57</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1494,7 +1501,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <script>
 (function(){
 
-const GAME_VERSION='22.14.56 - Nine Fox Dash Run Lean';
+const GAME_VERSION='22.14.57 - Nine Fox Native Animation Validation';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10038,8 +10045,8 @@ function getNineTailedFoxAssetPromise(){
 function nineTailedFoxClipName(requested){
   const n=String(requested||'').toLowerCase();
   if(n.includes('spawn'))return 'spawn';
-  if(n.includes('run')||n.includes('walk')||n.includes('dash'))return 'guard_run';
-  if(n.includes('jump')||n.includes('land'))return 'fallow';
+  if(n.includes('run')||n.includes('walk')||n.includes('dash')||
+     n.includes('jump')||n.includes('land'))return 'guard_run';
   if(/attack|melee|slash|chop|stab|shoot|magic|cast|hit|hurt|impact/.test(n))return 'fallow';
   return 'guard';
 }
@@ -10111,6 +10118,8 @@ function buildNineTailedFoxPlayer(options={}){
     wrapper.userData.kayRoot=root;
     wrapper.userData.nineFoxFit=fit;
     wrapper.userData.nineFoxDashLean=0;
+    wrapper.userData.nineFoxFitBaseScale=fit.scale.clone();
+    wrapper.userData.nineFoxFitBasePosition=fit.position.clone();
 
     const mixer=new THREEAsset.AnimationMixer(root);
     const clips={};
@@ -10126,7 +10135,13 @@ function buildNineTailedFoxPlayer(options={}){
       const actual=nineTailedFoxClipName(requested);
       const clip=clips[actual]||clips.guard||gltf.animations[0];
       if(!clip)return;
-      if(this.kayCurrentName===actual&&!force)return;
+
+      const shouldLoop=(actual==='guard'||actual==='guard_run')&&!oneShot;
+      if(this.kayCurrentName===actual&&!force){
+        // Do not restart a native loop every frame.
+        if(this.kayCurrentAction&&!this.kayCurrentAction.isRunning())this.kayCurrentAction.play();
+        return;
+      }
 
       const previous=this.kayCurrentAction;
       const action=mixer.clipAction(clip);
@@ -10135,7 +10150,6 @@ function buildNineTailedFoxPlayer(options={}){
       action.setEffectiveTimeScale(1);
       action.setEffectiveWeight(1);
 
-      const shouldLoop=(actual==='guard'||actual==='guard_run')&&!oneShot;
       if(shouldLoop){
         action.setLoop(THREEAsset.LoopRepeat,Infinity);
         action.clampWhenFinished=false;
@@ -10144,17 +10158,29 @@ function buildNineTailedFoxPlayer(options={}){
         action.clampWhenFinished=true;
       }
 
-      action.fadeIn(.10).play();
-      if(previous&&previous!==action)previous.fadeOut(.10);
+      const fade=(previous&&previous!==action)?.14:.08;
+      action.fadeIn(fade).play();
+      if(previous&&previous!==action)previous.fadeOut(fade);
 
       this.kayCurrentAction=action;
       this.kayCurrentName=actual;
       if(lockSeconds>0)this.kayActionLock=Math.max(this.kayActionLock||0,lockSeconds);
     };
 
-    // Use the model's own spawn animation once, then the normal movement loop
-    // naturally selects guard/guard_run on following frames.
-    wrapper.userData.playKayClip('spawn',true,true,.18);
+    // When a native one-shot finishes, clear its identity so the next normal
+    // gameplay frame can immediately choose guard or guard_run.
+    mixer.addEventListener('finished',ev=>{
+      if(!wrapper.parent)return;
+      if(wrapper.userData.kayCurrentAction===ev.action){
+        wrapper.userData.kayCurrentAction=null;
+        wrapper.userData.kayCurrentName='';
+        wrapper.userData.kayActionLock=0;
+      }
+    });
+
+    // Briefly show the model's real spawn resource, then allow the normal
+    // gameplay state machine to take over rather than locking movement for 3s.
+    wrapper.userData.playKayClip('spawn',true,true,.42);
     if(!options.silent)toast('Nine-Tailed Fox loaded · native animations');
   }).catch(err=>{
     console.error('Nine-Tailed Fox load failed:',err);
@@ -10162,6 +10188,33 @@ function buildNineTailedFoxPlayer(options={}){
   });
 
   return wrapper;
+}
+
+
+function nineFoxRepairPresentation(resetLean=false){
+  if(!player||state.avatarType!=='ninefox'||!player.userData.nineFoxFit)return;
+  const fit=player.userData.nineFoxFit;
+  const baseScale=player.userData.nineFoxFitBaseScale;
+  const basePos=player.userData.nineFoxFitBasePosition;
+
+  // Imported clips are allowed to animate their skeleton, never the external
+  // fit wrapper that determines gameplay size and centering.
+  if(baseScale){
+    if(!Number.isFinite(fit.scale.x)||Math.abs(fit.scale.x-baseScale.x)>.0001||
+       Math.abs(fit.scale.y-baseScale.y)>.0001||Math.abs(fit.scale.z-baseScale.z)>.0001){
+      fit.scale.copy(baseScale);
+    }
+  }
+  if(basePos){
+    if(!Number.isFinite(fit.position.x)||!Number.isFinite(fit.position.y)||!Number.isFinite(fit.position.z)){
+      fit.position.copy(basePos);
+    }
+  }
+
+  if(resetLean){
+    player.userData.nineFoxDashLean=0;
+    fit.rotation.x=0;
+  }
 }
 
 
@@ -10549,6 +10602,12 @@ function clearZombies(){
 
 function startRound(){
   clearMageRoundSpecials(true,true);
+  if(state.avatarType==='ninefox'&&player){
+    nineFoxRepairPresentation(true);
+    player.userData.kayActionLock=0;
+    player.userData.kayCurrentName='';
+    if(player.userData.playKayClip)player.userData.playKayClip('Idle',true,false,0);
+  }
   roundCompletionPending = false;
   roundCompletionStartedAt = 0;
   roundTimerFrozenElapsed = null;
@@ -11670,12 +11729,18 @@ function knightPauseSafety(){
 }
 function openPauseMenu(){
   knightPauseSafety();
+  if(state.avatarType==='ninefox')nineFoxRepairPresentation(true);
   if(!gameRunning) return;
   gameRunning = false;
   document.getElementById('pauseOverlay').classList.add('show');
 }
 function closePauseMenu(){
   document.getElementById('pauseOverlay').classList.remove('show');
+  if(state.avatarType==='ninefox'&&player){
+    nineFoxRepairPresentation(true);
+    player.userData.kayActionLock=0;
+    player.userData.kayCurrentName='';
+  }
   gameRunning = true;
   clock.getDelta();
   animate();
@@ -22073,6 +22138,7 @@ function update(dt){
     player.userData.kayMixer.update(dt);
     player.userData.kayActionLock = Math.max(0, (player.userData.kayActionLock || 0) - dt);
   }
+  if(state.avatarType==='ninefox')nineFoxRepairPresentation(false);
 
   // camera
   const guardianTitanCamera=typeof knightGuardianGiantActive==='function' && knightGuardianGiantActive();
