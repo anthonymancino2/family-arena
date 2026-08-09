@@ -1,3 +1,4 @@
+<!-- V22.14.41 Linear Ground Marker Fix: preserves the approved V22.14.40 Linear lighting and changes only Linear's player locator ring. Her marker is smaller, thinner, softer, and uses normal depth testing so it sits naturally on the ground instead of reading like a large glowing hoop. Other avatars retain their existing locator marker. -->
 <!-- V22.14.40 Linear Lighting Balanced: keeps the successful texture-aware lighting fix from V22.14.39 but reduces the emissive contribution so Linear no longer appears washed out or self-lit in bright outdoor maps. The goal is to match the surrounding scene brightness while preserving original GameCube texture color and normal shadow response. Rig stability remains unchanged. -->
 <!-- V22.14.39 Linear Lighting Match Fix: corrects the uploaded GameCube character's persistent dark appearance by making her texture contribute directly to the material's emissive response. This is Linear-only, preserves texture detail, avoids a glowing unlit look, and keeps normal scene lighting/shadow response on top. Rig stability from V22.14.38 is unchanged. -->
 <!-- V22.14.38 Linear Rig Stability Fix: fixes detached/displaced Linear body parts introduced by the experimental elbow/knee hierarchy. Restores the original leg and arm meshes as intact connected geometry, preserves the brighter Linear-only material correction, and uses conservative whole-limb articulation for stable movement. Experimental geometry splitting and nested elbow/knee re-parenting are disabled until a proper weight-safe solution is ready. Linear remains a separate Rig Test avatar; Mage is not replaced in this build. -->
@@ -229,7 +230,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.40</title>
+<title>Family Arena V22.14.41</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1442,7 +1443,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.40 - Linear Lighting Balanced';
+const GAME_VERSION='22.14.41 - Linear Ground Marker Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10367,8 +10368,26 @@ function spawnPlayer(){
   player.userData.facing = 0;
   player.userData.hp = 3;
   // Localized visibility aid only: glowing ground ring, no screen tint.
-  const locatorRing=new THREE.Mesh(new THREE.RingGeometry(.62,.82,32),new THREE.MeshBasicMaterial({color:0x7ff4ff,transparent:true,opacity:.82,side:THREE.DoubleSide,depthWrite:false,depthTest:false}));
-  locatorRing.rotation.x=-Math.PI/2;locatorRing.position.y=.035;locatorRing.renderOrder=999;locatorRing.userData.keepNormalWorldSize=true;player.add(locatorRing);player.userData.visibilityRing=locatorRing;
+  // Linear is visually smaller/thinner than the KayKit avatars, so her marker
+  // gets a tighter, softer treatment instead of the oversized bright hoop.
+  const linearGroundMarker=state.avatarType==='linear';
+  const locatorRing=new THREE.Mesh(
+    new THREE.RingGeometry(linearGroundMarker?.43:.62,linearGroundMarker?.53:.82,32),
+    new THREE.MeshBasicMaterial({
+      color:0x7ff4ff,
+      transparent:true,
+      opacity:linearGroundMarker?.34:.82,
+      side:THREE.DoubleSide,
+      depthWrite:false,
+      depthTest:linearGroundMarker?true:false
+    })
+  );
+  locatorRing.rotation.x=-Math.PI/2;
+  locatorRing.position.y=linearGroundMarker?.022:.035;
+  locatorRing.renderOrder=linearGroundMarker?1:999;
+  locatorRing.userData.keepNormalWorldSize=true;
+  player.add(locatorRing);
+  player.userData.visibilityRing=locatorRing;
   player.userData.attackCooldown = 0;
   player.userData.secondaryAttackCooldown = 0;
   player.userData.spinVisualTimer = 0;
