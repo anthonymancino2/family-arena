@@ -1,3 +1,4 @@
+<!-- V22.14.45 Linear Stronger Movement Feel: increases Linear's whole-body movement language to better match the older avatars. Forward lean, vertical bounce, and side-to-side weight shift are all amplified while preserving lighting, ground marker, knee deformation, foot sync, and current prototype combat. -->
 <!-- V22.14.44 Linear Walk/Run Cycle Polish: preserves the approved lighting, marker, safe knee deformation, and foot sync, while giving Linear more of the old-avatar movement feel. Run/walk now include a clearer forward lean, slightly more vertical bob, and subtle side sway/weight shift so movement reads less stiff and more alive. -->
 <!-- V22.14.43 Linear Knee + Foot Sync: keeps the safe non-destructive knee deformation from V22.14.42 but reduces the bend amplitude and synchronizes the separate exported shoe/ankle meshes with each virtual knee. This prevents the exaggerated split-foot stride while preserving visible knee flex. Lighting and Linear's smaller ground marker are unchanged. -->
 <!-- V22.14.42 Linear Safe Joint Rig: keeps Linear's connected OBJ hierarchy intact and adds non-destructive runtime knee deformation to the original long leg meshes. Vertices below the knee line are rotated around a virtual knee pivot instead of splitting/re-parenting body pieces, avoiding the detached-limb regression from earlier builds. Lighting and Linear-only ground marker are unchanged. -->
@@ -233,7 +234,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.44</title>
+<title>Family Arena V22.14.45</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1446,7 +1447,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.44 - Linear Walk Run Cycle Polish';
+const GAME_VERSION='22.14.45 - Linear Stronger Movement Feel';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10189,16 +10190,17 @@ function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
         // Arm and leg timing stay similar, but the whole body now carries the
         // step more like the older avatars: clearer forward pitch + bounce +
         // subtle side-to-side weight transfer.
-        la=s*.66; ra=-s*.66;
+        la=s*.76; ra=-s*.76;
         le=.24+Math.max(0,-s)*.30;
         re=.24+Math.max(0,s)*.30;
-        ll=-s*.52; rl=s*.52;
+        ll=-s*.58; rl=s*.58;
         lk=Math.max(0,Math.sin(phase+.35))*.42;
         rk=Math.max(0,Math.sin(phase+Math.PI+.35))*.42;
 
-        bob=.012 + step*.038;
-        lean=.095;
-        sideLean=weightShift*.028;
+        // Stronger whole-body read, closer to the existing avatars.
+        bob=.018 + step*.070;
+        lean=.155;
+        sideLean=weightShift*.060;
       }else if(this.mode==='jump'){
         const p=Math.min(1,this.shotTime/Math.max(.001,this.shotDuration));
         la=-.42;ra=-.42;le=.42;re=.42;
