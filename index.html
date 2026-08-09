@@ -201,7 +201,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.76</title>
+<title>Family Arena V22.14.77</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1414,7 +1414,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.76 - Cloud Native Rig Test';
+const GAME_VERSION='22.14.77 - Mode Play Navigation Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2148,9 +2148,36 @@ document.getElementById('backHome3').onclick = ()=>show('screenHome');
 
 document.getElementById('btnPlaySurvival').onclick = ()=>{
   state.mode = 'survival';
-  loadAvatarFromProfile();
-  buildCustomizeUI();
+
+  // Navigation must never be blocked by preview/model setup. Move to avatar
+  // selection first, then build the UI and preview defensively.
+  try{ loadAvatarFromProfile(); }catch(err){ console.warn('Profile load before avatar select:',err); }
   show('screenCustomize');
+
+  try{
+    buildCustomizeUI();
+  }catch(err){
+    console.error('Avatar selection setup failed:',err);
+
+    // Minimal recovery roster: the player can still choose a hero even if one
+    // preview asset fails to initialize.
+    const typeRow=document.getElementById('typeRow');
+    if(typeRow){
+      typeRow.innerHTML='';
+      AVATAR_TYPES.forEach(typeId=>{
+        const btn=document.createElement('button');
+        btn.className='hairBtn'+(state.avatarType===typeId?' sel':'');
+        btn.textContent=AVATAR_TYPE_LABELS[typeId]||typeId;
+        btn.onclick=()=>{
+          state.avatarType=typeId;
+          try{ buildCustomizeUI(); }catch(e){ console.error(e); }
+        };
+        typeRow.appendChild(btn);
+      });
+    }
+    const status=document.getElementById('avatarPreviewStatus');
+    if(status)status.textContent='Preview recovery mode · avatar selection still available';
+  }
 };
 
 // ---- CUSTOMIZE ----
@@ -23850,6 +23877,33 @@ document.getElementById('btnResultsHome').onclick = ()=>{
 })();
 </script>
 
+
+<script>
+/* V22.14.77 mobile navigation fail-safe.
+   This does not alter gameplay; it only guarantees Mode > Zombie Survival >
+   Play can reach avatar selection even if a character preview initializer fails. */
+document.addEventListener('click',function(ev){
+  const btn=ev.target&&ev.target.closest?ev.target.closest('#btnPlaySurvival'):null;
+  if(!btn)return;
+  setTimeout(function(){
+    const customize=document.getElementById('screenCustomize');
+    const modes=document.getElementById('screenModes');
+    if(customize && !customize.classList.contains('active')){
+      if(modes)modes.classList.remove('active');
+      document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+      customize.classList.add('active');
+      try{
+        if(typeof state!=='undefined')state.mode='survival';
+        if(typeof buildCustomizeUI==='function')buildCustomizeUI();
+      }catch(err){
+        console.error('Mode navigation fail-safe:',err);
+        const status=document.getElementById('avatarPreviewStatus');
+        if(status)status.textContent='Avatar preview failed · selection remains available';
+      }
+    }
+  },0);
+},true);
+</script>
 </body>
 </html>
 
