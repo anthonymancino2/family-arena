@@ -1,3 +1,4 @@
+<!-- V22.14.47 Linear Reduced Side Sway: keeps the stronger lean, bounce, arm swing, and leg swing from V22.14.46, but tones down the side-to-side sway so Linear feels less wobbly while still keeping the old-avatar movement energy. -->
 <!-- V22.14.46 Linear Exaggerated Movement Feel: intentionally pushes Linear's movement language much harder than V22.14.45. Forward lean, bounce, side sway, and limb swing are all significantly amplified so the motion reads clearly closer to the older avatars and is no longer subtle. Lighting, marker, knee deformation, and foot sync stay unchanged. -->
 <!-- V22.14.45 Linear Stronger Movement Feel: increases Linear's whole-body movement language to better match the older avatars. Forward lean, vertical bounce, and side-to-side weight shift are all amplified while preserving lighting, ground marker, knee deformation, foot sync, and current prototype combat. -->
 <!-- V22.14.44 Linear Walk/Run Cycle Polish: preserves the approved lighting, marker, safe knee deformation, and foot sync, while giving Linear more of the old-avatar movement feel. Run/walk now include a clearer forward lean, slightly more vertical bob, and subtle side sway/weight shift so movement reads less stiff and more alive. -->
@@ -235,7 +236,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.46</title>
+<title>Family Arena V22.14.47</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1448,7 +1449,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.46 - Linear Exaggerated Movement Feel';
+const GAME_VERSION='22.14.47 - Linear Reduced Side Sway';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10201,7 +10202,7 @@ function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
         // Deliberately exaggerated whole-body read so the motion is obvious.
         bob=.030 + step*.120;
         lean=.240;
-        sideLean=weightShift*.110;
+        sideLean=weightShift*.072;
       }else if(this.mode==='jump'){
         const p=Math.min(1,this.shotTime/Math.max(.001,this.shotDuration));
         la=-.42;ra=-.42;le=.42;re=.42;
