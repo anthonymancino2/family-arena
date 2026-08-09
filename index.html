@@ -201,7 +201,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.84</title>
+<title>Family Arena V22.14.86</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.84 - Cloud Onslaught Whirlwind Fix';
+const GAME_VERSION='22.14.86 - Onslaught Boss Exception';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -16365,34 +16365,100 @@ function knightRoyalOnslaughtSelectTarget(){
   knightRuntime.royalOnslaughtTargetCursor=(cursor+stride)%Math.max(1,living.length);
   return target;
 }
-function knightRoyalOnslaughtDamage(target,index){
-  if(!target||target.userData.dead) return;
-  if(knightRuntime.royalOnslaughtDamagedIds) knightRuntime.royalOnslaughtDamagedIds.add(target.uuid);
+
+const KNIGHT_ONSLAUGHT_LETHAL_SHOCK_RADIUS=5.0;
+
+function knightRoyalOnslaughtKillEnemy(target,index=0){
+  if(!target||!target.userData||target.userData.dead||target.userData.spawnPending)return false;
+
   const cls=knightEnemyClass(target);
-  const maxHp=Math.max(1,target.userData.maxHp||target.userData.hp||1);
-  let damage=(2.15+index*.18)*playerStats.power;
+  const hp=Math.max(1,Number(target.userData.hp)||1);
+  const maxHp=Math.max(1,Number(target.userData.maxHp)||hp);
+
   if(cls==='boss'){
-    // Bosses are the only enemy class allowed to survive an Onslaught hit.
-    // Keep each boss hit controlled, but do not impose a total cast cap that
-    // could make the elimination sequence impossible to finish.
-    // Every endpoint must make visible health progress, even against bosses
-    // with unusually large health pools or resistance. This prevents a boss
-    // from stalling the elimination sequence indefinitely.
-    damage=Math.max(damage*.45,maxHp*.065,(target.userData.hp||maxHp)*.055);
+    // Boss exception: Royal Onslaught must NEVER one-shot a boss.
+    // Restore the controlled boss scaling from the pre-lethal version while
+    // keeping each hit meaningful and visible.
+    let damage=(2.15+Math.max(0,index)*.18)*playerStats.power;
+    damage=Math.max(damage*.45,maxHp*.065,hp*.055);
+
+    // Never let a single Onslaught event reduce a living boss from positive HP
+    // to zero. Leave a tiny amount if the calculated damage would be lethal.
+    damage=Math.min(damage,Math.max(0,hp-.01));
+
     const used=knightRuntime.royalOnslaughtBossDamage.get(target.uuid)||0;
     knightRuntime.royalOnslaughtBossDamage.set(target.uuid,used+damage);
-  }else{
-    // Every non-boss touched by any valid Onslaught strike is defeated in one hit.
-    damage=Math.max(damage,(target.userData.hp||maxHp)+maxHp+1);
+
+    if(damage>0)applyBulletDamage(target,damage);
+    return !!target.userData.dead;
   }
-  applyBulletDamage(target,damage);
+
+  // Normal enemies and Brutes remain one-hit kills during Royal Onslaught.
+  applyBulletDamage(target,hp*4+999999);
   if(!target.userData.dead){
-    target.userData.hitStun=Math.max(target.userData.hitStun||0,cls==='boss'?.55:(cls==='brute'?1.15:1.8));
-    const dx=target.position.x-player.position.x,dz=target.position.z-player.position.z,l=Math.hypot(dx,dz)||1;
-    const force=cls==='boss'?.8:(cls==='brute'?3.8:7.0);
-    target.userData.knockbackX=dx/l*force;
-    target.userData.knockbackZ=dz/l*force;
+    target.userData.hp=-999999;
+    applyBulletDamage(target,9999999);
   }
+  return !!target.userData.dead;
+}
+
+function knightRoyalOnslaughtLethalShockwave(center,index,primaryTarget=null){
+  if(!center)return 0;
+  const radius=KNIGHT_ONSLAUGHT_LETHAL_SHOCK_RADIUS*knightTitanCombatScale();
+  const radiusSq=radius*radius;
+  let kills=0;
+
+  // Snapshot because killing enemies can mutate combat state.
+  const victims=Array.from(zombies);
+  for(const z of victims){
+    if(!z||z===primaryTarget||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    const dx=z.position.x-center.x,dz=z.position.z-center.z;
+    if(dx*dx+dz*dz>radiusSq)continue;
+
+    if(knightRuntime.royalOnslaughtDamagedIds)
+      knightRuntime.royalOnslaughtDamagedIds.add(z.uuid);
+
+    const wasBoss=knightEnemyClass(z)==='boss';
+    const died=knightRoyalOnslaughtKillEnemy(z,index);
+
+    if(died){
+      kills++;
+      knightRoyalOnslaughtClearMarker(z);
+    }else if(wasBoss){
+      // Bosses are affected by the shockwave, but never instantly killed.
+      z.userData.hitStun=Math.max(z.userData.hitStun||0,.35);
+    }
+  }
+
+  // One readable shockwave per actual Onslaught hit; shockwave victims do not
+  // spawn their own shockwaves.
+  if(scene){
+    const pos={x:center.x,y:center.y||0,z:center.z};
+    knightShockRing(pos,radius,KNIGHT_IVORY,.58);
+    knightShockRing(pos,radius*.72,KNIGHT_GOLD,.46);
+    if(knightFxBudget(2)){
+      spawnBurst(pos.x,pos.y+.45,pos.z,isMobile?7:11,FX_MAT_SPARK,Math.min(radius,5));
+    }
+  }
+  if(kills>0)triggerCombatShake(Math.min(9,4+kills*.55),90);
+  return kills;
+}
+
+function knightRoyalOnslaughtDamage(target,index){
+  if(!target||!target.userData||target.userData.dead||target.userData.spawnPending)return;
+  if(knightRuntime.royalOnslaughtDamagedIds)
+    knightRuntime.royalOnslaughtDamagedIds.add(target.uuid);
+
+  // Royal Onslaught rule: every valid non-boss contact is one hit / one kill.
+  const impactPos=target.position.clone
+    ? target.position.clone()
+    : {x:target.position.x,y:target.position.y||0,z:target.position.z};
+
+  knightRoyalOnslaughtKillEnemy(target,index);
+  if(target.userData.dead)knightRoyalOnslaughtClearMarker(target);
+
+  // The force kills every other non-boss enemy within 5 ft; bosses take controlled damage.
+  knightRoyalOnslaughtLethalShockwave(impactPos,index,target);
 }
 function knightRoyalOnslaughtSafePosition(x,z,y){
   const margin=Math.max(2.2,1.25*knightTitanCombatScale());
@@ -16689,26 +16755,15 @@ function knightRoyalOnslaughtFinish(){
   const combat=knightTitanCombatScale(), visual=knightTitanVisualScale();
   const radius=7.5*combat;
   spawnBurst(player.position.x,player.position.y+.6*visual,player.position.z,isMobile?16:24,FX_MAT_SPARK,5.2);
-  for(const z of zombies){
-    if(!z||z.userData.dead||z.userData.spawnPending) continue;
+  // The Onslaught finisher is lethal to non-boss enemies; bosses keep controlled damage.
+  for(const z of Array.from(zombies)){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
     const d=Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z);
-    if(d>radius) continue;
-    const cls=knightEnemyClass(z), maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
-    let damage=3.4*playerStats.power;
-    if(cls==='boss'){
-      damage=Math.max(damage*.45,maxHp*.08);
-      const used=knightRuntime.royalOnslaughtBossDamage.get(z.uuid)||0;
-      knightRuntime.royalOnslaughtBossDamage.set(z.uuid,used+damage);
-    }else{
-      damage=Math.max(damage,(z.userData.hp||maxHp)+maxHp+1);
-    }
-    applyBulletDamage(z,damage);
-    if(!z.userData.dead){
-      z.userData.hitStun=Math.max(z.userData.hitStun||0,cls==='boss'?.65:(cls==='brute'?1.35:2.0));
-      const dx=z.position.x-player.position.x,dz=z.position.z-player.position.z,l=d||1;
-      const force=cls==='boss'?1.0:(cls==='brute'?4.2:8.5);
-      z.userData.knockbackX=dx/l*force; z.userData.knockbackZ=dz/l*force;
-    }
+    if(d>radius)continue;
+    if(knightRuntime.royalOnslaughtDamagedIds)
+      knightRuntime.royalOnslaughtDamagedIds.add(z.uuid);
+    knightRoyalOnslaughtKillEnemy(z,Math.max(19,knightRuntime.royalOnslaughtStrikeIndex||19));
+    if(z.userData.dead)knightRoyalOnslaughtClearMarker(z);
   }
   knightPlayClip(['melee','chop'],'1H_Melee_Attack_Chop',.34,.18);
   knightHitStop(.10);
