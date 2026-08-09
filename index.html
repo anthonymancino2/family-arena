@@ -201,7 +201,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.78</title>
+<title>Family Arena V22.14.79</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1414,7 +1414,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.78 - Core Passive Repair Cloud';
+const GAME_VERSION='22.14.79 - Cloud Knight Combat Engine Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1768,7 +1768,7 @@ const HERO_ROSTER_INFO = {
   mage:{title:'Nine-Tailed Fox Mage',role:'RANGED • MEDIUM',desc:'Native-rigged fox using the complete Arcane Mage combat system, elemental magic, and Arcane Echo clones.'},
   knight:{title:'Knight of Dawn',role:'MELEE • DEFENDER',desc:'An armored royal defender. Sword-and-shield combos, Magical Armor, guarding and counterattacks. Strongest class for surviving while surrounded.'},
   barbarian:{title:'Fury Barbarian',role:'MELEE • MEDIUM',desc:'A durable heavy hitter with extended axe reach. Every third defeat erupts into a Shockwave; every fifth grants 3 seconds of Invincibility.'},
-  cloud:{title:'Cloud · Native Rig Test',role:'MELEE • NATIVE RIG TEST',desc:'Uploaded Cloud model using its native 43-joint skeleton and bundled Walk animation. Temporary melee compatibility gameplay is used only to evaluate whether this model should replace an older avatar. Model by Robukan, CC-BY-4.0.'}
+  cloud:{title:'Cloud · Knight Combat Test',role:'MELEE • KNIGHT MOVE SET',desc:'Uploaded Cloud model using its native 43-joint skeleton and bundled Walk animation while temporarily running the complete Knight combat kit for replacement testing. Model by Robukan, CC-BY-4.0.'}
 };
 
 // Data-driven hero passives. This object had accidentally been merged into
@@ -1795,13 +1795,10 @@ function mageGameplayActive(type=state.avatarType){
 }
 function gameplayAvatarType(type=state.avatarType){
   if(type==='ninefox')return 'mage';
-  if(type==='cloud')return 'hooded';
+  if(type==='cloud')return 'knight'; // Cloud test = Cloud visual + full Knight combat
   return type;
 }
 function passiveForAvatar(type=state.avatarType){
-  if(type==='cloud'){
-    return {name:'Native Rig Test',icon:'⚔️',desc:'Temporary melee compatibility rules while Cloud\'s model, scale, lighting and animation are evaluated.'};
-  }
   return HERO_PASSIVES[gameplayAvatarType(type)] || HERO_PASSIVES.rogue;
 }
 
@@ -2973,7 +2970,7 @@ function resetCharacterLoadout(){
   // Shield Bash is now part of Royal Vanguard Combo, not a Secondary.
   // Knight secondaries are Shield Toss and Defensive Whirlwind and follow their
   // normal unlock/equip rules.
-  if(state.avatarType==='knight' && currentWeaponId==='shield_bash'){
+  if(knightIsActive() && currentWeaponId==='shield_bash'){
     currentWeaponId=null;
   }
   if(typeof sanitizeRemovedAbilitySelection==='function') sanitizeRemovedAbilitySelection();
@@ -3680,7 +3677,7 @@ function buildTree(trunkHex, foliageHex, style){
     star.position.y = topY + 0.1;
     g.add(star);
     const ornamentColors = [0xff4444,0xffd700,0x4488ff,0xffffff];
-    for(let i=0;i<(stressed?3:7);i++){
+    for(let i=0;i<7;i++){
       const orn = new THREE.Mesh(new THREE.SphereGeometry(0.045,6,6), new THREE.MeshBasicMaterial({color:ornamentColors[i%ornamentColors.length]}));
       const ang = Math.random()*Math.PI*2, r = 0.3+Math.random()*0.2, oy = trunkH+0.2+Math.random()*0.6;
       orn.position.set(Math.cos(ang)*r, oy, Math.sin(ang)*r);
@@ -3825,7 +3822,7 @@ function buildMushroom(){
 function buildCampfire(){
   const g = new THREE.Group();
   const stoneMat = new THREE.MeshLambertMaterial({flatShading:true, color:0x8a8896});
-  for(let i=0;i<(stressed?4:10);i++){
+  for(let i=0;i<10;i++){
     const a = (i/8)*Math.PI*2;
     const stone = new THREE.Mesh(new THREE.IcosahedronGeometry(0.16+Math.random()*0.06,0), stoneMat);
     stone.position.set(Math.cos(a)*0.52, 0.08, Math.sin(a)*0.52);
@@ -4314,7 +4311,7 @@ function makePlankTexture(){
   const x = c.getContext('2d');
   x.fillStyle = '#d2d2d2'; x.fillRect(0,0,s,s);
   x.strokeStyle = '#9a9a9a'; x.lineWidth = 2;
-  for(let i=0;i<(stressed?2:6);i++){
+  for(let i=0;i<6;i++){
     const y = i*11 + 2;
     x.beginPath(); x.moveTo(0,y); x.lineTo(s,y); x.stroke();
   }
@@ -11245,7 +11242,7 @@ function registerMageKill(){
   }
 }
 function registerKnightKill(){
-  if(state.avatarType!=='knight') return;
+  if(!knightIsActive()) return;
   const p=HERO_PASSIVES.knight;
   passiveState.knightWhirlwindCounter=(passiveState.knightWhirlwindCounter||0)+1;
   if(passiveState.knightWhirlwindCounter>=(p.whirlwindKills||5)){
@@ -11256,7 +11253,7 @@ function registerKnightKill(){
 function updateKnightArmorHud(){
   const hud=document.getElementById('knightArmorHud');
   if(!hud) return;
-  const isKnight=state.avatarType==='knight';
+  const isKnight=knightIsActive();
   hud.classList.toggle('show',isKnight);
   if(!isKnight) return;
   const p=HERO_PASSIVES.knight;
@@ -11293,7 +11290,7 @@ function refreshPassiveState(dt=0){
     }
     if(passiveState.archerTailwindTimer<=0) passiveState.archerTailwindFxCooldown=0;
   }
-  if(state.avatarType==='knight'){
+  if(knightIsActive()){
     const p=HERO_PASSIVES.knight;
     passiveState.knightWhirlwindHudFlash=Math.max(0,(passiveState.knightWhirlwindHudFlash||0)-dt);
     // Whirlwind timing, pulses and spin visuals live in updateKnightSystems so the
@@ -11350,7 +11347,7 @@ function updatePassiveHud(){
   else if(state.avatarType==='rogue') suffix=(passiveState.archerTailwindTimer||0)>0
     ? ` · 🌪 TAILWIND ${passiveState.archerTailwindTimer.toFixed(1)}s · KILLS ${passiveState.archerKillCounter||0}/${p.tailwindKills||5}`
     : ` · KILLS ${passiveState.archerKillCounter||0}/${p.tailwindKills||5}`;
-  else if(state.avatarType==='knight'){
+  else if(knightIsActive()){
     const wwActive=(knightRuntime.whirlwindTimer||0)>0;
     const wwSource=knightRuntime.whirlwindSource;
     const wwLabel=wwSource==='passive'?'PASSIVE WHIRLWIND':'DEFENSIVE WHIRLWIND';
@@ -11369,8 +11366,8 @@ function updatePassiveHud(){
     : ` · CAST ${passiveState.mageAttackCounter||0}/3 · KILLS ${passiveState.mageKillCounter||0}/3`;
   el.classList.toggle('mageHaste',mageGameplayActive() && (passiveState.mageSpeedBoostTimer||0)>0);
   el.classList.toggle('mageReady',mageGameplayActive() && (passiveState.mageSpeedBoostTimer||0)<=0 && ((passiveState.mageAttackCounter||0)===2 || (passiveState.mageKillCounter||0)===2));
-  el.classList.toggle('knightWhirlwindReady',state.avatarType==='knight' && (passiveState.knightWhirlwindCounter||0)===(p.whirlwindKills||5)-1 && (knightRuntime.whirlwindTimer||0)<=0);
-  el.classList.toggle('knightWhirlwindProc',state.avatarType==='knight' && (passiveState.knightWhirlwindHudFlash||0)>0);
+  el.classList.toggle('knightWhirlwindReady',knightIsActive() && (passiveState.knightWhirlwindCounter||0)===(p.whirlwindKills||5)-1 && (knightRuntime.whirlwindTimer||0)<=0);
+  el.classList.toggle('knightWhirlwindProc',knightIsActive() && (passiveState.knightWhirlwindHudFlash||0)>0);
   el.textContent=`${p.icon} ${p.name}${suffix}`;
 }
 
@@ -11956,7 +11953,7 @@ function setupControls(){
     if(e){ e.preventDefault(); e.stopPropagation(); }
     if(mageGameplayActive()) triggerArcaneEchoes();
     else if(state.avatarType==='rogue') triggerArcherMirrorClones();
-    else if(state.avatarType==='knight'){
+    else if(knightIsActive()){
       // Guardian Titan is the active special during its sequence and Titan state.
       // Keep normal Primary/Secondary combat available, but prevent chaining the
       // separate Knights of the Round signature until Titan mode is over.
@@ -12573,10 +12570,10 @@ function attackCooldownFor(w){
   const passive=passiveForAvatar();
   if(state.avatarType==='rogue' && (passiveState.archerTailwindTimer||0)>0) factor *= (passive.tailwindAttackMult||1);
   // Barbarian Phase 2 replaces the old nearby-enemy attack-speed passive with kill-triggered Fury.
-  if(state.avatarType==='knight') factor *= knightDisciplineAttackSpeedMult();
+  if(knightIsActive()) factor *= knightDisciplineAttackSpeedMult();
   if(w.fireRateCap) factor = Math.min(w.fireRateCap, factor);
   const computed=w.cooldown / factor;
-  if(state.avatarType==='knight' && isKnightWeaponKind(w.kind)){
+  if(knightIsActive() && isKnightWeaponKind(w.kind)){
     // Minimal lockout prevents one physical touch from double-firing while keeping
     // every Knight primary/secondary responsive under tap and hold input.
     return Math.max(0.10,computed);
@@ -12613,7 +12610,7 @@ function spawnShadowSmoke(x,y,z,count=8){
 function updateHoodedHud(){
   const btn=document.getElementById('ultimateBtn'),meter=document.getElementById('soulMeter');
   if(!btn||!meter)return;
-  const isHooded=state.avatarType==='hooded', isArcher=state.avatarType==='rogue', isMage=mageGameplayActive(), isKnight=state.avatarType==='knight', isBarbarian=state.avatarType==='barbarian';
+  const isHooded=state.avatarType==='hooded', isArcher=state.avatarType==='rogue', isMage=mageGameplayActive(), isKnight=knightIsActive(), isBarbarian=state.avatarType==='barbarian';
   const mageEchoReady=isMage&&arcaneEchoesUnlocked();
   const knightCloneSpecialReady=isKnight&&Math.max(1,Number(round)||1)>=10;
   const hasSignature=isHooded||isArcher||knightCloneSpecialReady||isBarbarian||mageEchoReady;
@@ -13322,7 +13319,7 @@ const KNIGHT_CFG = {
   fxCap:150
 };
 
-function knightIsActive(){ return state.avatarType==='knight'; }
+function knightIsActive(){ return state.avatarType==='knight'||state.avatarType==='cloud'; }
 function knightHeavyVisualLoad(){
   return knightGuardianGiantActive() || knightRoyalClones.length>=8 || knightRuntime.ultPhase>0;
 }
@@ -17949,7 +17946,7 @@ function triggerKnightRoyalGuardClones(){
   triggerCombatShake(13,210);
   getKayKitAssetPromise('knight').then(({gltf,THREEAsset,cloneSkinned})=>{
     for(let i=0;i<cfg.count;i++)setTimeout(()=>{
-      if(summonEpoch!==knightRoyalCloneSummonEpoch||!player||state.avatarType!=='knight'||!gameRunning)return;
+      if(summonEpoch!==knightRoyalCloneSummonEpoch||!player||!knightIsActive()||!gameRunning)return;
       const wrap=new THREE.Group(),root=cloneSkinned(gltf.scene);root.rotation.y=0;
       const box=new THREEAsset.Box3().setFromObject(root),size=box.getSize(new THREEAsset.Vector3());
       root.scale.setScalar(1.48/Math.max(.001,size.y));
@@ -21680,7 +21677,7 @@ function doShoot(){
     if(w&&w.kind==='knight_vanguard'&&primaryInputHeld) return;
 
     // Other Knight Primary moves keep their existing tap-buffer behavior.
-    if(state.avatarType==='knight') knightBufferAttack();
+    if(knightIsActive()) knightBufferAttack();
     return;
   }
 
@@ -23007,7 +23004,7 @@ function killZombie(z){
     registerMageKill();
     updateHoodedHud();
   }
-  if(state.avatarType==='knight'){registerKnightKill();knightUltimateCharge=Math.min(100,knightUltimateCharge+4);spawnBurst(z.position.x,z.position.y+.8,z.position.z,12,FX_MAT_SPARK,3.5);updateHoodedHud();}
+  if(knightIsActive()){registerKnightKill();knightUltimateCharge=Math.min(100,knightUltimateCharge+4);spawnBurst(z.position.x,z.position.y+.8,z.position.z,12,FX_MAT_SPARK,3.5);updateHoodedHud();}
   if(state.avatarType==='barbarian'){registerBarbarianKill();barbarianUltimateCharge=Math.min(100,barbarianUltimateCharge+4);spawnBurst(z.position.x,z.position.y+.8,z.position.z,16,FX_MAT_SPARK,4.2);updateHoodedHud();}
   runTokens += tokensPerKill();
   updateRunTokensHud();
@@ -23022,7 +23019,7 @@ function killZombie(z){
 function playerTakeHit(sourceType='normal'){
   if(freeMode) return; // invincible while free-roaming
   if(invincibleTimer > 0) return; // invincible from a power-up pickup
-  if(state.avatarType==='knight' && knightGuardianGiantActive()){
+  if(knightIsActive() && knightGuardianGiantActive()){
     const incoming=String(sourceType||'normal').toLowerCase();
     if(incoming!=='boss' && incoming!=='brute'){
       spawnKnightGuardBurst(player.position,2.6,KNIGHT_STEEL);
@@ -23041,7 +23038,7 @@ function playerTakeHit(sourceType='normal'){
     // one normal heart of damage, giving deterministic 10% damage instead of
     // random hit negation.
   }
-  if(state.avatarType==='knight'){
+  if(knightIsActive()){
     const p=HERO_PASSIVES.knight;
     // Heavily protected while planting Judgment of the King.
     if(knightRuntime.ultInvuln>0 && knightRuntime.ultPhase>0){
@@ -23664,7 +23661,7 @@ function startSurvival(){
   }catch(err){
     console.error('Game engine initialization failed:',err);
     const stamp=document.getElementById('buildStamp');
-    if(stamp)stamp.textContent='ENGINE ERROR · '+String(err&&err.message||err).slice(0,80);
+    if(stamp)stamp.textContent='ENGINE ERROR · '+String(err&&err.message||err).slice(0,120);
     toast('Game engine error: '+String(err&&err.message||err).slice(0,100));
     return;
   }
@@ -23696,7 +23693,7 @@ function startSurvival(){
   renderHearts();
   passiveState = createFreshPassiveState();
   resetKnightRuntime();
-  if(state.avatarType==='knight'){
+  if(knightIsActive()){
     passiveState.knightArmor=HERO_PASSIVES.knight.armorMax||2;
     knightRuntime.fortX=player?player.position.x:0;
     knightRuntime.fortZ=player?player.position.z:0;
