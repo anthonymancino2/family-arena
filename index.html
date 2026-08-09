@@ -201,7 +201,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.88</title>
+<title>Family Arena V22.14.89</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.88 - Onslaught True Lethal Impact';
+const GAME_VERSION='22.14.89 - Onslaught Hard Reset Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2415,7 +2415,7 @@ async function updateAvatarPreview(characterId){
 
       const fit=new THREEAsset.Group();
       fit.name='CloudWoff_PreviewFit';
-      fit.rotation.y=-Math.PI/2;
+      fit.rotation.y=0;
       fit.add(root);
 
       root.updateMatrixWorld(true);
@@ -10193,7 +10193,7 @@ function buildCloudWoffPlayer(options={}){
     fit.name='CloudWoff_FitWrapper';
     // Uploaded Cloud's Armature is authored about +90° around Y.
     // Counter it here so wrapper.rotation.y matches actual travel direction.
-    fit.rotation.y=-Math.PI/2;
+    fit.rotation.y=0;
     fit.add(root);
 
     root.updateMatrixWorld(true);
@@ -13548,7 +13548,7 @@ function createFreshKnightRuntime(){
     royalOnslaughtDash:null,
     royalOnslaughtTargetCursor:0, royalOnslaughtEligibleIds:null,
     royalOnslaughtHitIds:null, royalOnslaughtDamagedIds:null,
-    royalOnslaughtBossDamage:null, royalOnslaughtTargets:[], royalOnslaughtOriginX:0, royalOnslaughtOriginZ:0,
+    royalOnslaughtBossDamage:null, royalOnslaughtTargets:[], royalOnslaughtOriginX:0, royalOnslaughtOriginZ:0, royalOnslaughtAura:null,
     shieldTossCooldown:0, shieldToss:null, shieldAway:false,
     resistTimer:0, frontGuardTimer:0,
     ultPhase:0, ultTimer:0, ultMarks:[], ultTickTimer:0, ultMarkIndex:0,
@@ -16239,6 +16239,54 @@ function knightRoyalOnslaughtClearAllMarkers(){
   // Cleanup any legacy markers from earlier builds without creating new ones.
   for(const z of zombies) knightRoyalOnslaughtClearMarker(z);
 }
+
+function createRoyalOnslaughtActiveAura(){
+  if(!scene||!player)return null;
+  const g=new THREE.Group();
+
+  const make=(color,opacity)=>new THREE.MeshBasicMaterial({
+    color,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide,
+    blending:THREE.AdditiveBlending
+  });
+
+  const outer=new THREE.Mesh(new THREE.RingGeometry(2.7,3.2,isMobile?40:64),make(KNIGHT_GOLD,.62));
+  outer.rotation.x=-Math.PI/2; outer.position.y=.05; g.add(outer);
+
+  const inner=new THREE.Mesh(new THREE.RingGeometry(1.15,1.48,isMobile?32:48),make(KNIGHT_IVORY,.72));
+  inner.rotation.x=-Math.PI/2; inner.position.y=.07; g.add(inner);
+
+  const crown=new THREE.Mesh(new THREE.CylinderGeometry(.18,.62,4.2,isMobile?12:18,1,true),make(KNIGHT_STEEL,.24));
+  crown.position.y=2.1; g.add(crown);
+
+  for(let i=0;i<(isMobile?6:10);i++){
+    const a=i*Math.PI*2/(isMobile?6:10);
+    const ray=new THREE.Mesh(new THREE.PlaneGeometry(.10,2.2),make(i%2?KNIGHT_GOLD:KNIGHT_IVORY,.46));
+    ray.rotation.x=-Math.PI/2;
+    ray.rotation.z=-a;
+    ray.position.set(Math.sin(a)*1.7,.08,Math.cos(a)*1.7);
+    g.add(ray);
+  }
+
+  g.position.set(player.position.x,player.position.y,player.position.z);
+  scene.add(g);
+  return g;
+}
+
+function updateRoyalOnslaughtActiveAura(dt){
+  const g=knightRuntime.royalOnslaughtAura;
+  if(!g||!player)return;
+  g.position.set(player.position.x,player.position.y,player.position.z);
+  g.rotation.y+=dt*4.8;
+  const pulse=1+Math.sin(performance.now()*.018)*.10;
+  g.scale.setScalar(pulse);
+}
+
+function clearRoyalOnslaughtActiveAura(){
+  const g=knightRuntime.royalOnslaughtAura;
+  if(g&&g.parent){scene.remove(g);disposeGroup(g);}
+  knightRuntime.royalOnslaughtAura=null;
+}
+
 function triggerKnightAegisCounter(){
   if(!gameRunning||!knightIsActive()) return;
   if(knightRuntime.aegisCooldown>0||knightRuntime.aegisWindow>0||knightRuntime.aegisRecovery>0) return;
@@ -16291,6 +16339,15 @@ function triggerKnightAegisCounter(){
   knightRuntime.royalOnslaughtTargetCursor=0;
   knightRoyalOnslaughtLeaderGlow(false);
   summonKnightRoyalOnslaughtSwarm();
+
+  clearRoyalOnslaughtActiveAura();
+  knightRuntime.royalOnslaughtAura=createRoyalOnslaughtActiveAura();
+  spawnRoyalOnslaughtImpactDome(
+    {x:player.position.x,y:player.position.y||0,z:player.position.z},
+    true
+  );
+  spawnBurst(player.position.x,player.position.y+.8,player.position.z,isMobile?12:20,FX_MAT_SPARK,4.8);
+  triggerCombatShake(10,160);
 
   const visual=knightTitanVisualScale();
   // Ground crown/ring removed: it created the large white floor effect.
@@ -16356,6 +16413,10 @@ function knightRoyalOnslaughtPathDamage(from,to,index,endpoint){
   for(const z of routeEnemies){
     if(!z||z===endpoint||!z.userData||z.userData.dead||z.userData.spawnPending) continue;
     if(knightRoyalOnslaughtSegmentDistanceSq(z.position,from,to)>radiusSq) continue;
+    spawnRoyalOnslaughtImpactDome(
+      {x:z.position.x,y:z.position.y||0,z:z.position.z},
+      false
+    );
     knightRoyalOnslaughtDamage(z,index);
   }
 }
@@ -16382,32 +16443,21 @@ function knightRoyalOnslaughtKillEnemy(target,index=0){
   const maxHp=Math.max(1,Number(target.userData.maxHp)||hp);
 
   if(cls==='boss'){
-    // Boss exception: Royal Onslaught must NEVER one-shot a boss.
-    // Restore the controlled boss scaling from the pre-lethal version while
-    // keeping each hit meaningful and visible.
+    // Bosses are the only Onslaught targets that are not instant kills.
     let damage=(2.15+Math.max(0,index)*.18)*playerStats.power;
     damage=Math.max(damage*.45,maxHp*.065,hp*.055);
-
-    // Never let a single Onslaught event reduce a living boss from positive HP
-    // to zero. Leave a tiny amount if the calculated damage would be lethal.
     damage=Math.min(damage,Math.max(0,hp-.01));
-
     const used=knightRuntime.royalOnslaughtBossDamage.get(target.uuid)||0;
     knightRuntime.royalOnslaughtBossDamage.set(target.uuid,used+damage);
-
     if(damage>0)applyBulletDamage(target,damage);
     return !!target.userData.dead;
   }
 
-  // Normal enemies and Brutes remain one-hit kills during Royal Onslaught.
-  applyBulletDamage(target,hp*4+999999);
-  if(!target.userData.dead){
-    target.userData.hp=-999999;
-    applyBulletDamage(target,9999999);
-  }
+  // Hard guarantee: bypass ordinary damage/mitigation math entirely.
+  target.userData.hp=0;
+  killZombie(target);
   return !!target.userData.dead;
 }
-
 function knightRoyalOnslaughtLethalShockwave(center,index,primaryTarget=null){
   if(!center)return 0;
   const radius=KNIGHT_ONSLAUGHT_LETHAL_SHOCK_RADIUS*knightTitanCombatScale();
@@ -16431,7 +16481,6 @@ function knightRoyalOnslaughtLethalShockwave(center,index,primaryTarget=null){
       kills++;
       knightRoyalOnslaughtClearMarker(z);
     }else if(wasBoss){
-      // Bosses are affected by the shockwave, but never instantly killed.
       z.userData.hitStun=Math.max(z.userData.hitStun||0,.35);
     }
   }
@@ -16774,6 +16823,10 @@ function knightRoyalOnslaughtImpactStrike(dash){
     knightRoyalOnslaughtAirShockwave(target,index);
     knightRoyalOnslaughtEndpointImpactFx(target,index,knightTitanVisualScale());
     knightRoyalOnslaughtWowShockwave(target,index);
+    spawnRoyalOnslaughtImpactDome(
+      {x:target.position.x,y:target.position.y||0,z:target.position.z},
+      ((index+1)%5===0)
+    );
     knightRoyalOnslaughtDamage(target,index);
     if(target.userData.dead) knightRoyalOnslaughtClearMarker(target);
     if(index%4===3) triggerCombatShake(5,70);
@@ -16799,7 +16852,7 @@ function knightRoyalOnslaughtStrike(){
   // convention. Royal Onslaught historically used raw atan2, which makes
   // Cloud face away/sideways from his explicit dash path.
   const pathYaw=Math.atan2(dx,dz);
-  const yaw=state.avatarType==='cloud'?pathYaw+Math.PI:pathYaw;
+  const yaw=pathYaw;
   player.rotation.y=yaw;
   const dist=Math.hypot(dx,dz)||1;
   const stop=1.15*knightTitanCombatScale();
@@ -16918,13 +16971,14 @@ function knightUpdateAegis(dt){
     if(player&&knightRuntime.whirlwindTimer<=0){
       player.userData.spinVisualTimer=0;
       if(state.avatarType==='cloud'&&player.userData.cloudFit){
-        player.userData.cloudFit.rotation.y=-Math.PI/2;
+        player.userData.cloudFit.rotation.y=0;
         player.userData.cloudFit.rotation.z=0;
         player.userData.cloudSpinBaseY=undefined;
         player.userData.cloudSpinAngle=0;
       }
     }
 
+    updateRoyalOnslaughtActiveAura(dt);
     knightRuntime.royalOnslaughtElapsed=(knightRuntime.royalOnslaughtElapsed||0)+dt;
     knightRuntime.royalOnslaughtCaptureRemainingTime=Math.max(0,(knightRuntime.royalOnslaughtCaptureRemainingTime||0)-dt);
     knightRoyalOnslaughtPruneEligibility();
@@ -16971,6 +17025,7 @@ function knightEndAegis(success){
   clearKnightRoyalOnslaughtSwarm();
   knightRoyalOnslaughtClearAllMarkers();
   knightRoyalOnslaughtAtmosphere(false);
+  clearRoyalOnslaughtActiveAura();
   const wowActive=knightRoyalOnslaughtWowShockwave.active;
   if(wowActive){
     for(const f of wowActive){
@@ -18531,7 +18586,7 @@ function clearKnightRoundSpecials(resetCooldowns=true){
   if(player){
     player.userData.spinVisualTimer=0;
     if(state.avatarType==='cloud'&&player.userData.cloudFit){
-      player.userData.cloudFit.rotation.y=-Math.PI/2;
+      player.userData.cloudFit.rotation.y=0;
       player.userData.cloudFit.rotation.z=0;
       player.userData.cloudFit.rotation.x=player.userData.cloudBodyLean||0;
       player.userData.cloudSpinBaseY=undefined;
@@ -22232,12 +22287,14 @@ function applyBulletDamage(z, dmg){
     knightRuntime.aegisWindow>0
   );
 
-  // During Royal Onslaught, ANY player-caused hit on a normal enemy or Brute
-  // is lethal regardless of which Knight sub-move/effect produced that hit.
-  // Bosses are deliberately exempt.
+  // During Royal Onslaught, ANY hit on a normal enemy or Brute is a direct
+  // kill. This bypasses armor, mitigation, damage caps, and resistance math.
   if(onslaughtActive && knightEnemyClass(z)!=='boss'){
-    const hp=Math.max(1,Number(z.userData.hp)||1,Number(z.userData.maxHp)||1);
-    dmg=Math.max(Number(dmg)||0,hp*4+999999);
+    const pos={x:z.position.x,y:z.position.y||0,z:z.position.z};
+    spawnRoyalOnslaughtImpactDome(pos,((knightRuntime.royalOnslaughtStrikeIndex||0)+1)%5===0);
+    z.userData.hp=0;
+    killZombie(z);
+    return;
   }
 
   z.userData.hp -= dmg;
@@ -24022,7 +24079,7 @@ function update(dt){
       // Spin only the clean fit wrapper around Y and keep pitch/roll stable.
       const fit=player.userData.cloudFit;
       if(player.userData.cloudSpinBaseY===undefined){
-        player.userData.cloudSpinBaseY=-Math.PI/2;
+        player.userData.cloudSpinBaseY=0;
         player.userData.cloudSpinAngle=0;
       }
       player.userData.cloudSpinAngle=
@@ -24041,7 +24098,7 @@ function update(dt){
   } else {
     if(state.avatarType==='cloud' && player.userData.cloudFit &&
        player.userData.cloudSpinBaseY!==undefined){
-      player.userData.cloudFit.rotation.y=-Math.PI/2;
+      player.userData.cloudFit.rotation.y=0;
       player.userData.cloudFit.rotation.z=0;
       player.userData.cloudFit.rotation.x=player.userData.cloudBodyLean||0;
       player.userData.cloudSpinBaseY=undefined;
@@ -24209,7 +24266,7 @@ function updateCloudNativeRigPre(dt){
     // Fixed model-space correction only. Actual travel/facing is controlled
     // exclusively by player.rotation.y in the movement controller.
     // During Whirlwind the fit wrapper itself intentionally owns the spin.
-    u.cloudFit.rotation.y=-Math.PI/2;
+    u.cloudFit.rotation.y=0;
     u.cloudFit.rotation.z=0;
   }
 
