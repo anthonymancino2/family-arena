@@ -201,7 +201,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.77</title>
+<title>Family Arena V22.14.78</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1414,7 +1414,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.77 - Mode Play Navigation Fix';
+const GAME_VERSION='22.14.78 - Core Passive Repair Cloud';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1768,7 +1768,13 @@ const HERO_ROSTER_INFO = {
   mage:{title:'Nine-Tailed Fox Mage',role:'RANGED • MEDIUM',desc:'Native-rigged fox using the complete Arcane Mage combat system, elemental magic, and Arcane Echo clones.'},
   knight:{title:'Knight of Dawn',role:'MELEE • DEFENDER',desc:'An armored royal defender. Sword-and-shield combos, Magical Armor, guarding and counterattacks. Strongest class for surviving while surrounded.'},
   barbarian:{title:'Fury Barbarian',role:'MELEE • MEDIUM',desc:'A durable heavy hitter with extended axe reach. Every third defeat erupts into a Shockwave; every fifth grants 3 seconds of Invincibility.'},
-  cloud:{title:'Cloud · Native Rig Test',role:'MELEE • NATIVE RIG TEST',desc:'Uploaded Cloud model using its native 43-joint skeleton and bundled Walk animation. Temporary melee compatibility gameplay is used only to evaluate whether this model should replace an older avatar. Model by Robukan, CC-BY-4.0.'},
+  cloud:{title:'Cloud · Native Rig Test',role:'MELEE • NATIVE RIG TEST',desc:'Uploaded Cloud model using its native 43-joint skeleton and bundled Walk animation. Temporary melee compatibility gameplay is used only to evaluate whether this model should replace an older avatar. Model by Robukan, CC-BY-4.0.'}
+};
+
+// Data-driven hero passives. This object had accidentally been merged into
+// HERO_ROSTER_INFO in an earlier cleanup, which stopped the main game script.
+const HERO_PASSIVES = {
+  rogue:{name:'Eagle Eye',icon:'🎯',desc:'Arrows fly 18% faster and remain active 15% longer. Every fifth defeat triggers 3 seconds of Tailwind.',projectileSpeedMult:1.18,projectileLifeMult:1.15,tailwindKills:5,tailwindDuration:3,tailwindMoveMult:1.35,tailwindAttackMult:1.40},
   hooded:{name:'Shadowstep',icon:'💨',desc:'Defeating an enemy grants 20% movement speed for 2.5 seconds.',killMoveMult:1.20,killMoveDuration:2.5},
   knight:{name:'Royal Guardian',icon:'🛡️',desc:'Two regenerating Magical Armor charges, Royal Discipline stacks, Fortified Position, Last Stand, and a defensive Whirlwind every fifth defeat.',armorMax:2,armorRegenDelay:5,armorRegenInterval:3,whirlwindKills:5,whirlwindDuration:3,whirlwindRadius:3.25,whirlwindDamage:.72,whirlwindStun:.20,whirlwindPulse:.22,whirlwindKnockback:3.4,whirlwindSpinSpeed:22},
   barbarian:{name:'Relentless Fury',icon:'🔥',desc:'Every third defeat releases a ground Shockwave. Every fifth defeat grants 3 seconds of Invincibility.',shockwaveKills:3,shockwaveRadius:5.2,shockwaveDamage:1.25,shockwaveStun:.65,invincibleKills:5,invincibleDuration:3.0},
@@ -1780,6 +1786,7 @@ const HERO_ROSTER_INFO = {
     killTrigger:3,hasteDuration:3.0,hasteMoveMult:1.75
   }
 };
+
 function officialFoxMageActive(type=state.avatarType){
   return type==='mage';
 }
@@ -1792,6 +1799,9 @@ function gameplayAvatarType(type=state.avatarType){
   return type;
 }
 function passiveForAvatar(type=state.avatarType){
+  if(type==='cloud'){
+    return {name:'Native Rig Test',icon:'⚔️',desc:'Temporary melee compatibility rules while Cloud\'s model, scale, lighting and animation are evaluated.'};
+  }
   return HERO_PASSIVES[gameplayAvatarType(type)] || HERO_PASSIVES.rogue;
 }
 
@@ -2176,7 +2186,7 @@ document.getElementById('btnPlaySurvival').onclick = ()=>{
       });
     }
     const status=document.getElementById('avatarPreviewStatus');
-    if(status)status.textContent='Preview recovery mode · avatar selection still available';
+    if(status)status.textContent='Avatar preview unavailable · selection still works';
   }
 };
 
@@ -23649,7 +23659,15 @@ function animate(){
 // ---- Survival lifecycle ----
 let engineInited = false;
 function startSurvival(){
-  if(!engineInited){ initEngine(); setupControls(); engineInited = true; }
+  try{
+    if(!engineInited){ initEngine(); setupControls(); engineInited = true; }
+  }catch(err){
+    console.error('Game engine initialization failed:',err);
+    const stamp=document.getElementById('buildStamp');
+    if(stamp)stamp.textContent='ENGINE ERROR · '+String(err&&err.message||err).slice(0,80);
+    toast('Game engine error: '+String(err&&err.message||err).slice(0,100));
+    return;
+  }
   fitHudChrome(); // the visible area may have changed since the last run
   clearZombies();
   clearCritters();
@@ -23717,6 +23735,10 @@ function startSurvival(){
   stopArcaneLaser(); laserCharge = LASER_MAX_CHARGE; laserRegenDelayTimer = 0;
   resetCharacterLoadout();
   resetAbilityLoadout();
+  if(state.avatarType==='cloud'){
+    updateWeaponHud();
+    updatePassiveHud();
+  }
   clearShadowClones();
   powerUps.forEach(p=>{ scene.remove(p.mesh); disposeGroup(p.mesh); });
   powerUps = [];
@@ -23898,7 +23920,7 @@ document.addEventListener('click',function(ev){
       }catch(err){
         console.error('Mode navigation fail-safe:',err);
         const status=document.getElementById('avatarPreviewStatus');
-        if(status)status.textContent='Avatar preview failed · selection remains available';
+        if(status)status.textContent='Avatar preview unavailable · selection still works';
       }
     }
   },0);
