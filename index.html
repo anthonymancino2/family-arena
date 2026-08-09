@@ -201,7 +201,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.83</title>
+<title>Family Arena V22.14.84</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.83 - Cloud Armature Facing Lock';
+const GAME_VERSION='22.14.84 - Cloud Onslaught Whirlwind Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -16616,7 +16616,11 @@ function knightRoyalOnslaughtStrike(){
   }
   const startPos=player.position.clone();
   const dx=target.position.x-player.position.x,dz=target.position.z-player.position.z;
-  const yaw=Math.atan2(dx,dz);
+  // Normal player travel uses atan2(vx,vz)+PI for the imported hero-facing
+  // convention. Royal Onslaught historically used raw atan2, which makes
+  // Cloud face away/sideways from his explicit dash path.
+  const pathYaw=Math.atan2(dx,dz);
+  const yaw=state.avatarType==='cloud'?pathYaw+Math.PI:pathYaw;
   player.rotation.y=yaw;
   const dist=Math.hypot(dx,dz)||1;
   const stop=1.15*knightTitanCombatScale();
@@ -18328,7 +18332,16 @@ function clearKnightRoundSpecials(resetCooldowns=true){
   knightRuntime.shieldAway=false;
   knightRuntime.mitigationPool=0;
   passiveState.knightWhirlwindTimer=0;
-  if(player){ player.userData.spinVisualTimer=0; }
+  if(player){
+    player.userData.spinVisualTimer=0;
+    if(state.avatarType==='cloud'&&player.userData.cloudFit){
+      player.userData.cloudFit.rotation.y=-Math.PI/2;
+      player.userData.cloudFit.rotation.z=0;
+      player.userData.cloudFit.rotation.x=player.userData.cloudBodyLean||0;
+      player.userData.cloudSpinBaseY=undefined;
+      player.userData.cloudSpinAngle=0;
+    }
+  }
   clearKnightRoyalClones();
   // Remove any expired or orphaned Knight-only effects immediately at round/reset
   // boundaries so repeated rounds cannot accumulate invisible scene objects.
@@ -23676,20 +23689,45 @@ function update(dt){
   updateSecondaryButton();
   refreshPassiveState(dt);
   updatePassiveHud();
-  // Whirlwind is a real full-body spin, independent of whichever KayKit arm clip exists.
-  // Rotating only the imported visual root preserves movement direction and controls.
+  // Whirlwind is a real full-body spin, independent of whichever arm clip exists.
   if(player.userData.spinVisualTimer>0){
     player.userData.spinVisualTimer-=dt;
-    const root=player.userData.kayRoot;
-    if(root){
-      if(player.userData.spinBaseY===undefined) player.userData.spinBaseY=root.rotation.y;
-      root.rotation.y += (player.userData.spinVisualSpeed||26)*dt;
-      root.rotation.z=Math.sin(performance.now()*0.035)*0.10;
+
+    if(state.avatarType==='cloud' && player.userData.cloudFit){
+      // Cloud's imported root has an authored quaternion with mixed axes.
+      // Spinning that root through Euler Y/Z makes his head pitch upward.
+      // Spin only the clean fit wrapper around Y and keep pitch/roll stable.
+      const fit=player.userData.cloudFit;
+      if(player.userData.cloudSpinBaseY===undefined){
+        player.userData.cloudSpinBaseY=-Math.PI/2;
+        player.userData.cloudSpinAngle=0;
+      }
+      player.userData.cloudSpinAngle=
+        (player.userData.cloudSpinAngle||0)+(player.userData.spinVisualSpeed||26)*dt;
+      fit.rotation.y=player.userData.cloudSpinBaseY+player.userData.cloudSpinAngle;
+      fit.rotation.z=0;
+      fit.rotation.x=.035; // tiny athletic forward set, never head-back/up.
+    }else{
+      const root=player.userData.kayRoot;
+      if(root){
+        if(player.userData.spinBaseY===undefined) player.userData.spinBaseY=root.rotation.y;
+        root.rotation.y += (player.userData.spinVisualSpeed||26)*dt;
+        root.rotation.z=Math.sin(performance.now()*0.035)*0.10;
+      }
     }
-  } else if(player.userData.kayRoot && player.userData.spinBaseY!==undefined){
-    player.userData.kayRoot.rotation.y=player.userData.spinBaseY;
-    player.userData.kayRoot.rotation.z=0;
-    player.userData.spinBaseY=undefined;
+  } else {
+    if(state.avatarType==='cloud' && player.userData.cloudFit &&
+       player.userData.cloudSpinBaseY!==undefined){
+      player.userData.cloudFit.rotation.y=-Math.PI/2;
+      player.userData.cloudFit.rotation.z=0;
+      player.userData.cloudFit.rotation.x=player.userData.cloudBodyLean||0;
+      player.userData.cloudSpinBaseY=undefined;
+      player.userData.cloudSpinAngle=0;
+    }else if(player.userData.kayRoot && player.userData.spinBaseY!==undefined){
+      player.userData.kayRoot.rotation.y=player.userData.spinBaseY;
+      player.userData.kayRoot.rotation.z=0;
+      player.userData.spinBaseY=undefined;
+    }
   }
   updateBullets(dt);
   updatePhoenixFireball(dt);
@@ -23844,10 +23882,12 @@ function updateCloudNativeRigPre(dt){
   u.cloudDashWanted=!!dashActive;
 
   // Preserve the model-authoring 90° correction at all times.
-  if(u.cloudFit){
+  if(u.cloudFit && !(u.spinVisualTimer>0)){
     // Fixed model-space correction only. Actual travel/facing is controlled
     // exclusively by player.rotation.y in the movement controller.
+    // During Whirlwind the fit wrapper itself intentionally owns the spin.
     u.cloudFit.rotation.y=-Math.PI/2;
+    u.cloudFit.rotation.z=0;
   }
 
   const controllerForward=-moveVec.y;
@@ -23922,7 +23962,7 @@ function updateCloudNativeRigPost(dt){
   const currentLean=Number(u.cloudBodyLean)||0;
   const leanBlend=1-Math.exp(-dt*(dash?16:11));
   u.cloudBodyLean=currentLean+(locomotionLean-currentLean)*leanBlend;
-  if(u.cloudFit)u.cloudFit.rotation.x=u.cloudBodyLean;
+  if(u.cloudFit && !(u.spinVisualTimer>0))u.cloudFit.rotation.x=u.cloudBodyLean;
 
   const timer=u.cloudAttackTimer||0;
   if(timer<=0)return;
@@ -23959,7 +23999,7 @@ function updateCloudNativeRigPost(dt){
     if(bones.hips)bones.hips.rotateY(-.18*side*swing);
   }
 
-  if(u.cloudFit){
+  if(u.cloudFit && !(u.spinVisualTimer>0)){
     const attackLean=(style==='chop'?.23:(style==='guard'?.10:.16))*swing;
     u.cloudFit.rotation.x=(u.cloudBodyLean||0)+attackLean;
   }
