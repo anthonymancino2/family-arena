@@ -1,3 +1,4 @@
+<!-- V22.14.39 Linear Lighting Match Fix: corrects the uploaded GameCube character's persistent dark appearance by making her texture contribute directly to the material's emissive response. This is Linear-only, preserves texture detail, avoids a glowing unlit look, and keeps normal scene lighting/shadow response on top. Rig stability from V22.14.38 is unchanged. -->
 <!-- V22.14.38 Linear Rig Stability Fix: fixes detached/displaced Linear body parts introduced by the experimental elbow/knee hierarchy. Restores the original leg and arm meshes as intact connected geometry, preserves the brighter Linear-only material correction, and uses conservative whole-limb articulation for stable movement. Experimental geometry splitting and nested elbow/knee re-parenting are disabled until a proper weight-safe solution is ready. Linear remains a separate Rig Test avatar; Mage is not replaced in this build. -->
 <!-- V22.14.37 Linear Elbow Rig + Full Movement Animation: adds real elbow articulation to the uploaded Linear avatar, improves run arm swing, jump/landing, casting/attack poses, hit reaction, and idle movement. Keeps the V22.14.36 lighting correction and knee articulation. Linear remains a prototype slot and does not replace Mage yet. -->
 <!-- V22.14.36 Linear Lighting + Knee Rig: lifts Linear's material response so the uploaded GameCube textures match the brighter Family Arena environment, without making her glow. Rebuilds each leg as hip -> upper leg -> knee -> lower leg/ankle/foot using runtime triangle splitting at the knee line, then adds real knee flexion to the run/walk cycle. Existing prototype combat remains unchanged. -->
@@ -227,7 +228,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.38</title>
+<title>Family Arena V22.14.39</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1440,7 +1441,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.38 - Linear Rig Stability Fix';
+const GAME_VERSION='22.14.39 - Linear Lighting Match Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10031,16 +10032,27 @@ function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
       const mats=Array.isArray(o.material)?o.material:[o.material];
       for(const m of mats){
         if(!m)continue;
-        if('roughness' in m)m.roughness=.82;
+        if('roughness' in m)m.roughness=.78;
         if('metalness' in m)m.metalness=0;
-        if(m.map)m.map.colorSpace=THREEAsset.SRGBColorSpace;
-        // The original GameCube materials render too dark under Family Arena's
-        // physically brighter scene. Lift only Linear's material response.
-        if(m.color)m.color.multiplyScalar(1.22);
-        if(m.emissive){
-          m.emissive.setHex(0x202020);
-          if('emissiveIntensity' in m)m.emissiveIntensity=.34;
+        if(m.map){
+          m.map.colorSpace=THREEAsset.SRGBColorSpace;
+          m.map.needsUpdate=true;
         }
+
+        // V22.14.39: GameCube baked textures are much darker than the KayKit
+        // assets in this scene. Multiplying material color was not enough.
+        // Feed Linear's own texture into emissive so the original colors remain
+        // readable in bright outdoor maps while normal light still shades her.
+        if(m.color)m.color.setRGB(1,1,1);
+        if(m.emissive){
+          m.emissive.setRGB(.72,.72,.72);
+          if('emissiveIntensity' in m)m.emissiveIntensity=.62;
+          if('emissiveMap' in m && m.map)m.emissiveMap=m.map;
+        }
+
+        // Prevent any legacy MTL ambient/diffuse tint from re-darkening texture.
+        if('aoMapIntensity' in m)m.aoMapIntensity=.35;
+        if('lightMapIntensity' in m)m.lightMapIntensity=1.15;
         m.needsUpdate=true;
       }
     }
