@@ -201,7 +201,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.80</title>
+<title>Family Arena V22.14.81</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -257,7 +257,30 @@ only as an emergency visual fallback if the native fox asset fails.
   html,body{margin:0;height:100%;height:100dvh;background:#050b12;color:var(--snow);
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; overflow:hidden;
     overscroll-behavior:none;}
-  #app{position:fixed;inset:0;height:100dvh;background:#050b12;}
+  #app{position:fixed;inset:0;height:100dvh;background:#050b12;transform-origin:center center;}
+
+  /* Portrait-only presentation.
+     JS swaps #app to portrait logical dimensions and counter-rotates it when
+     the physical/browser viewport becomes landscape. This deliberately keeps
+     every game screen and HUD in the same portrait composition. */
+  html.portraitLockedLandscape,
+  html.portraitLockedLandscape body{
+    overflow:hidden!important;
+    background:#050b12!important;
+  }
+  html.portraitLockedLandscape #app{
+    inset:auto!important;
+    position:fixed!important;
+    left:50%!important;
+    top:50%!important;
+    width:var(--portrait-lock-w)!important;
+    height:var(--portrait-lock-h)!important;
+    min-width:var(--portrait-lock-w)!important;
+    min-height:var(--portrait-lock-h)!important;
+    max-width:var(--portrait-lock-w)!important;
+    max-height:var(--portrait-lock-h)!important;
+  }
+
   .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
     justify-content:center;padding:24px;padding-top:calc(24px + env(safe-area-inset-top));
     padding-bottom:calc(24px + env(safe-area-inset-bottom));}
@@ -532,18 +555,8 @@ only as an emergency visual fallback if the native fox asset fails.
      screen. Gated to short/wide viewports so landscape tablets (which
      already have plenty of vertical room) keep the normal stacked
      layout instead of an unnecessary rearrangement. */
-  @media (orientation:landscape) and (max-height:500px){
-    .enemyRadar{left:calc(300px + env(safe-area-inset-left));top:calc(58px + env(safe-area-inset-top));}
-    /* Browser and installed-app landscape share one stable bottom action row. */
-    .actBtn{right:calc(14px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));}
-    .secondaryBtn{right:calc(14px + env(safe-area-inset-right));bottom:calc(96px + env(safe-area-inset-bottom));}
-    .ultimateBtn{right:calc(14px + env(safe-area-inset-right));bottom:calc(176px + env(safe-area-inset-bottom));width:72px;height:72px;}
-    .abilityBtn{right:calc(94px + env(safe-area-inset-right));bottom:calc(21px + env(safe-area-inset-bottom));}
-    .dashBtn{right:calc(94px + env(safe-area-inset-right));bottom:calc(101px + env(safe-area-inset-bottom));}
-    .camCluster{top:calc(10px + env(safe-area-inset-top));right:calc(10px + env(safe-area-inset-right));gap:4px;}
-    .roundPill{top:calc(10px + env(safe-area-inset-top));}
-    .roundTimerPill{top:calc(48px + env(safe-area-inset-top));}
-  }
+  /* Landscape-specific HUD layout intentionally disabled.
+     The app is now counter-rotated into its portrait logical viewport instead. */
   .invinciblePill{position:absolute;top:calc(112px + env(safe-area-inset-top));left:50%;
     transform:translateX(-50%);background:rgba(74,255,234,0.18);
     border:2px solid #4affea;border-radius:16px;padding:8px 16px;display:none;
@@ -1414,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.80 - Cloud Native Motion Rig';
+const GAME_VERSION='22.14.81 - Portrait Lock Cloud Facing Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2402,6 +2415,7 @@ async function updateAvatarPreview(characterId){
 
       const fit=new THREEAsset.Group();
       fit.name='CloudWoff_PreviewFit';
+      fit.rotation.y=-Math.PI/2;
       fit.add(root);
 
       root.updateMatrixWorld(true);
@@ -8904,19 +8918,93 @@ function buildFloaters(theme){
 // on something genuinely smaller than that.
 // ---------------------------------------------------------------------
 const HUD_NEEDED_PORTRAIT = {w:340, h:640};
-const HUD_NEEDED_LANDSCAPE = {w:620, h:330};
-function fitHudChrome(){
-  const el = document.getElementById('hudChrome');
-  if(!el) return;
-  const w = window.visualViewport ? window.visualViewport.width : window.innerWidth;
-  const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  const target = w >= h ? HUD_NEEDED_LANDSCAPE : HUD_NEEDED_PORTRAIT;
-  const scale = Math.min(1, w/target.w, h/target.h);
-  el.style.transform = scale < 0.999 ? 'scale('+scale.toFixed(3)+')' : '';
+let portraitLockRotation=0;
+
+function physicalViewportSize(){
+  return {
+    w:window.visualViewport?window.visualViewport.width:window.innerWidth,
+    h:window.visualViewport?window.visualViewport.height:window.innerHeight
+  };
 }
-window.addEventListener('resize', fitHudChrome);
-window.addEventListener('orientationchange', fitHudChrome);
-if(window.visualViewport) window.visualViewport.addEventListener('resize', fitHudChrome);
+function portraitLogicalViewport(){
+  const p=physicalViewportSize();
+  return p.w>p.h ? {w:p.h,h:p.w} : {w:p.w,h:p.h};
+}
+function orientationAngle(){
+  const a=(screen.orientation&&Number.isFinite(screen.orientation.angle))
+    ? screen.orientation.angle
+    : (Number.isFinite(window.orientation)?window.orientation:0);
+  return ((a%360)+360)%360;
+}
+async function requestPortraitOrientationLock(){
+  try{
+    if(screen.orientation&&screen.orientation.lock){
+      await screen.orientation.lock('portrait');
+    }
+  }catch(_){
+    // Normal iOS Safari does not allow orientation.lock. The CSS/JS
+    // counter-rotation below provides the same portrait game presentation.
+  }
+}
+function applyPortraitPresentation(){
+  const app=document.getElementById('app');
+  if(!app)return;
+  const p=physicalViewportSize();
+  const landscape=p.w>p.h;
+
+  document.documentElement.classList.toggle('portraitLockedLandscape',landscape);
+
+  if(!landscape){
+    portraitLockRotation=0;
+    app.style.removeProperty('--portrait-lock-w');
+    app.style.removeProperty('--portrait-lock-h');
+    app.style.width='';
+    app.style.height='';
+    app.style.left='';
+    app.style.top='';
+    app.style.transform='';
+    return;
+  }
+
+  // Logical portrait viewport: physical height becomes app width; physical
+  // width becomes app height. Counter-rotation prevents any landscape reflow.
+  const logicalW=p.h;
+  const logicalH=p.w;
+  app.style.setProperty('--portrait-lock-w',logicalW+'px');
+  app.style.setProperty('--portrait-lock-h',logicalH+'px');
+
+  const angle=orientationAngle();
+  portraitLockRotation=(angle===270)?-90:90;
+  app.style.transform='translate(-50%,-50%) rotate('+portraitLockRotation+'deg)';
+}
+function portraitClientPoint(t){
+  const p=physicalViewportSize();
+  if(p.w<=p.h||portraitLockRotation===0)return {x:t.clientX,y:t.clientY};
+  if(portraitLockRotation===90){
+    return {x:t.clientY,y:p.w-t.clientX};
+  }
+  return {x:p.h-t.clientY,y:t.clientX};
+}
+function fitHudChrome(){
+  applyPortraitPresentation();
+  const el=document.getElementById('hudChrome');
+  if(!el)return;
+  const v=portraitLogicalViewport();
+  const scale=Math.min(1,v.w/HUD_NEEDED_PORTRAIT.w,v.h/HUD_NEEDED_PORTRAIT.h);
+  el.style.transform=scale<0.999?'scale('+scale.toFixed(3)+')':'';
+}
+function handlePortraitViewportChange(){
+  applyPortraitPresentation();
+  fitHudChrome();
+  if(typeof onResize==='function')onResize();
+}
+window.addEventListener('resize',handlePortraitViewportChange);
+window.addEventListener('orientationchange',()=>{
+  requestPortraitOrientationLock();
+  setTimeout(handlePortraitViewportChange,80);
+});
+if(window.visualViewport)window.visualViewport.addEventListener('resize',handlePortraitViewportChange);
+requestPortraitOrientationLock();
 fitHudChrome();
 
 function initEngine(){
@@ -8927,7 +9015,8 @@ function initEngine(){
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.34;
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  const portraitView=portraitLogicalViewport();
+  renderer.setSize(portraitView.w,portraitView.h);
   // Shadows are the single biggest thing separating our look from the
   // low-poly reference renders — objects need to be grounded. Kept
   // deliberately cheap for mobile: one shadow-casting light, a modest
@@ -8939,7 +9028,7 @@ function initEngine(){
   scene.background = new THREE.Color(0x9fd6ea);
   scene.fog = new THREE.Fog(0x9fd6ea, 20, 55);
 
-  camera = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 200);
+  camera = new THREE.PerspectiveCamera(62, portraitView.w/portraitView.h, 0.1, 200);
 
   const hemi = new THREE.HemisphereLight(0xffffff, 0x667b90, 1.72);
   scene.add(hemi);
@@ -9020,9 +9109,11 @@ function initEngine(){
   HILL_ROUND_GEO = new THREE.SphereGeometry(1, 10, 6, 0, Math.PI*2, 0, Math.PI/2);
 }
 function onResize(){
-  if(!renderer) return;
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  camera.aspect = window.innerWidth/window.innerHeight;
+  applyPortraitPresentation();
+  if(!renderer)return;
+  const v=portraitLogicalViewport();
+  renderer.setSize(v.w,v.h);
+  camera.aspect=v.w/v.h;
   camera.updateProjectionMatrix();
 }
 
@@ -10100,6 +10191,9 @@ function buildCloudWoffPlayer(options={}){
 
     const fit=new THREEAsset.Group();
     fit.name='CloudWoff_FitWrapper';
+    // Uploaded Cloud's Armature is authored about +90° around Y.
+    // Counter it here so wrapper.rotation.y matches actual travel direction.
+    fit.rotation.y=-Math.PI/2;
     fit.add(root);
 
     root.updateMatrixWorld(true);
@@ -11780,7 +11874,7 @@ function setupControls(){
     e.preventDefault();
     const t = e.changedTouches[0];
     stickActive = true; stickId = t.identifier;
-    center = {x:t.clientX, y:t.clientY};
+    center = portraitClientPoint(t);
     // Knob appears wherever you actually touched down — no fixed
     // button to hunt for, same feel as Minecraft's mobile controls.
     knob.style.left = (center.x-44)+'px';
@@ -11792,7 +11886,8 @@ function setupControls(){
     for(const t of e.changedTouches){
       if(stickActive && t.identifier===stickId){
         e.preventDefault();
-        let dx=t.clientX-center.x, dy=t.clientY-center.y;
+        const pt=portraitClientPoint(t);
+        let dx=pt.x-center.x, dy=pt.y-center.y;
         const len=Math.hypot(dx,dy);
         if(len>maxRadius){ dx=dx/len*maxRadius; dy=dy/len*maxRadius; }
         knobDot.style.left = (28+dx)+'px'; knobDot.style.top=(28+dy)+'px';
@@ -11815,16 +11910,17 @@ function setupControls(){
     e.preventDefault();
     const t = e.changedTouches[0];
     lookId = t.identifier; lookActive = true;
-    lookLast = {x:t.clientX,y:t.clientY};
+    lookLast = portraitClientPoint(t);
   }, {passive:false});
   window.addEventListener('touchmove', e=>{
     for(const t of e.changedTouches){
       if(lookActive && t.identifier===lookId){
         e.preventDefault();
-        const dx = t.clientX-lookLast.x, dy = t.clientY-lookLast.y;
+        const pt=portraitClientPoint(t);
+        const dx=pt.x-lookLast.x, dy=pt.y-lookLast.y;
         camYaw += dx*0.008;
         camPitch = Math.max(0.1,Math.min(0.9,camPitch + dy*0.005));
-        lookLast = {x:t.clientX,y:t.clientY};
+        lookLast = pt;
       }
     }
   }, {passive:false});
@@ -23712,15 +23808,23 @@ function updateCloudNativeRigPre(dt){
   const moving=!!(moveVec.x||moveVec.y);
   u.cloudMoveWanted=moving||dashActive;
   u.cloudDashWanted=!!dashActive;
+  if(u.cloudFit && Number.isFinite(u.cloudFit.rotation.y)){
+    u.cloudFit.rotation.y=-Math.PI/2;
+  }
 
   // Explicitly drive the bundled Walk clip every gameplay frame. This avoids
   // Cloud becoming a translated static mesh even if a Knight animation request
   // temporarily changed the shared action state.
+  const controllerForward=-moveVec.y;
+  u.cloudBackwardInput=controllerForward<-.12 && Math.abs(controllerForward)>Math.abs(moveVec.x);
+
   if((u.cloudAttackTimer||0)<=0){
     if(u.cloudMoveWanted){
       action.enabled=true;
       action.paused=false;
       action.setEffectiveWeight(1);
+      // Player wrapper already rotates toward the actual travel vector, so the
+      // native Walk always plays forward; stick-back correctly turns Cloud around.
       action.setEffectiveTimeScale(u.cloudDashWanted?1.45:1.0);
       if(!action.isRunning())action.play();
     }else{
