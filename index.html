@@ -201,7 +201,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.86</title>
+<title>Family Arena V22.14.87</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.86 - Onslaught Boss Exception';
+const GAME_VERSION='22.14.87 - Onslaught Impact Shockwave Wow';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -16647,6 +16647,112 @@ function knightRoyalOnslaughtEndpointImpactFx(target,index=0,scale=1){
   },ttl);
 }
 
+
+function knightRoyalOnslaughtWowShockwave(target,index){
+  if(!scene||!target||!target.position)return;
+  const active=knightRoyalOnslaughtWowShockwave.active||(knightRoyalOnslaughtWowShockwave.active=[]);
+  const cap=isMobile?3:5;
+  while(active.length>=cap){
+    const old=active.shift();
+    if(old&&old.group&&old.group.parent){scene.remove(old.group);disposeGroup(old.group);}
+  }
+
+  const visual=Math.min(1.35,knightTitanVisualScale());
+  const radius=KNIGHT_ONSLAUGHT_LETHAL_SHOCK_RADIUS*visual;
+  const milestone=((index+1)%5===0);
+  const g=new THREE.Group();
+  g.position.set(target.position.x,(target.position.y||0)+.10,target.position.z);
+
+  const makeMat=(color,opacity)=>new THREE.MeshBasicMaterial({
+    color,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide,
+    blending:THREE.AdditiveBlending
+  });
+
+  const ringDefs=milestone
+    ? [[.22,.38,KNIGHT_IVORY,.82,1],[.48,.70,KNIGHT_GOLD,.72,.9],[.76,1.0,KNIGHT_STEEL,.55,.82]]
+    : [[.28,.48,KNIGHT_IVORY,.72,1],[.62,.84,KNIGHT_GOLD,.52,.86]];
+  for(const [inner,outer,color,opacity,startScale] of ringDefs){
+    const ring=new THREE.Mesh(
+      new THREE.RingGeometry(radius*inner,radius*outer,isMobile?30:42),
+      makeMat(color,opacity)
+    );
+    ring.rotation.x=-Math.PI/2;
+    ring.position.y=.03;
+    ring.scale.setScalar(startScale);
+    ring.userData={wowRing:true,baseOpacity:opacity,baseScale:startScale};
+    g.add(ring);
+  }
+
+  const rayCount=milestone?(isMobile?8:12):(isMobile?6:9);
+  for(let i=0;i<rayCount;i++){
+    const a=(i/rayCount)*Math.PI*2+index*.31;
+    const ray=new THREE.Mesh(
+      new THREE.PlaneGeometry(.09*visual,(milestone?1.85:1.35)*visual),
+      makeMat(i%3===0?KNIGHT_IVORY:(i%2?KNIGHT_GOLD:KNIGHT_STEEL),milestone?.70:.55)
+    );
+    const rr=radius*(milestone?.26:.21);
+    ray.position.set(Math.sin(a)*rr,.58*visual,Math.cos(a)*rr);
+    ray.rotation.y=-a;
+    ray.rotation.z=(i%2?1:-1)*(.18+(i%3)*.08);
+    ray.userData={wowRay:true,baseOpacity:milestone?.70:.55};
+    g.add(ray);
+  }
+
+  const core=new THREE.Mesh(
+    new THREE.CylinderGeometry(.12*visual,.34*visual,(milestone?3.6:2.6)*visual,isMobile?12:18,1,true),
+    makeMat(KNIGHT_IVORY,milestone?.52:.38)
+  );
+  core.position.y=(milestone?1.75:1.28)*visual;
+  core.userData={wowCore:true,baseOpacity:milestone?.52:.38};
+  g.add(core);
+
+  const halo=new THREE.Mesh(
+    new THREE.RingGeometry(.48*visual,.72*visual,isMobile?26:36),
+    makeMat(milestone?KNIGHT_IVORY:KNIGHT_GOLD,milestone?.80:.68)
+  );
+  halo.position.y=1.05*visual;
+  halo.userData={wowHalo:true,baseOpacity:milestone?.80:.68};
+  g.add(halo);
+
+  scene.add(g);
+  active.push({group:g,life:milestone?.42:.32,maxLife:milestone?.42:.32,milestone});
+
+  spawnBurst(target.position.x,(target.position.y||0)+.8*visual,target.position.z,
+    isMobile?(milestone?8:5):(milestone?13:8),FX_MAT_SPARK,milestone?3.8:2.8);
+  triggerCombatShake(milestone?8:5,milestone?110:75);
+}
+
+function updateKnightRoyalOnslaughtWowShockwaves(dt){
+  const active=knightRoyalOnslaughtWowShockwave.active;
+  if(!active||!active.length)return;
+  for(let i=active.length-1;i>=0;i--){
+    const f=active[i];
+    if(!f||!f.group){active.splice(i,1);continue;}
+    f.life-=dt;
+    const q=Math.max(0,f.life/f.maxLife),p=1-q;
+    for(const child of f.group.children){
+      if(child.userData.wowRing){
+        child.scale.setScalar((child.userData.baseScale||1)*(1+p*(f.milestone?1.75:1.45)));
+      }else if(child.userData.wowRay){
+        child.position.y+=dt*(f.milestone?2.4:1.8);
+        child.scale.y=1+p*(f.milestone?.65:.42);
+      }else if(child.userData.wowCore){
+        child.scale.y=1+p*.55;
+      }else if(child.userData.wowHalo){
+        child.scale.setScalar(1+p*(f.milestone?1.55:1.25));
+        child.rotation.z+=dt*(f.milestone?8:6);
+      }
+      if(child.material&&'opacity' in child.material)
+        child.material.opacity=(child.userData.baseOpacity||.5)*q;
+    }
+    if(f.life<=0){
+      if(f.group.parent)scene.remove(f.group);
+      disposeGroup(f.group);
+      active.splice(i,1);
+    }
+  }
+}
+
 function knightRoyalOnslaughtImpactStrike(dash){
   if(!dash||!player) return;
   const {target,index,yaw,startPos}=dash;
@@ -16661,6 +16767,7 @@ function knightRoyalOnslaughtImpactStrike(dash){
     knightRoyalOnslaughtSafeHitFx(target,index);
     knightRoyalOnslaughtAirShockwave(target,index);
     knightRoyalOnslaughtEndpointImpactFx(target,index,knightTitanVisualScale());
+    knightRoyalOnslaughtWowShockwave(target,index);
     knightRoyalOnslaughtDamage(target,index);
     if(target.userData.dead) knightRoyalOnslaughtClearMarker(target);
     if(index%4===3) triggerCombatShake(5,70);
@@ -16846,6 +16953,13 @@ function knightEndAegis(success){
   clearKnightRoyalOnslaughtSwarm();
   knightRoyalOnslaughtClearAllMarkers();
   knightRoyalOnslaughtAtmosphere(false);
+  const wowActive=knightRoyalOnslaughtWowShockwave.active;
+  if(wowActive){
+    for(const f of wowActive){
+      if(f&&f.group&&f.group.parent){scene.remove(f.group);disposeGroup(f.group);}
+    }
+    wowActive.length=0;
+  }
   knightRuntime.aegisRecovery=success?.28:.08;
   if(success&&wasActive) knightRoyalOnslaughtFinish();
   knightRuntime.royalOnslaughtTargets=[];
@@ -18335,6 +18449,7 @@ function updateKnightSystems(dt){
 
   knightUpdateFortified(dt);
   knightUpdateLastStand(dt);
+  updateKnightRoyalOnslaughtWowShockwaves(dt);
   knightUpdateShieldToss(dt);
   knightUpdateAegis(dt);
   knightUpdateEarthShatter(dt);
