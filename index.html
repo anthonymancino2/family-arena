@@ -201,7 +201,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.87</title>
+<title>Family Arena V22.14.88</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.87 - Onslaught Impact Shockwave Wow';
+const GAME_VERSION='22.14.88 - Onslaught True Lethal Impact';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -11417,6 +11417,12 @@ function registerMageKill(){
 }
 function registerKnightKill(){
   if(!knightIsActive()) return;
+
+  // Royal Onslaught is its own combat state. Kills produced during Onslaught
+  // must not charge or trigger the passive Whirlwind, otherwise every fifth
+  // Onslaught kill hijacks the animation and makes the move look like a spin.
+  if(knightRuntime&&knightRuntime.aegisWindow>0) return;
+
   const p=HERO_PASSIVES.knight;
   passiveState.knightWhirlwindCounter=(passiveState.knightWhirlwindCounter||0)+1;
   if(passiveState.knightWhirlwindCounter>=(p.whirlwindKills||5)){
@@ -16907,6 +16913,18 @@ function knightRoyalOnslaughtPruneEligibility(){
 }
 function knightUpdateAegis(dt){
   if(knightRuntime.aegisWindow>0){
+    // Onslaught owns the body animation. Cancel any passive Whirlwind visual
+    // state that may have been active immediately before the ultimate began.
+    if(player&&knightRuntime.whirlwindTimer<=0){
+      player.userData.spinVisualTimer=0;
+      if(state.avatarType==='cloud'&&player.userData.cloudFit){
+        player.userData.cloudFit.rotation.y=-Math.PI/2;
+        player.userData.cloudFit.rotation.z=0;
+        player.userData.cloudSpinBaseY=undefined;
+        player.userData.cloudSpinAngle=0;
+      }
+    }
+
     knightRuntime.royalOnslaughtElapsed=(knightRuntime.royalOnslaughtElapsed||0)+dt;
     knightRuntime.royalOnslaughtCaptureRemainingTime=Math.max(0,(knightRuntime.royalOnslaughtCaptureRemainingTime||0)-dt);
     knightRoyalOnslaughtPruneEligibility();
@@ -16959,6 +16977,13 @@ function knightEndAegis(success){
       if(f&&f.group&&f.group.parent){scene.remove(f.group);disposeGroup(f.group);}
     }
     wowActive.length=0;
+  }
+  const domeActive=spawnRoyalOnslaughtImpactDome.active;
+  if(domeActive){
+    for(const f of domeActive){
+      if(f&&f.group&&f.group.parent){scene.remove(f.group);disposeGroup(f.group);}
+    }
+    domeActive.length=0;
   }
   knightRuntime.aegisRecovery=success?.28:.08;
   if(success&&wasActive) knightRoyalOnslaughtFinish();
@@ -18450,6 +18475,7 @@ function updateKnightSystems(dt){
   knightUpdateFortified(dt);
   knightUpdateLastStand(dt);
   updateKnightRoyalOnslaughtWowShockwaves(dt);
+  updateRoyalOnslaughtImpactDomes(dt);
   knightUpdateShieldToss(dt);
   knightUpdateAegis(dt);
   knightUpdateEarthShatter(dt);
@@ -22098,8 +22124,122 @@ function bulletBlockedAt(x,y,z){
 // Applies one bullet's damage to a zombie and kills it if that drops
 // its HP to zero — shared by direct hits and splash damage so both
 // paths behave identically.
+
+function spawnRoyalOnslaughtImpactDome(pos,major=false){
+  if(!scene||!pos)return;
+
+  const active=spawnRoyalOnslaughtImpactDome.active||(spawnRoyalOnslaughtImpactDome.active=[]);
+  const cap=isMobile?2:4;
+  while(active.length>=cap){
+    const old=active.shift();
+    if(old&&old.group&&old.group.parent){scene.remove(old.group);disposeGroup(old.group);}
+  }
+
+  const radius=KNIGHT_ONSLAUGHT_LETHAL_SHOCK_RADIUS*Math.min(1.2,knightTitanVisualScale());
+  const g=new THREE.Group();
+  g.position.set(pos.x,(pos.y||0)+.03,pos.z);
+
+  const make=(color,opacity,wire=false)=>new THREE.MeshBasicMaterial({
+    color,transparent:true,opacity,wireframe:wire,depthWrite:false,
+    side:THREE.DoubleSide,blending:THREE.AdditiveBlending
+  });
+
+  // Large translucent upper hemisphere. At low opacity it reads as a pressure
+  // dome without hiding enemies or washing the whole screen.
+  const dome=new THREE.Mesh(
+    new THREE.SphereGeometry(1,isMobile?14:20,isMobile?8:12,0,Math.PI*2,0,Math.PI/2),
+    make(KNIGHT_GOLD,major?.20:.14,false)
+  );
+  dome.scale.setScalar(.15);
+  dome.userData={impactDome:true,baseOpacity:major?.20:.14};
+  g.add(dome);
+
+  // Wire shell makes the expansion visible even on bright maps.
+  const shell=new THREE.Mesh(
+    new THREE.SphereGeometry(1,isMobile?12:18,isMobile?7:10,0,Math.PI*2,0,Math.PI/2),
+    make(KNIGHT_IVORY,major?.52:.38,true)
+  );
+  shell.scale.setScalar(.16);
+  shell.userData={impactShell:true,baseOpacity:major?.52:.38};
+  g.add(shell);
+
+  // Ground ring expands to the same 5-ft gameplay radius.
+  const ring=new THREE.Mesh(
+    new THREE.RingGeometry(.82,1.0,isMobile?32:48),
+    make(major?KNIGHT_IVORY:KNIGHT_GOLD,major?.78:.62)
+  );
+  ring.rotation.x=-Math.PI/2;
+  ring.position.y=.025;
+  ring.scale.setScalar(.15);
+  ring.userData={impactRing:true,baseOpacity:major?.78:.62};
+  g.add(ring);
+
+  // Thin vertical burst column at the exact contact point.
+  const core=new THREE.Mesh(
+    new THREE.CylinderGeometry(.08,.30,major?4.2:3.0,isMobile?10:16,1,true),
+    make(KNIGHT_IVORY,major?.55:.38)
+  );
+  core.position.y=major?2.0:1.45;
+  core.userData={impactCore:true,baseOpacity:major?.55:.38};
+  g.add(core);
+
+  scene.add(g);
+  active.push({
+    group:g,
+    life:major?.52:.42,
+    maxLife:major?.52:.42,
+    radius,
+    major
+  });
+}
+
+function updateRoyalOnslaughtImpactDomes(dt){
+  const active=spawnRoyalOnslaughtImpactDome.active;
+  if(!active||!active.length)return;
+  for(let i=active.length-1;i>=0;i--){
+    const f=active[i];
+    if(!f||!f.group){active.splice(i,1);continue;}
+    f.life-=dt;
+    const q=Math.max(0,f.life/f.maxLife);
+    const p=1-q;
+    const eased=1-Math.pow(1-p,3);
+    const scale=.15+(f.radius-.15)*eased;
+
+    for(const c of f.group.children){
+      if(c.userData.impactDome||c.userData.impactShell||c.userData.impactRing){
+        c.scale.setScalar(scale);
+      }else if(c.userData.impactCore){
+        c.scale.y=1+p*(f.major?.80:.50);
+      }
+      if(c.material&&'opacity' in c.material)
+        c.material.opacity=(c.userData.baseOpacity||.4)*q;
+    }
+
+    if(f.life<=0){
+      if(f.group.parent)scene.remove(f.group);
+      disposeGroup(f.group);
+      active.splice(i,1);
+    }
+  }
+}
+
 function applyBulletDamage(z, dmg){
   if(!z || z.userData.dead) return;
+
+  const onslaughtActive=!!(
+    knightIsActive() &&
+    knightRuntime &&
+    knightRuntime.aegisWindow>0
+  );
+
+  // During Royal Onslaught, ANY player-caused hit on a normal enemy or Brute
+  // is lethal regardless of which Knight sub-move/effect produced that hit.
+  // Bosses are deliberately exempt.
+  if(onslaughtActive && knightEnemyClass(z)!=='boss'){
+    const hp=Math.max(1,Number(z.userData.hp)||1,Number(z.userData.maxHp)||1);
+    dmg=Math.max(Number(dmg)||0,hp*4+999999);
+  }
+
   z.userData.hp -= dmg;
 
   // Shared impact response for every hero and weapon. The enemy is pushed
@@ -22118,6 +22258,19 @@ function applyBulletDamage(z, dmg){
   z.scale.set(bs*1.18,bs*0.80,bs*1.18);
   setTimeout(()=>{ if(!z.userData.dead) z.scale.setScalar(bs); },105);
   flashZombie(z);
+
+  if(onslaughtActive){
+    const now=performance.now();
+    if(!z.userData.lastOnslaughtImpactVisualAt || now-z.userData.lastOnslaughtImpactVisualAt>140){
+      z.userData.lastOnslaughtImpactVisualAt=now;
+      const strikeIndex=knightRuntime.royalOnslaughtStrikeIndex||0;
+      spawnRoyalOnslaughtImpactDome(
+        {x:z.position.x,y:z.position.y||0,z:z.position.z},
+        ((strikeIndex+1)%5===0)
+      );
+    }
+  }
+
   spawnBurst(z.position.x,z.position.y+.72,z.position.z,dmg>=3?9:5,FX_MAT_SPARK,dmg>=3?3.5:2.4);
   triggerCombatShake(dmg>=3?4.5:2.2,dmg>=3?85:55);
   if(navigator.vibrate) navigator.vibrate(dmg>=3?14:7);
