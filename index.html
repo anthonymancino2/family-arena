@@ -201,7 +201,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.82</title>
+<title>Family Arena V22.14.83</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.82 - Cloud Movement Quality';
+const GAME_VERSION='22.14.83 - Cloud Armature Facing Lock';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10231,10 +10231,26 @@ function buildCloudWoffPlayer(options={}){
     wrapper.userData.cloudLoaded=true;
 
     const mixer=new THREEAsset.AnimationMixer(root);
-    const walkClip=gltf.animations.find(c=>String(c.name).toLowerCase()==='walk')||gltf.animations[0];
+    const sourceWalkClip=gltf.animations.find(c=>String(c.name).toLowerCase()==='walk')||gltf.animations[0];
+    let walkClip=sourceWalkClip?sourceWalkClip.clone():null;
+
+    // Critical facing fix: the uploaded Walk clip animates the top-level
+    // Armature quaternion. That track rotates the entire skinned character
+    // sideways after the game controller has already set player.rotation.y.
+    // Remove only top-level Armature transform tracks; all limb/bone animation
+    // remains native and intact.
+    if(walkClip){
+      walkClip.tracks=walkClip.tracks.filter(track=>{
+        const n=String(track.name||'');
+        return !/^Armature\.(quaternion|position|scale)$/i.test(n);
+      });
+      walkClip.resetDuration();
+    }
+
     wrapper.userData.kayMixer=mixer;
     wrapper.userData.kayClips={};
     gltf.animations.forEach(c=>wrapper.userData.kayClips[c.name]=c);
+    if(walkClip)wrapper.userData.kayClips['Walk']=walkClip;
     wrapper.userData.cloudWalkClip=walkClip;
     wrapper.userData.cloudWalkAction=walkClip?mixer.clipAction(walkClip):null;
     wrapper.userData.kayCurrentAction=null;
@@ -10252,6 +10268,10 @@ function buildCloudWoffPlayer(options={}){
     // joints from the uploaded Cloud model, not wrapper placeholders.
     const cloudBones={};
     root.traverse(o=>{if(o.name)cloudBones[o.name]=o;});
+    const cloudArmature=cloudBones['Armature']||null;
+    wrapper.userData.cloudArmature=cloudArmature;
+    wrapper.userData.cloudArmatureBindQuaternion=cloudArmature?cloudArmature.quaternion.clone():null;
+
     wrapper.userData.cloudBones={
       hips:cloudBones['Hips_100_03'],
       spine:cloudBones['Spine_110_04'],
@@ -10329,7 +10349,7 @@ function buildCloudWoffPlayer(options={}){
     };
 
     wrapper.userData.playKayClip('Idle',true,false,0);
-    if(!options.silent)toast('Cloud native rig ready · Walk animation detected');
+    if(!options.silent)toast('Cloud native rig ready · Walk root rotation locked');
   }).catch(err=>{
     console.error('Cloud native model load failed:',err);
     wrapper.userData.cloudLoadFailed=true;
@@ -23388,6 +23408,16 @@ function update(dt){
     player.userData.kayMixer.update(dt);
     player.userData.kayActionLock = Math.max(0, (player.userData.kayActionLock || 0) - dt);
   }
+  if(state.avatarType==='cloud' && player){
+    const u=player.userData;
+    if(u.cloudArmature && u.cloudArmatureBindQuaternion){
+      // Belt-and-suspenders safety: even if a future imported clip contains
+      // another root rotation track, restore the authored bind orientation
+      // after mixer evaluation so gameplay facing always wins.
+      u.cloudArmature.quaternion.copy(u.cloudArmatureBindQuaternion);
+      u.cloudArmature.updateMatrixWorld(true);
+    }
+  }
   if(state.avatarType==='cloud')updateCloudNativeRigPost(dt);
   if(state.avatarType==='mage')nineFoxRepairPresentation(false);
 
@@ -23814,7 +23844,11 @@ function updateCloudNativeRigPre(dt){
   u.cloudDashWanted=!!dashActive;
 
   // Preserve the model-authoring 90° correction at all times.
-  if(u.cloudFit)u.cloudFit.rotation.y=-Math.PI/2;
+  if(u.cloudFit){
+    // Fixed model-space correction only. Actual travel/facing is controlled
+    // exclusively by player.rotation.y in the movement controller.
+    u.cloudFit.rotation.y=-Math.PI/2;
+  }
 
   const controllerForward=-moveVec.y;
   u.cloudBackwardInput=controllerForward<-.12 && Math.abs(controllerForward)>Math.abs(moveVec.x);
