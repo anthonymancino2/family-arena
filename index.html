@@ -1,3 +1,4 @@
+<!-- V22.14.38 Linear Rig Stability Fix: fixes detached/displaced Linear body parts introduced by the experimental elbow/knee hierarchy. Restores the original leg and arm meshes as intact connected geometry, preserves the brighter Linear-only material correction, and uses conservative whole-limb articulation for stable movement. Experimental geometry splitting and nested elbow/knee re-parenting are disabled until a proper weight-safe solution is ready. Linear remains a separate Rig Test avatar; Mage is not replaced in this build. -->
 <!-- V22.14.37 Linear Elbow Rig + Full Movement Animation: adds real elbow articulation to the uploaded Linear avatar, improves run arm swing, jump/landing, casting/attack poses, hit reaction, and idle movement. Keeps the V22.14.36 lighting correction and knee articulation. Linear remains a prototype slot and does not replace Mage yet. -->
 <!-- V22.14.36 Linear Lighting + Knee Rig: lifts Linear's material response so the uploaded GameCube textures match the brighter Family Arena environment, without making her glow. Rebuilds each leg as hip -> upper leg -> knee -> lower leg/ankle/foot using runtime triangle splitting at the knee line, then adds real knee flexion to the run/walk cycle. Existing prototype combat remains unchanged. -->
 <!-- V22.14.35 Linear Character Rig Prototype: embeds the user's uploaded Evolution Worlds Linear OBJ/MTL/textures directly in the single-file build. Because OBJ contains no usable animation clips or skin weights, Linear receives a lightweight articulated compatibility rig built from her separate exported body pieces. Idle and Run are implemented first, with Jump/Attack compatibility poses so existing gameplay animation calls remain safe. Linear appears as a selectable RIG TEST avatar for direct testing before final combat design. -->
@@ -226,7 +227,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.37</title>
+<title>Family Arena V22.14.38</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1439,7 +1440,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.37 - Linear Elbow Full Movement';
+const GAME_VERSION='22.14.38 - Linear Rig Stability Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -9994,45 +9995,6 @@ function linearAttachObjectsToPivot(root,pivot,names){
 }
 
 
-function linearSplitMeshAtY(THREEAsset,mesh,splitY){
-  if(!mesh||!mesh.geometry||!mesh.geometry.attributes||!mesh.geometry.attributes.position)return null;
-  const source=mesh.geometry.index?mesh.geometry.toNonIndexed():mesh.geometry.clone();
-  const pos=source.getAttribute('position');
-  if(!pos||pos.count<3)return null;
-
-  const upperIdx=[],lowerIdx=[];
-  for(let i=0;i<pos.count;i+=3){
-    const avg=(pos.getY(i)+pos.getY(i+1)+pos.getY(i+2))/3;
-    const dest=avg>=splitY?upperIdx:lowerIdx;
-    dest.push(i,i+1,i+2);
-  }
-
-  function build(indices,name){
-    if(!indices.length)return null;
-    const g=new THREEAsset.BufferGeometry();
-    for(const attrName of Object.keys(source.attributes)){
-      const a=source.getAttribute(attrName);
-      const arr=new a.array.constructor(indices.length*a.itemSize);
-      let o=0;
-      for(const vi of indices){
-        const base=vi*a.itemSize;
-        for(let k=0;k<a.itemSize;k++)arr[o++]=a.array[base+k];
-      }
-      g.setAttribute(attrName,new THREEAsset.BufferAttribute(arr,a.itemSize,a.normalized));
-    }
-    g.computeBoundingBox();g.computeBoundingSphere();
-    const m=Array.isArray(mesh.material)?mesh.material.map(x=>x.clone()):mesh.material.clone();
-    const n=new THREEAsset.Mesh(g,m);
-    n.name=name;n.castShadow=true;n.receiveShadow=false;
-    return n;
-  }
-
-  return {
-    upper:build(upperIdx,mesh.name+'_Upper'),
-    lower:build(lowerIdx,mesh.name+'_Lower')
-  };
-}
-
 function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
   const root=cloneLinearModel(template);
   root.rotation.y=0;
@@ -10040,55 +10002,28 @@ function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
   // The OBJ kept separate body pieces but lost the original skeletal hierarchy.
   // Rebuild four useful articulation pivots around the exported shoulder/hip locations.
   const leftArm=new THREEAsset.Group(),rightArm=new THREEAsset.Group();
-  const leftElbow=new THREEAsset.Group(),rightElbow=new THREEAsset.Group();
   const leftLeg=new THREEAsset.Group(),rightLeg=new THREEAsset.Group();
-  const leftKnee=new THREEAsset.Group(),rightKnee=new THREEAsset.Group();
-  leftArm.name='LinearRig_LeftShoulder';rightArm.name='LinearRig_RightShoulder';
-  leftElbow.name='LinearRig_LeftElbow';rightElbow.name='LinearRig_RightElbow';
-  leftLeg.name='LinearRig_LeftHip';rightLeg.name='LinearRig_RightHip';
-  leftKnee.name='LinearRig_LeftKnee';rightKnee.name='LinearRig_RightKnee';
-
+  leftArm.name='LinearRig_LeftArm';rightArm.name='LinearRig_RightArm';
+  leftLeg.name='LinearRig_LeftLeg';rightLeg.name='LinearRig_RightLeg';
   leftArm.position.set(-335,330,0); rightArm.position.set(335,330,0);
-  leftElbow.position.set(-285,-230,0); rightElbow.position.set(285,-230,0);
   leftLeg.position.set(-215,-430,0); rightLeg.position.set(215,-430,0);
-  leftKnee.position.set(0,-760,0); rightKnee.position.set(0,-760,0);
-
   root.add(leftArm,rightArm,leftLeg,rightLeg);
-  leftArm.add(leftElbow);rightArm.add(rightElbow);
-  leftLeg.add(leftKnee);rightLeg.add(rightKnee);
 
-  // Upper arm stays with the shoulder. Forearm/hand pieces are re-parented
-  // under the elbow so the original OBJ can bend without skin weights.
+  // V22.14.38 stability restore:
+  // keep each exported limb mesh intact. Object3D.attach() preserves world
+  // transforms, so the model remains visually connected while whole limbs
+  // articulate around conservative shoulder/hip pivots.
   linearAttachObjectsToPivot(root,leftArm,[
-    'Bone05_mirrored__mirrored_','connectBone04_mirrored_','connectBone01_mirrored__mirrored_'
+    'Mesh_04','Bone01_mirrored_','Bone02_mirrored_','Bone03_mirrored_','Bone04_mirrored_',
+    'connectBone02_mirrored_','connectBone04_mirrored_','connectBone01_mirrored__mirrored_',
+    'Bone05_mirrored__mirrored_'
   ]);
   linearAttachObjectsToPivot(root,rightArm,[
-    'Bone05_mirrored_','connectBone04','connectBone01_mirrored_'
+    'Mesh_0055','Bone01','Bone02','Bone03','Bone04',
+    'connectBone02','connectBone04','connectBone01_mirrored_','Bone05_mirrored_'
   ]);
-  linearAttachObjectsToPivot(root,leftElbow,[
-    'Mesh_04','Bone01_mirrored_','Bone02_mirrored_','Bone03_mirrored_','Bone04_mirrored_',
-    'connectBone02_mirrored_'
-  ]);
-  linearAttachObjectsToPivot(root,rightElbow,[
-    'Mesh_0055','Bone01','Bone02','Bone03','Bone04','connectBone02'
-  ]);
-
-  // Split the long leg meshes at the approximate exported knee line. This
-  // creates real upper/lower sections from the OBJ even though the OBJ itself
-  // contains no skin weights.
-  const leftWhole=root.getObjectByName('Mesh_01');
-  const rightWhole=root.getObjectByName('Mesh_0066');
-  const leftSplit=linearSplitMeshAtY(THREEAsset,leftWhole,-1120);
-  const rightSplit=linearSplitMeshAtY(THREEAsset,rightWhole,-1120);
-  if(leftWhole&&leftWhole.parent)leftWhole.parent.remove(leftWhole);
-  if(rightWhole&&rightWhole.parent)rightWhole.parent.remove(rightWhole);
-
-  if(leftSplit&&leftSplit.upper){root.add(leftSplit.upper);linearAttachObjectsToPivot(root,leftLeg,[leftSplit.upper.name]);}
-  if(rightSplit&&rightSplit.upper){root.add(rightSplit.upper);linearAttachObjectsToPivot(root,rightLeg,[rightSplit.upper.name]);}
-  if(leftSplit&&leftSplit.lower){root.add(leftSplit.lower);linearAttachObjectsToPivot(root,leftKnee,[leftSplit.lower.name]);}
-  if(rightSplit&&rightSplit.lower){root.add(rightSplit.lower);linearAttachObjectsToPivot(root,rightKnee,[rightSplit.lower.name]);}
-  linearAttachObjectsToPivot(root,leftKnee,['Mesh_03','Mesh_02']);
-  linearAttachObjectsToPivot(root,rightKnee,['Mesh_0062','Mesh_0069']);
+  linearAttachObjectsToPivot(root,leftLeg,['Mesh_01','Mesh_03','Mesh_02']);
+  linearAttachObjectsToPivot(root,rightLeg,['Mesh_0066','Mesh_0062','Mesh_0069']);
 
   root.traverse(o=>{
     if(o.isMesh){
@@ -10187,10 +10122,10 @@ function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
         bob=.010*(breath+1)*.5;
       }
 
-      leftArm.rotation.x=la;rightArm.rotation.x=ra;
-      leftElbow.rotation.x=le;rightElbow.rotation.x=re;
-      leftLeg.rotation.x=ll;rightLeg.rotation.x=rl;
-      leftKnee.rotation.x=lk;rightKnee.rotation.x=rk;
+      // Stable whole-limb articulation. Elbow/knee values are folded into
+      // small shoulder/hip adjustments rather than moving detached submeshes.
+      leftArm.rotation.x=la + le*.16;rightArm.rotation.x=ra + re*.16;
+      leftLeg.rotation.x=ll + lk*.10;rightLeg.rotation.x=rl + rk*.10;
 
       if(this.mode!=='attack'&&this.mode!=='cast'){
         leftArm.rotation.z=0;rightArm.rotation.z=0;
@@ -10219,7 +10154,7 @@ function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
     }
   };
   anim.update(0);
-  return {root,anim,parts:{leftArm,rightArm,leftElbow,rightElbow,leftLeg,rightLeg,leftKnee,rightKnee}};
+  return {root,anim,parts:{leftArm,rightArm,leftLeg,rightLeg}};
 }
 
 function buildLinearPlayer(options={}){
