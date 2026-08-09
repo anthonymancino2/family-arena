@@ -1,3 +1,5 @@
+<!-- V22.14.37 Linear Elbow Rig + Full Movement Animation: adds real elbow articulation to the uploaded Linear avatar, improves run arm swing, jump/landing, casting/attack poses, hit reaction, and idle movement. Keeps the V22.14.36 lighting correction and knee articulation. Linear remains a prototype slot and does not replace Mage yet. -->
+<!-- V22.14.36 Linear Lighting + Knee Rig: lifts Linear's material response so the uploaded GameCube textures match the brighter Family Arena environment, without making her glow. Rebuilds each leg as hip -> upper leg -> knee -> lower leg/ankle/foot using runtime triangle splitting at the knee line, then adds real knee flexion to the run/walk cycle. Existing prototype combat remains unchanged. -->
 <!-- V22.14.35 Linear Character Rig Prototype: embeds the user's uploaded Evolution Worlds Linear OBJ/MTL/textures directly in the single-file build. Because OBJ contains no usable animation clips or skin weights, Linear receives a lightweight articulated compatibility rig built from her separate exported body pieces. Idle and Run are implemented first, with Jump/Attack compatibility poses so existing gameplay animation calls remain safe. Linear appears as a selectable RIG TEST avatar for direct testing before final combat design. -->
 <!-- V22.14.34 Royal Onslaught Camera Readability: during Royal Onslaught, non-bird-eye views temporarily use a wider and slightly steeper third-person framing so the player, 30 clones, and target-to-target movement remain readable. The player's selected camera mode/zoom/pitch are not overwritten; normal framing returns automatically when the move ends. Existing wide zoom levels are never forced closer, and bird-eye mode remains untouched. Gameplay, speed, damage, targeting, clone rules, and cooldowns are unchanged. -->
 <!-- V22.14.33 Royal Onslaught Endpoint Impact Polish: strengthens contact readability at the exact endpoint hit with lightweight airborne slash flares, a torso-height shock ring, and short sparks. No ground rings, white floor effects, persistent trails, or heavy per-clone geometry are added. Player dash remains 0.36s; Royal Onslaught clones remain 0.54s (2/3 player speed); regular Knights of the Round remain 2/3 player movement speed. Damage, targeting, bullet time, clone counts, capture rules, and cooldowns are unchanged. -->
@@ -224,7 +226,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.35</title>
+<title>Family Arena V22.14.37</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1437,7 +1439,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.35 - Linear Rig Prototype';
+const GAME_VERSION='22.14.37 - Linear Elbow Full Movement';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -9991,6 +9993,46 @@ function linearAttachObjectsToPivot(root,pivot,names){
   }
 }
 
+
+function linearSplitMeshAtY(THREEAsset,mesh,splitY){
+  if(!mesh||!mesh.geometry||!mesh.geometry.attributes||!mesh.geometry.attributes.position)return null;
+  const source=mesh.geometry.index?mesh.geometry.toNonIndexed():mesh.geometry.clone();
+  const pos=source.getAttribute('position');
+  if(!pos||pos.count<3)return null;
+
+  const upperIdx=[],lowerIdx=[];
+  for(let i=0;i<pos.count;i+=3){
+    const avg=(pos.getY(i)+pos.getY(i+1)+pos.getY(i+2))/3;
+    const dest=avg>=splitY?upperIdx:lowerIdx;
+    dest.push(i,i+1,i+2);
+  }
+
+  function build(indices,name){
+    if(!indices.length)return null;
+    const g=new THREEAsset.BufferGeometry();
+    for(const attrName of Object.keys(source.attributes)){
+      const a=source.getAttribute(attrName);
+      const arr=new a.array.constructor(indices.length*a.itemSize);
+      let o=0;
+      for(const vi of indices){
+        const base=vi*a.itemSize;
+        for(let k=0;k<a.itemSize;k++)arr[o++]=a.array[base+k];
+      }
+      g.setAttribute(attrName,new THREEAsset.BufferAttribute(arr,a.itemSize,a.normalized));
+    }
+    g.computeBoundingBox();g.computeBoundingSphere();
+    const m=Array.isArray(mesh.material)?mesh.material.map(x=>x.clone()):mesh.material.clone();
+    const n=new THREEAsset.Mesh(g,m);
+    n.name=name;n.castShadow=true;n.receiveShadow=false;
+    return n;
+  }
+
+  return {
+    upper:build(upperIdx,mesh.name+'_Upper'),
+    lower:build(lowerIdx,mesh.name+'_Lower')
+  };
+}
+
 function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
   const root=cloneLinearModel(template);
   root.rotation.y=0;
@@ -9998,24 +10040,55 @@ function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
   // The OBJ kept separate body pieces but lost the original skeletal hierarchy.
   // Rebuild four useful articulation pivots around the exported shoulder/hip locations.
   const leftArm=new THREEAsset.Group(),rightArm=new THREEAsset.Group();
+  const leftElbow=new THREEAsset.Group(),rightElbow=new THREEAsset.Group();
   const leftLeg=new THREEAsset.Group(),rightLeg=new THREEAsset.Group();
-  leftArm.name='LinearRig_LeftArm';rightArm.name='LinearRig_RightArm';
-  leftLeg.name='LinearRig_LeftLeg';rightLeg.name='LinearRig_RightLeg';
-  leftArm.position.set(-335,330,0); rightArm.position.set(335,330,0);
-  leftLeg.position.set(-215,-430,0); rightLeg.position.set(215,-430,0);
-  root.add(leftArm,rightArm,leftLeg,rightLeg);
+  const leftKnee=new THREEAsset.Group(),rightKnee=new THREEAsset.Group();
+  leftArm.name='LinearRig_LeftShoulder';rightArm.name='LinearRig_RightShoulder';
+  leftElbow.name='LinearRig_LeftElbow';rightElbow.name='LinearRig_RightElbow';
+  leftLeg.name='LinearRig_LeftHip';rightLeg.name='LinearRig_RightHip';
+  leftKnee.name='LinearRig_LeftKnee';rightKnee.name='LinearRig_RightKnee';
 
+  leftArm.position.set(-335,330,0); rightArm.position.set(335,330,0);
+  leftElbow.position.set(-285,-230,0); rightElbow.position.set(285,-230,0);
+  leftLeg.position.set(-215,-430,0); rightLeg.position.set(215,-430,0);
+  leftKnee.position.set(0,-760,0); rightKnee.position.set(0,-760,0);
+
+  root.add(leftArm,rightArm,leftLeg,rightLeg);
+  leftArm.add(leftElbow);rightArm.add(rightElbow);
+  leftLeg.add(leftKnee);rightLeg.add(rightKnee);
+
+  // Upper arm stays with the shoulder. Forearm/hand pieces are re-parented
+  // under the elbow so the original OBJ can bend without skin weights.
   linearAttachObjectsToPivot(root,leftArm,[
-    'Mesh_04','Bone01_mirrored_','Bone02_mirrored_','Bone03_mirrored_','Bone04_mirrored_',
-    'connectBone02_mirrored_','connectBone04_mirrored_','connectBone01_mirrored__mirrored_',
-    'Bone05_mirrored__mirrored_'
+    'Bone05_mirrored__mirrored_','connectBone04_mirrored_','connectBone01_mirrored__mirrored_'
   ]);
   linearAttachObjectsToPivot(root,rightArm,[
-    'Mesh_0055','Bone01','Bone02','Bone03','Bone04',
-    'connectBone02','connectBone04','connectBone01_mirrored_','Bone05_mirrored_'
+    'Bone05_mirrored_','connectBone04','connectBone01_mirrored_'
   ]);
-  linearAttachObjectsToPivot(root,leftLeg,['Mesh_01','Mesh_03','Mesh_02']);
-  linearAttachObjectsToPivot(root,rightLeg,['Mesh_0066','Mesh_0062','Mesh_0069']);
+  linearAttachObjectsToPivot(root,leftElbow,[
+    'Mesh_04','Bone01_mirrored_','Bone02_mirrored_','Bone03_mirrored_','Bone04_mirrored_',
+    'connectBone02_mirrored_'
+  ]);
+  linearAttachObjectsToPivot(root,rightElbow,[
+    'Mesh_0055','Bone01','Bone02','Bone03','Bone04','connectBone02'
+  ]);
+
+  // Split the long leg meshes at the approximate exported knee line. This
+  // creates real upper/lower sections from the OBJ even though the OBJ itself
+  // contains no skin weights.
+  const leftWhole=root.getObjectByName('Mesh_01');
+  const rightWhole=root.getObjectByName('Mesh_0066');
+  const leftSplit=linearSplitMeshAtY(THREEAsset,leftWhole,-1120);
+  const rightSplit=linearSplitMeshAtY(THREEAsset,rightWhole,-1120);
+  if(leftWhole&&leftWhole.parent)leftWhole.parent.remove(leftWhole);
+  if(rightWhole&&rightWhole.parent)rightWhole.parent.remove(rightWhole);
+
+  if(leftSplit&&leftSplit.upper){root.add(leftSplit.upper);linearAttachObjectsToPivot(root,leftLeg,[leftSplit.upper.name]);}
+  if(rightSplit&&rightSplit.upper){root.add(rightSplit.upper);linearAttachObjectsToPivot(root,rightLeg,[rightSplit.upper.name]);}
+  if(leftSplit&&leftSplit.lower){root.add(leftSplit.lower);linearAttachObjectsToPivot(root,leftKnee,[leftSplit.lower.name]);}
+  if(rightSplit&&rightSplit.lower){root.add(rightSplit.lower);linearAttachObjectsToPivot(root,rightKnee,[rightSplit.lower.name]);}
+  linearAttachObjectsToPivot(root,leftKnee,['Mesh_03','Mesh_02']);
+  linearAttachObjectsToPivot(root,rightKnee,['Mesh_0062','Mesh_0069']);
 
   root.traverse(o=>{
     if(o.isMesh){
@@ -10023,9 +10096,17 @@ function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
       const mats=Array.isArray(o.material)?o.material:[o.material];
       for(const m of mats){
         if(!m)continue;
-        if('roughness' in m)m.roughness=.88;
+        if('roughness' in m)m.roughness=.82;
         if('metalness' in m)m.metalness=0;
         if(m.map)m.map.colorSpace=THREEAsset.SRGBColorSpace;
+        // The original GameCube materials render too dark under Family Arena's
+        // physically brighter scene. Lift only Linear's material response.
+        if(m.color)m.color.multiplyScalar(1.22);
+        if(m.emissive){
+          m.emissive.setHex(0x202020);
+          if('emissiveIntensity' in m)m.emissiveIntensity=.34;
+        }
+        m.needsUpdate=true;
       }
     }
   });
@@ -10050,46 +10131,95 @@ function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
         }
       }
       const t=this.time;
-      let la=0,ra=0,ll=0,rl=0,bob=0,lean=0;
+      let la=0,ra=0,le=.15,re=.15,ll=0,rl=0,lk=0,rk=0,bob=0,lean=0,twist=0;
       if(this.mode==='run'){
-        const s=Math.sin(t*9.0);
-        la=s*.62; ra=-s*.62; ll=-s*.52; rl=s*.52;
-        bob=Math.abs(Math.sin(t*9.0))*.032;
+        const phase=t*9.0;
+        const s=Math.sin(phase);
+        la=s*.62; ra=-s*.62;
+        le=.26+Math.max(0,-s)*.34;
+        re=.26+Math.max(0,s)*.34;
+        ll=-s*.50; rl=s*.50;
+        lk=Math.max(0,Math.sin(phase+.35))*.82;
+        rk=Math.max(0,Math.sin(phase+Math.PI+.35))*.82;
+        bob=Math.abs(Math.sin(phase))*.032;
         lean=.06;
       }else if(this.mode==='jump'){
-        la=-.28;ra=-.28;ll=.20;rl=.20;bob=.035;
+        const p=Math.min(1,this.shotTime/Math.max(.001,this.shotDuration));
+        la=-.42;ra=-.42;le=.42;re=.42;
+        ll=.18;rl=.18;lk=.58;rk=.58;
+        bob=.04+Math.sin(p*Math.PI)*.018;
+        lean=-.03;
+      }else if(this.mode==='land'){
+        const p=Math.min(1,this.shotTime/Math.max(.001,this.shotDuration));
+        const a=Math.sin(p*Math.PI);
+        la=.22*a;ra=.22*a;le=.38*a;re=.38*a;
+        ll=.22*a;rl=.22*a;lk=.62*a;rk=.62*a;
+        bob=-.045*a;lean=.10*a;
+      }else if(this.mode==='hit'){
+        const p=Math.min(1,this.shotTime/Math.max(.001,this.shotDuration));
+        const a=Math.sin(p*Math.PI);
+        la=-.35*a;ra=.38*a;le=.48*a;re=.30*a;
+        ll=.10*a;rl=-.08*a;lk=.24*a;rk=.18*a;
+        lean=-.12*a;twist=.12*a;
       }else if(this.mode==='attack'){
         const p=Math.min(1,this.shotTime/Math.max(.001,this.shotDuration));
         const swing=Math.sin(p*Math.PI);
-        ra=-1.05*swing; la=.20*swing;
-        rightArm.rotation.z=-.48*swing;
-        leftArm.rotation.z=.12*swing;
+        ra=-1.00*swing; la=.18*swing;
+        re=.72*swing+.12;le=.20*swing+.10;
+        lk=.12*swing;rk=.08*swing;
+        rightArm.rotation.z=-.42*swing;
+        leftArm.rotation.z=.10*swing;
+        twist=-.10*swing;
         lean=.08*swing;
+      }else if(this.mode==='cast'){
+        const p=Math.min(1,this.shotTime/Math.max(.001,this.shotDuration));
+        const a=Math.sin(p*Math.PI);
+        la=-.62*a;ra=-.62*a;le=.64*a;re=.64*a;
+        lk=.08*a;rk=.08*a;
+        leftArm.rotation.z=.18*a;rightArm.rotation.z=-.18*a;
+        lean=-.03*a;
       }else{
         const breath=Math.sin(t*2.4);
         la=.035*breath;ra=-.035*breath;
+        le=.14+.025*(breath+1)*.5;re=.14+.025*(1-breath)*.5;
         ll=-.012*breath;rl=.012*breath;
+        lk=.018*(breath+1)*.5;rk=.018*(1-breath)*.5;
         bob=.010*(breath+1)*.5;
       }
+
       leftArm.rotation.x=la;rightArm.rotation.x=ra;
+      leftElbow.rotation.x=le;rightElbow.rotation.x=re;
       leftLeg.rotation.x=ll;rightLeg.rotation.x=rl;
-      if(this.mode!=='attack'){leftArm.rotation.z=0;rightArm.rotation.z=0;}
+      leftKnee.rotation.x=lk;rightKnee.rotation.x=rk;
+
+      if(this.mode!=='attack'&&this.mode!=='cast'){
+        leftArm.rotation.z=0;rightArm.rotation.z=0;
+      }
       root.rotation.x=lean;
+      root.rotation.y=twist;
       root.position.y=baseY+bob;
     },
     play(name,oneShot=false){
       const n=String(name||'').toLowerCase();
-      if(/jump/.test(n)) this.mode='jump';
+      if(/land/.test(n)) this.mode='land';
+      else if(/hurt|hit|damage|impact/.test(n)) this.mode='hit';
+      else if(/jump/.test(n)) this.mode='jump';
       else if(/run|walk/.test(n)) this.mode='run';
-      else if(/attack|melee|slash|chop|stab|shoot|magic|cast/.test(n)) this.mode='attack';
+      else if(/magic|cast|spell/.test(n)) this.mode='cast';
+      else if(/attack|melee|slash|chop|stab|shoot/.test(n)) this.mode='attack';
       else this.mode='idle';
-      this.oneShot=!!oneShot || this.mode==='attack' || this.mode==='jump';
+
+      this.oneShot=!!oneShot || ['attack','cast','jump','land','hit'].includes(this.mode);
       this.shotTime=0;
-      this.shotDuration=this.mode==='jump'?.48:.34;
+      if(this.mode==='jump')this.shotDuration=.48;
+      else if(this.mode==='land')this.shotDuration=.28;
+      else if(this.mode==='hit')this.shotDuration=.26;
+      else if(this.mode==='cast')this.shotDuration=.40;
+      else this.shotDuration=.34;
     }
   };
   anim.update(0);
-  return {root,anim,parts:{leftArm,rightArm,leftLeg,rightLeg}};
+  return {root,anim,parts:{leftArm,rightArm,leftElbow,rightElbow,leftLeg,rightLeg,leftKnee,rightKnee}};
 }
 
 function buildLinearPlayer(options={}){
@@ -10115,7 +10245,9 @@ function buildLinearPlayer(options={}){
     // Compatibility mixer: the main game can update this exactly like a normal AnimationMixer.
     wrapper.userData.kayMixer={update:dt=>rig.anim.update(dt),stopAllAction:()=>{}};
     wrapper.userData.kayClips={
-      Idle:{name:'Idle'},Running_A:{name:'Running_A'},Jump_Full_Short:{name:'Jump_Full_Short'},
+      Idle:{name:'Idle'},Running_A:{name:'Running_A'},Walking_A:{name:'Walking_A'},
+      Jump_Full_Short:{name:'Jump_Full_Short'},Jump_Land:{name:'Jump_Land'},
+      Hit_A:{name:'Hit_A'},Magic_Cast:{name:'Magic_Cast'},
       '1H_Melee_Attack_Chop':{name:'1H_Melee_Attack_Chop'},
       '1H_Melee_Attack_Slice_Horizontal':{name:'1H_Melee_Attack_Slice_Horizontal'},
       '1H_Ranged_Shoot':{name:'1H_Ranged_Shoot'}
