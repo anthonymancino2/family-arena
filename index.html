@@ -1,3 +1,8 @@
+<!-- V22.14.56 Nine-Tailed Fox Dash Run Lean
+Keeps the Nine-Tailed Fox in its native guard_run animation while dashing and adds
+a stronger whole-body forward lean during dash. The lean smoothly blends back out
+when dash ends so the fox no longer snaps upright and glides across the floor.
+-->
 <!-- V22.14.55 Nine-Tailed Fox Ground Marker Fix
 Keeps the approved fox model scale and native animation integration from V22.14.54,
 but gives the Nine-Tailed Fox a tighter, thinner, softer player locator ring sized
@@ -276,7 +281,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.55</title>
+<title>Family Arena V22.14.56</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1489,7 +1494,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <script>
 (function(){
 
-const GAME_VERSION='22.14.55 - Nine Fox Ground Marker Fix';
+const GAME_VERSION='22.14.56 - Nine Fox Dash Run Lean';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10033,7 +10038,7 @@ function getNineTailedFoxAssetPromise(){
 function nineTailedFoxClipName(requested){
   const n=String(requested||'').toLowerCase();
   if(n.includes('spawn'))return 'spawn';
-  if(n.includes('run')||n.includes('walk'))return 'guard_run';
+  if(n.includes('run')||n.includes('walk')||n.includes('dash'))return 'guard_run';
   if(n.includes('jump')||n.includes('land'))return 'fallow';
   if(/attack|melee|slash|chop|stab|shoot|magic|cast|hit|hurt|impact/.test(n))return 'fallow';
   return 'guard';
@@ -10105,6 +10110,7 @@ function buildNineTailedFoxPlayer(options={}){
     wrapper.add(fit);
     wrapper.userData.kayRoot=root;
     wrapper.userData.nineFoxFit=fit;
+    wrapper.userData.nineFoxDashLean=0;
 
     const mixer=new THREEAsset.AnimationMixer(root);
     const clips={};
@@ -22212,6 +22218,20 @@ function update(dt){
       ? 'Jump_Idle'
       : (dashActive ? 'Running_A' : (isMoving ? 'Running_A' : 'Idle'));
     player.userData.playKayClip(desired);
+  }
+
+  // Nine-Tailed Fox dash presentation:
+  // keep the real guard_run skeletal animation active and layer a stronger
+  // whole-body forward pitch on the non-animated fit wrapper. Blend it in/out
+  // instead of snapping so dash reads like an accelerated run, not a glide.
+  if(state.avatarType==='ninefox' && player.userData.nineFoxFit){
+    const fit=player.userData.nineFoxFit;
+    const targetLean=(dashActive && onGround)?0.34:0;
+    const current=Number(player.userData.nineFoxDashLean)||0;
+    const blend=1-Math.exp(-dt*(dashActive?18:11));
+    const next=current+(targetLean-current)*blend;
+    player.userData.nineFoxDashLean=next;
+    fit.rotation.x=next;
   }
 
   // clamp to arena
