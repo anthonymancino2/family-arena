@@ -1,3 +1,17 @@
+<!-- V22.14.61 Fox Mage Projectile Alignment
+Aligns Mage projectile origins to the Nine-Tailed Fox's actual compact body rather
+than the old human Mage hand/chest height. Fire & Ice, Arcane Lance and Giant
+Fireball now launch lower and farther in front of the fox, while normal Mage and
+other avatars retain their existing origins. Fox Arcane Echo bolts also originate
+from fox body/head height instead of the human-height +1.0 offset.
+-->
+<!-- V22.14.60 Invincible Arcane Echoes
+Arcane Echoes now use the Knight-clone survivability model: they cannot be killed
+by enemy melee/projectile contact and remain active until normal Echo cleanup.
+Normal enemies are still cleared on contact; Brutes/Bosses take the existing
+25%/10% Mage contact damage without consuming the Echo. Per-target contact cooldowns
+prevent overlap from applying that damage every frame.
+-->
 <!-- V22.14.59 Giant Fireball Performance Pass
 Removes the Mage Giant Fireball's expensive full Phoenix construction from the
 activation path. The Mage version now uses a lightweight cached Phoenix-style
@@ -302,7 +316,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.59</title>
+<title>Family Arena V22.14.61</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1515,7 +1529,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <script>
 (function(){
 
-const GAME_VERSION='22.14.59 - Giant Fireball Performance Pass';
+const GAME_VERSION='22.14.61 - Fox Mage Projectile Alignment';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2672,7 +2686,11 @@ function updateEnemyProjectiles(dt){
     for(const t of targets){let d=Math.hypot(t.position.x-p.mesh.position.x,(t.position.y+.55)-p.mesh.position.y,t.position.z-p.mesh.position.z);if(t===player)d-=knightGuardianGiantHitRadius();if(d<hitDist){hitDist=d;hitTarget=t;}}
     if(hitTarget&&hitDist<.55){
       spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,12,FX_MAT_ENEMY_SHOT,3.4);
-      if(hitTarget.userData&&hitTarget.userData.isArcaneEcho)destroyArcaneEcho(hitTarget);
+      if(hitTarget.userData&&hitTarget.userData.isArcaneEcho){
+        hitTarget.userData.hp=Infinity;
+        hitTarget.userData.dead=false;
+        spawnBurst(hitTarget.position.x,hitTarget.position.y+.65,hitTarget.position.z,4,FX_MAT_SPARK,1.8);
+      }
       else if(hitTarget.userData&&hitTarget.userData.isArcherMirror)damageArcherMirrorClone(hitTarget);
       else if(hitTarget.userData&&hitTarget.userData.isKnightRoyalClone){
         spawnKnightGuardBurst(hitTarget.position,1.05,KNIGHT_STEEL);
@@ -12445,7 +12463,13 @@ function triggerArcaneEchoes(){
 
         const a=(i/ARCANE_ECHO_COUNT)*Math.PI*2;
         wrap.position.set(player.position.x+Math.cos(a)*1.8,player.position.y,player.position.z+Math.sin(a)*1.8);
-        wrap.userData.isArcaneEcho=true;wrap.userData.hp=1;wrap.userData.dead=false;wrap.userData.echoIndex=i;wrap.userData.attackCooldown=.15+i*.08;
+        wrap.userData.isArcaneEcho=true;
+        wrap.userData.invincible=true;
+        wrap.userData.hp=Infinity;
+        wrap.userData.dead=false;
+        wrap.userData.echoIndex=i;
+        wrap.userData.attackCooldown=.15+i*.08;
+        wrap.userData.contactCooldowns=new Map();
         wrap.userData.kayMixer=new THREEAsset.AnimationMixer(root);wrap.userData.kayClips={};gltf.animations.forEach(c=>wrap.userData.kayClips[c.name]=c);
 
         // Native fox echoes idle in Guard rather than relying on Mage clip names.
@@ -12454,13 +12478,16 @@ function triggerArcaneEchoes(){
           if(guard)wrap.userData.kayMixer.clipAction(guard).play();
         }
 
-        scene.add(wrap);arcaneEchoes.push(wrap);spawnBurst(wrap.position.x,wrap.position.y+.7,wrap.position.z,14,FX_MAT_SPARK,3.0);updateHoodedHud();
+        scene.add(wrap);arcaneEchoes.push(wrap);spawnBurst(wrap.position.x,wrap.position.y+(foxEchoMode?.58:.7),wrap.position.z,14,FX_MAT_SPARK,3.0);updateHoodedHud();
       },i*120);
     }
   });
 }
 function spawnArcaneEchoBolt(from,to){
-  const points=[new THREE.Vector3(from.x,from.y+1.0,from.z),new THREE.Vector3(to.x,to.y+.75,to.z)];
+  // Fox echoes use the native fox body height instead of the legacy human
+  // Mage +1.0 origin. The normal Mage keeps its original bolt height.
+  const sourceY=from.y+(state.avatarType==='ninefox'?.70:1.0);
+  const points=[new THREE.Vector3(from.x,sourceY,from.z),new THREE.Vector3(to.x,to.y+.75,to.z)];
   const geometry=new THREE.BufferGeometry().setFromPoints(points);
   const material=new THREE.LineBasicMaterial({color:0xb86cff,transparent:true,opacity:.95,depthWrite:false,blending:THREE.AdditiveBlending});
   const line=new THREE.Line(geometry,material);line.renderOrder=8;scene.add(line);
@@ -12475,8 +12502,20 @@ function updateArcaneEchoes(dt){
   if(!player)return;
   const now=performance.now()*.001;
   for(const e of [...arcaneEchoes]){
-    if(!e||e.userData.dead||e.userData.hp<=0){destroyArcaneEcho(e);continue;}
+    if(!e||e.userData.dead||!e.parent)continue;
+    // Echoes now share the Knight-clone survivability rule: enemy damage never
+    // removes them. Only explicit Arcane Echo cleanup ends their lifetime.
+    e.userData.invincible=true;
+    e.userData.hp=Infinity;
     if(e.userData.kayMixer)e.userData.kayMixer.update(dt);
+
+    if(e.userData.contactCooldowns){
+      for(const [id,time] of [...e.userData.contactCooldowns.entries()]){
+        const next=Math.max(0,time-dt);
+        if(next<=0)e.userData.contactCooldowns.delete(id);
+        else e.userData.contactCooldowns.set(id,next);
+      }
+    }
     const i=e.userData.echoIndex||0;
     const a=now*.35+(i/ARCANE_ECHO_COUNT)*Math.PI*2;
     const orbitDesired=new THREE.Vector3(player.position.x+Math.cos(a)*2.25,player.position.y,player.position.z+Math.sin(a)*2.25);
@@ -12504,11 +12543,12 @@ function updateArcaneEchoes(dt){
     const dist=e.position.distanceTo(desired);
     if(dist>9)e.position.copy(desired);else e.position.lerp(desired,Math.min(1,dt*(dist>4?9:5.5)));
 
-    // Contact behavior:
-    // - Normal enemies are instantly defeated and do not consume the Echo.
-    // - Brutes consume the Echo and take 25% of the Mage's total attack damage.
-    // - Bosses consume the Echo and take 10% of the Mage's total attack damage.
-    let echoConsumed=false;
+    // Knight-clone-style contact behavior:
+    // - Normal enemies are instantly defeated and never consume the Echo.
+    // - Brutes take 25% of Mage attack damage and bosses take 10%.
+    // - Heavy contact never destroys the Echo.
+    // - A per-target cooldown prevents standing inside a boss from applying
+    //   contact damage every rendered frame.
     for(const z of [...zombies]){
       if(!z||z.userData.dead||z.userData.spawnPending||!z.visible)continue;
       const type=z.userData.archetype||'walker';
@@ -12516,16 +12556,20 @@ function updateArcaneEchoes(dt){
       if(e.position.distanceToSquared(z.position)>contactRadius*contactRadius)continue;
 
       if(type==='brute'||type==='boss'){
+        const cooldowns=e.userData.contactCooldowns;
+        const key=z.uuid||z.id;
+        if(cooldowns && (cooldowns.get(key)||0)>0)continue;
+
         const totalAttackDamage=Math.max(.08,(weaponForAvatar().damage||1)*playerStats.power);
         const contactDamage=totalAttackDamage*(type==='brute'?.25:.10);
         applyBulletDamage(z,contactDamage);
-        spawnBurst(z.position.x,z.position.y+.7,z.position.z,type==='brute'?16:20,FX_MAT_SPARK,type==='brute'?3.6:4.2);
-        destroyArcaneEcho(e);echoConsumed=true;break;
+        if(cooldowns)cooldowns.set(key,.72);
+        spawnBurst(z.position.x,z.position.y+.7,z.position.z,type==='brute'?10:12,FX_MAT_SPARK,type==='brute'?3.2:3.6);
+        continue;
       }
 
       killZombie(z);
     }
-    if(echoConsumed)continue;
 
     e.userData.attackCooldown=Math.max(0,(e.userData.attackCooldown||0)-dt);
     if(target&&!target.userData.dead&&target.parent){
@@ -20553,7 +20597,32 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
   let yaw=player.rotation.y+angleOffset;
   let dx=Math.sin(yaw),dy=0,dz=Math.cos(yaw);
   const rightX=Math.cos(yaw), rightZ=-Math.sin(yaw);
-  const startX=pos.x+dx*0.72+rightX*lateralOffset, startY=pos.y+1.02, startZ=pos.z+dz*0.72+rightZ*lateralOffset;
+
+  // The old Mage launches from human hand/chest height. The fox is much
+  // shorter and visually reads best when magic forms just ahead of its
+  // head/chest rather than floating a full metre above it.
+  let forwardOffset=.72;
+  let verticalOffset=1.02;
+  let foxLateralScale=1;
+  if(state.avatarType==='ninefox' && mageGameplayActive()){
+    if(w.kind==='giant_fireball'){
+      // Extra forward clearance keeps the huge sphere from swallowing the fox.
+      forwardOffset=1.34;
+      verticalOffset=.72;
+    }else if(w.kind==='arcane_lance'){
+      forwardOffset=.98;
+      verticalOffset=.74;
+    }else{
+      // Fire & Ice / rapid elemental.
+      forwardOffset=.84;
+      verticalOffset=.76;
+    }
+    foxLateralScale=.68;
+  }
+
+  const startX=pos.x+dx*forwardOffset+rightX*lateralOffset*foxLateralScale;
+  const startY=pos.y+verticalOffset;
+  const startZ=pos.z+dz*forwardOffset+rightZ*lateralOffset*foxLateralScale;
   if(target && Math.abs(angleOffset)<0.001){
     const tx=target.position.x-startX, ty=(target.position.y+0.8)-startY, tz=target.position.z-startZ;
     const len=Math.hypot(tx,ty,tz)||1; dx=tx/len;dy=ty/len;dz=tz/len;
@@ -22620,7 +22689,13 @@ function update(dt){
         const attackClip=type==='brute'?'2H_Melee_Attack_Spin':'1H_Melee_Attack_Chop';
         if(z.userData.playKayClip) z.userData.playKayClip(attackClip,true,true,type==='brute'?.55:.36);
         if(type==='brute'){spawnBurst(z.position.x,z.position.y+.2,z.position.z,16,FX_MAT_SPARK,4.5);triggerCombatShake(10,150);}
-        if(target.userData&&target.userData.isArcaneEcho)destroyArcaneEcho(target);
+        if(target.userData&&target.userData.isArcaneEcho){
+          // Same survivability model as Knight clones: enemy attacks can connect
+          // visually, but the clone is never damaged or removed.
+          spawnBurst(target.position.x,target.position.y+.65,target.position.z,5,FX_MAT_SPARK,2.0);
+          target.userData.hp=Infinity;
+          target.userData.dead=false;
+        }
         else if(target.userData&&target.userData.isArcherMirror)damageArcherMirrorClone(target);
         else if(target.userData&&target.userData.isKnightRoyalClone){
           spawnKnightGuardBurst(target.position,1.15,KNIGHT_STEEL);
