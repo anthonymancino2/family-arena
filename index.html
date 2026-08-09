@@ -1,3 +1,10 @@
+<!-- V22.14.58 Fox-as-Mage Shadow Test
+The Nine-Tailed Fox remains a separate selectable avatar, but its gameplay identity
+is temporarily mapped to Mage for compatibility testing. It uses Mage combat,
+passives, abilities, Arcane Echoes, cooldowns, shop/loadout logic, auto-aim behavior,
+and stat progression while preserving the fox's native glTF model/skeleton/animations.
+The visible Mage slot and old Mage model remain untouched for rollback.
+-->
 <!-- V22.14.57 Nine-Tailed Fox Native Animation Validation
 Hardens the fox's native animation lifecycle before Mage compatibility testing.
 Uses guard for idle, guard_run for ground movement/dash and aerial locomotion,
@@ -288,7 +295,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.57</title>
+<title>Family Arena V22.14.58</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1501,7 +1508,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <script>
 (function(){
 
-const GAME_VERSION='22.14.57 - Nine Fox Native Animation Validation';
+const GAME_VERSION='22.14.58 - Fox As Mage Shadow Test';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -1855,7 +1862,7 @@ const HERO_ROSTER_INFO = {
   mage:{title:'Arcane Mage',role:'RANGED • MEDIUM',desc:'Alternating elemental attacks and powerful area magic.'},
   knight:{title:'Knight of Dawn',role:'MELEE • DEFENDER',desc:'An armored royal defender. Sword-and-shield combos, Magical Armor, guarding and counterattacks. Strongest class for surviving while surrounded.'},
   barbarian:{title:'Fury Barbarian',role:'MELEE • MEDIUM',desc:'A durable heavy hitter with extended axe reach. Every third defeat erupts into a Shockwave; every fifth grants 3 seconds of Invincibility.'},
-  ninefox:{title:'Nine-Tailed Fox',role:'RANGED • NATIVE RIG',desc:'A fully skinned fox avatar using the animation resources bundled with the uploaded model: Guard, Guard Run, Fallow, and Spawn. Model by Witsanu Superball, CC-BY-4.0.'}
+  ninefox:{title:'Nine-Tailed Fox',role:'MAGE SHADOW TEST • NATIVE RIG',desc:'Uses the complete Mage gameplay systems while remaining a separate test avatar. Native Guard, Guard Run, Fallow, and Spawn animations stay on the fox rig. The original Mage remains untouched as fallback. Model by Witsanu Superball, CC-BY-4.0.'}
 };
 
 // Data-driven hero passives. New heroes only need one entry here; the
@@ -1865,7 +1872,7 @@ const HERO_PASSIVES = {
   hooded:{name:'Shadowstep',icon:'💨',desc:'Defeating an enemy grants 20% movement speed for 2.5 seconds.',killMoveMult:1.20,killMoveDuration:2.5},
   knight:{name:'Royal Guardian',icon:'🛡️',desc:'Two regenerating Magical Armor charges, Royal Discipline stacks, Fortified Position, Last Stand, and a defensive Whirlwind every fifth defeat.',armorMax:2,armorRegenDelay:5,armorRegenInterval:3,whirlwindKills:5,whirlwindDuration:3,whirlwindRadius:3.25,whirlwindDamage:.72,whirlwindStun:.20,whirlwindPulse:.22,whirlwindKnockback:3.4,whirlwindSpinSpeed:22},
   barbarian:{name:'Relentless Fury',icon:'🔥',desc:'Every third defeat releases a ground Shockwave. Every fifth defeat grants 3 seconds of Invincibility.',shockwaveKills:3,shockwaveRadius:5.2,shockwaveDamage:1.25,shockwaveStun:.65,invincibleKills:5,invincibleDuration:3.0},
-  ninefox:{name:'Spirit Guard',icon:'🦊',desc:'Native fox skeleton and bundled animation set.'},
+  ninefox:{name:'Arcane Fox Test',icon:'🦊',desc:'Shadow-testing the full Mage gameplay system on the fox native rig.'},
   mage:{
     name:'Arcane Flow',icon:'✨',
     desc:'Every third normal cast releases a stunning shockwave. Every third defeat grants Arcane Haste for 3 seconds.',
@@ -1874,7 +1881,15 @@ const HERO_PASSIVES = {
     killTrigger:3,hasteDuration:3.0,hasteMoveMult:1.75
   }
 };
-function passiveForAvatar(type=state.avatarType){ return HERO_PASSIVES[type] || HERO_PASSIVES.rogue; }
+function mageGameplayActive(type=state.avatarType){
+  return type==='mage'||type==='ninefox';
+}
+function gameplayAvatarType(type=state.avatarType){
+  return type==='ninefox'?'mage':type;
+}
+function passiveForAvatar(type=state.avatarType){
+  return HERO_PASSIVES[gameplayAvatarType(type)] || HERO_PASSIVES.rogue;
+}
 
 // Uniform scale applied on top of each avatar's own build — every value
 // Approved avatar size hierarchy:
@@ -2747,7 +2762,7 @@ const DEFAULT_HERO_STAT_CONFIG = {
   upgradeAmount: {power:1, speed:1, hp:1}
 };
 function activeHeroStatConfig(){
-  return HERO_STAT_CONFIG[state.avatarType] || DEFAULT_HERO_STAT_CONFIG;
+  return HERO_STAT_CONFIG[gameplayAvatarType()] || DEFAULT_HERO_STAT_CONFIG;
 }
 function startingStatsForActiveHero(){
   const bonus=activeHeroStatConfig().startingBonus;
@@ -2916,10 +2931,10 @@ function arcaneEchoesCooldownForLevel(level=avatarLevel()){
 // restore coin purchases and level-gated abilities.
 const UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING = true;
 function arcaneEchoesUnlocked(){
-  return state.avatarType==='mage' && (UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING || avatarLevel()>=10);
+  return mageGameplayActive() && (UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING || avatarLevel()>=10);
 }
 let previewRenderer=null, previewScene=null, previewCamera=null, previewRoot=null, previewMixer=null, previewRAF=0;
-function combatForAvatar(){ return CHARACTER_COMBAT[state.avatarType] || CHARACTER_COMBAT.rogue; }
+function combatForAvatar(){ return CHARACTER_COMBAT[gameplayAvatarType()] || CHARACTER_COMBAT.rogue; }
 function weaponForAvatar(){
   const c=combatForAvatar();
   const selected=currentPrimaryWeaponId&&c.weapons[currentPrimaryWeaponId];
@@ -2955,7 +2970,7 @@ function resetAbilityLoadout(){
   equippedAbilityId = null;
   ownedAbilities = {};
   if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING){
-    for(const ability of (HERO_ABILITIES[state.avatarType]||[])) ownedAbilities[ability.id]=true;
+    for(const ability of (HERO_ABILITIES[gameplayAvatarType()]||[])) ownedAbilities[ability.id]=true;
   }
 }
 
@@ -10858,7 +10873,7 @@ const MAGE_SPEED_KILLS = HERO_PASSIVES.mage.killTrigger;
 const MAGE_SPEED_BOOST_DURATION = HERO_PASSIVES.mage.hasteDuration;
 const MAGE_SPEED_BOOST_MULT = HERO_PASSIVES.mage.hasteMoveMult;
 function triggerMageAttackShockwave(){
-  if(state.avatarType!=='mage' || !player) return;
+  if(!mageGameplayActive() || !player) return;
   spawnArcaneAura(player.position);
   spawnArcaneRuneBurst(player.position,MAGE_SHOCKWAVE_RADIUS*.58);
   spawnArcaneSigil(player.position.x,player.position.y,player.position.z,MAGE_SHOCKWAVE_RADIUS);
@@ -10878,7 +10893,7 @@ function triggerMageAttackShockwave(){
   // Repetitive center-screen/toast announcements are intentionally disabled.
 }
 function registerMageNormalAttack(){
-  if(state.avatarType!=='mage') return;
+  if(!mageGameplayActive()) return;
   passiveState.mageAttackCounter=(passiveState.mageAttackCounter||0)+1;
   if(passiveState.mageAttackCounter>=MAGE_SHOCKWAVE_ATTACKS){
     passiveState.mageAttackCounter=0;
@@ -10923,7 +10938,7 @@ function registerBarbarianKill(){
 }
 
 function registerMageKill(){
-  if(state.avatarType!=='mage') return;
+  if(!mageGameplayActive()) return;
   // The buff cannot stack, and kills earned while it is active do not count.
   if((passiveState.mageSpeedBoostTimer||0)>0) return;
   passiveState.mageKillCounter=(passiveState.mageKillCounter||0)+1;
@@ -11056,11 +11071,11 @@ function updatePassiveHud(){
   else if(state.avatarType==='barbarian') suffix=invincibleTimer>0
     ? ` · 🛡 INVINCIBLE ${invincibleTimer.toFixed(1)}s · WAVE ${passiveState.barbarianShockwaveCounter||0}/3 · FURY ${passiveState.barbarianInvincibleCounter||0}/5`
     : ` · WAVE ${passiveState.barbarianShockwaveCounter||0}/3 · FURY ${passiveState.barbarianInvincibleCounter||0}/5`;
-  else if(state.avatarType==='mage') suffix=(passiveState.mageSpeedBoostTimer||0)>0
+  else if(mageGameplayActive()) suffix=(passiveState.mageSpeedBoostTimer||0)>0
     ? ` · ⚡ HASTE ${passiveState.mageSpeedBoostTimer.toFixed(1)}s`
     : ` · CAST ${passiveState.mageAttackCounter||0}/3 · KILLS ${passiveState.mageKillCounter||0}/3`;
-  el.classList.toggle('mageHaste',state.avatarType==='mage' && (passiveState.mageSpeedBoostTimer||0)>0);
-  el.classList.toggle('mageReady',state.avatarType==='mage' && (passiveState.mageSpeedBoostTimer||0)<=0 && ((passiveState.mageAttackCounter||0)===2 || (passiveState.mageKillCounter||0)===2));
+  el.classList.toggle('mageHaste',mageGameplayActive() && (passiveState.mageSpeedBoostTimer||0)>0);
+  el.classList.toggle('mageReady',mageGameplayActive() && (passiveState.mageSpeedBoostTimer||0)<=0 && ((passiveState.mageAttackCounter||0)===2 || (passiveState.mageKillCounter||0)===2));
   el.classList.toggle('knightWhirlwindReady',state.avatarType==='knight' && (passiveState.knightWhirlwindCounter||0)===(p.whirlwindKills||5)-1 && (knightRuntime.whirlwindTimer||0)<=0);
   el.classList.toggle('knightWhirlwindProc',state.avatarType==='knight' && (passiveState.knightWhirlwindHudFlash||0)>0);
   el.textContent=`${p.icon} ${p.name}${suffix}`;
@@ -11266,6 +11281,11 @@ const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogu
   knight:[KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER, KNIGHT_JUDGMENT_ULTIMATE] };
 const REMOVED_WEAPON_IDS=['radiant_cleave','blade_cyclone','holy_wave','shield_bash','banner_spear','knight_banner_spear'];
 function sanitizeRemovedAbilitySelection(){
+  if(state.avatarType==='ninefox'){
+    const mageCombat=CHARACTER_COMBAT.mage;
+    if(currentPrimaryWeaponId && !mageCombat.weapons[currentPrimaryWeaponId]) currentPrimaryWeaponId=null;
+    if(currentWeaponId && !mageCombat.weapons[currentWeaponId]) currentWeaponId=null;
+  }
   if(equippedAbilityId==='tempest_domain'||equippedAbilityId==='arrow_storm'||
      equippedAbilityId==='knight_whirlwind'||equippedAbilityId==='knight_earth_shatter'||
      equippedAbilityId==='knight_guardian_charge'||equippedAbilityId==='banner_spear'||
@@ -11281,7 +11301,7 @@ function sanitizeRemovedAbilitySelection(){
 }
 sanitizeRemovedAbilitySelection();
 function renderAbilityShopList(list){
-  const abilities = HERO_ABILITIES[state.avatarType];
+  const abilities = HERO_ABILITIES[gameplayAvatarType()];
   if(!abilities || !abilities.length) return;
   const header = document.createElement('div');
   header.className = 'wName';
@@ -11646,7 +11666,7 @@ function setupControls(){
   const ultimateBtnEl=document.getElementById('ultimateBtn');
   const activateUltimate=e=>{
     if(e){ e.preventDefault(); e.stopPropagation(); }
-    if(state.avatarType==='mage') triggerArcaneEchoes();
+    if(mageGameplayActive()) triggerArcaneEchoes();
     else if(state.avatarType==='rogue') triggerArcherMirrorClones();
     else if(state.avatarType==='knight'){
       // Guardian Titan is the active special during its sequence and Titan state.
@@ -11902,7 +11922,7 @@ function spawnHeroIdentityAura(){
 function updateHeroIdentityAura(dt){
   if(!gameRunning || !player) return;
   heroIdentityAuraTimer-=dt;
-  if(heroIdentityAuraTimer<=0){heroIdentityAuraTimer=state.avatarType==='mage'?.42:.72;spawnHeroIdentityAura();}
+  if(heroIdentityAuraTimer<=0){heroIdentityAuraTimer=mageGameplayActive()?.42:.72;spawnHeroIdentityAura();}
 }
 
 // Simple shared-geometry particle burst — used for hit sparks, zombie
@@ -12102,7 +12122,7 @@ function faceEnemyTarget(target){
 function findAutoAimTarget(maxRange){
   maxRange = maxRange || 16;
   // Mage and Barbarian use true 360-degree nearest-enemy targeting.
-  if(state.avatarType==='mage' || state.avatarType==='barbarian') return findNearestEnemy(maxRange);
+  if(mageGameplayActive() || state.avatarType==='barbarian') return findNearestEnemy(maxRange);
   const fx = Math.sin(player.rotation.y), fz = Math.cos(player.rotation.y);
   const isArcher = state.avatarType==='rogue';
   let best = null, bestScore = -Infinity;
@@ -12239,7 +12259,7 @@ function spawnShadowSmoke(x,y,z,count=8){
 function updateHoodedHud(){
   const btn=document.getElementById('ultimateBtn'),meter=document.getElementById('soulMeter');
   if(!btn||!meter)return;
-  const isHooded=state.avatarType==='hooded', isArcher=state.avatarType==='rogue', isMage=state.avatarType==='mage', isKnight=state.avatarType==='knight', isBarbarian=state.avatarType==='barbarian';
+  const isHooded=state.avatarType==='hooded', isArcher=state.avatarType==='rogue', isMage=mageGameplayActive(), isKnight=state.avatarType==='knight', isBarbarian=state.avatarType==='barbarian';
   const mageEchoReady=isMage&&arcaneEchoesUnlocked();
   const knightCloneSpecialReady=isKnight&&Math.max(1,Number(round)||1)>=10;
   const hasSignature=isHooded||isArcher||knightCloneSpecialReady||isBarbarian||mageEchoReady;
@@ -12386,20 +12406,47 @@ function triggerArcaneEchoes(){
   updateHoodedHud();
   toast('ARCANE ECHOES!');
   navigator.vibrate&&navigator.vibrate([30,25,55]);
-  getKayKitAssetPromise('mage').then(({gltf,THREEAsset,cloneSkinned})=>{
+  const foxEchoMode=state.avatarType==='ninefox';
+  const echoAssetPromise=foxEchoMode?getNineTailedFoxAssetPromise():getKayKitAssetPromise('mage');
+  echoAssetPromise.then(({gltf,THREEAsset,cloneSkinned})=>{
     for(let i=0;i<ARCANE_ECHO_COUNT;i++){
       setTimeout(()=>{
-        if(!player||state.avatarType!=='mage')return;
+        if(!player||!mageGameplayActive())return;
         const wrap=new THREE.Group();
         const root=cloneSkinned(gltf.scene);root.rotation.y=0;
-        const box=new THREEAsset.Box3().setFromObject(root),size=box.getSize(new THREEAsset.Vector3());
-        root.scale.setScalar(1.48/Math.max(.001,size.y));
-        const box2=new THREEAsset.Box3().setFromObject(root);root.position.y-=box2.min.y;
-        tintArcaneEcho(root);wrap.add(root);
+
+        if(foxEchoMode){
+          // Keep the native fox rig untouched and scale it through a wrapper,
+          // exactly like the player integration.
+          const fit=new THREEAsset.Group();
+          fit.add(root);
+          root.updateMatrixWorld(true);
+          const box=new THREEAsset.Box3().setFromObject(root,true),size=box.getSize(new THREEAsset.Vector3());
+          fit.scale.setScalar(1.12/Math.max(.001,size.y));
+          fit.updateMatrixWorld(true);
+          const box2=new THREEAsset.Box3().setFromObject(fit,true);
+          const center=box2.getCenter(new THREEAsset.Vector3());
+          fit.position.set(-center.x,-box2.min.y,-center.z);
+          tintArcaneEcho(root);
+          wrap.add(fit);
+        }else{
+          const box=new THREEAsset.Box3().setFromObject(root),size=box.getSize(new THREEAsset.Vector3());
+          root.scale.setScalar(1.48/Math.max(.001,size.y));
+          const box2=new THREEAsset.Box3().setFromObject(root);root.position.y-=box2.min.y;
+          tintArcaneEcho(root);wrap.add(root);
+        }
+
         const a=(i/ARCANE_ECHO_COUNT)*Math.PI*2;
         wrap.position.set(player.position.x+Math.cos(a)*1.8,player.position.y,player.position.z+Math.sin(a)*1.8);
         wrap.userData.isArcaneEcho=true;wrap.userData.hp=1;wrap.userData.dead=false;wrap.userData.echoIndex=i;wrap.userData.attackCooldown=.15+i*.08;
         wrap.userData.kayMixer=new THREEAsset.AnimationMixer(root);wrap.userData.kayClips={};gltf.animations.forEach(c=>wrap.userData.kayClips[c.name]=c);
+
+        // Native fox echoes idle in Guard rather than relying on Mage clip names.
+        if(foxEchoMode){
+          const guard=gltf.animations.find(c=>c.name==='guard')||gltf.animations[0];
+          if(guard)wrap.userData.kayMixer.clipAction(guard).play();
+        }
+
         scene.add(wrap);arcaneEchoes.push(wrap);spawnBurst(wrap.position.x,wrap.position.y+.7,wrap.position.z,14,FX_MAT_SPARK,3.0);updateHoodedHud();
       },i*120);
     }
@@ -19173,7 +19220,7 @@ function impactIce(m){
   }
 }
 function triggerBlizzardStorm(){
-  if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='blizzard_storm'||!ownedAbilities.blizzard_storm||blizzardCooldownTimer>0)return;
+  if(!gameRunning||!mageGameplayActive()||equippedAbilityId!=='blizzard_storm'||!ownedAbilities.blizzard_storm||blizzardCooldownTimer>0)return;
   markUltimateUsed();
   blizzardCooldownTimer=BLIZZARD_COOLDOWN; abilityButtonCooldown(BLIZZARD_COOLDOWN);
   blizzardActiveTimer=BLIZZARD_DURATION; blizzardSpawnTimer=0; blizzardDamageTimer=0; blizzardCenter.copy(player.position);
@@ -19718,7 +19765,7 @@ function spawnSuperMeteorForQuadrant(quadrantIndex){
 }
 
 function triggerSuperMeteor(){
-  if(!gameRunning||state.avatarType!=='mage'||equippedAbilityId!=='super_meteor'||!ownedAbilities.super_meteor||superMeteorCooldownTimer>0||activeSuperMeteor||superMeteorSequenceActive)return;
+  if(!gameRunning||!mageGameplayActive()||equippedAbilityId!=='super_meteor'||!ownedAbilities.super_meteor||superMeteorCooldownTimer>0||activeSuperMeteor||superMeteorSequenceActive)return;
 
   markUltimateUsed();
   superMeteorSequenceActive=true;
@@ -20173,7 +20220,7 @@ const LASER_RANGE = 22, LASER_WIDTH = 1.15, LASER_DPS_PRIMARY = 15, LASER_DPS_PI
   LASER_MAX_CHARGE = 100, LASER_DRAIN_RATE = 26, LASER_REGEN_RATE = 13, LASER_REGEN_DELAY = 0.6;
 let laserActive = false, laserCharge = LASER_MAX_CHARGE, laserRegenDelayTimer = 0, laserBeamMesh = null, laserHum = 0;
 function laserAvailable(){
-  return state.avatarType==='mage' && equippedAbilityId==='arcane_laser' && !!ownedAbilities.arcane_laser;
+  return mageGameplayActive() && equippedAbilityId==='arcane_laser' && !!ownedAbilities.arcane_laser;
 }
 function startArcaneLaser(){
   if(!gameRunning || !laserAvailable() || laserActive || laserCharge<=1) return;
@@ -20418,7 +20465,7 @@ function doMeleeAttack(w, origin=player.position, isClone=false){
 function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
   const target=findAutoAimTarget(state.avatarType==='rogue'?22:18);
   // Mage and Archer visibly face the selected target for readable casting/shooting.
-  if(target && (state.avatarType==='mage' || state.avatarType==='rogue') && Math.abs(angleOffset)<0.001){
+  if(target && (mageGameplayActive() || state.avatarType==='rogue') && Math.abs(angleOffset)<0.001){
     player.rotation.y=Math.atan2(target.position.x-player.position.x,target.position.z-player.position.z);
   }
   let yaw=player.rotation.y+angleOffset;
@@ -20641,7 +20688,7 @@ function performWeaponAttack(w, countsAsPrimary=true){
     spawnArcherMuzzleFan();spawnHeroIdentityAura();
   } else {
     if(player.userData.playKayClip){
-      const words=state.avatarType==='mage'?['magic']:['ranged','shoot'];
+      const words=mageGameplayActive()?['magic']:['ranged','shoot'];
       const shotBlend=state.avatarType==='rogue'?0.16:0.25;
       player.userData.playKayClip(findClipByWords(words,'1H_Ranged_Shoot'),true,true,shotBlend);
     }
@@ -20656,7 +20703,7 @@ function performWeaponAttack(w, countsAsPrimary=true){
   }
   // Only the regular Fire-button attack advances the Mage cast passive.
   // Special abilities use separate functions and never reach here.
-  if(countsAsPrimary && state.avatarType==='mage') registerMageNormalAttack();
+  if(countsAsPrimary && mageGameplayActive()) registerMageNormalAttack();
   if(w.kind!=='melee' && w.kind!=='spin') navigator.vibrate && navigator.vibrate(10);
 }
 function doShoot(){
@@ -21907,7 +21954,7 @@ function killZombie(z){
     updateHoodedHud();
     updatePassiveHud();
   }
-  if(state.avatarType==='mage'){
+  if(mageGameplayActive()){
     registerMageKill();
     updateHoodedHud();
   }
@@ -22243,7 +22290,7 @@ function update(dt){
     const len = Math.hypot(mx,mz)||1;
     const speedStat = playerStats.speed;
     const characterMoveMult = combatForAvatar().baseMoveMult || 1;
-    const passiveMoveMult=(state.avatarType==='hooded' && passiveState.shadowstepTimer>0)?(passiveForAvatar().killMoveMult||1):((state.avatarType==='rogue' && (passiveState.archerTailwindTimer||0)>0)?(passiveForAvatar().tailwindMoveMult||1):((state.avatarType==='mage' && passiveState.mageSpeedBoostTimer>0)?MAGE_SPEED_BOOST_MULT:1));
+    const passiveMoveMult=(state.avatarType==='hooded' && passiveState.shadowstepTimer>0)?(passiveForAvatar().killMoveMult||1):((state.avatarType==='rogue' && (passiveState.archerTailwindTimer||0)>0)?(passiveForAvatar().tailwindMoveMult||1):((mageGameplayActive() && passiveState.mageSpeedBoostTimer>0)?MAGE_SPEED_BOOST_MULT:1));
     const speed=(player&&player.userData&&player.userData.supernovaRooted)
       ? 0
       : PLAYER_SPEED * characterMoveMult * passiveMoveMult * knightMoveMultiplier() * (1 + (speedStat-1)*0.15);
