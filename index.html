@@ -1,3 +1,10 @@
+<!-- V22.14.59 Giant Fireball Performance Pass
+Removes the Mage Giant Fireball's expensive full Phoenix construction from the
+activation path. The Mage version now uses a lightweight cached Phoenix-style
+molten sphere with dramatically fewer meshes/material allocations while keeping
+its approved world size, speed, hit radius, damage, execution, splash, persistence,
+and cooldown behavior. The Archer Triple Phoenix remains visually unchanged.
+-->
 <!-- V22.14.58 Fox-as-Mage Shadow Test
 The Nine-Tailed Fox remains a separate selectable avatar, but its gameplay identity
 is temporarily mapped to Mage for compatibility testing. It uses Mage combat,
@@ -295,7 +302,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.58</title>
+<title>Family Arena V22.14.59</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1508,7 +1515,7 @@ License: http://creativecommons.org/licenses/by/4.0/
 <script>
 (function(){
 
-const GAME_VERSION='22.14.58 - Fox As Mage Shadow Test';
+const GAME_VERSION='22.14.59 - Giant Fireball Performance Pass';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -18084,6 +18091,81 @@ const PHOENIX_EXPLOSION_RADIUS=8.0;
 let phoenixFireball=null;
 let phoenixAfterEffects=[];
 
+
+let mageGiantFireballVisualCache=null;
+function getMageGiantFireballVisualCache(){
+  if(mageGiantFireballVisualCache)return mageGiantFireballVisualCache;
+
+  // Shared immutable resources: created once for the whole run, not on every cast.
+  const coreGeo=new THREE.IcosahedronGeometry(2.48,2);
+  const shellGeo=new THREE.IcosahedronGeometry(2.70,1);
+  const ringGeo=new THREE.TorusGeometry(2.60,.065,6,24);
+  const glowGeo=new THREE.SphereGeometry(3.15,12,8);
+
+  const coreMat=new THREE.MeshStandardMaterial({
+    color:0xff741d,emissive:0xff3506,emissiveIntensity:1.9,
+    roughness:.28,metalness:.04
+  });
+  const shellMat=new THREE.MeshStandardMaterial({
+    color:0x35100a,emissive:0x731a08,emissiveIntensity:.62,
+    roughness:.86,metalness:.04,transparent:true,opacity:.78
+  });
+  const ringMat=new THREE.MeshBasicMaterial({
+    color:0xffc13b,transparent:true,opacity:.82,depthWrite:false,
+    blending:THREE.AdditiveBlending
+  });
+  const glowMat=new THREE.MeshBasicMaterial({
+    color:0xff6517,transparent:true,opacity:.17,depthWrite:false,
+    blending:THREE.AdditiveBlending
+  });
+
+  mageGiantFireballVisualCache={coreGeo,shellGeo,ringGeo,glowGeo,coreMat,shellMat,ringMat,glowMat};
+  return mageGiantFireballVisualCache;
+}
+
+function createMageGiantFireballMeshFast(){
+  const c=getMageGiantFireballVisualCache();
+  const g=new THREE.Group();
+  g.userData.lightweightMageGiantFireball=true;
+
+  const core=new THREE.Mesh(c.coreGeo,c.coreMat);
+  core.userData.role='core';
+  g.add(core);
+
+  // One irregular dark shell instead of seven independent plates.
+  const shell=new THREE.Mesh(c.shellGeo,c.shellMat);
+  shell.scale.set(1.03,.93,1.03);
+  shell.rotation.set(.35,.62,.18);
+  shell.userData.role='shellPlate';
+  shell.userData.spin=.16;
+  g.add(shell);
+
+  // Two crossed molten crack rings instead of eight.
+  const ringA=new THREE.Mesh(c.ringGeo,c.ringMat);
+  ringA.rotation.set(Math.PI*.5,0,.35);
+  ringA.userData.role='crack';ringA.userData.spin=.72;
+  g.add(ringA);
+
+  const ringB=new THREE.Mesh(c.ringGeo,c.ringMat);
+  ringB.rotation.set(.24,Math.PI*.5,-.48);
+  ringB.userData.role='crack';ringB.userData.spin=-.58;
+  g.add(ringB);
+
+  const glow=new THREE.Mesh(c.glowGeo,c.glowMat);
+  glow.userData.role='glow';
+  g.add(glow);
+
+  // One modest light preserves the "giant molten object" presence without
+  // the more expensive high-range Phoenix lighting.
+  const light=new THREE.PointLight(0xff5b18,1.55,11,2);
+  light.position.y=.15;
+  g.add(light);
+
+  // Same final world-scale family as the approved Phoenix projectile.
+  g.scale.setScalar(.78);
+  return g;
+}
+
 function createPhoenixFireballMesh(){
   const g=new THREE.Group();
   const coreMat=new THREE.MeshStandardMaterial({color:0xff741d,emissive:0xff3506,emissiveIntensity:2.05,roughness:.24,metalness:.06});
@@ -20497,11 +20579,12 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
     b.directInstakill=!!w.directInstakill;
     b.pierces=w.pierce||0;
     if(w.kind==='giant_fireball'){
-      // Reuse the full Phoenix molten-sphere construction so the Mage projectile
-      // has the same readable silhouette and world-space size, without inheriting
-      // Phoenix seeking, gravity, burn, or lifetime behavior.
+      // Mage-specific lightweight Phoenix silhouette. The prior version built
+      // ~20 detailed meshes/material instances on every cast, causing a large
+      // mobile activation hitch. This keeps the same gameplay footprint using
+      // only five shared-resource visual meshes plus one light.
       const oldMesh=b.mesh;
-      const moltenMesh=createPhoenixFireballMesh();
+      const moltenMesh=createMageGiantFireballMeshFast();
       moltenMesh.position.copy(oldMesh.position);
       moltenMesh.quaternion.copy(oldMesh.quaternion);
       scene.add(moltenMesh);
@@ -20512,8 +20595,10 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
       b.boundaryPersistent=true;
       b.hitRadius=2.35;
       b.life=Infinity;
-      spawnArcaneSigil(startX,0,startZ,2.65);
-      spawnBurst(startX,startY,startZ,18,FX_MAT_SPARK,4.6);
+
+      // Keep a quick launch flash, but avoid the large animated ground sigil
+      // and high particle burst that compounded the activation-frame spike.
+      spawnBurst(startX,startY,startZ,6,FX_MAT_SPARK,3.2);
     }
     if(w.kind==='arcane_lance'){
       b.mesh.scale.set(3.0,3.0,9.0);
