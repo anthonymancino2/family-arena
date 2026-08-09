@@ -1,3 +1,4 @@
+<!-- V22.14.44 Linear Walk/Run Cycle Polish: preserves the approved lighting, marker, safe knee deformation, and foot sync, while giving Linear more of the old-avatar movement feel. Run/walk now include a clearer forward lean, slightly more vertical bob, and subtle side sway/weight shift so movement reads less stiff and more alive. -->
 <!-- V22.14.43 Linear Knee + Foot Sync: keeps the safe non-destructive knee deformation from V22.14.42 but reduces the bend amplitude and synchronizes the separate exported shoe/ankle meshes with each virtual knee. This prevents the exaggerated split-foot stride while preserving visible knee flex. Lighting and Linear's smaller ground marker are unchanged. -->
 <!-- V22.14.42 Linear Safe Joint Rig: keeps Linear's connected OBJ hierarchy intact and adds non-destructive runtime knee deformation to the original long leg meshes. Vertices below the knee line are rotated around a virtual knee pivot instead of splitting/re-parenting body pieces, avoiding the detached-limb regression from earlier builds. Lighting and Linear-only ground marker are unchanged. -->
 <!-- V22.14.41 Linear Ground Marker Fix: preserves the approved V22.14.40 Linear lighting and changes only Linear's player locator ring. Her marker is smaller, thinner, softer, and uses normal depth testing so it sits naturally on the ground instead of reading like a large glowing hoop. Other avatars retain their existing locator marker. -->
@@ -232,7 +233,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.43</title>
+<title>Family Arena V22.14.44</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1445,7 +1446,7 @@
 <script>
 (function(){
 
-const GAME_VERSION='22.14.43 - Linear Knee Foot Sync';
+const GAME_VERSION='22.14.44 - Linear Walk Run Cycle Polish';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10178,18 +10179,26 @@ function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
         }
       }
       const t=this.time;
-      let la=0,ra=0,le=.15,re=.15,ll=0,rl=0,lk=0,rk=0,bob=0,lean=0,twist=0;
+      let la=0,ra=0,le=.15,re=.15,ll=0,rl=0,lk=0,rk=0,bob=0,lean=0,twist=0,sideLean=0;
       if(this.mode==='run'){
         const phase=t*9.0;
         const s=Math.sin(phase);
-        la=s*.62; ra=-s*.62;
-        le=.26+Math.max(0,-s)*.34;
-        re=.26+Math.max(0,s)*.34;
-        ll=-s*.50; rl=s*.50;
+        const step=Math.abs(Math.sin(phase));
+        const weightShift=Math.sin(phase*2.0);
+
+        // Arm and leg timing stay similar, but the whole body now carries the
+        // step more like the older avatars: clearer forward pitch + bounce +
+        // subtle side-to-side weight transfer.
+        la=s*.66; ra=-s*.66;
+        le=.24+Math.max(0,-s)*.30;
+        re=.24+Math.max(0,s)*.30;
+        ll=-s*.52; rl=s*.52;
         lk=Math.max(0,Math.sin(phase+.35))*.42;
         rk=Math.max(0,Math.sin(phase+Math.PI+.35))*.42;
-        bob=Math.abs(Math.sin(phase))*.032;
-        lean=.06;
+
+        bob=.012 + step*.038;
+        lean=.095;
+        sideLean=weightShift*.028;
       }else if(this.mode==='jump'){
         const p=Math.min(1,this.shotTime/Math.max(.001,this.shotDuration));
         la=-.42;ra=-.42;le=.42;re=.42;
@@ -10252,6 +10261,7 @@ function createLinearRigInstance(THREEAsset,template,targetHeight=1.48){
       }
       root.rotation.x=lean;
       root.rotation.y=twist;
+      root.rotation.z=sideLean;
       root.position.y=baseY+bob;
     },
     play(name,oneShot=false){
