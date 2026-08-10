@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.15.01 - Crossbreaker No Whirlwind + 0.5s Cooldown';
+const GAME_VERSION='22.15.03 - Titan No Whirlwind';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -11446,6 +11446,7 @@ function registerKnightKill(){
   if(!knightIsActive()) return;
   if(knightRuntime.aegisWindow>0) return; // Onslaught never chains into passive Whirlwind.
   if(typeof cloudCrossbreakerActive==='function' && cloudCrossbreakerActive()) return; // Crossbreaker kills do not charge Whirlwind.
+  if(typeof knightTitanMoveActive==='function' && knightTitanMoveActive()) return; // Titan kills do not charge Whirlwind.
   const p=HERO_PASSIVES.knight;
   passiveState.knightWhirlwindCounter=(passiveState.knightWhirlwindCounter||0)+1;
   if(passiveState.knightWhirlwindCounter>=(p.whirlwindKills||5)){
@@ -15234,6 +15235,7 @@ function startKnightWhirlwind(source){
 }
 function triggerKnightWhirlwind(){
   if(typeof cloudCrossbreakerActive==='function' && cloudCrossbreakerActive()) return;
+  if(typeof knightTitanMoveActive==='function' && knightTitanMoveActive()) return;
   startKnightWhirlwind('passive');
   if(state.avatarType==='cloud'&&player&&player.userData.playKayClip){
     player.userData.playKayClip('whirl spin',true,true,.22);
@@ -15254,6 +15256,7 @@ function knightDefensiveWhirlwindDurationForRound(){
 function triggerKnightDefensiveWhirlwind(){
   if(!gameRunning||!knightIsActive()) return false;
   if(typeof cloudCrossbreakerActive==='function' && cloudCrossbreakerActive()) return false;
+  if(typeof knightTitanMoveActive==='function' && knightTitanMoveActive()) return false;
   if(knightRuntime.whirlwindCooldown>0) return false;
   if(knightRuntime.whirlwindTimer>0) return false;
   knightRuntime.whirlwindCooldown=knightDefensiveWhirlwindCooldownForRound();
@@ -15845,6 +15848,20 @@ function knightGuardianGiantSizeMult(){
 function knightGuardianGiantActive(){
   return knightGuardianGiantSizeMult()>1;
 }
+
+function knightTitanMoveActive(){
+  return !!(
+    knightRuntime &&
+    (
+      knightRuntime.guardianQuakeSequence ||
+      knightRuntime.guardianQuakeCombo ||
+      knightRuntime.guardianGiantBuffTimer>0 ||
+      knightRuntime.chargeTimer>0 ||
+      knightRuntime.shatterPhase>0
+    )
+  );
+}
+
 function knightGuardianGiantHitRadius(){
   return knightGuardianGiantActive()?KNIGHT_CFG.guardianQuakeGiant.hitboxRadius:0;
 }
@@ -15922,6 +15939,14 @@ function knightResetGuardianTitanState(applyCooldown=false){
 function knightStartGuardianGiantBuff(){
   knightRuntime.guardianQuakeCombo=false;
   knightRuntime.guardianQuakeSequence=false;
+  if(player&&player.userData){
+    player.userData.spinVisualTimer=0;
+    player.userData.whirlwindTimer=0;
+    player.userData.whirlwindActive=false;
+  }
+  knightRuntime.whirlwindTimer=0;
+  knightRuntime.whirlwindSource='';
+  passiveState.knightWhirlwindCounter=0;
   knightRuntime.guardianGiantBuffTimer=KNIGHT_CFG.guardianQuakeGiant.buffDuration;
   knightRuntime.guardianGiantDamagePool=0;
   knightRuntime.chargeCooldown=0;
@@ -15963,6 +15988,17 @@ function triggerKnightGuardianQuake(){
      knightRuntime.chargeTimer>0||knightRuntime.shatterPhase>0||
      knightRuntime.guardianGiantBuffTimer>0||knightRuntime.guardianQuakeSequence) return false;
   if(knightMovementLocked()) return false;
+
+  // Titan follows the same isolation rule as Crossbreaker:
+  // no passive/defensive Whirlwind can start or remain active during the move.
+  if(player&&player.userData){
+    player.userData.spinVisualTimer=0;
+    player.userData.whirlwindTimer=0;
+    player.userData.whirlwindActive=false;
+  }
+  knightRuntime.whirlwindTimer=0;
+  knightRuntime.whirlwindSource='';
+  passiveState.knightWhirlwindCounter=0;
 
   const c=KNIGHT_CFG.guardianCharge;
   markUltimateUsed();
@@ -22267,6 +22303,9 @@ function triggerCloudSkybreakerSlash(w){
   if(state.avatarType!=='cloud'||!player||!gameRunning)return false;
   if(!cloudSkybreakerReady())return false;
 
+  // Crossbreaker always begins from a clean Cloud pose.
+  cloudResetCombatPoseState(false);
+
   // Crossbreaker is its own two-cut sword attack. Never inherit Whirlwind.
   player.userData.spinVisualTimer=0;
   player.userData.whirlwindTimer=0;
@@ -22409,10 +22448,9 @@ function updateCloudSkybreaker(dt){
         // Never allow a failed visual/wave spawn to leave Skybreaker armed forever.
         cloudSkybreakerCharge=null;
         if(player&&player.userData){
-          player.userData.kayActionLock=0;
           player.userData.secondaryAttackCooldown=0;
         }
-        cloudForceLocomotionPoseReset();
+        cloudResetCombatPoseState(true);
       }
     }
   }
@@ -24372,11 +24410,7 @@ function update(dt){
   } else {
     if(state.avatarType==='cloud' && player.userData.cloudFit &&
        player.userData.cloudSpinBaseY!==undefined){
-      player.userData.cloudFit.rotation.y=-Math.PI/2;
-      player.userData.cloudFit.rotation.z=0;
-      player.userData.cloudFit.rotation.x=player.userData.cloudBodyLean||0;
-      player.userData.cloudSpinBaseY=undefined;
-      player.userData.cloudSpinAngle=0;
+      cloudResetCombatPoseState(true);
     }else if(player.userData.kayRoot && player.userData.spinBaseY!==undefined){
       player.userData.kayRoot.rotation.y=player.userData.spinBaseY;
       player.userData.kayRoot.rotation.z=0;
@@ -24599,16 +24633,50 @@ function updateCloudNativeRigPre(dt){
 }
 
 
-function cloudForceLocomotionPoseReset(){
-  if(state.avatarType!=='cloud'||!player||!player.userData.cloudLoaded)return;
-  const u=player.userData;
 
-  cloudRestoreProceduralBones();
+function cloudResetCombatPoseState(forceWalk=false){
+  if(state.avatarType!=='cloud'||!player||!player.userData)return;
+  const u=player.userData;
 
   u.cloudAttackTimer=0;
   u.cloudAttackDuration=.28;
   u.cloudAttackStyle='slash';
   u.kayActionLock=0;
+
+  // Never carry Knight spin state into ordinary Cloud movement/attacks.
+  if(!(knightRuntime&&knightRuntime.whirlwindTimer>0)){
+    u.spinVisualTimer=0;
+    u.whirlwindTimer=0;
+    u.whirlwindActive=false;
+    u.cloudSpinBaseY=undefined;
+    u.cloudSpinAngle=0;
+  }
+
+  if(typeof cloudRestoreProceduralBones==='function')cloudRestoreProceduralBones();
+
+  if(u.cloudFit){
+    u.cloudFit.rotation.x=u.cloudBodyLean||0;
+    if(!(knightRuntime&&knightRuntime.whirlwindTimer>0)){
+      u.cloudFit.rotation.z=0;
+      u.cloudFit.rotation.y=-Math.PI/2;
+    }
+  }
+
+  const action=u.cloudWalkAction;
+  if(forceWalk&&action&&u.kayMixer){
+    action.enabled=true;
+    action.paused=false;
+    action.setEffectiveWeight(1);
+    if(!action.isRunning())action.play();
+    u.kayMixer.update(0.0001);
+  }
+}
+
+function cloudForceLocomotionPoseReset(){
+  if(state.avatarType!=='cloud'||!player||!player.userData.cloudLoaded)return;
+  const u=player.userData;
+
+  cloudResetCombatPoseState(false);
 
   const action=u.cloudWalkAction;
   const mixer=u.kayMixer;
@@ -24636,9 +24704,7 @@ function updateCloudNativeRigPost(dt){
   const dash=!!u.cloudDashWanted;
 
   if(moving&&!cloudSkybreakerCharge&&(u.cloudAttackTimer||0)>0){
-    u.cloudAttackTimer=0;
-    u.kayActionLock=0;
-    u.cloudAttackStyle='slash';
+    cloudResetCombatPoseState(false);
   }
 
   // The imported Walk is usable but visually mild in this game camera.
@@ -24712,7 +24778,13 @@ function updateCloudNativeRigPost(dt){
 
   const timer=u.cloudAttackTimer||0;
   if(timer<=0){
-    if(u.cloudFit&&!(u.spinVisualTimer>0))u.cloudFit.rotation.x=u.cloudBodyLean||0;
+    if(!cloudSkybreakerCharge &&
+       !(knightRuntime&&knightRuntime.aegisWindow>0) &&
+       !(knightRuntime&&knightRuntime.whirlwindTimer>0)){
+      cloudResetCombatPoseState(false);
+    }else if(u.cloudFit&&!(u.spinVisualTimer>0)){
+      u.cloudFit.rotation.x=u.cloudBodyLean||0;
+    }
     return;
   }
 
