@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.97 - Cloud Bone Reset + Skybreaker Fix';
+const GAME_VERSION='22.14.98 - Skybreaker Reliable Repeat';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -11582,6 +11582,11 @@ function updateSecondaryButton(){
   const btn=document.getElementById('secondaryBtn');
   if(!btn) return;
   const w=secondaryWeaponForAvatar();
+  if(w&&w.kind==='cloud_great_sword_slash'){
+    const ready=cloudSkybreakerReady();
+    const btn=document.getElementById('secondaryBtn');
+    if(btn)btn.style.opacity=ready?'1':'.72';
+  }
   let cooldown=Math.max(0,player&&player.userData?(player.userData.secondaryAttackCooldown||0):0);
   if(w&&w.kind==='knight_whirlwind_secondary'){
     cooldown=Math.max(0,knightRuntime.whirlwindCooldown||0);
@@ -22242,10 +22247,19 @@ function doShoot(){
 
 let cloudSkybreakerCharge=null;
 let cloudSkybreakerWaves=[];
+let cloudSkybreakerNextReadyAt=0;
+
+function cloudSkybreakerReady(){
+  return !cloudSkybreakerCharge && performance.now()>=cloudSkybreakerNextReadyAt;
+}
 
 function triggerCloudSkybreakerSlash(w){
   if(state.avatarType!=='cloud'||!player||!gameRunning)return false;
-  if(cloudSkybreakerCharge)return false;
+  if(!cloudSkybreakerReady())return false;
+
+  // Timestamp-based cooldown is independent of the generic Secondary timer.
+  // This cannot get permanently stuck if another combat update path misbehaves.
+  cloudSkybreakerNextReadyAt=performance.now()+Math.max(250,(w.cooldown||1.15)*1000);
 
   const target=findNearestEnemy(22);
   if(target){
@@ -22343,10 +22357,19 @@ function updateCloudSkybreaker(dt){
     c.timer-=dt;
     if(c.timer<=0&&!c.released){
       c.released=true;
-      spawnCloudSkybreakerWave(c.weapon,c.yaw);
-      cloudSkybreakerCharge=null;
-      if(player&&player.userData)player.userData.kayActionLock=0;
-      cloudForceLocomotionPoseReset();
+      try{
+        spawnCloudSkybreakerWave(c.weapon,c.yaw);
+      }catch(err){
+        console.error('Skybreaker release recovered:',err);
+      }finally{
+        // Never allow a failed visual/wave spawn to leave Skybreaker armed forever.
+        cloudSkybreakerCharge=null;
+        if(player&&player.userData){
+          player.userData.kayActionLock=0;
+          player.userData.secondaryAttackCooldown=0;
+        }
+        cloudForceLocomotionPoseReset();
+      }
     }
   }
 
@@ -22357,6 +22380,7 @@ function updateCloudSkybreaker(dt){
       continue;
     }
 
+    try{
     const step=wv.speed*dt;
     const prev={x:wv.group.position.x,z:wv.group.position.z};
     wv.group.position.x+=wv.dirX*step;
@@ -22395,11 +22419,19 @@ function updateCloudSkybreaker(dt){
       disposeGroup(wv.group);
       cloudSkybreakerWaves.splice(i,1);
     }
+    }catch(err){
+      console.error('Skybreaker wave recovered:',err);
+      if(wv.group&&wv.group.parent)scene.remove(wv.group);
+      try{disposeGroup(wv.group);}catch(_){}
+      cloudSkybreakerWaves.splice(i,1);
+    }
   }
 }
 
 function clearCloudSkybreaker(){
   cloudSkybreakerCharge=null;
+  cloudSkybreakerNextReadyAt=0;
+  if(player&&player.userData)player.userData.secondaryAttackCooldown=0;
   for(const wv of cloudSkybreakerWaves){
     if(wv&&wv.group&&wv.group.parent){
       scene.remove(wv.group);
@@ -22427,8 +22459,10 @@ function doSecondaryShoot(){
     return;
   }
   if(w.kind==='cloud_great_sword_slash'){
-    if((player.userData.secondaryAttackCooldown||0)>0||cloudSkybreakerCharge)return;
-    player.userData.secondaryAttackCooldown=attackCooldownFor(w);
+    if(!cloudSkybreakerReady())return;
+    // Do not use shared secondaryAttackCooldown for Skybreaker.
+    // Its own timestamp gate controls tap and hold repeats.
+    player.userData.secondaryAttackCooldown=0;
     markSecondaryUsed();
     triggerCloudSkybreakerSlash(w);
     return;
@@ -24249,7 +24283,7 @@ function update(dt){
   if(secondaryInputHeld && gameRunning){
     const heldSecondary=secondaryWeaponForAvatar();
     if(heldSecondary&&heldSecondary.kind==='cloud_great_sword_slash'){
-      if((player.userData.secondaryAttackCooldown||0)<=0&&!cloudSkybreakerCharge)doSecondaryShoot();
+      if(cloudSkybreakerReady())doSecondaryShoot();
     }else{
       doSecondaryShoot();
     }
