@@ -201,7 +201,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.93</title>
+<title>Family Arena V22.14.95</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.93 - Onslaught Frame Contact Kill';
+const GAME_VERSION='22.14.95 - Cloud Head Fix + Great Sword Slash';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2909,7 +2909,9 @@ const CHARACTER_COMBAT = {
       shield_toss:{name:'Shield Toss', price:380, slot:'secondary', kind:'knight_shield_toss', cooldown:0.18, damage:1.6, radius:1.15,
         desc:'Throws the shield on a controlled path with one slight ricochet. Every surviving enemy it touches—normal, Brute, or boss—is stunned for 3 seconds before the shield returns to your hand. You lose one Magical Armor charge while the shield is away.'},
       defensive_whirlwind:{name:'Defensive Whirlwind', price:420, slot:'secondary', kind:'knight_whirlwind_secondary', cooldown:0, damage:0, radius:3.25,
-        desc:'Activate a moving sword-and-shield whirlwind that repeatedly damages and pushes enemies away while deflecting weak projectiles. Duration starts at 3.8 seconds and increases by 0.5 seconds each round through Round 24; from Round 25 onward it remains active indefinitely. Cooldown is 8 seconds in Rounds 1–10, 3 seconds in Rounds 11–15, 1.5 seconds in Rounds 16–20, and zero from Round 21 onward.'}
+        desc:'Activate a moving sword-and-shield whirlwind that repeatedly damages and pushes enemies away while deflecting weak projectiles. Duration starts at 3.8 seconds and increases by 0.5 seconds each round through Round 24; from Round 25 onward it remains active indefinitely. Cooldown is 8 seconds in Rounds 1–10, 3 seconds in Rounds 11–15, 1.5 seconds in Rounds 16–20, and zero from Round 21 onward.'},
+      cloud_great_sword_slash:{name:'Skybreaker Slash', price:460, slot:'secondary', kind:'cloud_great_sword_slash', cooldown:2.0, damage:3.4, range:15, width:3.4, cloudOnly:true,
+        desc:'Cloud raises the Buster Sword overhead, slams it down, and releases a giant piercing sword-wave straight ahead. Every enemy crossed by the wave takes heavy damage.'}
     }
   },
   barbarian: {
@@ -2971,6 +2973,7 @@ function secondaryWeaponForAvatar(){
   const c=combatForAvatar();
   if(!currentWeaponId)return null;
   const selected=c.weapons[currentWeaponId];
+  if(selected&&selected.cloudOnly&&state.avatarType!=='cloud')return null;
   return selected&&selected.slot!=='primary'?selected:null;
 }
 function resetCharacterLoadout(){
@@ -10283,6 +10286,8 @@ function buildCloudWoffPlayer(options={}){
       rightArm:cloudBones['RightArm_610_010'],
       rightForeArm:cloudBones['RightForeArm_620_011'],
       rightHand:cloudBones['RightHand_630_012'],
+      head:cloudBones['Head_210_015'],
+      neck:cloudBones['Head_210_015']?cloudBones['Head_210_015'].parent:null,
       leftUpLeg:cloudBones['LeftUpLeg_300_022'],
       leftLeg:cloudBones['LeftLeg_310_023'],
       rightUpLeg:cloudBones['RightUpLeg_400_024'],
@@ -10310,13 +10315,16 @@ function buildCloudWoffPlayer(options={}){
 
       const req=String(requested||'').toLowerCase();
       const moving=/run|walk|dash|jump|land/.test(req);
-      const attacking=/attack|slash|slice|chop|melee|guard|shield|throw|whirl/.test(req);
+      const attacking=/attack|slash|slice|chop|overhead|skybreaker|stab|thrust|melee|guard|shield|throw|whirl|spin/.test(req);
       const action=this.cloudWalkAction;
 
       if(attacking){
-        this.cloudAttackStyle=req.includes('chop')?'chop':
+        this.cloudAttackStyle=(req.includes('overhead')||req.includes('skybreaker'))?'overhead':
+          ((req.includes('whirl')||req.includes('spin'))?'spin':
+          ((req.includes('stab')||req.includes('thrust'))?'thrust':
+          (req.includes('chop')?'chop':
           (req.includes('slice')?'slice':
-          (req.includes('guard')||req.includes('shield')?'guard':'slash'));
+          (req.includes('guard')||req.includes('shield')||req.includes('throw')?'guard':'slash')))));
         this.cloudAttackDuration=Math.max(.18,Number(lockSeconds)||.28);
         this.cloudAttackTimer=this.cloudAttackDuration;
         this.kayCurrentName='CloudAttack';
@@ -11574,7 +11582,7 @@ function updateSecondaryButton(){
     btn.innerHTML='<span class="secondaryIcon">🔒</span><span class="secondaryLabel">SECONDARY</span>';
     return;
   }
-  const icon=w.kind==='giant_fireball'?'☄️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'))));
+  const icon=w.kind==='giant_fireball'?'☄️':(w.kind==='cloud_great_sword_slash'?'⚔️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦')))));
   if(whirlwindActive){
     const remaining=Number.isFinite(knightRuntime.whirlwindTimer)
       ? `${knightRuntime.whirlwindTimer.toFixed(1)}s`
@@ -11686,6 +11694,7 @@ function renderShopList(){
   }
   if(shopMode==='weapons' || shopMode==='abilities') for(const id in weapons){
     const w = weapons[id];
+    if(w.cloudOnly && state.avatarType!=='cloud') continue;
     const owned = !!ownedWeapons[id];
     const isDefault=id===combatForAvatar().defaultId;
     const slot=w.slot||(isDefault?'primary':'secondary');
@@ -15198,7 +15207,12 @@ function startKnightWhirlwind(source){
   triggerCombatShake(source==='ability'?9:7,150);
   if(navigator.vibrate) navigator.vibrate([28,16,42]);
 }
-function triggerKnightWhirlwind(){ startKnightWhirlwind('passive'); }
+function triggerKnightWhirlwind(){
+  startKnightWhirlwind('passive');
+  if(state.avatarType==='cloud'&&player&&player.userData.playKayClip){
+    player.userData.playKayClip('whirl spin',true,true,.22);
+  }
+}
 function knightDefensiveWhirlwindCooldownForRound(){
   const r=Math.max(1,Number(round)||1);
   if(r<=10) return 8;
@@ -15217,6 +15231,9 @@ function triggerKnightDefensiveWhirlwind(){
   if(knightRuntime.whirlwindTimer>0) return false;
   knightRuntime.whirlwindCooldown=knightDefensiveWhirlwindCooldownForRound();
   startKnightWhirlwind('ability');
+  if(state.avatarType==='cloud'&&player&&player.userData.playKayClip){
+    player.userData.playKayClip('whirl spin',true,true,.24);
+  }
   return true;
 }
 function knightWhirlwindPulse(){
@@ -18637,6 +18654,7 @@ function updateKnightSystems(dt){
 }
 
 function clearKnightRoundSpecials(resetCooldowns=true){
+  clearCloudSkybreaker();
   knightRoyalOnslaughtRestoreBulletTime();
   knightClearJudgment();
   knightEndShieldToss(false);
@@ -22202,6 +22220,174 @@ function doShoot(){
   player.userData.attackCooldown=attackCooldownFor(w);
   performWeaponAttack(w,true);
 }
+
+let cloudSkybreakerCharge=null;
+let cloudSkybreakerWaves=[];
+
+function triggerCloudSkybreakerSlash(w){
+  if(state.avatarType!=='cloud'||!player||!gameRunning)return false;
+  if(cloudSkybreakerCharge)return false;
+
+  const target=findNearestEnemy(22);
+  if(target){
+    player.rotation.y=Math.atan2(
+      target.position.x-player.position.x,
+      target.position.z-player.position.z
+    );
+  }
+
+  const yaw=player.rotation.y;
+  cloudSkybreakerCharge={
+    weapon:w,
+    timer:.42,
+    total:.42,
+    yaw,
+    released:false
+  };
+
+  player.userData.kayActionLock=Math.max(player.userData.kayActionLock||0,.62);
+  if(player.userData.playKayClip)
+    player.userData.playKayClip('skybreaker overhead',true,true,.62);
+
+  // Charge cue stays tight around the sword/body and uses existing Knight FX.
+  spawnKnightGuardBurst(player.position,2.2,KNIGHT_GOLD);
+  knightShockRing(player.position,1.85,KNIGHT_IVORY,.24);
+  if(navigator.vibrate)navigator.vibrate([18,12,24]);
+  return true;
+}
+
+function spawnCloudSkybreakerWave(w,yaw){
+  if(!player||!scene)return;
+
+  const g=new THREE.Group();
+  const matOuter=knightMat(KNIGHT_GOLD,.72);
+  const matCore=knightMat(KNIGHT_IVORY,.88);
+
+  // Giant vertical crescent-like sword slash. Two narrow planes keep it cheap.
+  const outer=new THREE.Mesh(new THREE.PlaneGeometry(3.2,5.6),matOuter);
+  outer.rotation.y=yaw;
+  outer.rotation.z=-.12;
+  outer.position.y=2.35;
+  g.add(outer);
+
+  const core=new THREE.Mesh(new THREE.PlaneGeometry(1.15,5.0),matCore);
+  core.rotation.y=yaw;
+  core.position.y=2.25;
+  g.add(core);
+
+  // Ground-facing pressure edge makes the lane readable without a full floor wash.
+  const edge=new THREE.Mesh(
+    new THREE.PlaneGeometry((w.width||3.4)*1.15,2.2),
+    knightMat(KNIGHT_STEEL,.32)
+  );
+  edge.rotation.x=-Math.PI/2;
+  edge.rotation.z=-yaw;
+  edge.position.y=.06;
+  g.add(edge);
+
+  const fx=Math.sin(yaw),fz=Math.cos(yaw);
+  g.position.set(
+    player.position.x+fx*1.15,
+    player.position.y,
+    player.position.z+fz*1.15
+  );
+  scene.add(g);
+
+  cloudSkybreakerWaves.push({
+    group:g,
+    weapon:w,
+    yaw,
+    dirX:fx,
+    dirZ:fz,
+    travelled:0,
+    range:w.range||15,
+    speed:22,
+    width:w.width||3.4,
+    hitIds:new Set(),
+    lastX:g.position.x,
+    lastZ:g.position.z,
+    life:1.1
+  });
+
+  // Slam impact at Cloud's feet.
+  knightShockRing(player.position,3.2,KNIGHT_IVORY,.44);
+  knightShockRing(player.position,2.35,KNIGHT_GOLD,.54);
+  knightGroundCracks(player.position,3.5,8,KNIGHT_GOLD);
+  spawnBurst(player.position.x,player.position.y+.8,player.position.z,isMobile?12:20,FX_MAT_SPARK,4.8);
+  triggerCombatShake(9,125);
+  if(navigator.vibrate)navigator.vibrate([32,12,48]);
+}
+
+function updateCloudSkybreaker(dt){
+  if(cloudSkybreakerCharge){
+    const c=cloudSkybreakerCharge;
+    c.timer-=dt;
+    if(c.timer<=0&&!c.released){
+      c.released=true;
+      spawnCloudSkybreakerWave(c.weapon,c.yaw);
+      cloudSkybreakerCharge=null;
+    }
+  }
+
+  for(let i=cloudSkybreakerWaves.length-1;i>=0;i--){
+    const wv=cloudSkybreakerWaves[i];
+    if(!wv||!wv.group){
+      cloudSkybreakerWaves.splice(i,1);
+      continue;
+    }
+
+    const step=wv.speed*dt;
+    const prev={x:wv.group.position.x,z:wv.group.position.z};
+    wv.group.position.x+=wv.dirX*step;
+    wv.group.position.z+=wv.dirZ*step;
+    wv.travelled+=step;
+    wv.life-=dt;
+
+    // Slight pulse/roll so the slash reads as moving energy rather than a flat card.
+    wv.group.rotation.z+=dt*1.8;
+    const pulse=1+Math.sin(performance.now()*.025)*.05;
+    wv.group.scale.setScalar(pulse);
+
+    // Wide swept lane. Each enemy can be hit once by this sword-wave.
+    const halfWidth=(wv.width||3.4)*.5;
+    const r2=halfWidth*halfWidth;
+    for(const z of Array.from(zombies)){
+      if(!z||!z.userData||z.userData.dead||z.userData.spawnPending||wv.hitIds.has(z.uuid))continue;
+      if(knightRoyalOnslaughtSegmentDistanceSq(z.position,prev,wv.group.position)>r2)continue;
+
+      wv.hitIds.add(z.uuid);
+      const cls=knightEnemyClass(z);
+      let damage=(wv.weapon.damage||3.4)*playerStats.power;
+      if(cls==='brute')damage*=.78;
+      if(cls==='boss'){
+        const maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
+        damage=Math.min(damage*.45,maxHp*.055);
+      }
+      applyBulletDamage(z,damage);
+
+      spawnKnightGuardBurst(z.position,1.55,KNIGHT_GOLD);
+      spawnBurst(z.position.x,z.position.y+.8,z.position.z,isMobile?6:10,FX_MAT_SPARK,3.2);
+    }
+
+    if(wv.travelled>=wv.range||wv.life<=0){
+      if(wv.group.parent)scene.remove(wv.group);
+      disposeGroup(wv.group);
+      cloudSkybreakerWaves.splice(i,1);
+    }
+  }
+}
+
+function clearCloudSkybreaker(){
+  cloudSkybreakerCharge=null;
+  for(const wv of cloudSkybreakerWaves){
+    if(wv&&wv.group&&wv.group.parent){
+      scene.remove(wv.group);
+      disposeGroup(wv.group);
+    }
+  }
+  cloudSkybreakerWaves.length=0;
+}
+
 function doSecondaryShoot(){
   const w=secondaryWeaponForAvatar();
   if(!gameRunning||!w)return;
@@ -22217,6 +22403,13 @@ function doSecondaryShoot(){
   if(w.kind==='mirror_volley'){
     markSecondaryUsed();
     triggerMirrorVolley(w);
+    return;
+  }
+  if(w.kind==='cloud_great_sword_slash'){
+    if((player.userData.secondaryAttackCooldown||0)>0||cloudSkybreakerCharge)return;
+    player.userData.secondaryAttackCooldown=attackCooldownFor(w);
+    markSecondaryUsed();
+    triggerCloudSkybreakerSlash(w);
     return;
   }
   if((player.userData.secondaryAttackCooldown||0)>0)return;
@@ -23749,6 +23942,7 @@ function update(dt){
     dt*=0.30;
   }
   updateKnightSystems(dt);
+  updateCloudSkybreaker(dt);
   updateHeroIdentityAura(dt);
   updateShadowClones(dt);
   updateArcaneEchoes(dt);
@@ -24310,6 +24504,37 @@ function updateCloudNativeRigPost(dt){
   u.cloudBodyLean=currentLean+(locomotionLean-currentLean)*leanBlend;
   if(u.cloudFit && !(u.spinVisualTimer>0))u.cloudFit.rotation.x=u.cloudBodyLean;
 
+  // Knight-system body overrides for Cloud. These do not change gameplay;
+  // they only make the imported rig visibly participate in the move.
+  const onslaughtActive=!!(knightRuntime&&knightRuntime.aegisWindow>0);
+  const whirlwindActive=!!(knightRuntime&&knightRuntime.whirlwindTimer>0);
+
+  if(onslaughtActive){
+    // Dash/assault posture: low torso, sword arm swept back, knees flexed.
+    if(bones.spine)bones.spine.rotateX(-.20);
+    if(bones.rightShoulder){bones.rightShoulder.rotateX(.38);bones.rightShoulder.rotateZ(-.18);}
+    if(bones.rightArm){bones.rightArm.rotateX(.55);bones.rightArm.rotateZ(-.28);}
+    if(bones.rightForeArm)bones.rightForeArm.rotateX(.34);
+    if(bones.leftArm)bones.leftArm.rotateX(-.28);
+    if(bones.leftUpLeg)bones.leftUpLeg.rotateX(-.10);
+    if(bones.rightUpLeg)bones.rightUpLeg.rotateX(-.10);
+    if(bones.leftLeg)bones.leftLeg.rotateX(.18);
+    if(bones.rightLeg)bones.rightLeg.rotateX(.18);
+    if(u.cloudFit && !(u.spinVisualTimer>0))u.cloudFit.rotation.x=(u.cloudBodyLean||0)+.15;
+  }
+
+  if(whirlwindActive){
+    // Keep Cloud's head level while the clean wrapper performs the Y-axis spin.
+    if(bones.neck)bones.neck.rotateX(.10);
+    if(bones.head)bones.head.rotateX(.08);
+    if(bones.spine)bones.spine.rotateX(-.08);
+    // Sword arm extends outward so the spin reads as an attack, not a mannequin turn.
+    if(bones.rightShoulder)bones.rightShoulder.rotateZ(-.42);
+    if(bones.rightArm){bones.rightArm.rotateX(-.28);bones.rightArm.rotateZ(-.78);}
+    if(bones.rightForeArm)bones.rightForeArm.rotateX(-.24);
+    if(bones.leftArm)bones.leftArm.rotateZ(.32);
+  }
+
   const timer=u.cloudAttackTimer||0;
   if(timer<=0)return;
 
@@ -24319,10 +24544,51 @@ function updateCloudNativeRigPost(dt){
   const snap=Math.sin(Math.PI*Math.min(1,p*1.35));
   const style=u.cloudAttackStyle||'slash';
 
+  // Keep Cloud's face level during ordinary sword attacks. The imported rig's
+  // parent-axis orientation makes positive whole-body pitch read as looking up.
+  // Counter the neck/head locally while the shoulders and torso still swing.
+  if(style!=='spin'&&style!=='overhead'){
+    if(bones.neck)bones.neck.rotateX(-.16*swing);
+    if(bones.head)bones.head.rotateX(-.12*swing);
+  }
+
   // Stronger whole-body Knight-compatible strikes. These are applied to
   // Cloud's imported bones after AnimationMixer.update(), so the visible model
   // participates in the move instead of merely standing inside the effects.
-  if(style==='chop'){
+  if(style==='overhead'){
+    // Two-beat Buster Sword motion: lift high first, then commit forward/down.
+    const lift=Math.sin(Math.PI*Math.min(1,p*1.55));
+    const slam=Math.sin(Math.PI*Math.max(0,Math.min(1,(p-.32)/.68)));
+    if(bones.rightShoulder){bones.rightShoulder.rotateX(-1.42*lift+.88*slam);bones.rightShoulder.rotateZ(-.22*lift);}
+    if(bones.rightArm){bones.rightArm.rotateX(-1.22*lift+1.05*slam);bones.rightArm.rotateZ(-.28*lift);}
+    if(bones.rightForeArm)bones.rightForeArm.rotateX(-.52*lift+.38*slam);
+    if(bones.leftShoulder)bones.leftShoulder.rotateX(-.72*lift+.38*slam);
+    if(bones.leftArm){bones.leftArm.rotateX(-.82*lift+.52*slam);bones.leftArm.rotateZ(.20*lift);}
+    if(bones.spine)bones.spine.rotateX(-.12*lift-.30*slam);
+    if(bones.hips)bones.hips.rotateX(-.10*slam);
+    if(bones.leftUpLeg)bones.leftUpLeg.rotateX(-.12*slam);
+    if(bones.rightUpLeg)bones.rightUpLeg.rotateX(-.12*slam);
+    if(bones.leftLeg)bones.leftLeg.rotateX(.18*slam);
+    if(bones.rightLeg)bones.rightLeg.rotateX(.18*slam);
+    // Head follows the target/front, not the sword above him.
+    if(bones.neck)bones.neck.rotateX(.10*lift-.18*slam);
+    if(bones.head)bones.head.rotateX(.08*lift-.14*slam);
+  }else if(style==='thrust'){
+    if(bones.rightShoulder){bones.rightShoulder.rotateX(-.18*swing);bones.rightShoulder.rotateY(-.38*swing);}
+    if(bones.rightArm){bones.rightArm.rotateX(-.72*swing);bones.rightArm.rotateY(-.34*swing);}
+    if(bones.rightForeArm)bones.rightForeArm.rotateX(-.48*snap);
+    if(bones.leftArm){bones.leftArm.rotateX(-.24*swing);bones.leftArm.rotateZ(.24*swing);}
+    if(bones.spine)bones.spine.rotateX(-.24*swing);
+    if(bones.hips)bones.hips.rotateX(-.08*swing);
+  }else if(style==='spin'){
+    if(bones.rightShoulder)bones.rightShoulder.rotateZ(-.52*swing);
+    if(bones.rightArm){bones.rightArm.rotateX(-.32*swing);bones.rightArm.rotateZ(-.92*swing);}
+    if(bones.rightForeArm)bones.rightForeArm.rotateX(-.28*snap);
+    if(bones.leftArm)bones.leftArm.rotateZ(.40*swing);
+    if(bones.spine)bones.spine.rotateX(-.10*swing);
+    if(bones.neck)bones.neck.rotateX(.08*swing);
+    if(bones.head)bones.head.rotateX(.06*swing);
+  }else if(style==='chop'){
     if(bones.rightShoulder){bones.rightShoulder.rotateX(-1.28*swing);bones.rightShoulder.rotateZ(-.24*swing);}
     if(bones.rightArm){bones.rightArm.rotateX(-.92*swing);bones.rightArm.rotateZ(-.34*swing);}
     if(bones.rightForeArm)bones.rightForeArm.rotateX(-.66*snap);
@@ -24346,7 +24612,13 @@ function updateCloudNativeRigPost(dt){
   }
 
   if(u.cloudFit && !(u.spinVisualTimer>0)){
-    const attackLean=(style==='chop'?.23:(style==='guard'?.10:.16))*swing;
+    // Negative/near-zero pitch keeps Cloud from visually looking upward during
+    // regular attacks. Overhead gets a controlled forward commitment on the slam.
+    const attackLean=style==='overhead'?(-.16*Math.sin(Math.PI*Math.max(0,Math.min(1,(p-.30)/.70)))):
+      (style==='chop'?-.07:
+      (style==='thrust'?-.06:
+      (style==='guard'?-.03:
+      (style==='spin'?0:-.045))))*swing;
     u.cloudFit.rotation.x=(u.cloudBodyLean||0)+attackLean;
   }
 }
