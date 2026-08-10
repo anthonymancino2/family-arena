@@ -11,6 +11,7 @@ preview, gameplay, abilities, Arcane Echoes, lifecycle cleanup, and save migrati
 Legacy ninefox IDs remain migration-only. The original KayKit Mage remains available
 only as an emergency visual fallback if the native fox asset fails.
 -->
+<!-- V22.16.00 Crossbreaker X-Wave + Onslaught Launch: fixes the two crashes behind both broken moves. (1) isMobile was referenced by twelve effect functions but never declared anywhere in the file, so every one of those calls threw a ReferenceError - during Royal Onslaught the throw landed inside the per-frame perimeter update, which stopped renderer.render() and froze the screen permanently at the first point. isMobile is now defined and the frame loop survives any single update error. (2) cloudCrossbreakerCapVisuals() and cloudCrossbreakerDestroyWave() were called but never defined, so the Crossbreaker X wave threw on creation and was silently swallowed - the projectile literally never existed. Both are now implemented and the wave is a real growing X-shaped projectile that carries its own damage, expands and dims as it leaves the arena, and self-destructs through three independent paths. Royal Onslaught now launches the Knight across the map at roughly ten times walking speed to twenty designated perimeter endpoints, each at least 115 degrees around the perimeter from the previous endpoint and never near the point two back, executing everything crossed on the line. Only endpoints advance the sequence, transit kills never consume one of the twenty, bosses take repeated capped damage instead of dying to a touch, and a runaway timeout scaled to the endpoint count always releases invulnerability and bullet time. Enemies remain at 50% speed for the whole move, including any that spawn mid-move. -->
 <!-- V22.13.99 Royal Onslaught Shadow Trail: adds lightweight avatar afterimage clones during Royal Onslaught dashes. Each dash now leaves several short-lived Knight shadow images at roughly 15% opacity between the start and end of the dash, creating a super-speed silhouette without restoring the removed ground trail. Gameplay, damage, cooldowns, capture rules, and version-label synchronization are unchanged. -->
 <!-- V22.13.98 Version Label Synchronization: synchronizes the static browser title and all visible landing-page/build labels to V22.13.98 using the centralized GAME_VERSION value. Gameplay, Royal Onslaught behavior, visuals, cooldowns, and balance are unchanged. -->
 <!-- V22.13.97 Royal Onslaught Trail Removal + Freeze Guard: completely removes the Royal Onslaught ground dash-lane/trail geometry and its delayed cleanup path, then isolates each strike inside a runtime safety boundary so one visual or target-state failure cannot stop the entire gameplay update loop between strikes. Damage, capture window, bullet time, elimination behavior, cooldown scaling, and remaining impact visuals are unchanged. -->
@@ -1427,8 +1428,33 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.15.12 - Onslaught Performance + Crossbreaker Direct';
+const GAME_VERSION='22.16.00 - Crossbreaker X-Wave + Onslaught Launch';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
+
+// ---------------------------------------------------------------------
+// V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
+// (Royal Onslaught endpoint bursts, activation burst, map-wipe finisher,
+// every Onslaught impact effect, and the Crossbreaker wave core) but was
+// never declared. Each of those calls threw a ReferenceError. Inside the
+// per-frame Onslaught update that throw skipped renderer.render() forever,
+// which is exactly what "froze" the game at the first perimeter point.
+// ---------------------------------------------------------------------
+const isMobile = (function(){
+  try{
+    if(typeof navigator==='undefined') return false;
+    const ua=String(navigator.userAgent||'');
+    if(/Android|iPhone|iPad|iPod|IEMobile|Opera Mini|Mobile/i.test(ua)) return true;
+    // iPadOS reports a desktop Macintosh UA but exposes multi-touch.
+    if(/Macintosh/.test(ua) && Number(navigator.maxTouchPoints||0)>1) return true;
+    if(typeof window!=='undefined' && window.matchMedia){
+      return !!window.matchMedia('(pointer:coarse)').matches;
+    }
+    return false;
+  }catch(_err){
+    // Unknown environment: assume the conservative mobile effect budgets.
+    return true;
+  }
+})();
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
 // ---------------------------------------------------------------------
@@ -2730,7 +2756,7 @@ const LEVEL_UNLOCKS = [
   {level:8,  id:'knight_shield_toss', name:'Shield Toss', desc:'Throw and recall the royal shield from the Secondary slot, stunning every surviving enemy class for 3 seconds on contact.', avatar:'knight'},
   {level:10, id:'knight_royal_guard_clones', name:'Knights of the Round', desc:'Summon invincible Knight copies that inherit the moves unlocked so far and draw enemy attention.', avatar:'knight'},
   {level:12, id:'knight_guardian_quake', name:'Guardian Titan', desc:'Guardian Charge and Earth Shatter combine into one hold-controlled Titan Ability with movement steering, followed by a 15-second Titan form.', avatar:'knight'},
-  {level:14, id:'knight_aegis_counter', name:'Royal Onslaught', desc:'Enter royal bullet time with thirty Knights of the Round joining the attack. Non-boss enemies touched are instantly defeated and the captured group is pursued until eliminated.', avatar:'knight'},
+  {level:14, id:'knight_aegis_counter', name:'Royal Onslaught', desc:'Royal bullet time. Twenty designated perimeter endpoints, each one a full launch across the map to a point far from the last, executing every non-boss enemy on the line. The twentieth landing wipes the arena.', avatar:'knight'},
   {level:18, id:'knight_judgment', name:'Judgment of the King', desc:'Judgment becomes an equipable ultimate-tier move in the Ability slot.', avatar:'knight'}
 ];
 let reachedLevelUnlocks = new Set();
@@ -3034,7 +3060,7 @@ const KNIGHT_DEFENSIVE_WHIRLWIND = {id:'knight_whirlwind', name:'Defensive Whirl
 const KNIGHT_GUARDIAN_QUAKE = {id:'knight_guardian_quake', name:'Guardian Titan', price:760, avatar:'knight', unlockLevel:12,
   desc:'Hold the Ability button to begin Guardian Charge and automatically flow into Earth Shatter when the charge finishes. Releasing before the charge ends cancels the Earth Shatter follow-up. Steer the charge with the normal movement controls. After the sequence, the Knight remains in Titan form for 15 seconds. Cooldown begins after Titan mode ends and scales with the current round tier.'};
 const KNIGHT_AEGIS_COUNTER = {id:'knight_aegis_counter', name:'Royal Onslaught', price:880, avatar:'knight', unlockLevel:14,
-  desc:'Map-clearing active ultimate. Enter royal bullet time, reducing every enemy and enemy projectile to 20% speed while you chain at least 20 invulnerable sword-and-shield dashes, continuing until every captured enemy is eliminated. Enemies crossed along each route take full strike damage without consuming a sequence hit. Endpoint targeting skips progressively more enemies as rounds rise, reaching five skipped enemies between targets at Round 20. Finishes with a large crown shockwave. Cooldown scales down by round to 0 at Round 45; boss damage remains capped.'};
+  desc:'Map-clearing active ultimate. Royal bullet time drops every enemy and enemy projectile to 50% speed, including anything that spawns while it runs. You are then launched across the arena to twenty designated perimeter endpoints at roughly ten times running speed, each destination at least 115 degrees around the perimeter from the last and never near the point two back, executing every non-boss enemy on the line and hammering bosses on contact. Enemies killed in transit never consume one of the twenty endpoints. The twentieth landing wipes the arena. You are invulnerable for the whole sequence. Cooldown scales down by round to 0 at Round 45; boss damage remains capped.'};
 const KNIGHT_ROYAL_GUARD_CLONES = {id:'knight_royal_guard_clones', name:'Knights of the Round', price:0, avatar:'knight', unlockLevel:10,
   desc:'Knight signature move. Summon invincible Knight clones that draw enemy attention and use only the Knight moves currently unlocked. Each clone deals 10% of the player\'s damage. Rounds 10–15 summon 2 clones for 8 seconds with a 10-second cooldown; Rounds 16–20 summon 5 for 15 seconds with a 5-second cooldown; Round 21 onward summons 10 for 30 seconds with a 1.5-second cooldown.'};
 const KNIGHT_JUDGMENT_ULTIMATE = {id:'knight_judgment', name:'Judgment of the King', price:920, avatar:'knight', unlockLevel:18,
@@ -13578,6 +13604,8 @@ function createFreshKnightRuntime(){
     aegisCooldown:0, aegisWindow:0, aegisRecovery:0, aegisRing:null,
     royalOnslaughtStartedAt:0, royalOnslaughtCaptureUntil:0, royalOnslaughtElapsed:0, royalOnslaughtCaptureRemainingTime:0,
     royalOnslaughtStrikeIndex:0, royalOnslaughtStrikeTimer:0,
+    onslaughtPerimeterPoints:null, onslaughtPerimeterIndex:0, onslaughtPerimeterLeg:null,
+    onslaughtPerimeterFinished:false, onslaughtHoldTimer:0,
     royalOnslaughtDash:null,
     royalOnslaughtTargetCursor:0, royalOnslaughtEligibleIds:null,
     royalOnslaughtHitIds:null, royalOnslaughtDamagedIds:null, royalOnslaughtPauseContactIds:null,
@@ -16207,7 +16235,15 @@ function knightEndGuardianCharge(allowFollowup=true){
 /* ------------------------------------------------------------- ABILITY 4 */
 function knightRoyalOnslaughtAtmosphere(active){
   let veil=document.getElementById('royalOnslaughtVeil');
+  if(knightRoyalOnslaughtAtmosphere.failsafe){
+    clearTimeout(knightRoyalOnslaughtAtmosphere.failsafe);
+    knightRoyalOnslaughtAtmosphere.failsafe=null;
+  }
   if(active){
+    // Independent of every gameplay cleanup path: the tint removes itself.
+    knightRoyalOnslaughtAtmosphere.failsafe=setTimeout(()=>{
+      try{ knightRoyalOnslaughtAtmosphere(false); }catch(_err){}
+    },20000);
     if(!veil){
       veil=document.createElement('div');
       veil.id='royalOnslaughtVeil';
@@ -16322,54 +16358,203 @@ function knightRoyalOnslaughtClearAllMarkers(){
   for(const z of zombies) knightRoyalOnslaughtClearMarker(z);
 }
 
-function knightOnslaughtPerimeterMoveSpeed(){
-  const speedStat=(playerStats&&Number.isFinite(playerStats.speed))?playerStats.speed:1;
-  const characterMoveMult=(combatForAvatar().baseMoveMult||1);
-  const passiveMoveMult=(passiveForAvatar().moveMult||1);
+/* ------------------------------------------------ ROYAL ONSLAUGHT: LAUNCH
+   Ten perimeter executions. Each one fires the Knight clear across the arena
+   to a point that is always on the far side of the map from the last one, and
+   everything standing on that line is executed on the way through.
 
-  // Match ordinary player navigation speed, but deliberately DO NOT call
-  // knightMoveMultiplier(): aegisWindow itself applies a 50% Knight penalty.
-  const normal=PLAYER_SPEED*characterMoveMult*passiveMoveMult*(1+(speedStat-1)*0.15);
-  return Math.max(.1,normal);
+   Every effect used here goes through the shared fx list (auto-expiring,
+   globally capped, and scrubbed again by knightEndAegis) or a bounded
+   setTimeout, so nothing can outlive the move.                             */
+const ONSLAUGHT_POINTS=20;                       // twenty designated endpoints
+const ONSLAUGHT_MIN_TURN=115*Math.PI/180;        // never land near the last point
+const ONSLAUGHT_MIN_TURN_TWO_BACK=42*Math.PI/180;// and never ping-pong A-B-A
+const ONSLAUGHT_HOLD_TIME=.08;                   // readable beat at each point
+// Absolute runaway guard. Scales with the endpoint count so a legitimately
+// long 20-point route can never be cut short by the failsafe, while a stalled
+// route still always releases invulnerability and bullet time.
+const ONSLAUGHT_MAX_DURATION=ONSLAUGHT_POINTS*.95+5;
+const ONSLAUGHT_CONTACT_RADIUS=3.05;
+
+function knightOnslaughtAngleGap(a,b){
+  let d=Math.abs(a-b)%(Math.PI*2);
+  if(d>Math.PI)d=Math.PI*2-d;
+  return d;
 }
 
-function knightOnslaughtMakePerimeterPoints(count=10){
+function knightOnslaughtPickEndpointAngle(prev,twoBack){
+  if(prev===null||prev===undefined) return Math.random()*Math.PI*2;
+
+  // Legal window for the next endpoint: everything at least ONSLAUGHT_MIN_TURN
+  // around the perimeter from the previous endpoint, measured either way.
+  const lo=prev+ONSLAUGHT_MIN_TURN;
+  const span=Math.PI*2-ONSLAUGHT_MIN_TURN*2;
+  if(span<=0) return prev+Math.PI;
+
+  // Work in offsets 0..span from lo, then cut out the two-back exclusion.
+  let segments=[[0,span]];
+  if(twoBack!==null&&twoBack!==undefined){
+    let center=twoBack-lo;
+    center=((center%(Math.PI*2))+Math.PI*2)%(Math.PI*2);
+    for(const shift of [-Math.PI*2,0,Math.PI*2]){
+      const a=center+shift-ONSLAUGHT_MIN_TURN_TWO_BACK;
+      const b=center+shift+ONSLAUGHT_MIN_TURN_TWO_BACK;
+      const next=[];
+      for(const seg of segments){
+        const s0=seg[0],s1=seg[1];
+        if(b<=s0||a>=s1){ next.push([s0,s1]); continue; }
+        if(a>s0) next.push([s0,Math.min(a,s1)]);
+        if(b<s1) next.push([Math.max(b,s0),s1]);
+      }
+      segments=next.filter(seg=>seg[1]-seg[0]>1e-4);
+    }
+  }
+
+  // A 130-degree window minus an 84-degree exclusion always leaves room, but
+  // if anything ever changes those numbers the previous-endpoint rule wins.
+  if(!segments.length) return lo+Math.random()*span;
+
+  let total=0;
+  for(const seg of segments) total+=seg[1]-seg[0];
+  let pick=Math.random()*total;
+  for(const seg of segments){
+    const len=seg[1]-seg[0];
+    if(pick<=len) return lo+seg[0]+pick;
+    pick-=len;
+  }
+  return lo+segments[segments.length-1][1];
+}
+
+function knightOnslaughtPerimeterMoveSpeed(){
+  // Royal Onslaught is a launch, not a jog. The Knight crosses the entire
+  // arena in roughly a third of a second, independent of movement stats and
+  // independent of the 50% aegisWindow move penalty (this move is on rails).
+  return Math.max(70,arenaSize*5.6);
+}
+
+function knightOnslaughtMakePerimeterPoints(count=ONSLAUGHT_POINTS){
+  // Endpoint rules, applied to all twenty designated points:
+  //   * every endpoint sits on the arena perimeter
+  //   * every endpoint is at least ONSLAUGHT_MIN_TURN around the perimeter
+  //     from the one before it, measured either direction, so no destination
+  //     is ever close to the previous destination
+  //   * no endpoint may sit near the point two back, so the route cannot
+  //     bounce between the same two sides
+  //   * only endpoints advance the sequence; enemies executed in transit
+  //     never consume one of the twenty
   const pts=[];
   const radius=Math.max(4,arenaSize-2.0);
-  const minAngularSeparation=55*Math.PI/180;
-  let prevAngle=null;
+
+  // Seed from wherever the Knight is standing, so even the first launch is a
+  // genuine crossing instead of a hop along the nearest edge.
+  let prevAngle=player?Math.atan2(player.position.x,player.position.z):null;
+  let twoBack=null;
 
   for(let i=0;i<count;i++){
-    let angle=Math.random()*Math.PI*2;
-
-    // Each destination must be clearly separated from the prior perimeter point.
-    // Retry first, then force a large angular jump as a failsafe.
-    if(prevAngle!==null){
-      let tries=0;
-      const angularDiff=(a,b)=>{
-        let d=Math.abs(a-b)%(Math.PI*2);
-        if(d>Math.PI)d=Math.PI*2-d;
-        return d;
-      };
-      while(angularDiff(angle,prevAngle)<minAngularSeparation && tries<24){
-        angle=Math.random()*Math.PI*2;
-        tries++;
-      }
-      if(angularDiff(angle,prevAngle)<minAngularSeparation){
-        angle=prevAngle+(Math.PI*.65)+(Math.random()-.5)*.5;
-      }
-    }
-
+    // Sampled from the legal arc directly: both separation rules hold by
+    // construction on every endpoint, not just on most of them.
+    let angle=knightOnslaughtPickEndpointAngle(prevAngle,twoBack);
     angle=(angle%(Math.PI*2)+Math.PI*2)%(Math.PI*2);
-    pts.push({
-      x:Math.sin(angle)*radius,
-      z:Math.cos(angle)*radius,
-      angle
-    });
+    pts.push({x:Math.sin(angle)*radius,z:Math.cos(angle)*radius,angle});
+    twoBack=prevAngle;
     prevAngle=angle;
   }
 
   return pts;
+}
+
+function knightOnslaughtLaunchFlash(pos,yaw,scale=1,color=KNIGHT_GOLD){
+  if(!scene||!pos||!knightFxBudget(3))return;
+  const g=new THREE.Group();
+  // Vertical cannon-blast fan at the launch point. Deliberately upright so it
+  // can never turn into a white floor wash over the play area.
+  for(let i=0;i<3;i++){
+    const p=new THREE.Mesh(
+      new THREE.PlaneGeometry((.34+i*.18)*scale,(2.6-i*.38)*scale),
+      knightMat(i===1?KNIGHT_IVORY:color,.50-i*.12)
+    );
+    p.position.set(0,(1.30-i*.14)*scale,0);
+    p.rotation.y=yaw+(i-1)*.44;
+    g.add(p);
+  }
+  const ring=new THREE.Mesh(
+    new THREE.TorusGeometry(1.05*scale,.10*scale,6,24),
+    knightMat(KNIGHT_IVORY,.60)
+  );
+  ring.position.y=1.05*scale;
+  ring.rotation.y=yaw+Math.PI/2;
+  g.add(ring);
+  g.position.set(pos.x,pos.y||0,pos.z);
+  knightBaseOpacity(g);
+  pushKnightFx(g,{life:.26,grow:1.6,from:.7});
+}
+
+function knightOnslaughtSpeedTrail(pos,yaw,index=0){
+  if(!scene||!pos||!knightFxBudget(2))return;
+  const visual=Math.min(1.4,knightTitanVisualScale());
+  const tone=(index%3===0)?KNIGHT_GOLD:((index%3===1)?KNIGHT_IVORY:KNIGHT_STEEL);
+  const g=new THREE.Group();
+  for(let i=0;i<2;i++){
+    const p=new THREE.Mesh(
+      new THREE.PlaneGeometry((.17+i*.08)*visual,(1.9-i*.32)*visual),
+      knightMat(i?KNIGHT_IVORY:tone,.30-i*.10)
+    );
+    p.position.set((i?.22:-.22)*visual,1.0*visual,0);
+    p.rotation.y=yaw;
+    g.add(p);
+  }
+  g.position.set(pos.x,pos.y||0,pos.z);
+  knightBaseOpacity(g);
+  pushKnightFx(g,{life:.20,grow:.30,from:1});
+}
+
+function knightOnslaughtLaunchStrike(prev,curr,index=0){
+  // Executes everything the launch line passes through. Kills are capped per
+  // frame because killZombie() runs HUD, radar, drop and refill work, and an
+  // uncapped burst of those is what stalls Safari on late rounds.
+  if(!player||!zombies||!zombies.length)return 0;
+
+  const radius=ONSLAUGHT_CONTACT_RADIUS*Math.max(1,Math.min(1.8,knightTitanCombatScale()));
+  const r2=radius*radius;
+  const hitIds=knightRuntime.royalOnslaughtFrameHitIds||
+    (knightRuntime.royalOnslaughtFrameHitIds=new Set());
+  const killCap=isMobile?6:10;
+
+  let kills=0,fxUsed=0;
+  const fxCap=isMobile?2:3;
+  const snapshot=Array.from(zombies);
+
+  for(const z of snapshot){
+    if(kills>=killCap)break;
+    if(!(knightRuntime.aegisWindow>0))break; // a kill may have ended the round
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    if(knightRoyalOnslaughtSegmentDistanceSq(z.position,prev,curr)>r2)continue;
+
+    if(knightEnemyClass(z)==='boss'){
+      const now=performance.now();
+      if(!z.userData.lastOnslaughtBossTouchAt||now-z.userData.lastOnslaughtBossTouchAt>150){
+        z.userData.lastOnslaughtBossTouchAt=now;
+        knightRoyalOnslaughtBossHit(z,index);
+        if(fxUsed<fxCap){fxUsed++;knightShockRing(z.position,3.4,KNIGHT_STEEL,.30);}
+      }
+      continue;
+    }
+
+    if(hitIds.has(z.uuid))continue;
+    hitIds.add(z.uuid);
+
+    if(fxUsed<fxCap){
+      fxUsed++;
+      knightShockRing(z.position,2.9,KNIGHT_IVORY,.26);
+      spawnBurst(z.position.x,z.position.y+.8,z.position.z,isMobile?5:8,FX_MAT_SPARK,3.0);
+    }
+
+    z.userData.hp=0;
+    killZombie(z);
+    kills++;
+  }
+
+  return kills;
 }
 
 function knightOnslaughtBeginPerimeterLeg(index){
@@ -16377,22 +16562,29 @@ function knightOnslaughtBeginPerimeterLeg(index){
   if(!player||index<0||index>=pts.length)return false;
 
   const dest=pts[index];
+  const safe=knightRoyalOnslaughtSafePosition(dest.x,dest.z,player.position.y);
   const fromX=player.position.x,fromZ=player.position.z;
-  const dx=dest.x-fromX,dz=dest.z-fromZ;
+  const dx=safe.x-fromX,dz=safe.z-fromZ;
   const distance=Math.hypot(dx,dz);
   const speed=knightOnslaughtPerimeterMoveSpeed();
+  const yaw=Math.atan2(dx,dz);
 
   knightRuntime.onslaughtPerimeterLeg={
     index,
     fromX,fromZ,
-    toX:dest.x,toZ:dest.z,
+    toX:safe.x,toZ:safe.z,
     elapsed:0,
-    duration:Math.max(.18,distance/Math.max(.1,speed)),
-    yaw:Math.atan2(dx,dz)
+    trailTimer:0,
+    duration:Math.max(.16,Math.min(.62,distance/Math.max(.1,speed))),
+    yaw
   };
 
-  // Compact endpoint marker so the route is readable but not blinding.
-  knightShockRing({x:dest.x,y:0,z:dest.z},1.8,KNIGHT_GOLD,.34);
+  // Launch blast where he leaves from, plus a compact beacon on the point he
+  // is being fired at so the crossing reads before it happens.
+  knightOnslaughtLaunchFlash(player.position,yaw,1.15,KNIGHT_GOLD);
+  knightShockRing(player.position,2.6,KNIGHT_GOLD,.30);
+  knightShockRing({x:safe.x,y:0,z:safe.z},2.0,KNIGHT_STEEL,.34);
+  triggerCombatShake(4,60);
   return true;
 }
 
@@ -16445,55 +16637,105 @@ function knightUpdatePerimeterOnslaught(dt){
   if(!(knightRuntime.aegisWindow>0)||!player)return;
 
   const pts=knightRuntime.onslaughtPerimeterPoints;
-  if(!pts||pts.length!==10)return;
+  if(!pts||!pts.length){ knightEndAegis(false); return; }
+
+  const finishRun=()=>{
+    if(knightRuntime.onslaughtPerimeterFinished)return;
+    knightRuntime.onslaughtPerimeterFinished=true;
+    try{ knightOnslaughtKillEntireMap(); }
+    catch(err){ console.error('Onslaught finisher recovered:',err); }
+    knightEndAegis(false);
+    knightRuntime.aegisRecovery=.28;
+  };
+
+  // Absolute runaway guard. However the route stalls, the move releases the
+  // player, the bullet time, and the invulnerability on its own.
+  if((knightRuntime.royalOnslaughtElapsed||0)>ONSLAUGHT_MAX_DURATION){
+    finishRun();
+    return;
+  }
+
+  const safeDt=Math.max(0,Math.min(.12,Number.isFinite(dt)?dt:0));
+
+  // Short landing beat between launches so ten crossings stay readable.
+  if((knightRuntime.onslaughtHoldTimer||0)>0){
+    knightRuntime.onslaughtHoldTimer=Math.max(0,knightRuntime.onslaughtHoldTimer-safeDt);
+    try{
+      knightOnslaughtLaunchStrike(
+        {x:player.position.x,z:player.position.z},
+        {x:player.position.x,z:player.position.z},
+        knightRuntime.onslaughtPerimeterIndex||0
+      );
+    }catch(err){ console.error('Onslaught hold contact recovered:',err); }
+    return;
+  }
 
   let leg=knightRuntime.onslaughtPerimeterLeg;
   if(!leg){
     const nextIndex=knightRuntime.onslaughtPerimeterIndex||0;
-    if(nextIndex>=10){
-      if(!knightRuntime.onslaughtPerimeterFinished){
-        knightRuntime.onslaughtPerimeterFinished=true;
-        knightOnslaughtKillEntireMap();
-
-        // End without the old nearby-damage finisher; the map wipe already happened.
-        knightEndAegis(false);
-        knightRuntime.aegisRecovery=.28;
-      }
-      return;
-    }
-    knightOnslaughtBeginPerimeterLeg(nextIndex);
+    if(nextIndex>=pts.length){ finishRun(); return; }
+    if(!knightOnslaughtBeginPerimeterLeg(nextIndex))return;
     leg=knightRuntime.onslaughtPerimeterLeg;
     if(!leg)return;
   }
 
-  const safeDt=Math.max(0,Math.min(.20,Number.isFinite(dt)?dt:0));
-  leg.elapsed+=safeDt;
-  const p=Math.min(1,leg.elapsed/Math.max(.001,leg.duration));
+  const prev={x:player.position.x,z:player.position.z};
 
-  player.position.x=leg.fromX+(leg.toX-leg.fromX)*p;
-  player.position.z=leg.fromZ+(leg.toZ-leg.fromZ)*p;
+  leg.elapsed+=safeDt;
+  const t=Math.min(1,leg.elapsed/Math.max(.001,leg.duration));
+  // Hard out of the launch, settling into the landing.
+  const e=1-Math.pow(1-t,2.2);
+
+  player.position.x=leg.fromX+(leg.toX-leg.fromX)*e;
+  player.position.z=leg.fromZ+(leg.toZ-leg.fromZ)*e;
   player.rotation.y=leg.yaw;
 
-  // Lean into travel instead of spinning or using Whirlwind.
+  // Lean into travel instead of spinning or inheriting Whirlwind.
   if(state.avatarType==='cloud'&&player.userData){
     player.userData.spinVisualTimer=0;
     player.userData.whirlwindTimer=0;
     player.userData.whirlwindActive=false;
   }
 
-  if(p>=1){
+  // Everything crossed on the way over is executed.
+  try{
+    knightOnslaughtLaunchStrike(prev,{x:player.position.x,z:player.position.z},leg.index);
+  }catch(err){ console.error('Onslaught contact recovered:',err); }
+
+  // A kill can complete the round, which tears this move down underneath us.
+  if(!(knightRuntime.aegisWindow>0)||knightRuntime.onslaughtPerimeterLeg!==leg)return;
+
+  leg.trailTimer=(leg.trailTimer||0)-safeDt;
+  if(leg.trailTimer<=0){
+    leg.trailTimer=.045;
+    knightOnslaughtSpeedTrail(player.position,leg.yaw,leg.index);
+  }
+
+  if(t>=1){
     player.position.x=leg.toX;
     player.position.z=leg.toZ;
 
     const pointNumber=leg.index+1;
-    knightShockRing(player.position,2.5,KNIGHT_IVORY,.42);
-    spawnKnightGuardBurst(player.position,2.2,KNIGHT_GOLD);
-    spawnBurst(player.position.x,player.position.y+.75,player.position.z,isMobile?7:11,FX_MAT_SPARK,3.2);
-    triggerCombatShake(pointNumber===10?9:4.5,pointNumber===10?120:65);
+    // Endpoint 20 is the finale; 5 / 10 / 15 are the escalation beats.
+    const finale=pointNumber>=pts.length;
+    const milestone=finale||pointNumber%5===0;
+
+    knightShockRing(player.position,milestone?4.4:3.0,KNIGHT_IVORY,.40);
+    knightShockRing(player.position,milestone?3.1:2.2,KNIGHT_GOLD,.46);
+    spawnKnightGuardBurst(player.position,milestone?3.2:2.3,KNIGHT_GOLD);
+    knightRoyalOnslaughtImpactColumn(player.position,milestone?1.5:1.05,KNIGHT_IVORY,200);
+    spawnBurst(
+      player.position.x,player.position.y+.8,player.position.z,
+      isMobile?(milestone?12:7):(milestone?18:11),
+      FX_MAT_SPARK,milestone?4.4:3.2
+    );
+    triggerCombatShake(milestone?10:5,milestone?130:70);
+    if(navigator.vibrate)navigator.vibrate(milestone?[28,14,42]:18);
 
     knightRuntime.onslaughtPerimeterIndex=pointNumber;
     knightRuntime.royalOnslaughtStrikeIndex=pointNumber;
     knightRuntime.onslaughtPerimeterLeg=null;
+    knightRuntime.onslaughtHoldTimer=finale?0:ONSLAUGHT_HOLD_TIME;
   }
 }
 
@@ -16524,10 +16766,15 @@ function triggerKnightAegisCounter(){
   knightRuntime.royalOnslaughtStartedAt=performance.now();
   knightRuntime.royalOnslaughtElapsed=0;
 
-  knightRuntime.onslaughtPerimeterPoints=knightOnslaughtMakePerimeterPoints(10);
+  knightRuntime.onslaughtPerimeterPoints=knightOnslaughtMakePerimeterPoints(ONSLAUGHT_POINTS);
   knightRuntime.onslaughtPerimeterIndex=0;
   knightRuntime.onslaughtPerimeterLeg=null;
   knightRuntime.onslaughtPerimeterFinished=false;
+  knightRuntime.onslaughtHoldTimer=0;
+  knightRuntime.royalOnslaughtLastBodyX=null;
+  knightRuntime.royalOnslaughtLastBodyZ=null;
+  if(knightRuntime.royalOnslaughtFrameHitIds)knightRuntime.royalOnslaughtFrameHitIds.clear();
+  knightRuntime.royalOnslaughtFrameHitIds=new Set();
 
   // Old enemy-capture/target systems are deliberately disabled for this version.
   knightRuntime.royalOnslaughtEligibleIds=null;
@@ -16541,13 +16788,20 @@ function triggerKnightAegisCounter(){
   knightRoyalOnslaughtLeaderGlow(false);
   knightRuntime.aegisRing=null;
 
+  // Bullet-time veil. It carries its own 20s self-destruct on top of every
+  // gameplay cleanup path, so it can never be left on the screen.
+  knightRoyalOnslaughtAtmosphere(true);
+
   knightShockRing(player.position,4.2,KNIGHT_GOLD,.42);
   knightShockRing(player.position,3.0,KNIGHT_IVORY,.48);
   spawnKnightGuardBurst(player.position,3.4,KNIGHT_GOLD);
+  knightRoyalOnslaughtImpactColumn(player.position,1.7,KNIGHT_IVORY,320);
+  knightRoyalOnslaughtSigilFx(player.position,2.1,340);
   spawnBurst(player.position.x,player.position.y+.85,player.position.z,isMobile?12:18,FX_MAT_SPARK,4.2);
   triggerCombatShake(7,110);
+  if(navigator.vibrate)navigator.vibrate([30,14,48]);
 
-  toast('ROYAL ONSLAUGHT · 10 POINT EXECUTION');
+  toast('ROYAL ONSLAUGHT · '+ONSLAUGHT_POINTS+' CROSS-MAP EXECUTIONS');
   updateHoodedHud();
 }
 function knightRoyalOnslaughtCrownFinisherFx(center,visual,combat){
@@ -17340,6 +17594,7 @@ function knightEndAegis(success){
   knightRuntime.onslaughtPerimeterIndex=0;
   knightRuntime.onslaughtPerimeterLeg=null;
   knightRuntime.onslaughtPerimeterFinished=false;
+  knightRuntime.onslaughtHoldTimer=0;
 
   // Final orphan scrub: only Knight spectacle effects are touched. Enemy
   // projectiles and unrelated avatar/gameplay effects are intentionally left alone.
@@ -18929,8 +19184,13 @@ function knightAbilityCooldownInfo(){
       const active=knightRuntime.aegisWindow>0;
       const captureLeft=active?knightRoyalOnslaughtCaptureRemaining():0;
       const hits=knightRuntime.royalOnslaughtStrikeIndex||0;
+      const totalPoints=(knightRuntime.onslaughtPerimeterPoints&&knightRuntime.onslaughtPerimeterPoints.length)
+        ? knightRuntime.onslaughtPerimeterPoints.length
+        : ONSLAUGHT_POINTS;
       return {
-        label:active?(captureLeft>0?'CAPTURE '+captureLeft.toFixed(1)+'s':'HIT '+hits):'ONSLAUGHT',
+        label:active
+          ? (captureLeft>0?'CAPTURE '+captureLeft.toFixed(1)+'s':'POINT '+Math.min(hits+1,totalPoints)+'/'+totalPoints)
+          : 'ONSLAUGHT',
         cd:knightRuntime.aegisCooldown,
         active,
         activeTime:active?knightRoyalOnslaughtActiveElapsed():undefined
@@ -22427,10 +22687,10 @@ function cloudSkybreakerReady(){
 }
 
 
-function cloudCrossbreakerDirectDamage(w,yaw,fanIndex=0){
+function cloudCrossbreakerDirectDamage(w,yaw,fanIndex=0,rangeOverride=0){
   if(!player)return 0;
 
-  const range=Math.max(1,w.range||50);
+  const range=Math.max(1,rangeOverride>0?rangeOverride:(w.range||50));
   const halfAngle=((Math.abs(fanIndex)===1)?40:34)*Math.PI/180;
   const fx=Math.sin(yaw),fz=Math.cos(yaw);
   const ox=player.position.x,oz=player.position.z;
@@ -22528,9 +22788,12 @@ function triggerCloudSkybreakerSlash(w){
 
       // Damage and known-good FX are authoritative.
       for(const a of angles){
-        cloudCrossbreakerDirectDamage(w,a.yaw,a.index);
+        // The sword itself only reaches melee distance now. Everything past
+        // that is the job of the travelling X wave spawned below.
+        cloudCrossbreakerDirectDamage(w,a.yaw,a.index,CROSSBREAKER_MELEE_RANGE);
         cloudCrossbreakerKnownGoodFx(a.yaw,a.index);
-        try{spawnCloudSkybreakerWave(w,a.yaw,a.index);}catch(_){}
+        try{spawnCloudSkybreakerWave(w,a.yaw,a.index);}
+        catch(err){console.error('Crossbreaker wave recovered:',err);}
       }
       cloudCrossbreakerStreak=0;
 
@@ -22538,9 +22801,10 @@ function triggerCloudSkybreakerSlash(w){
       triggerCombatShake(12,160);
       if(navigator.vibrate)navigator.vibrate([35,12,35,12,60]);
     }else{
-      cloudCrossbreakerDirectDamage(w,yaw,0);
+      cloudCrossbreakerDirectDamage(w,yaw,0,CROSSBREAKER_MELEE_RANGE);
       cloudCrossbreakerKnownGoodFx(yaw,0);
-      try{spawnCloudSkybreakerWave(w,yaw,0);}catch(_){}
+      try{spawnCloudSkybreakerWave(w,yaw,0);}
+      catch(err){console.error('Crossbreaker wave recovered:',err);}
 
       cloudCrossbreakerStreak=Math.min(3,cloudCrossbreakerStreak+1);
       if(cloudCrossbreakerStreak===3)toast('TRIPLE CROSSBREAKER READY');
@@ -22554,151 +22818,310 @@ function triggerCloudSkybreakerSlash(w){
   cloudSkybreakerCharge=null;
   return true;
 }
+/* ------------------------------------------------- CROSSBREAKER X-WAVE
+   The X is a real projectile now, not decoration. It carries its own damage,
+   grows the further it gets from the caster, dims as it grows so a giant wave
+   can never white out the arena, and keeps expanding as it crosses the arena
+   boundary before fading out.
+
+   Three independent removal paths guarantee nothing is ever left behind:
+     1. travel limit / lifetime inside updateCloudSkybreaker()
+     2. a hard setTimeout that does not depend on the frame loop
+     3. clearCloudSkybreaker() on round end, reset, death, or avatar change   */
+const CROSSBREAKER_MELEE_RANGE=12;     // instant sword reach at the caster
+const CROSSBREAKER_WAVE_SPEED=46;      // units per second
+const CROSSBREAKER_WAVE_LIFE=2.4;      // absolute lifetime ceiling (seconds)
+const CROSSBREAKER_WAVE_GROW=3.0;      // extra scale gained by the arena edge
+const CROSSBREAKER_WAVE_HALF_WIDTH=3.0;// damage half-width at spawn scale
+const CROSSBREAKER_WAVE_DEPTH=2.1;     // damage thickness of the wave plane
+const CROSSBREAKER_WAVE_OVERSHOOT=24;  // how far past the map edge it flies
+
+function cloudCrossbreakerMaxWaves(){ return isMobile?5:8; }
+
+function cloudCrossbreakerCapVisuals(){
+  // Hard ceiling on simultaneous waves. Oldest goes first so a held attack
+  // button can never stack geometry on an iPhone.
+  let guard=0;
+  while(cloudSkybreakerWaves.length>=cloudCrossbreakerMaxWaves() && guard++<40){
+    cloudCrossbreakerDestroyWave(cloudSkybreakerWaves[0]);
+  }
+}
+
+function cloudCrossbreakerDestroyWave(wv){
+  if(!wv) return;
+  if(wv.cleanupTimer){ clearTimeout(wv.cleanupTimer); wv.cleanupTimer=null; }
+  if(!wv.destroyed){
+    wv.destroyed=true;
+    try{ if(wv.group && wv.group.parent) scene.remove(wv.group); }catch(_err){}
+    try{ if(wv.group) disposeGroup(wv.group); }catch(_err){}
+    wv.group=null;
+  }
+  if(wv.hitIds){ wv.hitIds.clear(); wv.hitIds=null; }
+  const i=cloudSkybreakerWaves.indexOf(wv);
+  if(i>=0) cloudSkybreakerWaves.splice(i,1);
+}
+
+function cloudCrossbreakerWaveMat(color,opacity){
+  return new THREE.MeshBasicMaterial({
+    color,
+    transparent:true,
+    opacity,
+    depthWrite:false,
+    depthTest:false,
+    side:THREE.DoubleSide,
+    blending:THREE.AdditiveBlending
+  });
+}
+
+function cloudCrossbreakerExitDistance(ox,oz,fx,fz){
+  // Distance from the spawn point to the arena boundary along the travel line.
+  // The wave reaches full size exactly as it leaves the map.
+  const R=Math.max(6,arenaSize);
+  const b=ox*fx+oz*fz;
+  const c=ox*ox+oz*oz-R*R;
+  const disc=b*b-c;
+  if(!(disc>0)) return R;
+  return Math.max(8,-b+Math.sqrt(disc));
+}
+
+function cloudCrossbreakerWaveDamage(wv,fromTravel,toTravel){
+  if(!wv||wv.destroyed||!zombies||!zombies.length) return 0;
+
+  const hitIds=wv.hitIds||(wv.hitIds=new Set());
+  const halfW=CROSSBREAKER_WAVE_HALF_WIDTH*(wv.scale||1);
+  const back=fromTravel-CROSSBREAKER_WAVE_DEPTH*(wv.scale||1);
+  const front=toTravel+CROSSBREAKER_WAVE_DEPTH*(wv.scale||1);
+
+  let hits=0,fxUsed=0;
+  const fxCap=isMobile?2:3;
+  const snapshot=Array.from(zombies);
+
+  for(const z of snapshot){
+    if(wv.destroyed) break;
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending) continue;
+    if(hitIds.has(z.uuid)) continue;
+
+    const dx=z.position.x-wv.originX, dz=z.position.z-wv.originZ;
+    const along=dx*wv.dirX+dz*wv.dirZ;
+    if(along<back||along>front) continue;
+    const perp=Math.abs(dx*wv.dirZ-dz*wv.dirX);
+    if(perp>halfW) continue;
+
+    hitIds.add(z.uuid);
+
+    if(fxUsed<fxCap){
+      fxUsed++;
+      knightShockRing(z.position,2.6,KNIGHT_IVORY,.26);
+      spawnBurst(z.position.x,z.position.y+.8,z.position.z,isMobile?5:8,FX_MAT_SPARK,3.0);
+    }
+
+    if(knightEnemyClass(z)==='boss'){
+      const hp=Math.max(1,Number(z.userData.hp)||1);
+      const maxHp=Math.max(1,Number(z.userData.maxHp)||hp);
+      const damage=Math.min(
+        Math.max(8*playerStats.power,maxHp*.075),
+        Math.max(0,hp-.01)
+      );
+      if(damage>0) applyBulletDamage(z,damage);
+    }else{
+      // Crossbreaker stays an execution attack: anything the X touches dies.
+      z.userData.hp=0;
+      killZombie(z);
+    }
+    hits++;
+  }
+
+  if(hits>0 && !wv.destroyed){
+    if(navigator.vibrate) navigator.vibrate(12);
+  }
+  return hits;
+}
+
 function spawnCloudSkybreakerWave(w,yaw,fanIndex=0){
-  if(!player||!scene)return null;
+  if(!player||!scene) return null;
 
   cloudCrossbreakerCapVisuals();
 
   const group=new THREE.Group();
   const fx=Math.sin(yaw),fz=Math.cos(yaw);
   const sideWave=Math.abs(fanIndex)===1;
+  const bladeLength=sideWave?8.4:7.6;
 
-  // Parent faces the attack direction. Child blades are true 3D boxes, so the X
-  // cannot disappear edge-on like the old PlaneGeometry version.
+  // Parent faces the travel direction, so the two crossed blades always read
+  // as an X standing up in front of the wave instead of a flat plane that can
+  // vanish edge-on.
   group.rotation.y=yaw;
 
-  const makeMat=(color,opacity)=>new THREE.MeshBasicMaterial({
-    color,
-    transparent:true,
-    opacity,
-    depthWrite:false,
-    depthTest:false,
-    blending:THREE.AdditiveBlending
-  });
-
   function addBlade(angle,color){
-    const length=sideWave?7.8:7.0;
-
-    // Outer glow volume.
     const glow=new THREE.Mesh(
-      new THREE.BoxGeometry(sideWave?.72:.66,length,.52),
-      makeMat(color,sideWave?.50:.46)
+      new THREE.BoxGeometry(sideWave?.80:.72,bladeLength,.54),
+      cloudCrossbreakerWaveMat(color,sideWave?.52:.48)
     );
-    glow.rotation.z=angle;
-    glow.position.y=2.35;
-    glow.renderOrder=40;
+    glow.rotation.z=angle; glow.position.y=2.35; glow.renderOrder=40;
     group.add(glow);
 
-    // Bright inner sword-energy core.
     const core=new THREE.Mesh(
-      new THREE.BoxGeometry(sideWave?.25:.22,length*.93,.26),
-      makeMat(KNIGHT_IVORY,sideWave?.92:.88)
+      new THREE.BoxGeometry(sideWave?.27:.24,bladeLength*.94,.28),
+      cloudCrossbreakerWaveMat(KNIGHT_IVORY,sideWave?.94:.90)
     );
-    core.rotation.z=angle;
-    core.position.y=2.35;
-    core.position.z=.02;
-    core.renderOrder=41;
+    core.rotation.z=angle; core.position.y=2.35; core.position.z=.02; core.renderOrder=41;
     group.add(core);
+
+    // Tip flares at both ends of each blade give the X real presence as it
+    // scales up, without adding another draw-heavy system.
+    for(let end=-1;end<=1;end+=2){
+      const tip=new THREE.Mesh(
+        new THREE.ConeGeometry(.30,1.05,4),
+        cloudCrossbreakerWaveMat(color,.62)
+      );
+      tip.rotation.z=angle+(end<0?Math.PI:0);
+      tip.position.set(
+        -Math.sin(angle)*bladeLength*.52*end,
+        2.35+Math.cos(angle)*bladeLength*.52*end,
+        .02
+      );
+      tip.renderOrder=41;
+      group.add(tip);
+    }
   }
 
   addBlade(Math.PI/4,KNIGHT_GOLD);
   addBlade(-Math.PI/4,KNIGHT_STEEL);
 
-  // Compact bright X center punch.
+  // Bright centre punch plus a slow counter-spinning diamond for motion.
   const center=new THREE.Mesh(
-    new THREE.SphereGeometry(sideWave?.54:.48,isMobile?10:14,isMobile?7:10),
-    makeMat(KNIGHT_IVORY,.82)
+    new THREE.SphereGeometry(sideWave?.58:.52,isMobile?10:14,isMobile?7:10),
+    cloudCrossbreakerWaveMat(KNIGHT_IVORY,.86)
   );
-  center.position.y=2.35;
-  center.renderOrder=42;
+  center.position.y=2.35; center.renderOrder=42;
   group.add(center);
 
-  // A low ground streak makes the direction readable without washing out the map.
-  const streak=new THREE.Mesh(
-    new THREE.BoxGeometry(sideWave?5.2:4.5,.06,2.1),
-    makeMat(fanIndex===0?KNIGHT_IVORY:KNIGHT_GOLD,sideWave?.18:.14)
+  const spinner=new THREE.Mesh(
+    new THREE.OctahedronGeometry(sideWave?1.05:.95,0),
+    cloudCrossbreakerWaveMat(KNIGHT_GOLD,.42)
   );
-  streak.position.y=.08;
-  streak.renderOrder=39;
+  spinner.position.y=2.35; spinner.renderOrder=42;
+  group.add(spinner);
+  group.userData.spinner=spinner;
+
+  // Low ground streak keeps the travel direction readable at a glance.
+  const streak=new THREE.Mesh(
+    new THREE.BoxGeometry(sideWave?5.4:4.7,.06,2.2),
+    cloudCrossbreakerWaveMat(fanIndex===0?KNIGHT_IVORY:KNIGHT_GOLD,.16)
+  );
+  streak.position.y=.08; streak.renderOrder=39;
   group.add(streak);
 
-  group.position.set(
-    player.position.x+fx*1.2,
-    player.position.y,
-    player.position.z+fz*1.2
-  );
+  const ox=player.position.x+fx*1.2;
+  const oz=player.position.z+fz*1.2;
+  group.position.set(ox,player.position.y,oz);
   scene.add(group);
 
-  // Damage is already resolved authoritatively in triggerCloudSkybreakerSlash().
-  // This custom 3D object is presentation only.
-  const fullAreaHits=0;
+  // Every child remembers the opacity it was authored with, so fading is
+  // always relative to that value instead of compounding toward invisible.
+  group.traverse(o=>{
+    if(o.material&&'opacity' in o.material) o.userData.crossBaseOpacity=o.material.opacity;
+  });
+
+  const exitDist=cloudCrossbreakerExitDistance(ox,oz,fx,fz);
 
   const wv={
     group,
     weapon:w,
     yaw,
+    originX:ox,
+    originZ:oz,
     dirX:fx,
     dirZ:fz,
     travelled:0,
-    range:w.range||50,
-    speed:30,
-    life:.58,
-    maxLife:.58,
+    exitDist,
+    range:exitDist+CROSSBREAKER_WAVE_OVERSHOOT,
+    speed:CROSSBREAKER_WAVE_SPEED,
+    life:CROSSBREAKER_WAVE_LIFE,
+    maxLife:CROSSBREAKER_WAVE_LIFE,
     fanIndex,
-    fullAreaHits,
+    scale:sideWave?1.10:1,
+    baseScale:sideWave?1.10:1,
+    age:0,
+    hitIds:new Set(),
     destroyed:false,
-    cleanupTimer:null,
-    baseScale:sideWave?1.10:1
+    cleanupTimer:null
   };
   cloudSkybreakerWaves.push(wv);
 
-  // Hard timeout independent of the frame loop.
+  // Immediate first slice so an enemy standing on top of the caster still
+  // registers against the wave on the frame it is created.
+  try{ cloudCrossbreakerWaveDamage(wv,0,0); }catch(err){ console.error('Crossbreaker wave contact recovered:',err); }
+
+  // Hard timeout independent of the frame loop: even a stalled tab cleans up.
   wv.cleanupTimer=setTimeout(()=>{
     cloudCrossbreakerDestroyWave(wv);
-  },620);
+  },Math.round(CROSSBREAKER_WAVE_LIFE*1000)+500);
 
   return wv;
 }
+
 function updateCloudSkybreaker(dt){
-  // Visual motion only. Collision already resolved at cast time.
-    for(let i=cloudSkybreakerWaves.length-1;i>=0;i--){
-      const wv=cloudSkybreakerWaves[i];
-      if(!wv||wv.destroyed){
-        cloudSkybreakerWaves.splice(i,1);
-        continue;
+  if(!cloudSkybreakerWaves.length) return;
+  const step=Math.max(0,Math.min(.1,Number.isFinite(dt)?dt:0));
+
+  // Snapshot: a kill inside the damage pass can complete the round, which
+  // clears the live array underneath this loop.
+  const waves=cloudSkybreakerWaves.slice();
+
+  for(const wv of waves){
+    if(!wv||wv.destroyed) continue;
+
+    try{
+      const before=wv.travelled;
+      const advance=wv.speed*step;
+      wv.travelled+=advance;
+      wv.age+=step;
+      wv.life-=step;
+
+      wv.group.position.x=wv.originX+wv.dirX*wv.travelled;
+      wv.group.position.z=wv.originZ+wv.dirZ*wv.travelled;
+
+      // Growth: full size right as it crosses the arena boundary, then a
+      // little more while it sails off the map.
+      const spread=Math.min(1.35,wv.travelled/Math.max(1,wv.exitDist));
+      wv.scale=(wv.baseScale||1)*(1+spread*CROSSBREAKER_WAVE_GROW);
+      wv.group.scale.setScalar(wv.scale);
+
+      // Small wobble keeps it alive on screen while still reading as an X.
+      wv.group.rotation.z=Math.sin(wv.age*7.5+(wv.fanIndex||0))*.09;
+      if(wv.group.userData.spinner){
+        wv.group.userData.spinner.rotation.y+=step*3.4;
+        wv.group.userData.spinner.rotation.x+=step*2.1;
       }
-  
-      try{
-        const step=wv.speed*dt;
-        wv.group.position.x+=wv.dirX*step;
-        wv.group.position.z+=wv.dirZ*step;
-        wv.travelled+=step;
-        wv.life-=dt;
-  
-        const q=Math.max(0,wv.life/(wv.maxLife||.58));
-        const pulse=(wv.baseScale||1)*(1+Math.sin(performance.now()*.035+(wv.fanIndex||0))*.06);
-        wv.group.scale.setScalar(pulse);
-  
-        // Store original opacity once and fade from that value, avoiding the old
-        // multiplicative fade that could make the wave effectively invisible instantly.
-        for(const child of wv.group.children){
-          if(child.material&&'opacity' in child.material){
-            if(child.userData.crossBaseOpacity===undefined){
-              child.userData.crossBaseOpacity=child.material.opacity;
-            }
-            child.material.opacity=child.userData.crossBaseOpacity*Math.min(1,q*1.8);
-          }
+
+      // The bigger it gets the softer it draws, so a huge wave never blinds
+      // the player. Past the boundary it fades out over the overshoot run.
+      let alpha=1-.58*Math.min(1,wv.travelled/Math.max(1,wv.exitDist));
+      if(wv.travelled>wv.exitDist){
+        alpha*=Math.max(0,1-(wv.travelled-wv.exitDist)/CROSSBREAKER_WAVE_OVERSHOOT);
+      }
+      alpha*=Math.min(1,Math.max(0,wv.life/(wv.maxLife||CROSSBREAKER_WAVE_LIFE))*2.2);
+
+      wv.group.traverse(o=>{
+        if(o.material&&'opacity' in o.material){
+          const base=o.userData.crossBaseOpacity!==undefined?o.userData.crossBaseOpacity:1;
+          o.material.opacity=base*alpha;
         }
-  
-        if(wv.life<=0||wv.travelled>=wv.range){
-          cloudCrossbreakerDestroyWave(wv);
-        }
-      }catch(err){
-        console.error('Crossbreaker visual cleanup recovered:',err);
+      });
+
+      // Damage sweeps the band the wave passed through this frame.
+      cloudCrossbreakerWaveDamage(wv,before,wv.travelled);
+      if(wv.destroyed) continue;
+
+      if(wv.life<=0||wv.travelled>=wv.range||alpha<=.01){
         cloudCrossbreakerDestroyWave(wv);
       }
+    }catch(err){
+      console.error('Crossbreaker wave update recovered:',err);
+      cloudCrossbreakerDestroyWave(wv);
     }
-  
+  }
 }
 
 function clearCloudSkybreaker(){
@@ -25064,11 +25487,22 @@ function updateCloudNativeRigPost(dt){
 function animate(){
   if(arenaRenderLoopStarted) return;
   arenaRenderLoopStarted = true;
+  let arenaFrameErrors=0;
   function arenaFrame(){
     requestAnimationFrame(arenaFrame);
     if(!renderer || !scene || !camera || !clock) return;
     const dt = Math.min(clock.getDelta(), 0.05);
-    if(gameRunning) update(dt);
+    if(gameRunning){
+      // A single bad visual must never be able to stop the render loop again.
+      // Before this guard, one thrown effect skipped renderer.render() on every
+      // following frame, which reads to the player as a hard freeze.
+      try{
+        update(dt);
+      }catch(err){
+        arenaFrameErrors++;
+        if(arenaFrameErrors<=5) console.error('Frame update recovered:',err);
+      }
+    }
     renderer.render(scene, camera);
   }
   requestAnimationFrame(arenaFrame);
