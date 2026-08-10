@@ -11,7 +11,7 @@ preview, gameplay, abilities, Arcane Echoes, lifecycle cleanup, and save migrati
 Legacy ninefox IDs remain migration-only. The original KayKit Mage remains available
 only as an emergency visual fallback if the native fox asset fails.
 -->
-<!-- V22.16.00 Crossbreaker X-Wave + Onslaught Launch: fixes the two crashes behind both broken moves. (1) isMobile was referenced by twelve effect functions but never declared anywhere in the file, so every one of those calls threw a ReferenceError - during Royal Onslaught the throw landed inside the per-frame perimeter update, which stopped renderer.render() and froze the screen permanently at the first point. isMobile is now defined and the frame loop survives any single update error. (2) cloudCrossbreakerCapVisuals() and cloudCrossbreakerDestroyWave() were called but never defined, so the Crossbreaker X wave threw on creation and was silently swallowed - the projectile literally never existed. Both are now implemented and the wave is a real growing X-shaped projectile that carries its own damage, expands and dims as it leaves the arena, and self-destructs through three independent paths. Royal Onslaught crosses the map to five designated perimeter endpoints at half the old launch speed, each at least 115 degrees around the perimeter from the previous endpoint and never near the point two back, executing everything crossed on the line while the slow pace gathers the crowd behind an invulnerable Knight. Royal bullet time is now scoped to the playable area instead of the whole world, so enemies spawning outside the arena close at full speed and only slow to 50% once they cross the boundary. For the entire sequence every non-boss enemy inside the playable area is executed on sight through a shared rate-limited queue, with bosses the standing exception. Contact during transit is also unconditionally lethal: detection is uncapped and marks enemies on touch, so no enemy can survive by being late in a rate-limited kill queue. After the fifth endpoint he takes the centre of the map and fires five X slash waves outward past the arena boundary, executing every enemy inside it, then repeats that volley on a 1.5 second cooldown for up to six turns total or until the last enemy is dead. The finale waves run on an independent clock with a setTimeout backstop, so they finish their flight after the arena wipe stops the gameplay loop and can never be left in the scene. Crossbreaker Slash is halved in size and its travel speed is cut to 17.25 u/s, 37.5% of the original, with the lifetime ceiling and concurrent-wave cap raised so the slower waves still reach the map edge instead of expiring in mid-air. Enemies remain at 50% speed for the whole move, including any that spawn mid-move. -->
+<!-- V22.16.00 Crossbreaker X-Wave + Onslaught Launch: fixes the two crashes behind both broken moves. (1) isMobile was referenced by twelve effect functions but never declared anywhere in the file, so every one of those calls threw a ReferenceError - during Royal Onslaught the throw landed inside the per-frame perimeter update, which stopped renderer.render() and froze the screen permanently at the first point. isMobile is now defined and the frame loop survives any single update error. (2) cloudCrossbreakerCapVisuals() and cloudCrossbreakerDestroyWave() were called but never defined, so the Crossbreaker X wave threw on creation and was silently swallowed - the projectile literally never existed. Both are now implemented and the wave is a real growing X-shaped projectile that carries its own damage, expands and dims as it leaves the arena, and self-destructs through three independent paths. Royal Onslaught crosses the map to five designated perimeter endpoints at half the old launch speed, each at least 115 degrees around the perimeter from the previous endpoint and never near the point two back, executing everything crossed on the line while the slow pace gathers the crowd behind an invulnerable Knight. Royal bullet time is now scoped to the playable area instead of the whole world, so enemies spawning outside the arena close at full speed and only slow to 50% once they cross the boundary. For the entire sequence every non-boss enemy inside the playable area is executed on sight through a shared rate-limited queue, with bosses the standing exception. Contact during transit is also unconditionally lethal: detection is uncapped and marks enemies on touch, so no enemy can survive by being late in a rate-limited kill queue. After the fifth endpoint he takes the centre of the map and fires five X slash waves outward past the arena boundary, executing every enemy inside it, then repeats that volley on a 1.5 second cooldown for up to six turns total or until the last enemy is dead. The finale waves run on an independent clock with a setTimeout backstop, so they finish their flight after the arena wipe stops the gameplay loop and can never be left in the scene. Crossbreaker Slash is halved in size and its travel speed is cut to 8.625 u/s, 18.75% of the original, while the Onslaught centre slashes drop to 29 u/s. Lifetime ceilings and concurrent-wave caps are raised to match so no wave expires in mid-air, and overlapping Onslaught volleys now own their waves independently instead of the newest volley culling the previous one. Enemies remain at 50% speed for the whole move, including any that spawn mid-move. -->
 <!-- V22.13.99 Royal Onslaught Shadow Trail: adds lightweight avatar afterimage clones during Royal Onslaught dashes. Each dash now leaves several short-lived Knight shadow images at roughly 15% opacity between the start and end of the dash, creating a super-speed silhouette without restoring the removed ground trail. Gameplay, damage, cooldowns, capture rules, and version-label synchronization are unchanged. -->
 <!-- V22.13.98 Version Label Synchronization: synchronizes the static browser title and all visible landing-page/build labels to V22.13.98 using the centralized GAME_VERSION value. Gameplay, Royal Onslaught behavior, visuals, cooldowns, and balance are unchanged. -->
 <!-- V22.13.97 Royal Onslaught Trail Removal + Freeze Guard: completely removes the Royal Onslaught ground dash-lane/trail geometry and its delayed cleanup path, then isolates each strike inside a runtime safety boundary so one visual or target-state failure cannot stop the entire gameplay update loop between strikes. Damage, capture window, bullet time, elimination behavior, cooldown scaling, and remaining impact visuals are unchanged. -->
@@ -1428,7 +1428,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.16.04 - Onslaught Play-Area Rules + Slower Crossbreaker';
+const GAME_VERSION='22.16.05 - Slower Slash Waves';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -16625,16 +16625,26 @@ function knightOnslaughtDrainDoomed(){
 
 let knightOnslaughtFinaleWaves=[];
 
+const ONSLAUGHT_FINALE_WAVE_SPEED=29;   // u/s: half the original 58
+const ONSLAUGHT_FINALE_WAVE_CEILING=18; // absolute cap across overlapping sets
+
+function knightOnslaughtDisposeFinaleWave(wv){
+  if(!wv)return;
+  if(wv.timer){ clearTimeout(wv.timer); wv.timer=null; }
+  wv.dead=true;
+  try{ if(wv.group&&wv.group.parent) scene.remove(wv.group); }catch(_err){}
+  try{ if(wv.group) disposeGroup(wv.group); }catch(_err){}
+  wv.group=null;
+  const i=knightOnslaughtFinaleWaves.indexOf(wv);
+  if(i>=0) knightOnslaughtFinaleWaves.splice(i,1);
+}
+
 function clearKnightOnslaughtFinaleWaves(){
-  while(knightOnslaughtFinaleWaves.length){
-    const wv=knightOnslaughtFinaleWaves.pop();
-    if(!wv)continue;
-    if(wv.timer){ clearTimeout(wv.timer); wv.timer=null; }
-    wv.dead=true;
-    try{ if(wv.group&&wv.group.parent) scene.remove(wv.group); }catch(_err){}
-    try{ if(wv.group) disposeGroup(wv.group); }catch(_err){}
-    wv.group=null;
+  let guard=0;
+  while(knightOnslaughtFinaleWaves.length && guard++<200){
+    knightOnslaughtDisposeFinaleWave(knightOnslaughtFinaleWaves[0]);
   }
+  knightOnslaughtFinaleWaves.length=0;
 }
 
 function knightOnslaughtFinaleSlashWave(yaw,originX,originZ,y){
@@ -16677,28 +16687,36 @@ function knightOnslaughtFinaleBurst(){
   // flight still completes after the arena wipe freezes the gameplay loop,
   // with a setTimeout backstop that does not depend on that callback at all.
   if(!scene)return 0;
-  clearKnightOnslaughtFinaleWaves();
 
   const originX=player?player.position.x:0;
   const originZ=player?player.position.z:0;
   const y=player?player.position.y:0;
 
   const count=5;
-  const speed=58;
+  const speed=ONSLAUGHT_FINALE_WAVE_SPEED;
   const reach=Math.max(24,arenaSize+22);
   const life=Math.max(1.1,reach/speed+.35);
   const lead=Math.random()*Math.PI*2;
 
+  // Overlapping volleys are allowed now, but never without a hard ceiling:
+  // oldest waves go first if the sets ever stack up.
+  let guard=0;
+  while(knightOnslaughtFinaleWaves.length+count>ONSLAUGHT_FINALE_WAVE_CEILING && guard++<40){
+    knightOnslaughtDisposeFinaleWave(knightOnslaughtFinaleWaves[0]);
+  }
+
+  const running=[];
   for(let i=0;i<count;i++){
     const yaw=lead+(i/count)*Math.PI*2;
     const wv=knightOnslaughtFinaleSlashWave(yaw,originX,originZ,y);
-    if(wv)knightOnslaughtFinaleWaves.push(wv);
+    if(wv){ knightOnslaughtFinaleWaves.push(wv); running.push(wv); }
   }
-  if(!knightOnslaughtFinaleWaves.length)return 0;
-
-  const running=knightOnslaughtFinaleWaves.slice();
+  if(!running.length)return 0;
   const startedAt=performance.now();
-  const backstop=setTimeout(clearKnightOnslaughtFinaleWaves,Math.round(life*1000)+700);
+  // Backstop disposes only this volley's waves, never a later one's.
+  const backstop=setTimeout(()=>{
+    for(const wv of running) knightOnslaughtDisposeFinaleWave(wv);
+  },Math.round(life*1000)+700);
   for(const wv of running) wv.timer=backstop;
 
   function step(){
@@ -16731,7 +16749,10 @@ function knightOnslaughtFinaleBurst(){
       alive=false;
     }
     if(alive) requestAnimationFrame(step);
-    else { clearTimeout(backstop); clearKnightOnslaughtFinaleWaves(); }
+    else {
+      clearTimeout(backstop);
+      for(const wv of running) knightOnslaughtDisposeFinaleWave(wv);
+    }
   }
   requestAnimationFrame(step);
   return running.length;
@@ -23161,15 +23182,15 @@ function triggerCloudSkybreakerSlash(w){
 // CROSSBREAKER_WAVE_GROW is intentionally unchanged, so the wave still
 // visibly expands on its way off the map - just from half the size.
 const CROSSBREAKER_MELEE_RANGE=6;      // instant sword reach at the caster
-const CROSSBREAKER_WAVE_SPEED=17.25;   // units per second (75% of the 23 pass)
-const CROSSBREAKER_WAVE_LIFE=5.2;      // lifetime ceiling: slower waves need longer
+const CROSSBREAKER_WAVE_SPEED=8.625;   // units per second (half of 17.25)
+const CROSSBREAKER_WAVE_LIFE=9.0;      // lifetime ceiling: clears the worst-case flight
 const CROSSBREAKER_WAVE_GROW=3.0;      // extra scale gained by the arena edge
 const CROSSBREAKER_WAVE_HALF_WIDTH=1.5;// damage half-width at spawn scale
 const CROSSBREAKER_WAVE_DEPTH=1.05;    // damage thickness of the wave plane
 const CROSSBREAKER_WAVE_OVERSHOOT=12;  // how far past the map edge it flies
 const CROSSBREAKER_WAVE_BLADE_Y=1.9;   // lower centre keeps the smaller X on enemies
 
-function cloudCrossbreakerMaxWaves(){ return isMobile?7:10; }
+function cloudCrossbreakerMaxWaves(){ return isMobile?10:16; }
 
 function cloudCrossbreakerCapVisuals(){
   // Hard ceiling on simultaneous waves. Oldest goes first so a held attack
