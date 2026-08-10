@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.15.05 - Crossbreaker Triple Fan Visible';
+const GAME_VERSION='22.15.07 - Crossbreaker Hard Rebuild';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -15255,6 +15255,7 @@ function knightDefensiveWhirlwindDurationForRound(){
   return 3.8+(r-1)*0.5;
 }
 function triggerKnightDefensiveWhirlwind(){
+  if(state.avatarType==='cloud') resetCloudCrossbreakerChain();
   if(!gameRunning||!knightIsActive()) return false;
   if(typeof cloudCrossbreakerActive==='function' && cloudCrossbreakerActive()) return false;
   if(typeof knightTitanMoveActive==='function' && knightTitanMoveActive()) return false;
@@ -22269,7 +22270,6 @@ function performWeaponAttack(w, countsAsPrimary=true){
 }
 function doShoot(){
   if(!gameRunning) return;
-  if(state.avatarType==='cloud') resetCloudCrossbreakerChain();
   // The Knight is deliberate: attacks never fire while charging, slamming or
   // casting the ultimate.
   if(typeof knightMovementLocked==='function' && knightMovementLocked()) return;
@@ -22295,6 +22295,7 @@ let cloudSkybreakerCharge=null;
 let cloudSkybreakerWaves=[];
 let cloudSkybreakerNextReadyAt=0;
 let cloudCrossbreakerStreak=0;
+let cloudCrossbreakerSequenceId=0;
 
 function resetCloudCrossbreakerChain(){
   cloudCrossbreakerStreak=0;
@@ -22333,16 +22334,12 @@ function triggerCloudSkybreakerSlash(w){
 
   // Three consecutive normal Crossbreakers prime the NEXT Crossbreaker.
   // The fourth consecutive cast releases the three-wave fan, then restarts the chain.
-  const tripleFan=cloudCrossbreakerStreak>=3;
-  if(tripleFan){
-    cloudCrossbreakerStreak=0;
-    toast('TRIPLE CROSSBREAKER');
-  }else{
-    cloudCrossbreakerStreak++;
-    if(cloudCrossbreakerStreak===3) toast('TRIPLE CROSSBREAKER READY');
-  }
+  // Do not decide the chain from generic combat state. The completed
+  // Crossbreaker count alone determines whether THIS cast is the triple.
+  const tripleFan=(cloudCrossbreakerStreak===3);
+  if(tripleFan) toast('TRIPLE CROSSBREAKER');
 
-  const target=findNearestEnemy(22);
+  const target=findNearestEnemy(50);
   if(target){
     player.rotation.y=Math.atan2(
       target.position.x-player.position.x,
@@ -22357,6 +22354,7 @@ function triggerCloudSkybreakerSlash(w){
     total:.34,
     yaw,
     tripleFan,
+    sequenceId:++cloudCrossbreakerSequenceId,
     released:false
   };
 
@@ -22374,12 +22372,66 @@ function triggerCloudSkybreakerSlash(w){
   return true;
 }
 
+
+function cloudCrossbreakerHitFullWaveArea(w,yaw,fanIndex=0){
+  if(!player)return 0;
+
+  const range=Math.max(1,w.range||50);
+  const fx=Math.sin(yaw),fz=Math.cos(yaw);
+  const rx=Math.cos(yaw),rz=-Math.sin(yaw);
+  const ox=player.position.x,oz=player.position.z;
+
+  // Hard rebuild: the damaging area is intentionally broader than the visible
+  // X so the attack can never feel like a thin projectile. It is a giant
+  // piercing sword-energy lane.
+  const nearHalfWidth=7.0;
+  const farHalfWidth=10.0;
+  let hitCount=0;
+
+  for(const z of Array.from(zombies)){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+
+    const dx=z.position.x-ox;
+    const dz=z.position.z-oz;
+
+    const forward=dx*fx+dz*fz;
+    if(forward<0||forward>range)continue;
+
+    const lateral=Math.abs(dx*rx+dz*rz);
+    const t=Math.max(0,Math.min(1,forward/range));
+    const allowed=nearHalfWidth+(farHalfWidth-nearHalfWidth)*t;
+    if(lateral>allowed)continue;
+
+    if(knightEnemyClass(z)==='boss'){
+      const hp=Math.max(1,Number(z.userData.hp)||1);
+      const maxHp=Math.max(1,Number(z.userData.maxHp)||hp);
+      const damage=Math.min(
+        Math.max(8*playerStats.power,maxHp*.075),
+        Math.max(0,hp-.01)
+      );
+      if(damage>0)applyBulletDamage(z,damage);
+    }else{
+      z.userData.hp=0;
+      z.userData.dead=false;
+      killZombie(z);
+    }
+
+    hitCount++;
+    if(hitCount<=(isMobile?14:24)){
+      knightShockRing(z.position,2.4,KNIGHT_IVORY,.36);
+      spawnKnightGuardBurst(z.position,2.0,KNIGHT_GOLD);
+      spawnBurst(z.position.x,z.position.y+.8,z.position.z,isMobile?4:7,FX_MAT_SPARK,3.2);
+    }
+  }
+  return hitCount;
+}
 function spawnCloudSkybreakerWave(w,yaw,fanIndex=0){
   if(!player||!scene)return;
 
   const group=new THREE.Group();
   const fx=Math.sin(yaw),fz=Math.cos(yaw);
   const sideWave=Math.abs(fanIndex)===1;
+  group.userData.crossFanIndex=fanIndex;
 
   const makeMat=(color,opacity)=>new THREE.MeshBasicMaterial({
     color,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide,
@@ -22387,7 +22439,7 @@ function spawnCloudSkybreakerWave(w,yaw,fanIndex=0){
   });
 
   const slashA=new THREE.Mesh(
-    new THREE.PlaneGeometry((w.width||4.8)*(sideWave?1.12:1),6.4*(sideWave?1.08:1)),
+    new THREE.PlaneGeometry(sideWave?12.0:10.0,sideWave?9.0:8.2),
     makeMat(KNIGHT_IVORY,sideWave?.96:.90)
   );
   slashA.rotation.y=yaw;
@@ -22396,7 +22448,7 @@ function spawnCloudSkybreakerWave(w,yaw,fanIndex=0){
   group.add(slashA);
 
   const slashB=new THREE.Mesh(
-    new THREE.PlaneGeometry((w.width||4.8)*(sideWave?1.12:1),6.4*(sideWave?1.08:1)),
+    new THREE.PlaneGeometry(sideWave?12.0:10.0,sideWave?9.0:8.2),
     makeMat(KNIGHT_GOLD,sideWave?.90:.82)
   );
   slashB.rotation.y=yaw;
@@ -22413,7 +22465,7 @@ function spawnCloudSkybreakerWave(w,yaw,fanIndex=0){
   group.add(core);
 
   const lane=new THREE.Mesh(
-    new THREE.PlaneGeometry((w.width||4.8)*(sideWave?1.65:1.35),sideWave?4.2:3.5),
+    new THREE.PlaneGeometry(sideWave?13.5:11.5,sideWave?5.4:4.6),
     makeMat(fanIndex===0?KNIGHT_IVORY:KNIGHT_GOLD,sideWave?.38:.30)
   );
   lane.rotation.x=-Math.PI/2;
@@ -22421,12 +22473,18 @@ function spawnCloudSkybreakerWave(w,yaw,fanIndex=0){
   lane.position.y=.055;
   group.add(lane);
 
+  const sideX=Math.cos(yaw),sideZ=-Math.sin(yaw);
+  const lateralOffset=fanIndex*3.2;
   group.position.set(
-    player.position.x+fx*(sideWave?.8:1.1),
+    player.position.x+fx*(sideWave?1.0:1.2)+sideX*lateralOffset,
     player.position.y,
-    player.position.z+fz*(sideWave?.8:1.1)
+    player.position.z+fz*(sideWave?1.0:1.2)+sideZ*lateralOffset
   );
   scene.add(group);
+
+  // Damage the complete visible lane immediately; the moving X that follows is
+  // presentation only and no longer determines who gets hit.
+  const fullAreaHits=cloudCrossbreakerHitFullWaveArea(w,yaw,fanIndex);
 
   cloudSkybreakerWaves.push({
     group,
@@ -22436,12 +22494,14 @@ function spawnCloudSkybreakerWave(w,yaw,fanIndex=0){
     dirZ:fz,
     travelled:0,
     range:w.range||50,
-    speed:26,
+    speed:22,
     width:w.width||4.8,
     hitIds:new Set(),
-    life:1.45,
+    life:2.5,
     cross:true,
-    fanIndex
+    fanIndex,
+    fullAreaHits,
+    damageResolved:true
   });
 
   knightShockRing(player.position,4.0,KNIGHT_IVORY,.55);
@@ -22467,34 +22527,48 @@ function updateCloudSkybreaker(dt){
       c.released=true;
       try{
         if(c.tripleFan){
-          // Three clearly separated forward waves.
-          // Center axes are -62°, 0°, +62°. Because each X has a very wide
-          // energy footprint, their combined attack envelope exceeds 180°
-          // while none of the three actually fires backward.
-          const sideAngle=62*Math.PI/180;
+          // Three distinct forward X-waves. Side lanes are ±58° so they visibly
+          // separate immediately while their wide corridors overlap into a
+          // little over 180° of practical forward coverage.
+          const sideAngle=60*Math.PI/180;
           spawnCloudSkybreakerWave(c.weapon,c.yaw-sideAngle,-1);
           spawnCloudSkybreakerWave(c.weapon,c.yaw,0);
           spawnCloudSkybreakerWave(c.weapon,c.yaw+sideAngle,1);
 
-          // Unique triple-cast launch spectacle so the 4th attack cannot look
-          // like an ordinary Crossbreaker.
-          knightShockRing(player.position,7.2,KNIGHT_IVORY,.78);
-          knightShockRing(player.position,5.8,KNIGHT_GOLD,.82);
-          knightShockRing(player.position,4.3,KNIGHT_STEEL,.68);
-          spawnKnightGuardBurst(player.position,6.4,KNIGHT_GOLD);
-          knightGroundCracks(player.position,6.8,14,KNIGHT_GOLD);
+          knightShockRing(player.position,8.0,KNIGHT_IVORY,.82);
+          knightShockRing(player.position,6.4,KNIGHT_GOLD,.86);
+          knightShockRing(player.position,4.8,KNIGHT_STEEL,.72);
+          spawnKnightGuardBurst(player.position,7.0,KNIGHT_GOLD);
+          knightGroundCracks(player.position,7.4,16,KNIGHT_GOLD);
           spawnBurst(
             player.position.x,
             player.position.y+1.0,
             player.position.z,
-            isMobile?28:44,
+            isMobile?32:50,
             FX_MAT_SPARK,
-            7.0
+            7.6
           );
-          triggerCombatShake(17,220);
-          if(navigator.vibrate)navigator.vibrate([45,12,45,12,80]);
+
+          // Three unmistakable launch markers, one for each fan lane.
+          for(const a of [c.yaw-sideAngle,c.yaw,c.yaw+sideAngle]){
+            const mx=player.position.x+Math.sin(a)*5.5;
+            const mz=player.position.z+Math.cos(a)*5.5;
+            knightShockRing({x:mx,y:player.position.y,z:mz},3.4,KNIGHT_IVORY,.64);
+            spawnKnightGuardBurst({x:mx,y:player.position.y,z:mz},3.0,KNIGHT_GOLD);
+          }
+
+          triggerCombatShake(18,230);
+          if(navigator.vibrate)navigator.vibrate([48,12,48,12,85]);
+
+          // Triple is the 4th consecutive Crossbreaker, then sequence restarts.
+          cloudCrossbreakerStreak=0;
         }else{
           spawnCloudSkybreakerWave(c.weapon,c.yaw,0);
+          cloudCrossbreakerStreak++;
+          if(cloudCrossbreakerStreak>=3){
+            cloudCrossbreakerStreak=3;
+            toast('TRIPLE CROSSBREAKER READY');
+          }
         }
       }catch(err){
         console.error('Crossbreaker release recovered:',err);
@@ -22529,43 +22603,6 @@ function updateCloudSkybreaker(dt){
     const pulse=1+Math.sin(performance.now()*.028+(wv.fanIndex||0)*.9)*(side?.10:.07);
     wv.group.scale.setScalar(pulse);
 
-    // Match collision to the visible diagonal X, not only its center line.
-    // The rotated X is visibly much wider than the raw PlaneGeometry width.
-    const visualHalfSpan=Math.max(
-      Math.abs(wv.fanIndex)===1?5.2:4.4,
-      (wv.width||4.8)*(Math.abs(wv.fanIndex)===1?1.04:.92)
-    );
-    const r2=visualHalfSpan*visualHalfSpan;
-    for(const z of Array.from(zombies)){
-      if(!z||!z.userData||z.userData.dead||z.userData.spawnPending||wv.hitIds.has(z.uuid))continue;
-
-      // Swept full-width energy volume: every enemy inside the visible wave
-      // footprint is hit in the same frame, so crowded rows die together.
-      if(knightRoyalOnslaughtSegmentDistanceSq(z.position,prev,wv.group.position)>r2)continue;
-
-      wv.hitIds.add(z.uuid);
-      const cls=knightEnemyClass(z);
-
-      if(cls==='boss'){
-        const hp=Math.max(1,Number(z.userData.hp)||1);
-        const maxHp=Math.max(1,Number(z.userData.maxHp)||hp);
-        const damage=Math.min(
-          Math.max(8*playerStats.power,maxHp*.075),
-          Math.max(0,hp-.01)
-        );
-        if(damage>0)applyBulletDamage(z,damage);
-      }else{
-        // Crossbreaker: any non-boss touched by either slash dies immediately.
-        z.userData.hp=0;
-        z.userData.dead=false;
-        killZombie(z);
-      }
-
-      knightShockRing(z.position,1.9,KNIGHT_IVORY,.34);
-      spawnKnightGuardBurst(z.position,1.75,KNIGHT_GOLD);
-      spawnBurst(z.position.x,z.position.y+.8,z.position.z,isMobile?6:10,FX_MAT_SPARK,3.4);
-    }
-
     if(wv.travelled>=wv.range||wv.life<=0){
       if(wv.group.parent)scene.remove(wv.group);
       disposeGroup(wv.group);
@@ -22584,6 +22621,7 @@ function clearCloudSkybreaker(){
   cloudSkybreakerCharge=null;
   cloudSkybreakerNextReadyAt=0;
   cloudCrossbreakerStreak=0;
+  cloudCrossbreakerSequenceId=0;
   if(player&&player.userData)player.userData.secondaryAttackCooldown=0;
   for(const wv of cloudSkybreakerWaves){
     if(wv&&wv.group&&wv.group.parent){
