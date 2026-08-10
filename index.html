@@ -201,7 +201,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.91</title>
+<title>Family Arena V22.14.92</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.91 - Onslaught Continuous Contact Hitbox';
+const GAME_VERSION='22.14.92 - Onslaught Touch Kill Ultimate';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -16349,8 +16349,8 @@ function knightRoyalOnslaughtSegmentDistanceSq(point,a,b){
   return dx*dx+dz*dz;
 }
 
-const KNIGHT_ONSLAUGHT_BODY_CONTACT_RADIUS=1.75;
-const KNIGHT_ONSLAUGHT_ENDPOINT_CONTACT_RADIUS=2.20;
+const KNIGHT_ONSLAUGHT_BODY_CONTACT_RADIUS=2.15;
+const KNIGHT_ONSLAUGHT_ENDPOINT_CONTACT_RADIUS=2.65;
 
 function knightRoyalOnslaughtContactRadius(endpoint=false){
   const base=endpoint
@@ -16362,9 +16362,6 @@ function knightRoyalOnslaughtContactRadius(endpoint=false){
 function knightRoyalOnslaughtRegisterContact(z,index,hitPoint,hitSet,major=false){
   if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)return false;
 
-  // One contact per enemy per dash. This is particularly important for bosses:
-  // a boss standing inside Cloud for several render frames should count as one
-  // Onslaught contact, not 5-10 repeated boss damage events.
   if(hitSet&&hitSet.has(z.uuid))return false;
   if(hitSet)hitSet.add(z.uuid);
 
@@ -16374,15 +16371,25 @@ function knightRoyalOnslaughtRegisterContact(z,index,hitPoint,hitSet,major=false
     z:z.position.z
   };
 
-  // Every physical contact is now an official Onslaught hit point.
   knightRoyalOnslaughtProvenImpactWow(z,index);
 
-  // Direct hit + 5-unit lethal shockwave.
-  knightRoyalOnslaughtDamage(z,index);
+  const isBoss=knightEnemyClass(z)==='boss';
+
+  if(isBoss){
+    knightRoyalOnslaughtBossHit(z,index);
+  }else{
+    // Ultimate rule: TOUCH = KILL.
+    // No damage amount, armor, mitigation, resistance, or damage cap is consulted.
+    z.userData.hp=0;
+    z.userData.dead=false;
+    killZombie(z);
+  }
+
+  // Every confirmed contact also releases the 5-unit lethal shockwave.
+  knightRoyalOnslaughtLethalRadius(pos,index,z);
 
   return true;
 }
-
 function knightRoyalOnslaughtSweepBodyContacts(from,to,index,hitSet,endpointTarget=null){
   if(!from||!to)return 0;
   const radius=knightRoyalOnslaughtContactRadius(false);
@@ -16482,33 +16489,45 @@ function knightRoyalOnslaughtLethalRadius(center,index,primary=null){
   if(!center)return;
   const radius=KNIGHT_ONSLAUGHT_KILL_RADIUS*knightTitanCombatScale();
   const r2=radius*radius;
+
   for(const z of Array.from(zombies)){
     if(!z||z===primary||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+
     const dx=z.position.x-center.x,dz=z.position.z-center.z;
     if(dx*dx+dz*dz>r2)continue;
-    knightRoyalOnslaughtKillOrBossDamage(z,index);
+
+    if(knightEnemyClass(z)==='boss'){
+      knightRoyalOnslaughtBossHit(z,index);
+      continue;
+    }
+
+    // Shockwave rule: any non-boss caught inside 5 units dies immediately.
+    z.userData.hp=0;
+    z.userData.dead=false;
+    killZombie(z);
   }
 }
-
 function knightRoyalOnslaughtDamage(target,index){
   if(!target||!target.userData||target.userData.dead||target.userData.spawnPending)return;
 
   if(knightRuntime.royalOnslaughtDamagedIds)
     knightRuntime.royalOnslaughtDamagedIds.add(target.uuid);
 
-  // Capture the hit point before killZombie removes/disposes the target.
   const impact={
     x:target.position.x,
     y:target.position.y||0,
     z:target.position.z
   };
 
-  knightRoyalOnslaughtKillOrBossDamage(target,index);
+  if(knightEnemyClass(target)==='boss'){
+    knightRoyalOnslaughtBossHit(target,index);
+  }else{
+    target.userData.hp=0;
+    target.userData.dead=false;
+    killZombie(target);
+  }
 
-  // Strong impact kills all non-boss enemies within 5 gameplay units.
   knightRoyalOnslaughtLethalRadius(impact,index,target);
-
-  if(target.userData.dead)knightRoyalOnslaughtClearMarker(target);
 }
 function knightRoyalOnslaughtSafePosition(x,z,y){
   const margin=Math.max(2.2,1.25*knightTitanCombatScale());
@@ -22158,9 +22177,12 @@ function applyBulletDamage(z, dmg){
 
   if(knightIsActive() && knightRuntime.aegisWindow>0 && knightEnemyClass(z)!=='boss'){
     const impact={x:z.position.x,y:z.position.y||0,z:z.position.z};
+
+    // Active Onslaught converts ANY non-boss player damage event into a direct kill.
     z.userData.hp=0;
+    z.userData.dead=false;
     killZombie(z);
-    // Any valid hit during Onslaught also carries the 5-unit lethal shockwave.
+
     knightRoyalOnslaughtLethalRadius(
       impact,
       knightRuntime.royalOnslaughtStrikeIndex||0,
