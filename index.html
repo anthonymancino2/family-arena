@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.99 - Crossbreaker Slash';
+const GAME_VERSION='22.15.00 - Crossbreaker 50ft No Whirlwind';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2910,8 +2910,8 @@ const CHARACTER_COMBAT = {
         desc:'Throws the shield on a controlled path with one slight ricochet. Every surviving enemy it touches—normal, Brute, or boss—is stunned for 3 seconds before the shield returns to your hand. You lose one Magical Armor charge while the shield is away.'},
       defensive_whirlwind:{name:'Defensive Whirlwind', price:420, slot:'secondary', kind:'knight_whirlwind_secondary', cooldown:0, damage:0, radius:3.25,
         desc:'Activate a moving sword-and-shield whirlwind that repeatedly damages and pushes enemies away while deflecting weak projectiles. Duration starts at 3.8 seconds and increases by 0.5 seconds each round through Round 24; from Round 25 onward it remains active indefinitely. Cooldown is 8 seconds in Rounds 1–10, 3 seconds in Rounds 11–15, 1.5 seconds in Rounds 16–20, and zero from Round 21 onward.'},
-      cloud_great_sword_slash:{name:'Crossbreaker Slash', price:460, slot:'secondary', kind:'cloud_great_sword_slash', cooldown:1.15, damage:999999, range:30, width:4.8, auto:true, cloudOnly:true,
-        desc:'Cloud swings the Buster Sword twice, releasing two giant diagonal energy blades that cross into an X. The attack pierces through the full 30-foot lane and instantly kills every non-boss enemy it touches.'}
+      cloud_great_sword_slash:{name:'Crossbreaker Slash', price:460, slot:'secondary', kind:'cloud_great_sword_slash', cooldown:1.15, damage:999999, range:50, width:4.8, auto:true, cloudOnly:true,
+        desc:'Cloud swings the Buster Sword twice, releasing two giant diagonal energy blades that cross into an X. The attack pierces through the full 50-foot lane and instantly kills every non-boss enemy it touches.'}
     }
   },
   barbarian: {
@@ -22257,6 +22257,12 @@ function triggerCloudSkybreakerSlash(w){
   if(state.avatarType!=='cloud'||!player||!gameRunning)return false;
   if(!cloudSkybreakerReady())return false;
 
+  // Crossbreaker is its own two-cut sword attack. Never inherit Whirlwind.
+  player.userData.spinVisualTimer=0;
+  player.userData.whirlwindTimer=0;
+  player.userData.whirlwindActive=false;
+  player.userData.cloudAttackStyle='cross';
+
   // Timestamp-based cooldown is independent of the generic Secondary timer.
   // This cannot get permanently stuck if another combat update path misbehaves.
   cloudSkybreakerNextReadyAt=performance.now()+Math.max(250,(w.cooldown||1.15)*1000);
@@ -22280,7 +22286,11 @@ function triggerCloudSkybreakerSlash(w){
 
   player.userData.kayActionLock=Math.max(player.userData.kayActionLock||0,.46);
   if(player.userData.playKayClip)
-    player.userData.playKayClip('crossbreaker slash',true,true,.46);
+    player.userData.cloudAttackStyle='cross';
+    // Crossbreaker uses only the procedural diagonal sword-cut pose.
+    // No native spin/whirlwind animation is requested.
+    player.userData.cloudAttackTimer=.46;
+    player.userData.cloudAttackDuration=.46;
 
   // Charge cue stays tight around the sword/body and uses existing Knight FX.
   spawnKnightGuardBurst(player.position,2.2,KNIGHT_GOLD);
@@ -22349,7 +22359,7 @@ function spawnCloudSkybreakerWave(w,yaw){
     dirX:fx,
     dirZ:fz,
     travelled:0,
-    range:w.range||30,
+    range:w.range||50,
     speed:26,
     width:w.width||4.8,
     hitIds:new Set(),
@@ -24698,6 +24708,11 @@ function updateCloudNativeRigPost(dt){
   const swing=Math.sin(Math.PI*p);
   const snap=Math.sin(Math.PI*Math.min(1,p*1.35));
   const style=u.cloudAttackStyle||'slash';
+  if(style==='cross'){
+    u.spinVisualTimer=0;
+    u.whirlwindTimer=0;
+    u.whirlwindActive=false;
+  }
 
   // Keep Cloud's face level during ordinary sword attacks. The imported rig's
   // parent-axis orientation makes positive whole-body pitch read as looking up.
