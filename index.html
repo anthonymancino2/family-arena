@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.96 - Cloud Pose Reset + Skybreaker Hold';
+const GAME_VERSION='22.14.97 - Cloud Bone Reset + Skybreaker Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -10293,6 +10293,19 @@ function buildCloudWoffPlayer(options={}){
       rightUpLeg:cloudBones['RightUpLeg_400_024'],
       rightLeg:cloudBones['RightLeg_410_025']
     };
+
+    // Save an immutable clean transform for every bone that our procedural
+    // Cloud animation code may touch. rotateX/rotateY/rotateZ are incremental,
+    // so without this reset attack offsets accumulate every render frame.
+    wrapper.userData.cloudBoneBase={};
+    for(const [key,bone] of Object.entries(wrapper.userData.cloudBones)){
+      if(!bone)continue;
+      wrapper.userData.cloudBoneBase[key]={
+        quaternion:bone.quaternion.clone(),
+        position:bone.position.clone(),
+        scale:bone.scale.clone()
+      };
+    }
 
     if(wrapper.userData.cloudWalkAction){
       const a=wrapper.userData.cloudWalkAction;
@@ -22251,9 +22264,9 @@ function triggerCloudSkybreakerSlash(w){
     released:false
   };
 
-  player.userData.kayActionLock=Math.max(player.userData.kayActionLock||0,.62);
+  player.userData.kayActionLock=Math.max(player.userData.kayActionLock||0,.46);
   if(player.userData.playKayClip)
-    player.userData.playKayClip('skybreaker overhead',true,true,.62);
+    player.userData.playKayClip('skybreaker overhead',true,true,.46);
 
   // Charge cue stays tight around the sword/body and uses existing Knight FX.
   spawnKnightGuardBurst(player.position,2.2,KNIGHT_GOLD);
@@ -22332,6 +22345,7 @@ function updateCloudSkybreaker(dt){
       c.released=true;
       spawnCloudSkybreakerWave(c.weapon,c.yaw);
       cloudSkybreakerCharge=null;
+      if(player&&player.userData)player.userData.kayActionLock=0;
       cloudForceLocomotionPoseReset();
     }
   }
@@ -24424,8 +24438,34 @@ function update(dt){
 
 let arenaRenderLoopStarted = false;
 
+
+function cloudRestoreProceduralBones(){
+  if(state.avatarType!=='cloud'||!player||!player.userData.cloudLoaded)return;
+  const u=player.userData;
+  const bones=u.cloudBones||{};
+  const base=u.cloudBoneBase||{};
+
+  for(const key of Object.keys(base)){
+    const bone=bones[key],b=base[key];
+    if(!bone||!b)continue;
+    bone.quaternion.copy(b.quaternion);
+    bone.position.copy(b.position);
+    bone.scale.copy(b.scale);
+  }
+
+  if(u.cloudArmature&&u.cloudArmatureBindQuaternion){
+    u.cloudArmature.quaternion.copy(u.cloudArmatureBindQuaternion);
+  }
+}
+
 function updateCloudNativeRigPre(dt){
   if(state.avatarType!=='cloud'||!player||!player.userData.cloudLoaded)return;
+
+  // Remove the prior frame's temporary procedural pose first. The AnimationMixer
+  // then writes the native Walk pose fresh, and post-update adds only this frame's
+  // attack/lean offsets.
+  cloudRestoreProceduralBones();
+
   const u=player.userData;
   const action=u.cloudWalkAction;
   if(!action)return;
@@ -24476,6 +24516,9 @@ function updateCloudNativeRigPre(dt){
 function cloudForceLocomotionPoseReset(){
   if(state.avatarType!=='cloud'||!player||!player.userData.cloudLoaded)return;
   const u=player.userData;
+
+  cloudRestoreProceduralBones();
+
   u.cloudAttackTimer=0;
   u.cloudAttackDuration=.28;
   u.cloudAttackStyle='slash';
@@ -24619,9 +24662,10 @@ function updateCloudNativeRigPost(dt){
     if(bones.rightUpLeg)bones.rightUpLeg.rotateX(-.12*slam);
     if(bones.leftLeg)bones.leftLeg.rotateX(.18*slam);
     if(bones.rightLeg)bones.rightLeg.rotateX(.18*slam);
-    // Head follows the target/front, not the sword above him.
-    if(bones.neck)bones.neck.rotateX(.10*lift-.18*slam);
-    if(bones.head)bones.head.rotateX(.08*lift-.14*slam);
+    // Keep face/neck neutral. Raising a giant sword should move the shoulders
+    // and torso, not make Cloud stare at the sky.
+    if(bones.neck)bones.neck.rotateX(-.08*lift-.10*slam);
+    if(bones.head)bones.head.rotateX(-.06*lift-.08*slam);
   }else if(style==='thrust'){
     if(bones.rightShoulder){bones.rightShoulder.rotateX(-.18*swing);bones.rightShoulder.rotateY(-.38*swing);}
     if(bones.rightArm){bones.rightArm.rotateX(-.72*swing);bones.rightArm.rotateY(-.34*swing);}
