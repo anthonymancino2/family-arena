@@ -11,7 +11,7 @@ preview, gameplay, abilities, Arcane Echoes, lifecycle cleanup, and save migrati
 Legacy ninefox IDs remain migration-only. The original KayKit Mage remains available
 only as an emergency visual fallback if the native fox asset fails.
 -->
-<!-- V22.16.00 Crossbreaker X-Wave + Onslaught Launch: fixes the two crashes behind both broken moves. (1) isMobile was referenced by twelve effect functions but never declared anywhere in the file, so every one of those calls threw a ReferenceError - during Royal Onslaught the throw landed inside the per-frame perimeter update, which stopped renderer.render() and froze the screen permanently at the first point. isMobile is now defined and the frame loop survives any single update error. (2) cloudCrossbreakerCapVisuals() and cloudCrossbreakerDestroyWave() were called but never defined, so the Crossbreaker X wave threw on creation and was silently swallowed - the projectile literally never existed. Both are now implemented and the wave is a real growing X-shaped projectile that carries its own damage, expands and dims as it leaves the arena, and self-destructs through three independent paths. Royal Onslaught crosses the map to five designated perimeter endpoints at half the old launch speed, each at least 115 degrees around the perimeter from the previous endpoint and never near the point two back, executing everything crossed on the line while the slow pace gathers the crowd behind an invulnerable Knight. After the fifth endpoint he takes the centre of the map and five X slash waves fire outward past the arena boundary while every enemy still inside is executed instantly. The finale waves run on an independent clock with a setTimeout backstop, so they finish their flight after the arena wipe stops the gameplay loop and can never be left in the scene. Crossbreaker Slash is halved in both size and travel speed. Enemies remain at 50% speed for the whole move, including any that spawn mid-move. -->
+<!-- V22.16.00 Crossbreaker X-Wave + Onslaught Launch: fixes the two crashes behind both broken moves. (1) isMobile was referenced by twelve effect functions but never declared anywhere in the file, so every one of those calls threw a ReferenceError - during Royal Onslaught the throw landed inside the per-frame perimeter update, which stopped renderer.render() and froze the screen permanently at the first point. isMobile is now defined and the frame loop survives any single update error. (2) cloudCrossbreakerCapVisuals() and cloudCrossbreakerDestroyWave() were called but never defined, so the Crossbreaker X wave threw on creation and was silently swallowed - the projectile literally never existed. Both are now implemented and the wave is a real growing X-shaped projectile that carries its own damage, expands and dims as it leaves the arena, and self-destructs through three independent paths. Royal Onslaught crosses the map to five designated perimeter endpoints at half the old launch speed, each at least 115 degrees around the perimeter from the previous endpoint and never near the point two back, executing everything crossed on the line while the slow pace gathers the crowd behind an invulnerable Knight. Royal bullet time is now scoped to the playable area instead of the whole world, so enemies spawning outside the arena close at full speed and only slow to 50% once they cross the boundary. For the entire sequence every non-boss enemy inside the playable area is executed on sight through a shared rate-limited queue, with bosses the standing exception. Contact during transit is also unconditionally lethal: detection is uncapped and marks enemies on touch, so no enemy can survive by being late in a rate-limited kill queue. After the fifth endpoint he takes the centre of the map and fires five X slash waves outward past the arena boundary, executing every enemy inside it, then repeats that volley on a 1.5 second cooldown for up to six turns total or until the last enemy is dead. The finale waves run on an independent clock with a setTimeout backstop, so they finish their flight after the arena wipe stops the gameplay loop and can never be left in the scene. Crossbreaker Slash is halved in size and its travel speed is cut to 17.25 u/s, 37.5% of the original, with the lifetime ceiling and concurrent-wave cap raised so the slower waves still reach the map edge instead of expiring in mid-air. Enemies remain at 50% speed for the whole move, including any that spawn mid-move. -->
 <!-- V22.13.99 Royal Onslaught Shadow Trail: adds lightweight avatar afterimage clones during Royal Onslaught dashes. Each dash now leaves several short-lived Knight shadow images at roughly 15% opacity between the start and end of the dash, creating a super-speed silhouette without restoring the removed ground trail. Gameplay, damage, cooldowns, capture rules, and version-label synchronization are unchanged. -->
 <!-- V22.13.98 Version Label Synchronization: synchronizes the static browser title and all visible landing-page/build labels to V22.13.98 using the centralized GAME_VERSION value. Gameplay, Royal Onslaught behavior, visuals, cooldowns, and balance are unchanged. -->
 <!-- V22.13.97 Royal Onslaught Trail Removal + Freeze Guard: completely removes the Royal Onslaught ground dash-lane/trail geometry and its delayed cleanup path, then isolates each strike inside a runtime safety boundary so one visual or target-state failure cannot stop the entire gameplay update loop between strikes. Damage, capture window, bullet time, elimination behavior, cooldown scaling, and remaining impact visuals are unchanged. -->
@@ -1428,7 +1428,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.16.01 - Onslaught Gather + Centre Finale';
+const GAME_VERSION='22.16.04 - Onslaught Play-Area Rules + Slower Crossbreaker';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -2666,10 +2666,25 @@ const ENEMY_SHOT_TAIL_MAX_LEN = 1.7;
 function knightRoyalOnslaughtBulletTimeActive(){
   return !!(knightRuntime && Number(knightRuntime.aegisWindow)>0);
 }
-function knightRoyalOnslaughtEnemyTimeScale(){
-  // While Onslaught is active, enemies and their attacks/projectiles run at
-  // 50% normal speed. The player/Cloud is not slowed.
-  return knightRoyalOnslaughtBulletTimeActive()?0.50:1;
+function knightOnslaughtPlayAreaRadius(){
+  // The playable circle: the same boundary the movement system holds the
+  // player inside (see buildArenaBoundary's collisionR).
+  return Math.max(4,arenaSize-1);
+}
+function knightOnslaughtInsidePlayArea(pos){
+  if(!pos||!Number.isFinite(pos.x)||!Number.isFinite(pos.z))return false;
+  const r=knightOnslaughtPlayAreaRadius();
+  return (pos.x*pos.x+pos.z*pos.z)<=r*r;
+}
+function knightRoyalOnslaughtEnemyTimeScale(entity){
+  // Royal bullet time applies to the playable area, not to the whole world.
+  // Enemies spawn well outside the arena and walk in: they travel at full
+  // speed the entire way and only drop to 50% once they cross the boundary.
+  // Called with no argument the answer is the in-area rate.
+  if(!knightRoyalOnslaughtBulletTimeActive())return 1;
+  const pos=(entity&&entity.position)?entity.position:entity;
+  if(pos&&Number.isFinite(pos.x)&&!knightOnslaughtInsidePlayArea(pos))return 1;
+  return 0.50;
 }
 function knightRoyalOnslaughtRestoreBulletTime(){
   // Slow motion is calculated from live state each frame, so resetting
@@ -2690,10 +2705,11 @@ function knightRoyalOnslaughtRestoreBulletTime(){
     }
   }catch(_err){}
 }
-function updateEnemyProjectiles(dt){
-  dt*=knightRoyalOnslaughtEnemyTimeScale();
+function updateEnemyProjectiles(baseDt){
   for(let i=enemyProjectiles.length-1;i>=0;i--){
     const p=enemyProjectiles[i];
+    // Per-shot: a projectile still outside the arena is not slowed either.
+    const dt=baseDt*knightRoyalOnslaughtEnemyTimeScale(p&&p.mesh);
     p.life-=dt; p.age+=dt;
     p.mesh.position.x+=p.dx*p.speed*dt;p.mesh.position.y+=p.dy*p.speed*dt;p.mesh.position.z+=p.dz*p.speed*dt;
     p.mesh.rotation.y+=dt*10;
@@ -2704,7 +2720,7 @@ function updateEnemyProjectiles(dt){
       // genuinely grows out of the shot rather than popping in at full
       // size — it can never be "longer than where this shot has been."
       p.tail.scale.y=Math.max(0.0001, Math.min(ENEMY_SHOT_TAIL_MAX_LEN, p.age*p.speed));
-      const bulletTime=knightRoyalOnslaughtEnemyTimeScale()<1;
+      const bulletTime=knightRoyalOnslaughtEnemyTimeScale(p.mesh)<1;
       p.tail.scale.x=bulletTime?1.55:1;
       p.tail.scale.z=bulletTime?1.55:1;
       for(const child of p.tail.children){
@@ -2756,7 +2772,7 @@ const LEVEL_UNLOCKS = [
   {level:8,  id:'knight_shield_toss', name:'Shield Toss', desc:'Throw and recall the royal shield from the Secondary slot, stunning every surviving enemy class for 3 seconds on contact.', avatar:'knight'},
   {level:10, id:'knight_royal_guard_clones', name:'Knights of the Round', desc:'Summon invincible Knight copies that inherit the moves unlocked so far and draw enemy attention.', avatar:'knight'},
   {level:12, id:'knight_guardian_quake', name:'Guardian Titan', desc:'Guardian Charge and Earth Shatter combine into one hold-controlled Titan Ability with movement steering, followed by a 15-second Titan form.', avatar:'knight'},
-  {level:14, id:'knight_aegis_counter', name:'Royal Onslaught', desc:'Royal bullet time. Five slow invulnerable crossings between far-apart perimeter points drag the crowd together, then the Knight takes the centre and five slash waves fire outward past the map edge, executing everything inside it.', avatar:'knight'},
+  {level:14, id:'knight_aegis_counter', name:'Royal Onslaught', desc:'Royal bullet time inside the arena only. Every non-boss enemy standing in the playable area is executed on the spot for the whole sequence; enemies still outside run at full speed until they cross in. Five slow invulnerable crossings, then the Knight takes the centre and fires five slash waves outward past the map edge, repeating up to six times on a 1.5s cooldown until the last enemy is dead.', avatar:'knight'},
   {level:18, id:'knight_judgment', name:'Judgment of the King', desc:'Judgment becomes an equipable ultimate-tier move in the Ability slot.', avatar:'knight'}
 ];
 let reachedLevelUnlocks = new Set();
@@ -3060,7 +3076,7 @@ const KNIGHT_DEFENSIVE_WHIRLWIND = {id:'knight_whirlwind', name:'Defensive Whirl
 const KNIGHT_GUARDIAN_QUAKE = {id:'knight_guardian_quake', name:'Guardian Titan', price:760, avatar:'knight', unlockLevel:12,
   desc:'Hold the Ability button to begin Guardian Charge and automatically flow into Earth Shatter when the charge finishes. Releasing before the charge ends cancels the Earth Shatter follow-up. Steer the charge with the normal movement controls. After the sequence, the Knight remains in Titan form for 15 seconds. Cooldown begins after Titan mode ends and scales with the current round tier.'};
 const KNIGHT_AEGIS_COUNTER = {id:'knight_aegis_counter', name:'Royal Onslaught', price:880, avatar:'knight', unlockLevel:14,
-  desc:'Map-clearing active ultimate. Royal bullet time drops every enemy and enemy projectile to 50% speed, including anything that spawns while it runs. You then cross the arena to five designated perimeter endpoints at half pace, each destination at least 115 degrees around the perimeter from the last and never near the point two back, executing every non-boss enemy on the line and hammering bosses on contact. The slow crossings pull the crowd together behind you. After the fifth endpoint the Knight takes the middle of the map and five slash waves fire outward past the arena edge, instantly killing every enemy still inside it. You are invulnerable for the whole sequence. Cooldown scales down by round to 0 at Round 45; boss damage remains capped.'};
+  desc:'Map-clearing active ultimate. Royal bullet time covers the playable area only: enemies and enemy projectiles inside the arena run at 50% speed while anything still outside the boundary travels at full speed until it crosses in. For the entire sequence every non-boss enemy inside the playable area is killed instantly, so the arena stays swept from activation to finish. You then cross the arena to five designated perimeter endpoints at half pace, each destination at least 115 degrees around the perimeter from the last and never near the point two back, executing every non-boss enemy on the line and hammering bosses on contact. The slow crossings pull the crowd together behind you. Any non-boss enemy the Knight touches in transit dies on contact, no exceptions. After the fifth endpoint he takes the middle of the map and fires five slash waves outward past the arena edge, instantly killing every enemy inside it, then repeats that volley on a 1.5 second cooldown up to six times in total or until the last enemy is dead. You are invulnerable for the whole sequence. Cooldown scales down by round to 0 at Round 45; boss damage remains capped.'};
 const KNIGHT_ROYAL_GUARD_CLONES = {id:'knight_royal_guard_clones', name:'Knights of the Round', price:0, avatar:'knight', unlockLevel:10,
   desc:'Knight signature move. Summon invincible Knight clones that draw enemy attention and use only the Knight moves currently unlocked. Each clone deals 10% of the player\'s damage. Rounds 10–15 summon 2 clones for 8 seconds with a 10-second cooldown; Rounds 16–20 summon 5 for 15 seconds with a 5-second cooldown; Round 21 onward summons 10 for 30 seconds with a 1.5-second cooldown.'};
 const KNIGHT_JUDGMENT_ULTIMATE = {id:'knight_judgment', name:'Judgment of the King', price:920, avatar:'knight', unlockLevel:18,
@@ -13606,6 +13622,8 @@ function createFreshKnightRuntime(){
     royalOnslaughtStrikeIndex:0, royalOnslaughtStrikeTimer:0,
     onslaughtPerimeterPoints:null, onslaughtPerimeterIndex:0, onslaughtPerimeterLeg:null,
     onslaughtPerimeterFinished:false, onslaughtHoldTimer:0, onslaughtCenterStarted:false,
+    onslaughtVolleyPhase:false, onslaughtVolleyCount:0, onslaughtVolleyTimer:0,
+    onslaughtCenterX:null, onslaughtCenterZ:null, onslaughtDoomedIds:null,
     royalOnslaughtDash:null,
     royalOnslaughtTargetCursor:0, royalOnslaughtEligibleIds:null,
     royalOnslaughtHitIds:null, royalOnslaughtDamagedIds:null, royalOnslaughtPauseContactIds:null,
@@ -16373,7 +16391,9 @@ const ONSLAUGHT_HOLD_TIME=.08;                   // readable beat at each point
 // Absolute runaway guard. Scales with the endpoint count so a legitimately
 // long 20-point route can never be cut short by the failsafe, while a stalled
 // route still always releases invulnerability and bullet time.
-const ONSLAUGHT_MAX_DURATION=ONSLAUGHT_POINTS*1.9+7;
+const ONSLAUGHT_VOLLEY_MAX=6;                    // the centre slash and 5 repeats
+const ONSLAUGHT_VOLLEY_COOLDOWN=1.5;             // seconds between centre volleys
+const ONSLAUGHT_MAX_DURATION=ONSLAUGHT_POINTS*1.9+ONSLAUGHT_VOLLEY_MAX*ONSLAUGHT_VOLLEY_COOLDOWN+9;
 const ONSLAUGHT_CONTACT_RADIUS=3.05;
 
 function knightOnslaughtAngleGap(a,b){
@@ -16509,44 +16529,90 @@ function knightOnslaughtSpeedTrail(pos,yaw,index=0){
 }
 
 function knightOnslaughtLaunchStrike(prev,curr,index=0){
-  // Executes everything the launch line passes through. Kills are capped per
-  // frame because killZombie() runs HUD, radar, drop and refill work, and an
-  // uncapped burst of those is what stalls Safari on late rounds.
+  // Contact between endpoints is unconditionally lethal to non-boss enemies.
+  //
+  // Detection is uncapped and marks the enemy for death the instant the Knight
+  // touches it. Only the execution itself is rate limited, because killZombie()
+  // runs HUD, radar, drop and refill work and an uncapped burst of that stalls
+  // Safari on late rounds. Anything marked stays marked and dies on a following
+  // frame, so a touched enemy can never survive by being late in the queue.
   if(!player||!zombies||!zombies.length)return 0;
 
   const radius=ONSLAUGHT_CONTACT_RADIUS*Math.max(1,Math.min(1.8,knightTitanCombatScale()));
   const r2=radius*radius;
-  const hitIds=knightRuntime.royalOnslaughtFrameHitIds||
-    (knightRuntime.royalOnslaughtFrameHitIds=new Set());
-  const killCap=isMobile?6:10;
+  const doomed=knightRuntime.onslaughtDoomedIds||
+    (knightRuntime.onslaughtDoomedIds=new Set());
 
-  let kills=0,fxUsed=0;
-  const fxCap=isMobile?2:3;
+  // --- pass 1: contact. Geometry only, no cap, no side effects. ---
   const snapshot=Array.from(zombies);
-
   for(const z of snapshot){
-    if(kills>=killCap)break;
-    if(!(knightRuntime.aegisWindow>0))break; // a kill may have ended the round
     if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    if(doomed.has(z.uuid))continue;
     if(knightRoyalOnslaughtSegmentDistanceSq(z.position,prev,curr)>r2)continue;
 
     if(knightEnemyClass(z)==='boss'){
+      // Bosses are the one exception: contact damages, never executes.
       const now=performance.now();
       if(!z.userData.lastOnslaughtBossTouchAt||now-z.userData.lastOnslaughtBossTouchAt>150){
         z.userData.lastOnslaughtBossTouchAt=now;
         knightRoyalOnslaughtBossHit(z,index);
-        if(fxUsed<fxCap){fxUsed++;knightShockRing(z.position,3.4,KNIGHT_STEEL,.30);}
+        knightShockRing(z.position,3.4,KNIGHT_STEEL,.30);
       }
       continue;
     }
+    doomed.add(z.uuid);
+  }
 
-    if(hitIds.has(z.uuid))continue;
-    hitIds.add(z.uuid);
+  return knightOnslaughtDrainDoomed();
+}
 
-    if(fxUsed<fxCap){
-      fxUsed++;
-      knightShockRing(z.position,2.9,KNIGHT_IVORY,.26);
-      spawnBurst(z.position.x,z.position.y+.8,z.position.z,isMobile?5:8,FX_MAT_SPARK,3.0);
+function knightOnslaughtPurgePlayArea(){
+  // Rule for the whole sequence: nothing non-boss survives inside the playable
+  // area while Royal Onslaught is running. Enemies are marked the frame they
+  // cross the boundary. Bosses are the standing exception and are never
+  // instantly killed - they take contact damage instead.
+  if(!zombies||!zombies.length)return 0;
+  const doomed=knightRuntime.onslaughtDoomedIds||
+    (knightRuntime.onslaughtDoomedIds=new Set());
+
+  for(const z of Array.from(zombies)){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    if(doomed.has(z.uuid))continue;
+    if(!knightOnslaughtInsidePlayArea(z.position))continue;
+    if(knightEnemyClass(z)==='boss')continue;
+    doomed.add(z.uuid);
+  }
+
+  return knightOnslaughtDrainDoomed();
+}
+
+function knightOnslaughtDrainDoomed(){
+  // Execution pass, rate limited but never abandoning a marked enemy.
+  // killZombie() runs HUD, radar, drop and refill work, so an uncapped burst
+  // of it stalls Safari on late rounds; anything left over dies next frame.
+  const doomed=knightRuntime.onslaughtDoomedIds;
+  if(!doomed||!doomed.size)return 0;
+
+  const hitIds=knightRuntime.royalOnslaughtFrameHitIds||
+    (knightRuntime.royalOnslaughtFrameHitIds=new Set());
+  let kills=0,fxUsed=0;
+  const killCap=isMobile?8:14;
+  const fxCap=isMobile?2:3;
+
+  for(const z of Array.from(zombies)){
+    if(kills>=killCap)break;
+    if(!(knightRuntime.aegisWindow>0))break; // a kill may have ended the round
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    if(!doomed.has(z.uuid))continue;
+
+    doomed.delete(z.uuid);
+    if(!hitIds.has(z.uuid)){
+      hitIds.add(z.uuid);
+      if(fxUsed<fxCap){
+        fxUsed++;
+        knightShockRing(z.position,2.9,KNIGHT_IVORY,.26);
+        spawnBurst(z.position.x,z.position.y+.8,z.position.z,isMobile?5:8,FX_MAT_SPARK,3.0);
+      }
     }
 
     z.userData.hp=0;
@@ -16671,6 +16737,69 @@ function knightOnslaughtFinaleBurst(){
   return running.length;
 }
 
+function knightOnslaughtLivingEnemyCount(){
+  let n=0;
+  for(const z of zombies){ if(z&&z.userData&&!z.userData.dead) n++; }
+  return n;
+}
+
+function knightOnslaughtEnemiesStillComing(){
+  // Enemies still queued to walk into the map mean the last one is not dead yet.
+  return (typeof zombiesRemainingToSpawn==='number' && zombiesRemainingToSpawn>0);
+}
+
+function knightOnslaughtFireCentreVolley(){
+  // One turn of the centre move: five slash waves outward past the map edge,
+  // and everything standing inside the map dies on the spot.
+  try{ knightOnslaughtFinaleBurst(); }
+  catch(err){ console.error('Onslaught finale recovered:',err); }
+  try{ return knightOnslaughtKillEntireMap(); }
+  catch(err){ console.error('Onslaught finisher recovered:',err); }
+  return 0;
+}
+
+function knightOnslaughtEndSequence(){
+  knightRuntime.onslaughtVolleyPhase=false;
+  if(knightRuntime.onslaughtPerimeterFinished)return;
+  knightRuntime.onslaughtPerimeterFinished=true;
+  knightEndAegis(false);
+  knightRuntime.aegisRecovery=.28;
+}
+
+function knightUpdateOnslaughtVolleys(dt){
+  // The Knight holds the centre and repeats the slash move on a fixed cooldown
+  // until the cap is reached or the map is genuinely empty.
+  if(!player)return;
+
+  // Hold the landing spot. Every volley has to fire from the same centre point.
+  if(Number.isFinite(knightRuntime.onslaughtCenterX)&&
+     Number.isFinite(knightRuntime.onslaughtCenterZ)){
+    player.position.x=knightRuntime.onslaughtCenterX;
+    player.position.z=knightRuntime.onslaughtCenterZ;
+  }
+  if(state.avatarType==='cloud'&&player.userData){
+    player.userData.spinVisualTimer=0;
+    player.userData.whirlwindTimer=0;
+    player.userData.whirlwindActive=false;
+  }
+
+  knightRuntime.onslaughtVolleyTimer=Math.max(0,(knightRuntime.onslaughtVolleyTimer||0)-dt);
+  if(knightRuntime.onslaughtVolleyTimer>0)return;
+
+  const fired=knightRuntime.onslaughtVolleyCount||0;
+  if(fired>=ONSLAUGHT_VOLLEY_MAX){ knightOnslaughtEndSequence(); return; }
+
+  // Last enemy already down and nothing left to arrive: stop early.
+  if(fired>0 && knightOnslaughtLivingEnemyCount()===0 && !knightOnslaughtEnemiesStillComing()){
+    knightOnslaughtEndSequence();
+    return;
+  }
+
+  knightRuntime.onslaughtVolleyCount=fired+1;
+  knightRuntime.onslaughtVolleyTimer=ONSLAUGHT_VOLLEY_COOLDOWN;
+  knightOnslaughtFireCentreVolley();
+}
+
 function knightOnslaughtBeginCenterLeg(){
   // Sixth and final move of the sequence: straight to the middle of the map.
   if(!player)return false;
@@ -16772,6 +16901,9 @@ function knightOnslaughtKillEntireMap(){
   triggerCombatShake(13,180);
   if(navigator.vibrate)navigator.vibrate([45,16,75]);
 
+  // Repeat volleys need the arena to refill promptly rather than waiting on the
+  // once-per-second recovery pass. Both calls no-op once the round is finished.
+  fillEnemySlotsFromQueue();
   completeCurrentRound();
   return count;
 }
@@ -16781,17 +16913,11 @@ function knightUpdatePerimeterOnslaught(dt){
   const pts=knightRuntime.onslaughtPerimeterPoints;
   if(!pts||!pts.length){ knightEndAegis(false); return; }
 
+  // Abnormal exit only (runaway guard, missing route): one volley, then stop.
   const finishRun=()=>{
     if(knightRuntime.onslaughtPerimeterFinished)return;
-    knightRuntime.onslaughtPerimeterFinished=true;
-    // Waves first so they are already flying on their own clock, then the
-    // instant execution of everything still standing inside the map.
-    try{ knightOnslaughtFinaleBurst(); }
-    catch(err){ console.error('Onslaught finale recovered:',err); }
-    try{ knightOnslaughtKillEntireMap(); }
-    catch(err){ console.error('Onslaught finisher recovered:',err); }
-    knightEndAegis(false);
-    knightRuntime.aegisRecovery=.28;
+    knightOnslaughtFireCentreVolley();
+    knightOnslaughtEndSequence();
   };
 
   // Absolute runaway guard. However the route stalls, the move releases the
@@ -16803,7 +16929,20 @@ function knightUpdatePerimeterOnslaught(dt){
 
   const safeDt=Math.max(0,Math.min(.12,Number.isFinite(dt)?dt:0));
 
-  // Short landing beat between launches so ten crossings stay readable.
+  // Every frame of the sequence, in every phase: anything non-boss standing
+  // inside the playable area is executed. Enemies are safe only while they are
+  // still outside the boundary walking in.
+  try{ knightOnslaughtPurgePlayArea(); }
+  catch(err){ console.error('Onslaught purge recovered:',err); }
+  if(!(knightRuntime.aegisWindow>0))return; // a kill may have ended the round
+
+  // Centre phase: hold position and repeat the slash move on its cooldown.
+  if(knightRuntime.onslaughtVolleyPhase){
+    knightUpdateOnslaughtVolleys(safeDt);
+    return;
+  }
+
+  // Short landing beat between launches so the crossings stay readable.
   if((knightRuntime.onslaughtHoldTimer||0)>0){
     knightRuntime.onslaughtHoldTimer=Math.max(0,knightRuntime.onslaughtHoldTimer-safeDt);
     try{
@@ -16850,7 +16989,8 @@ function knightUpdatePerimeterOnslaught(dt){
     player.userData.whirlwindActive=false;
   }
 
-  // Everything crossed on the way over is executed.
+  // Everything crossed on the way over is executed. Called every frame, so the
+  // marked-for-death queue keeps draining even during the landing beats.
   try{
     knightOnslaughtLaunchStrike(prev,{x:player.position.x,z:player.position.z},leg.index);
   }catch(err){ console.error('Onslaught contact recovered:',err); }
@@ -16869,13 +17009,19 @@ function knightUpdatePerimeterOnslaught(dt){
     player.position.z=leg.toZ;
 
     if(leg.isCenter){
-      // Landed dead centre: five slash waves outward, arena executed.
+      // Landed dead centre. The first volley fires on the next frame and the
+      // move then repeats it on a 1.5s cooldown from this exact spot.
       knightRuntime.onslaughtPerimeterLeg=null;
       knightRuntime.onslaughtHoldTimer=0;
+      knightRuntime.onslaughtVolleyPhase=true;
+      knightRuntime.onslaughtVolleyCount=0;
+      knightRuntime.onslaughtVolleyTimer=0;
+      knightRuntime.onslaughtCenterX=player.position.x;
+      knightRuntime.onslaughtCenterZ=player.position.z;
       knightRoyalOnslaughtImpactColumn(player.position,2.2,KNIGHT_IVORY,300);
+      knightRoyalOnslaughtSigilFx(player.position,2.4,400);
       triggerCombatShake(15,200);
       if(navigator.vibrate)navigator.vibrate([45,18,80]);
-      finishRun();
       return;
     }
 
@@ -16936,6 +17082,13 @@ function triggerKnightAegisCounter(){
   knightRuntime.onslaughtPerimeterFinished=false;
   knightRuntime.onslaughtHoldTimer=0;
   knightRuntime.onslaughtCenterStarted=false;
+  knightRuntime.onslaughtVolleyPhase=false;
+  knightRuntime.onslaughtVolleyCount=0;
+  knightRuntime.onslaughtVolleyTimer=0;
+  knightRuntime.onslaughtCenterX=null;
+  knightRuntime.onslaughtCenterZ=null;
+  if(knightRuntime.onslaughtDoomedIds)knightRuntime.onslaughtDoomedIds.clear();
+  knightRuntime.onslaughtDoomedIds=new Set();
   knightRuntime.royalOnslaughtLastBodyX=null;
   knightRuntime.royalOnslaughtLastBodyZ=null;
   if(knightRuntime.royalOnslaughtFrameHitIds)knightRuntime.royalOnslaughtFrameHitIds.clear();
@@ -17761,6 +17914,13 @@ function knightEndAegis(success){
   knightRuntime.onslaughtPerimeterFinished=false;
   knightRuntime.onslaughtHoldTimer=0;
   knightRuntime.onslaughtCenterStarted=false;
+  knightRuntime.onslaughtVolleyPhase=false;
+  knightRuntime.onslaughtVolleyCount=0;
+  knightRuntime.onslaughtVolleyTimer=0;
+  knightRuntime.onslaughtCenterX=null;
+  knightRuntime.onslaughtCenterZ=null;
+  if(knightRuntime.onslaughtDoomedIds)knightRuntime.onslaughtDoomedIds.clear();
+  knightRuntime.onslaughtDoomedIds=null;
 
   // Final orphan scrub: only Knight spectacle effects are touched. Enemy
   // projectiles and unrelated avatar/gameplay effects are intentionally left alone.
@@ -19356,7 +19516,9 @@ function knightAbilityCooldownInfo(){
         : ONSLAUGHT_POINTS;
       return {
         label:active
-          ? (captureLeft>0?'CAPTURE '+captureLeft.toFixed(1)+'s':'POINT '+Math.min(hits+1,totalPoints)+'/'+totalPoints)
+          ? (knightRuntime.onslaughtVolleyPhase
+              ? 'SLASH '+Math.min(knightRuntime.onslaughtVolleyCount||0,ONSLAUGHT_VOLLEY_MAX)+'/'+ONSLAUGHT_VOLLEY_MAX
+              : (captureLeft>0?'CAPTURE '+captureLeft.toFixed(1)+'s':'POINT '+Math.min(hits+1,totalPoints)+'/'+totalPoints))
           : 'ONSLAUGHT',
         cd:knightRuntime.aegisCooldown,
         active,
@@ -22999,15 +23161,15 @@ function triggerCloudSkybreakerSlash(w){
 // CROSSBREAKER_WAVE_GROW is intentionally unchanged, so the wave still
 // visibly expands on its way off the map - just from half the size.
 const CROSSBREAKER_MELEE_RANGE=6;      // instant sword reach at the caster
-const CROSSBREAKER_WAVE_SPEED=23;      // units per second
-const CROSSBREAKER_WAVE_LIFE=3.8;      // lifetime ceiling: half speed needs longer
+const CROSSBREAKER_WAVE_SPEED=17.25;   // units per second (75% of the 23 pass)
+const CROSSBREAKER_WAVE_LIFE=5.2;      // lifetime ceiling: slower waves need longer
 const CROSSBREAKER_WAVE_GROW=3.0;      // extra scale gained by the arena edge
 const CROSSBREAKER_WAVE_HALF_WIDTH=1.5;// damage half-width at spawn scale
 const CROSSBREAKER_WAVE_DEPTH=1.05;    // damage thickness of the wave plane
 const CROSSBREAKER_WAVE_OVERSHOOT=12;  // how far past the map edge it flies
 const CROSSBREAKER_WAVE_BLADE_Y=1.9;   // lower centre keeps the smaller X on enemies
 
-function cloudCrossbreakerMaxWaves(){ return isMobile?5:8; }
+function cloudCrossbreakerMaxWaves(){ return isMobile?7:10; }
 
 function cloudCrossbreakerCapVisuals(){
   // Hard ceiling on simultaneous waves. Oldest goes first so a held attack
@@ -25220,7 +25382,7 @@ function update(dt){
   // Zombies chase + contact damage — frozen in place while free roaming.
   if(!freeMode){
     zombies.forEach(z=>{
-      const enemyDt=dt*knightRoyalOnslaughtEnemyTimeScale();
+      const enemyDt=dt*knightRoyalOnslaughtEnemyTimeScale(z);
       if(z.userData.kayMixer) z.userData.kayMixer.update(enemyDt);
       z.userData.kayActionLock=Math.max(0,(z.userData.kayActionLock||0)-enemyDt);
       if(z.userData.dead || z.userData.spawnPending) return;
