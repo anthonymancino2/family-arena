@@ -201,7 +201,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Family Arena V22.14.92</title>
+<title>Family Arena V22.14.93</title>
 <!-- V22.10.8 Development Testing Unlocks: temporarily unlocks every combat attack and ability at the start of each run, including Arcane Echoes, so all current moves can be equipped and tested without level or coin requirements. Progression rules remain available to restore for release. -->
 <!-- V22.10.5 Arena-Scale Blizzard + True Boundary Readability: Blizzard uses a five-times-larger gameplay radius, rains impacts only inside the playable arena, and reliably affects arena-wide enemies; a visible circular curb and warning stripe now line up exactly with the player's collision boundary so there are no misleading invisible walls. -->
 <!-- V22.10.2 Pause Abilities Navigation Fix: Pause → Abilities now opens directly above the pause screen while combat remains fully frozen; closing it returns to Pause instead of resuming. The menu now includes the regular primary/secondary attack shop plus ultimate-tier abilities. -->
@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.14.92 - Onslaught Touch Kill Ultimate';
+const GAME_VERSION='22.14.93 - Onslaught Frame Contact Kill';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -13543,7 +13543,7 @@ function createFreshKnightRuntime(){
     royalOnslaughtDash:null,
     royalOnslaughtTargetCursor:0, royalOnslaughtEligibleIds:null,
     royalOnslaughtHitIds:null, royalOnslaughtDamagedIds:null, royalOnslaughtPauseContactIds:null,
-    royalOnslaughtBossDamage:null, royalOnslaughtTargets:[], royalOnslaughtOriginX:0, royalOnslaughtOriginZ:0,
+    royalOnslaughtBossDamage:null, royalOnslaughtTargets:[], royalOnslaughtOriginX:0, royalOnslaughtOriginZ:0, royalOnslaughtLastBodyX:null, royalOnslaughtLastBodyZ:null, royalOnslaughtFrameHitIds:null,
     shieldTossCooldown:0, shieldToss:null, shieldAway:false,
     resistTimer:0, frontGuardTimer:0,
     ultPhase:0, ultTimer:0, ultMarks:[], ultTickTimer:0, ultMarkIndex:0,
@@ -16276,6 +16276,9 @@ function triggerKnightAegisCounter(){
   knightRuntime.royalOnslaughtElapsed=0;
   knightRuntime.royalOnslaughtOriginX=player.position.x;
   knightRuntime.royalOnslaughtOriginZ=player.position.z;
+  knightRuntime.royalOnslaughtLastBodyX=player.position.x;
+  knightRuntime.royalOnslaughtLastBodyZ=player.position.z;
+  knightRuntime.royalOnslaughtFrameHitIds=new Set();
   knightRuntime.royalOnslaughtCaptureUntil=knightRuntime.royalOnslaughtStartedAt+3000;
   knightRuntime.royalOnslaughtCaptureRemainingTime=3;
   knightRuntime.royalOnslaughtEligibleIds=new Set(
@@ -16349,8 +16352,8 @@ function knightRoyalOnslaughtSegmentDistanceSq(point,a,b){
   return dx*dx+dz*dz;
 }
 
-const KNIGHT_ONSLAUGHT_BODY_CONTACT_RADIUS=2.15;
-const KNIGHT_ONSLAUGHT_ENDPOINT_CONTACT_RADIUS=2.65;
+const KNIGHT_ONSLAUGHT_BODY_CONTACT_RADIUS=2.65;
+const KNIGHT_ONSLAUGHT_ENDPOINT_CONTACT_RADIUS=3.00;
 
 function knightRoyalOnslaughtContactRadius(endpoint=false){
   const base=endpoint
@@ -16973,8 +16976,86 @@ function knightRoyalOnslaughtPruneEligibility(){
     if(!liveIds.has(id)) eligible.delete(id);
   }
 }
+
+function knightRoyalOnslaughtFrameContactKill(){
+  if(!(knightRuntime.aegisWindow>0)||!player)return 0;
+
+  const prev={
+    x:Number.isFinite(knightRuntime.royalOnslaughtLastBodyX)
+      ? knightRuntime.royalOnslaughtLastBodyX
+      : player.position.x,
+    z:Number.isFinite(knightRuntime.royalOnslaughtLastBodyZ)
+      ? knightRuntime.royalOnslaughtLastBodyZ
+      : player.position.z
+  };
+  const curr={x:player.position.x,z:player.position.z};
+
+  knightRuntime.royalOnslaughtLastBodyX=curr.x;
+  knightRuntime.royalOnslaughtLastBodyZ=curr.z;
+
+  const radius=2.65*Math.max(1,Math.min(1.8,knightTitanCombatScale()));
+  const r2=radius*radius;
+  const hitIds=knightRuntime.royalOnslaughtFrameHitIds||
+    (knightRuntime.royalOnslaughtFrameHitIds=new Set());
+
+  let killsNow=0;
+  const victims=Array.from(zombies);
+
+  for(const z of victims){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+
+    // Capsule from previous actual player position to current actual position.
+    const sweptSq=knightRoyalOnslaughtSegmentDistanceSq(z.position,prev,curr);
+
+    // Also check current overlap directly. This catches enemies that are simply
+    // standing inside Cloud while he pauses at an endpoint.
+    const dx=z.position.x-curr.x,dz=z.position.z-curr.z;
+    const overlapSq=dx*dx+dz*dz;
+
+    if(sweptSq>r2 && overlapSq>r2)continue;
+
+    const isBoss=knightEnemyClass(z)==='boss';
+
+    // One visual/contact event per enemy for this Onslaught use.
+    if(!hitIds.has(z.uuid)){
+      hitIds.add(z.uuid);
+      knightRoyalOnslaughtProvenImpactWow(z,knightRuntime.royalOnslaughtStrikeIndex||0);
+    }
+
+    if(isBoss){
+      // Bosses are contact-damaged but never touch-killed.
+      const now=performance.now();
+      if(!z.userData.lastOnslaughtBossTouchAt || now-z.userData.lastOnslaughtBossTouchAt>180){
+        z.userData.lastOnslaughtBossTouchAt=now;
+        knightRoyalOnslaughtBossHit(z,knightRuntime.royalOnslaughtStrikeIndex||0);
+      }
+      continue;
+    }
+
+    // Hardest possible rule: direct removal through the canonical death path.
+    // No damage function is involved.
+    z.userData.hp=0;
+    killZombie(z);
+    killsNow++;
+
+    // Every touch-kill also wipes nearby non-boss enemies in the 5-unit
+    // shockwave. This helper itself uses direct killZombie() for non-bosses.
+    knightRoyalOnslaughtLethalRadius(
+      {x:curr.x,y:player.position.y||0,z:curr.z},
+      knightRuntime.royalOnslaughtStrikeIndex||0,
+      z
+    );
+  }
+
+  return killsNow;
+}
+
 function knightUpdateAegis(dt){
   if(knightRuntime.aegisWindow>0){
+    // Absolute fallback/authority: physical player contact itself kills.
+    // This runs every Onslaught frame independently of dash/endpoint callbacks.
+    knightRoyalOnslaughtFrameContactKill();
+
     knightRuntime.royalOnslaughtElapsed=(knightRuntime.royalOnslaughtElapsed||0)+dt;
     knightRuntime.royalOnslaughtCaptureRemainingTime=Math.max(0,(knightRuntime.royalOnslaughtCaptureRemainingTime||0)-dt);
     knightRoyalOnslaughtPruneEligibility();
@@ -17057,6 +17138,10 @@ function knightEndAegis(success){
   knightRuntime.royalOnslaughtTargetCursor=0;
   knightRuntime.royalOnslaughtOriginX=0;
   knightRuntime.royalOnslaughtOriginZ=0;
+  knightRuntime.royalOnslaughtLastBodyX=null;
+  knightRuntime.royalOnslaughtLastBodyZ=null;
+  if(knightRuntime.royalOnslaughtFrameHitIds)knightRuntime.royalOnslaughtFrameHitIds.clear();
+  knightRuntime.royalOnslaughtFrameHitIds=null;
 
   // Final orphan scrub: only Knight spectacle effects are touched. Enemy
   // projectiles and unrelated avatar/gameplay effects are intentionally left alone.
