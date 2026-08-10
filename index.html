@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.15.03 - Titan No Whirlwind';
+const GAME_VERSION='22.15.04 - Crossbreaker Triple Fan';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -12163,6 +12163,7 @@ function setupControls(){
   const ultimateBtnEl=document.getElementById('ultimateBtn');
   const activateUltimate=e=>{
     if(e){ e.preventDefault(); e.stopPropagation(); }
+    if(state.avatarType==='cloud') resetCloudCrossbreakerChain();
     if(mageGameplayActive()) triggerArcaneEchoes();
     else if(state.avatarType==='rogue') triggerArcherMirrorClones();
     else if(knightIsActive()){
@@ -15983,6 +15984,7 @@ function updateKnightGuardianGiant(dt){
   knightSyncAvatarScale();
 }
 function triggerKnightGuardianQuake(){
+  if(state.avatarType==='cloud') resetCloudCrossbreakerChain();
   if(!gameRunning||!knightIsActive()||!knightGuardianQuakeEquipped()) return false;
   if(knightRuntime.chargeCooldown>0||knightRuntime.shatterCooldown>0||
      knightRuntime.chargeTimer>0||knightRuntime.shatterPhase>0||
@@ -16317,6 +16319,7 @@ function knightRoyalOnslaughtClearAllMarkers(){
   for(const z of zombies) knightRoyalOnslaughtClearMarker(z);
 }
 function triggerKnightAegisCounter(){
+  if(state.avatarType==='cloud') resetCloudCrossbreakerChain();
   if(!gameRunning||!knightIsActive()) return;
   if(knightRuntime.aegisCooldown>0||knightRuntime.aegisWindow>0||knightRuntime.aegisRecovery>0) return;
 
@@ -17463,6 +17466,7 @@ function knightSpawnJudgmentSword(){
   knightRuntime.ultSword=g;
 }
 function triggerKingsJudgment(){
+  if(state.avatarType==='cloud') resetCloudCrossbreakerChain();
   if(!gameRunning||!knightIsActive()||knightRuntime.ultPhase>0) return;
   if((knightRuntime.ultCooldown||0)>0){ toast(`Judgment ready in ${Math.ceil(knightRuntime.ultCooldown)}s`); return; }
   const c=KNIGHT_CFG.ultimate;
@@ -18521,6 +18525,7 @@ function updateKnightRoyalOnslaughtClone(c,dt){
   else c.userData.onslaughtStrikeCooldown=.035+phase;
 }
 function triggerKnightRoyalGuardClones(){
+  if(state.avatarType==='cloud') resetCloudCrossbreakerChain();
   if(!gameRunning||!knightRoyalCloneUnlocked()||knightRoyalCloneCooldown>0)return false;
   const cfg=knightRoyalCloneConfig();
   if(cfg.count<=0)return false;
@@ -18821,6 +18826,7 @@ function knightAbilityCooldownInfo(){
 }
 function triggerKnightEquippedAbility(){
   if(!knightIsActive()) return;
+  if(state.avatarType==='cloud') resetCloudCrossbreakerChain();
   // Guardian Titan owns the special/Ability slot for the entire transformation.
   // Primary and Secondary routing is intentionally untouched so both remain
   // usable during the 15-second post-quake Titan combat window.
@@ -22263,6 +22269,7 @@ function performWeaponAttack(w, countsAsPrimary=true){
 }
 function doShoot(){
   if(!gameRunning) return;
+  if(state.avatarType==='cloud') resetCloudCrossbreakerChain();
   // The Knight is deliberate: attacks never fire while charging, slamming or
   // casting the ultimate.
   if(typeof knightMovementLocked==='function' && knightMovementLocked()) return;
@@ -22287,6 +22294,11 @@ function doShoot(){
 let cloudSkybreakerCharge=null;
 let cloudSkybreakerWaves=[];
 let cloudSkybreakerNextReadyAt=0;
+let cloudCrossbreakerStreak=0;
+
+function resetCloudCrossbreakerChain(){
+  cloudCrossbreakerStreak=0;
+}
 
 function cloudCrossbreakerActive(){
   return state.avatarType==='cloud' && (
@@ -22317,8 +22329,13 @@ function triggerCloudSkybreakerSlash(w){
   player.userData.cloudAttackStyle='cross';
 
   // Timestamp-based cooldown is independent of the generic Secondary timer.
-  // This cannot get permanently stuck if another combat update path misbehaves.
   cloudSkybreakerNextReadyAt=performance.now()+Math.max(150,(w.cooldown||0.5)*1000);
+
+  // Three consecutive normal Crossbreakers prime the NEXT Crossbreaker.
+  // The fourth consecutive cast releases the three-wave fan, then restarts the chain.
+  const tripleFan=cloudCrossbreakerStreak>=3;
+  if(tripleFan) cloudCrossbreakerStreak=0;
+  else cloudCrossbreakerStreak++;
 
   const target=findNearestEnemy(22);
   if(target){
@@ -22334,6 +22351,7 @@ function triggerCloudSkybreakerSlash(w){
     timer:.34,
     total:.34,
     yaw,
+    tripleFan,
     released:false
   };
 
@@ -22351,7 +22369,7 @@ function triggerCloudSkybreakerSlash(w){
   return true;
 }
 
-function spawnCloudSkybreakerWave(w,yaw){
+function spawnCloudSkybreakerWave(w,yaw,fanIndex=0){
   if(!player||!scene)return;
 
   const group=new THREE.Group();
@@ -22416,7 +22434,8 @@ function spawnCloudSkybreakerWave(w,yaw){
     width:w.width||4.8,
     hitIds:new Set(),
     life:1.45,
-    cross:true
+    cross:true,
+    fanIndex
   });
 
   knightShockRing(player.position,4.0,KNIGHT_IVORY,.55);
@@ -22441,9 +22460,24 @@ function updateCloudSkybreaker(dt){
     if(c.timer<=0&&!c.released){
       c.released=true;
       try{
-        spawnCloudSkybreakerWave(c.weapon,c.yaw);
+        if(c.tripleFan){
+          // A little over 180 degrees total: 184° from left edge to right edge.
+          // All three X-waves originate at Cloud and penetrate their full 50-ft lanes.
+          const fanHalf=(184*Math.PI/180)*.5;
+          spawnCloudSkybreakerWave(c.weapon,c.yaw-fanHalf,-1);
+          spawnCloudSkybreakerWave(c.weapon,c.yaw,0);
+          spawnCloudSkybreakerWave(c.weapon,c.yaw+fanHalf,1);
+
+          knightShockRing(player.position,5.2,KNIGHT_IVORY,.62);
+          knightShockRing(player.position,4.1,KNIGHT_GOLD,.68);
+          spawnKnightGuardBurst(player.position,5.0,KNIGHT_GOLD);
+          triggerCombatShake(14,180);
+          if(navigator.vibrate)navigator.vibrate([35,10,35,10,70]);
+        }else{
+          spawnCloudSkybreakerWave(c.weapon,c.yaw,0);
+        }
       }catch(err){
-        console.error('Skybreaker release recovered:',err);
+        console.error('Crossbreaker release recovered:',err);
       }finally{
         // Never allow a failed visual/wave spawn to leave Skybreaker armed forever.
         cloudSkybreakerCharge=null;
@@ -22474,11 +22508,15 @@ function updateCloudSkybreaker(dt){
     const pulse=1+Math.sin(performance.now()*.028)*.07;
     wv.group.scale.setScalar(pulse);
 
-    // Wide swept lane. Each enemy can be hit once by this sword-wave.
-    const halfWidth=(wv.width||3.4)*.5;
-    const r2=halfWidth*halfWidth;
+    // Match collision to the visible diagonal X, not only its center line.
+    // The rotated X is visibly much wider than the raw PlaneGeometry width.
+    const visualHalfSpan=Math.max(4.1,(wv.width||4.8)*.84);
+    const r2=visualHalfSpan*visualHalfSpan;
     for(const z of Array.from(zombies)){
       if(!z||!z.userData||z.userData.dead||z.userData.spawnPending||wv.hitIds.has(z.uuid))continue;
+
+      // Swept full-width energy volume: every enemy inside the visible wave
+      // footprint is hit in the same frame, so crowded rows die together.
       if(knightRoyalOnslaughtSegmentDistanceSq(z.position,prev,wv.group.position)>r2)continue;
 
       wv.hitIds.add(z.uuid);
@@ -22521,6 +22559,7 @@ function updateCloudSkybreaker(dt){
 function clearCloudSkybreaker(){
   cloudSkybreakerCharge=null;
   cloudSkybreakerNextReadyAt=0;
+  cloudCrossbreakerStreak=0;
   if(player&&player.userData)player.userData.secondaryAttackCooldown=0;
   for(const wv of cloudSkybreakerWaves){
     if(wv&&wv.group&&wv.group.parent){
@@ -22534,6 +22573,7 @@ function clearCloudSkybreaker(){
 function doSecondaryShoot(){
   const w=secondaryWeaponForAvatar();
   if(!gameRunning||!w)return;
+  if(state.avatarType==='cloud'&&w.kind!=='cloud_great_sword_slash') resetCloudCrossbreakerChain();
   // Chain-Lightning Javelin launches without a target or charge, but uses a fixed
   // one-second cooldown so repeated casts remain powerful without becoming spammy.
   if(w.kind==='chain_lightning_javelin'){
