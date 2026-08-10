@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.15.08 - Crossbreaker Reliable Area + Cleanup';
+const GAME_VERSION='22.15.09 - Crossbreaker 3D Visible + Head Neutral';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -22402,7 +22402,7 @@ function cloudCrossbreakerHitFullWaveArea(w,yaw,fanIndex=0){
 
   // Single Crossbreaker is deliberately broad. Triple side waves are broader
   // still; centers at -65/0/+65 with ±32° half-angle produce ~194° coverage.
-  const halfAngleDeg=(Math.abs(fanIndex)===1)?32:18;
+  const halfAngleDeg=(Math.abs(fanIndex)===1)?34:28;
   const halfAngle=halfAngleDeg*Math.PI/180;
   const fx=Math.sin(yaw),fz=Math.cos(yaw);
   let hitCount=0;
@@ -22452,54 +22452,73 @@ function spawnCloudSkybreakerWave(w,yaw,fanIndex=0){
   const fx=Math.sin(yaw),fz=Math.cos(yaw);
   const sideWave=Math.abs(fanIndex)===1;
 
+  // Parent faces the attack direction. Child blades are true 3D boxes, so the X
+  // cannot disappear edge-on like the old PlaneGeometry version.
+  group.rotation.y=yaw;
+
   const makeMat=(color,opacity)=>new THREE.MeshBasicMaterial({
     color,
     transparent:true,
     opacity,
     depthWrite:false,
-    side:THREE.DoubleSide,
+    depthTest:false,
     blending:THREE.AdditiveBlending
   });
 
-  // Two bright but narrow diagonal blades form a readable X without filling
-  // the entire screen with solid white.
-  const slashA=new THREE.Mesh(
-    new THREE.PlaneGeometry(sideWave?7.0:6.2,sideWave?5.6:5.0),
-    makeMat(KNIGHT_IVORY,sideWave?.50:.46)
-  );
-  slashA.rotation.y=yaw;
-  slashA.rotation.z=Math.PI/4;
-  slashA.position.y=2.1;
-  group.add(slashA);
+  function addBlade(angle,color){
+    const length=sideWave?7.8:7.0;
 
-  const slashB=new THREE.Mesh(
-    new THREE.PlaneGeometry(sideWave?7.0:6.2,sideWave?5.6:5.0),
-    makeMat(KNIGHT_GOLD,sideWave?.46:.40)
-  );
-  slashB.rotation.y=yaw;
-  slashB.rotation.z=-Math.PI/4;
-  slashB.position.y=2.1;
-  group.add(slashB);
+    // Outer glow volume.
+    const glow=new THREE.Mesh(
+      new THREE.BoxGeometry(sideWave?.72:.66,length,.52),
+      makeMat(color,sideWave?.50:.46)
+    );
+    glow.rotation.z=angle;
+    glow.position.y=2.35;
+    glow.renderOrder=40;
+    group.add(glow);
 
-  // Ground sector shows the actual damage direction/width.
-  const halfAngle=(sideWave?32:18)*Math.PI/180;
-  const sector=new THREE.Mesh(
-    new THREE.CircleGeometry(6.2,28,-halfAngle*0.5,halfAngle),
+    // Bright inner sword-energy core.
+    const core=new THREE.Mesh(
+      new THREE.BoxGeometry(sideWave?.25:.22,length*.93,.26),
+      makeMat(KNIGHT_IVORY,sideWave?.92:.88)
+    );
+    core.rotation.z=angle;
+    core.position.y=2.35;
+    core.position.z=.02;
+    core.renderOrder=41;
+    group.add(core);
+  }
+
+  addBlade(Math.PI/4,KNIGHT_GOLD);
+  addBlade(-Math.PI/4,KNIGHT_STEEL);
+
+  // Compact bright X center punch.
+  const center=new THREE.Mesh(
+    new THREE.SphereGeometry(sideWave?.54:.48,isMobile?10:14,isMobile?7:10),
+    makeMat(KNIGHT_IVORY,.82)
+  );
+  center.position.y=2.35;
+  center.renderOrder=42;
+  group.add(center);
+
+  // A low ground streak makes the direction readable without washing out the map.
+  const streak=new THREE.Mesh(
+    new THREE.BoxGeometry(sideWave?5.2:4.5,.06,2.1),
     makeMat(fanIndex===0?KNIGHT_IVORY:KNIGHT_GOLD,sideWave?.18:.14)
   );
-  sector.rotation.x=-Math.PI/2;
-  sector.rotation.z=-yaw-Math.PI/2;
-  sector.position.y=.045;
-  group.add(sector);
+  streak.position.y=.08;
+  streak.renderOrder=39;
+  group.add(streak);
 
   group.position.set(
-    player.position.x+fx*1.1,
+    player.position.x+fx*1.2,
     player.position.y,
-    player.position.z+fz*1.1
+    player.position.z+fz*1.2
   );
   scene.add(group);
 
-  // Resolve damage now. The visual is no longer responsible for collision.
+  // Resolve the full attack sector immediately. The 3D X is presentation only.
   const fullAreaHits=cloudCrossbreakerHitFullWaveArea(w,yaw,fanIndex);
 
   const wv={
@@ -22510,19 +22529,21 @@ function spawnCloudSkybreakerWave(w,yaw,fanIndex=0){
     dirZ:fz,
     travelled:0,
     range:w.range||50,
-    speed:34,
-    life:.42,
+    speed:30,
+    life:.58,
+    maxLife:.58,
     fanIndex,
     fullAreaHits,
     destroyed:false,
-    cleanupTimer:null
+    cleanupTimer:null,
+    baseScale:sideWave?1.10:1
   };
   cloudSkybreakerWaves.push(wv);
 
-  // HARD cleanup independent of requestAnimationFrame/updateCloudSkybreaker().
+  // Hard timeout independent of the frame loop.
   wv.cleanupTimer=setTimeout(()=>{
     cloudCrossbreakerDestroyWave(wv);
-  },420);
+  },620);
 
   return wv;
 }
@@ -22581,11 +22602,18 @@ function updateCloudSkybreaker(dt){
       wv.travelled+=step;
       wv.life-=dt;
 
-      // Fade fast so repeated 0.5-sec casts remain readable.
-      const q=Math.max(0,wv.life/.42);
+      const q=Math.max(0,wv.life/(wv.maxLife||.58));
+      const pulse=(wv.baseScale||1)*(1+Math.sin(performance.now()*.035+(wv.fanIndex||0))*.06);
+      wv.group.scale.setScalar(pulse);
+
+      // Store original opacity once and fade from that value, avoiding the old
+      // multiplicative fade that could make the wave effectively invisible instantly.
       for(const child of wv.group.children){
         if(child.material&&'opacity' in child.material){
-          child.material.opacity*=Math.max(.82,q);
+          if(child.userData.crossBaseOpacity===undefined){
+            child.userData.crossBaseOpacity=child.material.opacity;
+          }
+          child.material.opacity=child.userData.crossBaseOpacity*Math.min(1,q*1.8);
         }
       }
 
@@ -24881,7 +24909,7 @@ function updateCloudNativeRigPost(dt){
   // Keep Cloud's face level during ordinary sword attacks. The imported rig's
   // parent-axis orientation makes positive whole-body pitch read as looking up.
   // Counter the neck/head locally while the shoulders and torso still swing.
-  if(style!=='spin'&&style!=='overhead'){
+  if(style!=='spin'&&style!=='overhead'&&style!=='cross'){
     if(bones.neck)bones.neck.rotateX(-.16*swing);
     if(bones.head)bones.head.rotateX(-.12*swing);
   }
@@ -24909,8 +24937,7 @@ function updateCloudNativeRigPost(dt){
       bones.spine.rotateX(-.10*(first+second));
     }
     if(bones.hips)bones.hips.rotateY(-.18*first+.18*second);
-    if(bones.neck)bones.neck.rotateX(-.06*(first+second));
-    if(bones.head)bones.head.rotateX(-.04*(first+second));
+    // Head and neck intentionally remain at the clean mixer pose for Crossbreaker.
   }else if(style==='thrust'){
     if(bones.rightShoulder){bones.rightShoulder.rotateX(-.18*swing);bones.rightShoulder.rotateY(-.38*swing);}
     if(bones.rightArm){bones.rightArm.rotateX(-.72*swing);bones.rightArm.rotateY(-.34*swing);}
@@ -24952,7 +24979,7 @@ function updateCloudNativeRigPost(dt){
   if(u.cloudFit && !(u.spinVisualTimer>0)){
     // Negative/near-zero pitch keeps Cloud from visually looking upward during
     // regular attacks. Overhead gets a controlled forward commitment on the slam.
-    const attackLean=style==='cross'?(-.06*swing):
+    const attackLean=style==='cross'?0:
       (style==='chop'?-.07:
       (style==='thrust'?-.06:
       (style==='guard'?-.03:
