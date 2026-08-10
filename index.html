@@ -11,7 +11,7 @@ preview, gameplay, abilities, Arcane Echoes, lifecycle cleanup, and save migrati
 Legacy ninefox IDs remain migration-only. The original KayKit Mage remains available
 only as an emergency visual fallback if the native fox asset fails.
 -->
-<!-- V22.16.00 Crossbreaker X-Wave + Onslaught Launch: fixes the two crashes behind both broken moves. (1) isMobile was referenced by twelve effect functions but never declared anywhere in the file, so every one of those calls threw a ReferenceError - during Royal Onslaught the throw landed inside the per-frame perimeter update, which stopped renderer.render() and froze the screen permanently at the first point. isMobile is now defined and the frame loop survives any single update error. (2) cloudCrossbreakerCapVisuals() and cloudCrossbreakerDestroyWave() were called but never defined, so the Crossbreaker X wave threw on creation and was silently swallowed - the projectile literally never existed. Both are now implemented and the wave is a real growing X-shaped projectile that carries its own damage, expands and dims as it leaves the arena, and self-destructs through three independent paths. Royal Onslaught crosses the map to five designated perimeter endpoints at half the old launch speed, each at least 115 degrees around the perimeter from the previous endpoint and never near the point two back, executing everything crossed on the line while the slow pace gathers the crowd behind an invulnerable Knight. Royal bullet time is now scoped to the playable area instead of the whole world, so enemies spawning outside the arena close at full speed and only slow to 50% once they cross the boundary. For the entire sequence every non-boss enemy inside the playable area is executed on sight through a shared rate-limited queue, with bosses the standing exception. Contact during transit is also unconditionally lethal: detection is uncapped and marks enemies on touch, so no enemy can survive by being late in a rate-limited kill queue. After the fifth endpoint he takes the centre of the map and fires five X slash waves outward past the arena boundary, executing every enemy inside it, then repeats that volley on a 1.5 second cooldown for up to six turns total or until the last enemy is dead. The finale waves run on an independent clock with a setTimeout backstop, so they finish their flight after the arena wipe stops the gameplay loop and can never be left in the scene. Crossbreaker Slash is halved in size and its travel speed is cut to 8.625 u/s, 18.75% of the original, while the Onslaught centre slashes drop to 29 u/s. Lifetime ceilings and concurrent-wave caps are raised to match so no wave expires in mid-air, and overlapping Onslaught volleys now own their waves independently instead of the newest volley culling the previous one. Enemies remain at 50% speed for the whole move, including any that spawn mid-move. -->
+<!-- V22.16.00 Crossbreaker X-Wave + Onslaught Launch: fixes the two crashes behind both broken moves. (1) isMobile was referenced by twelve effect functions but never declared anywhere in the file, so every one of those calls threw a ReferenceError - during Royal Onslaught the throw landed inside the per-frame perimeter update, which stopped renderer.render() and froze the screen permanently at the first point. isMobile is now defined and the frame loop survives any single update error. (2) cloudCrossbreakerCapVisuals() and cloudCrossbreakerDestroyWave() were called but never defined, so the Crossbreaker X wave threw on creation and was silently swallowed - the projectile literally never existed. Both are now implemented and the wave is a real growing X-shaped projectile that carries its own damage, expands and dims as it leaves the arena, and self-destructs through three independent paths. Royal Onslaught crosses the map to five designated perimeter endpoints at half the old launch speed, each at least 115 degrees around the perimeter from the previous endpoint and never near the point two back, executing everything crossed on the line while the slow pace gathers the crowd behind an invulnerable Knight. Royal Onslaught is now three endpoints, no damage during the crossings, and a full time stop: every enemy inside the playable area is frozen solid from activation until the third endpoint lands, while enemies outside the arena close at full speed and freeze as they cross in. The Knight then takes the centre, in-area enemies resume at 50%, and three cycles of five slash waves fire two seconds apart, wiping the arena on each cycle. Royal bullet time is scoped to the playable area rather than the whole world. The contact-kill and play-area purge paths are retained but no longer called: detection is uncapped and marks enemies on touch, so no enemy can survive by being late in a rate-limited kill queue. After the fifth endpoint he takes the centre of the map and fires five X slash waves outward past the arena boundary, executing every enemy inside it, then repeats that volley on a 1.5 second cooldown for up to six turns total or until the last enemy is dead. The finale waves run on an independent clock with a setTimeout backstop, so they finish their flight after the arena wipe stops the gameplay loop and can never be left in the scene. Crossbreaker Slash is halved in size and its travel speed is cut to 8.625 u/s, 18.75% of the original, while the Onslaught centre slashes drop to 29 u/s. Lifetime ceilings and concurrent-wave caps are raised to match so no wave expires in mid-air, and overlapping Onslaught volleys now own their waves independently instead of the newest volley culling the previous one. Enemies remain at 50% speed for the whole move, including any that spawn mid-move. -->
 <!-- V22.13.99 Royal Onslaught Shadow Trail: adds lightweight avatar afterimage clones during Royal Onslaught dashes. Each dash now leaves several short-lived Knight shadow images at roughly 15% opacity between the start and end of the dash, creating a super-speed silhouette without restoring the removed ground trail. Gameplay, damage, cooldowns, capture rules, and version-label synchronization are unchanged. -->
 <!-- V22.13.98 Version Label Synchronization: synchronizes the static browser title and all visible landing-page/build labels to V22.13.98 using the centralized GAME_VERSION value. Gameplay, Royal Onslaught behavior, visuals, cooldowns, and balance are unchanged. -->
 <!-- V22.13.97 Royal Onslaught Trail Removal + Freeze Guard: completely removes the Royal Onslaught ground dash-lane/trail geometry and its delayed cleanup path, then isolates each strike inside a runtime safety boundary so one visual or target-state failure cannot stop the entire gameplay update loop between strikes. Damage, capture window, bullet time, elimination behavior, cooldown scaling, and remaining impact visuals are unchanged. -->
@@ -1428,7 +1428,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.16.05 - Slower Slash Waves';
+const GAME_VERSION='22.16.06 - Onslaught Time Stop + 3 Cycles';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -2676,15 +2676,26 @@ function knightOnslaughtInsidePlayArea(pos){
   const r=knightOnslaughtPlayAreaRadius();
   return (pos.x*pos.x+pos.z*pos.z)<=r*r;
 }
+function knightOnslaughtFreezePhaseActive(){
+  // Activation through the landing of the third endpoint. The centre approach
+  // clears this the moment the last crossing finishes.
+  if(!knightRoyalOnslaughtBulletTimeActive())return false;
+  if(!knightRuntime)return false;
+  return !knightRuntime.onslaughtCenterStarted && !knightRuntime.onslaughtVolleyPhase;
+}
 function knightRoyalOnslaughtEnemyTimeScale(entity){
   // Royal bullet time applies to the playable area, not to the whole world.
   // Enemies spawn well outside the arena and walk in: they travel at full
-  // speed the entire way and only drop to 50% once they cross the boundary.
+  // speed the entire way and only change pace once they cross the boundary.
+  //
+  // Inside the arena there are two rates:
+  //   * frozen solid while the Knight is running the three endpoints
+  //   * 50% once he commits to the centre and starts the slash cycles
   // Called with no argument the answer is the in-area rate.
   if(!knightRoyalOnslaughtBulletTimeActive())return 1;
   const pos=(entity&&entity.position)?entity.position:entity;
   if(pos&&Number.isFinite(pos.x)&&!knightOnslaughtInsidePlayArea(pos))return 1;
-  return 0.50;
+  return knightOnslaughtFreezePhaseActive()?0:0.50;
 }
 function knightRoyalOnslaughtRestoreBulletTime(){
   // Slow motion is calculated from live state each frame, so resetting
@@ -2772,7 +2783,7 @@ const LEVEL_UNLOCKS = [
   {level:8,  id:'knight_shield_toss', name:'Shield Toss', desc:'Throw and recall the royal shield from the Secondary slot, stunning every surviving enemy class for 3 seconds on contact.', avatar:'knight'},
   {level:10, id:'knight_royal_guard_clones', name:'Knights of the Round', desc:'Summon invincible Knight copies that inherit the moves unlocked so far and draw enemy attention.', avatar:'knight'},
   {level:12, id:'knight_guardian_quake', name:'Guardian Titan', desc:'Guardian Charge and Earth Shatter combine into one hold-controlled Titan Ability with movement steering, followed by a 15-second Titan form.', avatar:'knight'},
-  {level:14, id:'knight_aegis_counter', name:'Royal Onslaught', desc:'Royal bullet time inside the arena only. Every non-boss enemy standing in the playable area is executed on the spot for the whole sequence; enemies still outside run at full speed until they cross in. Five slow invulnerable crossings, then the Knight takes the centre and fires five slash waves outward past the map edge, repeating up to six times on a 1.5s cooldown until the last enemy is dead.', avatar:'knight'},
+  {level:14, id:'knight_aegis_counter', name:'Royal Onslaught', desc:'Time stop inside the arena. Every enemy on the map freezes solid from activation until the third endpoint lands, while enemies still outside close at full speed and freeze as they cross in. The crossings deal no damage. The Knight then takes the centre and fires three cycles of five slash waves outward past the map edge, two seconds apart, killing everything inside the arena on each cycle.', avatar:'knight'},
   {level:18, id:'knight_judgment', name:'Judgment of the King', desc:'Judgment becomes an equipable ultimate-tier move in the Ability slot.', avatar:'knight'}
 ];
 let reachedLevelUnlocks = new Set();
@@ -3076,7 +3087,7 @@ const KNIGHT_DEFENSIVE_WHIRLWIND = {id:'knight_whirlwind', name:'Defensive Whirl
 const KNIGHT_GUARDIAN_QUAKE = {id:'knight_guardian_quake', name:'Guardian Titan', price:760, avatar:'knight', unlockLevel:12,
   desc:'Hold the Ability button to begin Guardian Charge and automatically flow into Earth Shatter when the charge finishes. Releasing before the charge ends cancels the Earth Shatter follow-up. Steer the charge with the normal movement controls. After the sequence, the Knight remains in Titan form for 15 seconds. Cooldown begins after Titan mode ends and scales with the current round tier.'};
 const KNIGHT_AEGIS_COUNTER = {id:'knight_aegis_counter', name:'Royal Onslaught', price:880, avatar:'knight', unlockLevel:14,
-  desc:'Map-clearing active ultimate. Royal bullet time covers the playable area only: enemies and enemy projectiles inside the arena run at 50% speed while anything still outside the boundary travels at full speed until it crosses in. For the entire sequence every non-boss enemy inside the playable area is killed instantly, so the arena stays swept from activation to finish. You then cross the arena to five designated perimeter endpoints at half pace, each destination at least 115 degrees around the perimeter from the last and never near the point two back, executing every non-boss enemy on the line and hammering bosses on contact. The slow crossings pull the crowd together behind you. Any non-boss enemy the Knight touches in transit dies on contact, no exceptions. After the fifth endpoint he takes the middle of the map and fires five slash waves outward past the arena edge, instantly killing every enemy inside it, then repeats that volley on a 1.5 second cooldown up to six times in total or until the last enemy is dead. You are invulnerable for the whole sequence. Cooldown scales down by round to 0 at Round 45; boss damage remains capped.'};
+  desc:'Map-clearing active ultimate. Activation freezes every enemy inside the playable area solid until the third endpoint lands; enemies still outside the arena close at full speed and freeze the instant they cross in. The three crossings deal no damage at all - each destination is at least 115 degrees around the perimeter from the last and never near the point two back. The Knight then takes the middle of the map, enemies inside resume at 50% speed, and three cycles of five slash waves fire outward past the arena edge two seconds apart, killing every enemy inside the map on each cycle. You are invulnerable for the whole sequence. Cooldown scales down by round to 0 at Round 45; boss damage remains capped.'};
 const KNIGHT_ROYAL_GUARD_CLONES = {id:'knight_royal_guard_clones', name:'Knights of the Round', price:0, avatar:'knight', unlockLevel:10,
   desc:'Knight signature move. Summon invincible Knight clones that draw enemy attention and use only the Knight moves currently unlocked. Each clone deals 10% of the player\'s damage. Rounds 10–15 summon 2 clones for 8 seconds with a 10-second cooldown; Rounds 16–20 summon 5 for 15 seconds with a 5-second cooldown; Round 21 onward summons 10 for 30 seconds with a 1.5-second cooldown.'};
 const KNIGHT_JUDGMENT_ULTIMATE = {id:'knight_judgment', name:'Judgment of the King', price:920, avatar:'knight', unlockLevel:18,
@@ -16384,15 +16395,15 @@ function knightRoyalOnslaughtClearAllMarkers(){
    Every effect used here goes through the shared fx list (auto-expiring,
    globally capped, and scrubbed again by knightEndAegis) or a bounded
    setTimeout, so nothing can outlive the move.                             */
-const ONSLAUGHT_POINTS=5;                        // five designated endpoints
+const ONSLAUGHT_POINTS=3;                        // three designated endpoints
 const ONSLAUGHT_MIN_TURN=115*Math.PI/180;        // never land near the last point
 const ONSLAUGHT_MIN_TURN_TWO_BACK=42*Math.PI/180;// and never ping-pong A-B-A
 const ONSLAUGHT_HOLD_TIME=.08;                   // readable beat at each point
 // Absolute runaway guard. Scales with the endpoint count so a legitimately
 // long 20-point route can never be cut short by the failsafe, while a stalled
 // route still always releases invulnerability and bullet time.
-const ONSLAUGHT_VOLLEY_MAX=6;                    // the centre slash and 5 repeats
-const ONSLAUGHT_VOLLEY_COOLDOWN=1.5;             // seconds between centre volleys
+const ONSLAUGHT_VOLLEY_MAX=3;                    // three slash cycles from the centre
+const ONSLAUGHT_VOLLEY_COOLDOWN=2.0;             // seconds between centre cycles
 const ONSLAUGHT_MAX_DURATION=ONSLAUGHT_POINTS*1.9+ONSLAUGHT_VOLLEY_MAX*ONSLAUGHT_VOLLEY_COOLDOWN+9;
 const ONSLAUGHT_CONTACT_RADIUS=3.05;
 
@@ -16950,14 +16961,13 @@ function knightUpdatePerimeterOnslaught(dt){
 
   const safeDt=Math.max(0,Math.min(.12,Number.isFinite(dt)?dt:0));
 
-  // Every frame of the sequence, in every phase: anything non-boss standing
-  // inside the playable area is executed. Enemies are safe only while they are
-  // still outside the boundary walking in.
-  try{ knightOnslaughtPurgePlayArea(); }
-  catch(err){ console.error('Onslaught purge recovered:',err); }
-  if(!(knightRuntime.aegisWindow>0))return; // a kill may have ended the round
+  // The endpoint run deals no damage of any kind. Enemies inside the arena are
+  // frozen in place instead (see knightOnslaughtFreezePhaseActive), and all
+  // killing is done by the slash cycles once the Knight reaches the centre.
+  // knightOnslaughtPurgePlayArea() and knightOnslaughtLaunchStrike() are kept
+  // below for that behaviour but are intentionally not called here.
 
-  // Centre phase: hold position and repeat the slash move on its cooldown.
+  // Centre phase: hold position and run the slash cycle on its cooldown.
   if(knightRuntime.onslaughtVolleyPhase){
     knightUpdateOnslaughtVolleys(safeDt);
     return;
@@ -16966,14 +16976,8 @@ function knightUpdatePerimeterOnslaught(dt){
   // Short landing beat between launches so the crossings stay readable.
   if((knightRuntime.onslaughtHoldTimer||0)>0){
     knightRuntime.onslaughtHoldTimer=Math.max(0,knightRuntime.onslaughtHoldTimer-safeDt);
-    try{
-      knightOnslaughtLaunchStrike(
-        {x:player.position.x,z:player.position.z},
-        {x:player.position.x,z:player.position.z},
-        knightRuntime.onslaughtPerimeterIndex||0
-      );
-    }catch(err){ console.error('Onslaught hold contact recovered:',err); }
-    return;
+    return; // landing beat: still no damage, the arena stays frozen
+
   }
 
   let leg=knightRuntime.onslaughtPerimeterLeg;
@@ -16992,8 +16996,6 @@ function knightUpdatePerimeterOnslaught(dt){
     if(!leg)return;
   }
 
-  const prev={x:player.position.x,z:player.position.z};
-
   leg.elapsed+=safeDt;
   const t=Math.min(1,leg.elapsed/Math.max(.001,leg.duration));
   // Hard out of the launch, settling into the landing.
@@ -17010,13 +17012,8 @@ function knightUpdatePerimeterOnslaught(dt){
     player.userData.whirlwindActive=false;
   }
 
-  // Everything crossed on the way over is executed. Called every frame, so the
-  // marked-for-death queue keeps draining even during the landing beats.
-  try{
-    knightOnslaughtLaunchStrike(prev,{x:player.position.x,z:player.position.z},leg.index);
-  }catch(err){ console.error('Onslaught contact recovered:',err); }
-
-  // A kill can complete the round, which tears this move down underneath us.
+  // No contact damage during the crossings: the Knight passes straight through
+  // a frozen arena.
   if(!(knightRuntime.aegisWindow>0)||knightRuntime.onslaughtPerimeterLeg!==leg)return;
 
   leg.trailTimer=(leg.trailTimer||0)-safeDt;
