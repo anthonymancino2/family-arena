@@ -1427,7 +1427,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.15.09 - Crossbreaker 3D Visible + Head Neutral';
+const GAME_VERSION='22.15.11 - Onslaught Enemy Slow 50%';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 const GAME_BUILD_LABEL = `V${GAME_VERSION} · ROUND = AVATAR LEVEL`;
 
@@ -2641,7 +2641,9 @@ function knightRoyalOnslaughtBulletTimeActive(){
   return !!(knightRuntime && Number(knightRuntime.aegisWindow)>0);
 }
 function knightRoyalOnslaughtEnemyTimeScale(){
-  return knightRoyalOnslaughtBulletTimeActive()?0.20:1;
+  // While Onslaught is active, enemies and their attacks/projectiles run at
+  // 50% normal speed. The player/Cloud is not slowed.
+  return knightRoyalOnslaughtBulletTimeActive()?0.50:1;
 }
 function knightRoyalOnslaughtRestoreBulletTime(){
   // Slow motion is calculated from live state each frame, so resetting
@@ -16319,78 +16321,205 @@ function knightRoyalOnslaughtClearAllMarkers(){
   // Cleanup any legacy markers from earlier builds without creating new ones.
   for(const z of zombies) knightRoyalOnslaughtClearMarker(z);
 }
+
+function knightOnslaughtPerimeterMoveSpeed(){
+  const speedStat=(playerStats&&Number.isFinite(playerStats.speed))?playerStats.speed:1;
+  const characterMoveMult=(combatForAvatar().baseMoveMult||1);
+  const normal=PLAYER_SPEED*characterMoveMult*knightMoveMultiplier()*(1+(speedStat-1)*0.15);
+  // Cloud keeps 100% of his normal movement speed during Onslaught.
+  return Math.max(.1,normal);
+}
+
+function knightOnslaughtMakePerimeterPoints(count=10){
+  const pts=[];
+  const radius=Math.max(4,arenaSize-2.0);
+  const minAngularSeparation=55*Math.PI/180;
+  let prevAngle=null;
+
+  for(let i=0;i<count;i++){
+    let angle=Math.random()*Math.PI*2;
+
+    // Each destination must be clearly separated from the prior perimeter point.
+    // Retry first, then force a large angular jump as a failsafe.
+    if(prevAngle!==null){
+      let tries=0;
+      const angularDiff=(a,b)=>{
+        let d=Math.abs(a-b)%(Math.PI*2);
+        if(d>Math.PI)d=Math.PI*2-d;
+        return d;
+      };
+      while(angularDiff(angle,prevAngle)<minAngularSeparation && tries<24){
+        angle=Math.random()*Math.PI*2;
+        tries++;
+      }
+      if(angularDiff(angle,prevAngle)<minAngularSeparation){
+        angle=prevAngle+(Math.PI*.65)+(Math.random()-.5)*.5;
+      }
+    }
+
+    angle=(angle%(Math.PI*2)+Math.PI*2)%(Math.PI*2);
+    pts.push({
+      x:Math.sin(angle)*radius,
+      z:Math.cos(angle)*radius,
+      angle
+    });
+    prevAngle=angle;
+  }
+
+  return pts;
+}
+
+function knightOnslaughtBeginPerimeterLeg(index){
+  const pts=knightRuntime.onslaughtPerimeterPoints||[];
+  if(!player||index<0||index>=pts.length)return false;
+
+  const dest=pts[index];
+  const fromX=player.position.x,fromZ=player.position.z;
+  const dx=dest.x-fromX,dz=dest.z-fromZ;
+  const distance=Math.hypot(dx,dz);
+  const speed=knightOnslaughtPerimeterMoveSpeed();
+
+  knightRuntime.onslaughtPerimeterLeg={
+    index,
+    fromX,fromZ,
+    toX:dest.x,toZ:dest.z,
+    elapsed:0,
+    duration:Math.max(.18,distance/Math.max(.1,speed)),
+    yaw:Math.atan2(dx,dz)
+  };
+
+  // Compact endpoint marker so the route is readable but not blinding.
+  knightShockRing({x:dest.x,y:0,z:dest.z},1.8,KNIGHT_GOLD,.34);
+  return true;
+}
+
+function knightOnslaughtKillEntireMap(){
+  // User-approved ultimate finisher: every enemy currently alive on the map,
+  // including bosses and Brutes, dies immediately after point 10.
+  const victims=Array.from(zombies);
+  for(const z of victims){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    z.userData.hp=0;
+    z.userData.dead=false;
+    killZombie(z);
+  }
+
+  // Arena-wide but bounded finisher confirmation.
+  knightShockRing(player.position,Math.max(8,arenaSize*.88),KNIGHT_IVORY,.42);
+  knightShockRing(player.position,Math.max(6,arenaSize*.68),KNIGHT_GOLD,.48);
+  spawnKnightGuardBurst(player.position,5.5,KNIGHT_GOLD);
+  spawnBurst(player.position.x,player.position.y+.9,player.position.z,isMobile?24:38,FX_MAT_SPARK,6.0);
+  triggerCombatShake(16,220);
+  if(navigator.vibrate)navigator.vibrate([50,18,90]);
+}
+
+function knightUpdatePerimeterOnslaught(dt){
+  if(!(knightRuntime.aegisWindow>0)||!player)return;
+
+  const pts=knightRuntime.onslaughtPerimeterPoints;
+  if(!pts||pts.length!==10)return;
+
+  let leg=knightRuntime.onslaughtPerimeterLeg;
+  if(!leg){
+    const nextIndex=knightRuntime.onslaughtPerimeterIndex||0;
+    if(nextIndex>=10){
+      if(!knightRuntime.onslaughtPerimeterFinished){
+        knightRuntime.onslaughtPerimeterFinished=true;
+        knightOnslaughtKillEntireMap();
+
+        // End without the old nearby-damage finisher; the map wipe already happened.
+        knightEndAegis(false);
+        knightRuntime.aegisRecovery=.28;
+      }
+      return;
+    }
+    knightOnslaughtBeginPerimeterLeg(nextIndex);
+    leg=knightRuntime.onslaughtPerimeterLeg;
+    if(!leg)return;
+  }
+
+  const safeDt=Math.max(0,Math.min(.10,Number.isFinite(dt)?dt:0));
+  leg.elapsed+=safeDt;
+  const p=Math.min(1,leg.elapsed/Math.max(.001,leg.duration));
+
+  player.position.x=leg.fromX+(leg.toX-leg.fromX)*p;
+  player.position.z=leg.fromZ+(leg.toZ-leg.fromZ)*p;
+  player.rotation.y=leg.yaw;
+
+  // Lean into travel instead of spinning or using Whirlwind.
+  if(state.avatarType==='cloud'&&player.userData){
+    player.userData.spinVisualTimer=0;
+    player.userData.whirlwindTimer=0;
+    player.userData.whirlwindActive=false;
+  }
+
+  if(p>=1){
+    player.position.x=leg.toX;
+    player.position.z=leg.toZ;
+
+    const pointNumber=leg.index+1;
+    knightShockRing(player.position,2.5,KNIGHT_IVORY,.42);
+    spawnKnightGuardBurst(player.position,2.2,KNIGHT_GOLD);
+    spawnBurst(player.position.x,player.position.y+.75,player.position.z,isMobile?7:11,FX_MAT_SPARK,3.2);
+    triggerCombatShake(pointNumber===10?9:4.5,pointNumber===10?120:65);
+
+    knightRuntime.onslaughtPerimeterIndex=pointNumber;
+    knightRuntime.royalOnslaughtStrikeIndex=pointNumber;
+    knightRuntime.onslaughtPerimeterLeg=null;
+  }
+}
+
 function triggerKnightAegisCounter(){
   if(state.avatarType==='cloud') resetCloudCrossbreakerChain();
   if(!gameRunning||!knightIsActive()) return;
   if(knightRuntime.aegisCooldown>0||knightRuntime.aegisWindow>0||knightRuntime.aegisRecovery>0) return;
 
-  // V22.14.26 repeat-activation preflight. A fresh Royal Onslaught must never
-  // inherit clone reservations, delayed summons, or captured-target state from
-  // a prior use.
-  try{ clearKnightRoyalOnslaughtSwarm(); }catch(_err){}
-  try{
-    knightRoyalOnslaughtClearAllMarkers();
-    for(const z of zombies){
-      if(!z||!z.userData) continue;
-      z.userData.royalOnslaughtCloneReservedBy=null;
-      if(z.userData.targetPlayer&&z.userData.targetPlayer.userData&&
-         z.userData.targetPlayer.userData.isRoyalOnslaughtClone){
-        z.userData.targetPlayer=null;
-        z.userData.targetRefresh=0;
-      }
-    }
-  }catch(_err){}
-  knightRuntime.royalOnslaughtEligibleIds=new Set();
-  knightRuntime.royalOnslaughtTargets=[];
-  knightRuntime.royalOnslaughtTargetCursor=0;
-  knightRuntime.royalOnslaughtHitIds=new Set();
-  knightRuntime.royalOnslaughtDamagedIds=new Set();
-  knightRuntime.royalOnslaughtBossDamage=new Map();
+  // Onslaught and Whirlwind are fully isolated.
+  if(player&&player.userData){
+    player.userData.spinVisualTimer=0;
+    player.userData.whirlwindTimer=0;
+    player.userData.whirlwindActive=false;
+  }
+  knightRuntime.whirlwindTimer=0;
+  knightRuntime.whirlwindSource='';
+  passiveState.knightWhirlwindCounter=0;
+
+  try{clearKnightRoyalOnslaughtSwarm();}catch(_){}
+  try{knightRoyalOnslaughtClearAllMarkers();}catch(_){}
 
   markUltimateUsed();
   knightRuntime.aegisCooldown=knightJudgmentCooldownForRound();
   knightRuntime.aegisWindow=9999;
   knightRuntime.aegisRecovery=0;
-  knightRuntime.royalOnslaughtStrikeTimer=.08;
+
   knightRuntime.royalOnslaughtStrikeIndex=0;
-  knightRuntime.royalOnslaughtBossDamage=new Map();
-  knightRuntime.royalOnslaughtHitIds=new Set();
-  knightRuntime.royalOnslaughtDamagedIds=new Set();
   knightRuntime.royalOnslaughtStartedAt=performance.now();
   knightRuntime.royalOnslaughtElapsed=0;
-  knightRuntime.royalOnslaughtOriginX=player.position.x;
-  knightRuntime.royalOnslaughtOriginZ=player.position.z;
-  knightRuntime.royalOnslaughtLastBodyX=player.position.x;
-  knightRuntime.royalOnslaughtLastBodyZ=player.position.z;
-  knightRuntime.royalOnslaughtFrameHitIds=new Set();
-  knightRuntime.royalOnslaughtCaptureUntil=knightRuntime.royalOnslaughtStartedAt+3000;
-  knightRuntime.royalOnslaughtCaptureRemainingTime=3;
-  knightRuntime.royalOnslaughtEligibleIds=new Set(
-    zombies.filter(z=>z&&!z.userData.dead).map(z=>z.uuid)
-  );
-  // Target candidates are selected live per strike. Do not build/sort a second
-  // large enemy list on the same frame as activation; the eligible UUID set is
-  // the single source of truth for the 3-second capture group.
-  knightRuntime.royalOnslaughtTargets=[];
-  knightRuntime.royalOnslaughtTargetCursor=0;
-  knightRoyalOnslaughtLeaderGlow(false);
-  summonKnightRoyalOnslaughtSwarm();
 
-  const visual=knightTitanVisualScale();
-  // Ground crown/ring removed: it created the large white floor effect.
+  knightRuntime.onslaughtPerimeterPoints=knightOnslaughtMakePerimeterPoints(10);
+  knightRuntime.onslaughtPerimeterIndex=0;
+  knightRuntime.onslaughtPerimeterLeg=null;
+  knightRuntime.onslaughtPerimeterFinished=false;
+
+  // Old enemy-capture/target systems are deliberately disabled for this version.
+  knightRuntime.royalOnslaughtEligibleIds=null;
+  knightRuntime.royalOnslaughtTargets=[];
+  knightRuntime.royalOnslaughtDash=null;
+  knightRuntime.royalOnslaughtHitIds=null;
+  knightRuntime.royalOnslaughtDamagedIds=null;
+  knightRuntime.royalOnslaughtBossDamage=null;
+  knightRuntime.royalOnslaughtCaptureRemainingTime=0;
+
+  knightRoyalOnslaughtLeaderGlow(false);
   knightRuntime.aegisRing=null;
 
-  // Immediate but bounded activation confirmation using existing Knight FX.
-  knightShockRing(player.position,4.8*visual,KNIGHT_GOLD,.42);
-  knightShockRing(player.position,3.2*visual,KNIGHT_IVORY,.52);
-  spawnKnightGuardBurst(player.position,3.8*visual,KNIGHT_GOLD);
-  spawnBurst(player.position.x,player.position.y+.85*visual,player.position.z,
-    isMobile?14:22,FX_MAT_SPARK,4.8);
-  triggerCombatShake(9,130);
+  knightShockRing(player.position,4.2,KNIGHT_GOLD,.42);
+  knightShockRing(player.position,3.0,KNIGHT_IVORY,.48);
+  spawnKnightGuardBurst(player.position,3.4,KNIGHT_GOLD);
+  spawnBurst(player.position.x,player.position.y+.85,player.position.z,isMobile?12:18,FX_MAT_SPARK,4.2);
+  triggerCombatShake(7,110);
 
-  knightPlayClip(['melee','slash'],'1H_Melee_Attack_Slice_Horizontal',.20,.12);
-  if(navigator.vibrate) navigator.vibrate([28,18,44]);
-  toast('ROYAL ONSLAUGHT!');
+  toast('ROYAL ONSLAUGHT · 10 POINT EXECUTION');
   updateHoodedHud();
 }
 function knightRoyalOnslaughtCrownFinisherFx(center,visual,combat){
@@ -17136,59 +17265,12 @@ function knightRoyalOnslaughtFrameContactKill(){
 
 function knightUpdateAegis(dt){
   if(knightRuntime.aegisWindow>0){
-    // Absolute fallback/authority: physical player contact itself kills.
-    // This runs every Onslaught frame independently of dash/endpoint callbacks.
-    knightRoyalOnslaughtFrameContactKill();
-
     knightRuntime.royalOnslaughtElapsed=(knightRuntime.royalOnslaughtElapsed||0)+dt;
-    knightRuntime.royalOnslaughtCaptureRemainingTime=Math.max(0,(knightRuntime.royalOnslaughtCaptureRemainingTime||0)-dt);
-    knightRoyalOnslaughtPruneEligibility();
-    knightRoyalOnslaughtUpdateMarkers(dt);
-    if(knightRuntime.aegisRing){
-      knightRuntime.aegisRing.position.set(player.position.x,.08,player.position.z);
-      knightRuntime.aegisRing.rotation.y+=dt*3.8;
-      const pulse=1+Math.sin(performance.now()*.015)*.10;
-      knightRuntime.aegisRing.scale.setScalar(pulse);
-    }
-    const dashing=knightRoyalOnslaughtUpdateDash(dt);
-    if(!dashing){
-      // Even during the short endpoint pause, touching Cloud counts as a hit.
-      try{
-        const pauseHitSet=knightRuntime.royalOnslaughtPauseContactIds||
-          (knightRuntime.royalOnslaughtPauseContactIds=new Set());
-        knightRoyalOnslaughtEndpointContacts(
-          knightRuntime.royalOnslaughtStrikeIndex||0,
-          pauseHitSet,
-          null
-        );
-      }catch(err){
-        console.error('Royal Onslaught pause contact recovered:',err);
-      }
-
-      knightRuntime.royalOnslaughtStrikeTimer=(knightRuntime.royalOnslaughtStrikeTimer||0)-dt;
-      const strikeIndex=knightRuntime.royalOnslaughtStrikeIndex||0;
-      const captureClosed=knightRoyalOnslaughtCaptureClosed();
-      const livingEligible=knightRoyalOnslaughtLivingEligible();
-      const needsMinimum=strikeIndex<20;
-      const needsElimination=captureClosed&&livingEligible.length>0;
-      if((needsMinimum||needsElimination)&&knightRuntime.royalOnslaughtStrikeTimer<=0&&!knightRuntime.royalOnslaughtDash){
-        try{ knightRoyalOnslaughtStrike(); }
-        catch(err){
-          console.error('Royal Onslaught strike recovered:',err);
-          knightRuntime.royalOnslaughtDash=null;
-          knightRuntime.royalOnslaughtStrikeIndex=strikeIndex+1;
-          knightRuntime.royalOnslaughtTargetCursor=(knightRuntime.royalOnslaughtTargetCursor||0)+1;
-          knightRuntime.royalOnslaughtStrikeTimer=.10;
-        }
-      }
-      const afterStrikeIndex=knightRuntime.royalOnslaughtStrikeIndex||0;
-      const afterLiving=knightRoyalOnslaughtLivingEligible();
-      if(captureClosed&&afterStrikeIndex>=20&&afterLiving.length===0&&!knightRuntime.royalOnslaughtDash){
-        knightEndAegis(true);
-      }
-    }
+    knightUpdatePerimeterOnslaught(dt);
   }
-  if(knightRuntime.aegisRecovery>0) knightRuntime.aegisRecovery=Math.max(0,knightRuntime.aegisRecovery-dt);
+  if(knightRuntime.aegisRecovery>0){
+    knightRuntime.aegisRecovery=Math.max(0,knightRuntime.aegisRecovery-dt);
+  }
 }
 function knightEndAegis(success){
   knightRoyalOnslaughtRestoreBulletTime();
@@ -17226,6 +17308,10 @@ function knightEndAegis(success){
   knightRuntime.royalOnslaughtLastBodyZ=null;
   if(knightRuntime.royalOnslaughtFrameHitIds)knightRuntime.royalOnslaughtFrameHitIds.clear();
   knightRuntime.royalOnslaughtFrameHitIds=null;
+  knightRuntime.onslaughtPerimeterPoints=null;
+  knightRuntime.onslaughtPerimeterIndex=0;
+  knightRuntime.onslaughtPerimeterLeg=null;
+  knightRuntime.onslaughtPerimeterFinished=false;
 
   // Final orphan scrub: only Knight spectacle effects are touched. Enemy
   // projectiles and unrelated avatar/gameplay effects are intentionally left alone.
@@ -22316,10 +22402,8 @@ function triggerCloudSkybreakerSlash(w){
   if(state.avatarType!=='cloud'||!player||!gameRunning)return false;
   if(!cloudSkybreakerReady())return false;
 
-  // Crossbreaker always begins from a clean Cloud pose.
+  // Crossbreaker begins from a clean pose and can never inherit Whirlwind.
   cloudResetCombatPoseState(false);
-
-  // Crossbreaker is its own two-cut sword attack. Never inherit Whirlwind.
   player.userData.spinVisualTimer=0;
   player.userData.whirlwindTimer=0;
   player.userData.whirlwindActive=false;
@@ -22327,17 +22411,9 @@ function triggerCloudSkybreakerSlash(w){
     knightRuntime.whirlwindTimer=0;
     knightRuntime.whirlwindSource='';
   }
-  player.userData.cloudAttackStyle='cross';
 
-  // Timestamp-based cooldown is independent of the generic Secondary timer.
-  cloudSkybreakerNextReadyAt=performance.now()+Math.max(150,(w.cooldown||0.5)*1000);
-
-  // Three consecutive normal Crossbreakers prime the NEXT Crossbreaker.
-  // The fourth consecutive cast releases the three-wave fan, then restarts the chain.
-  // Do not decide the chain from generic combat state. The completed
-  // Crossbreaker count alone determines whether THIS cast is the triple.
-  const tripleFan=(cloudCrossbreakerStreak>=3);
-  if(tripleFan) toast('TRIPLE CROSSBREAKER');
+  const now=performance.now();
+  cloudSkybreakerNextReadyAt=now+Math.max(150,(w.cooldown||0.5)*1000);
 
   const target=findNearestEnemy(50);
   if(target){
@@ -22346,102 +22422,44 @@ function triggerCloudSkybreakerSlash(w){
       target.position.z-player.position.z
     );
   }
-
   const yaw=player.rotation.y;
-  cloudSkybreakerCharge={
-    weapon:w,
-    timer:.34,
-    total:.34,
-    yaw,
-    tripleFan,
-    sequenceId:++cloudCrossbreakerSequenceId,
-    released:false
-  };
 
-  player.userData.kayActionLock=Math.max(player.userData.kayActionLock||0,.46);
-  // Crossbreaker uses only the procedural diagonal sword-cut pose.
-  // No native spin/whirlwind animation is requested.
+  // Animate the sword immediately, but the projectile/damage no longer waits
+  // for animation timing or a charge object.
+  player.userData.kayActionLock=Math.max(player.userData.kayActionLock||0,.34);
   player.userData.cloudAttackStyle='cross';
-  player.userData.cloudAttackTimer=.46;
-  player.userData.cloudAttackDuration=.46;
+  player.userData.cloudAttackTimer=.34;
+  player.userData.cloudAttackDuration=.34;
 
-  // Charge cue stays tight around the sword/body and uses existing Knight FX.
-  spawnKnightGuardBurst(player.position,2.2,KNIGHT_GOLD);
-  knightShockRing(player.position,1.85,KNIGHT_IVORY,.24);
-  if(navigator.vibrate)navigator.vibrate([18,12,24]);
-  return true;
-}
+  const tripleFan=(cloudCrossbreakerStreak>=3);
 
+  try{
+    if(tripleFan){
+      const sideAngle=65*Math.PI/180;
+      spawnCloudSkybreakerWave(w,yaw-sideAngle,-1);
+      spawnCloudSkybreakerWave(w,yaw,0);
+      spawnCloudSkybreakerWave(w,yaw+sideAngle,1);
+      cloudCrossbreakerStreak=0;
 
-
-function cloudCrossbreakerDestroyWave(wv){
-  if(!wv||wv.destroyed)return;
-  wv.destroyed=true;
-  if(wv.cleanupTimer){
-    clearTimeout(wv.cleanupTimer);
-    wv.cleanupTimer=null;
-  }
-  if(wv.group&&wv.group.parent)scene.remove(wv.group);
-  try{disposeGroup(wv.group);}catch(_){}
-  const idx=cloudSkybreakerWaves.indexOf(wv);
-  if(idx>=0)cloudSkybreakerWaves.splice(idx,1);
-}
-
-function cloudCrossbreakerCapVisuals(){
-  const cap=isMobile?4:7;
-  while(cloudSkybreakerWaves.length>=cap){
-    cloudCrossbreakerDestroyWave(cloudSkybreakerWaves[0]);
-  }
-}
-
-function cloudCrossbreakerHitFullWaveArea(w,yaw,fanIndex=0){
-  if(!player)return 0;
-
-  const range=Math.max(1,w.range||50);
-  const ox=player.position.x,oz=player.position.z;
-
-  // Single Crossbreaker is deliberately broad. Triple side waves are broader
-  // still; centers at -65/0/+65 with ±32° half-angle produce ~194° coverage.
-  const halfAngleDeg=(Math.abs(fanIndex)===1)?34:28;
-  const halfAngle=halfAngleDeg*Math.PI/180;
-  const fx=Math.sin(yaw),fz=Math.cos(yaw);
-  let hitCount=0;
-
-  for(const z of Array.from(zombies)){
-    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-
-    const dx=z.position.x-ox;
-    const dz=z.position.z-oz;
-    const dist=Math.hypot(dx,dz);
-    if(dist<=0.001||dist>range)continue;
-
-    const dot=(dx*fx+dz*fz)/dist;
-    const angle=Math.acos(Math.max(-1,Math.min(1,dot)));
-    if(angle>halfAngle)continue;
-
-    if(knightEnemyClass(z)==='boss'){
-      const hp=Math.max(1,Number(z.userData.hp)||1);
-      const maxHp=Math.max(1,Number(z.userData.maxHp)||hp);
-      const damage=Math.min(
-        Math.max(8*playerStats.power,maxHp*.075),
-        Math.max(0,hp-.01)
-      );
-      if(damage>0)applyBulletDamage(z,damage);
+      toast('TRIPLE CROSSBREAKER');
+      knightShockRing(player.position,5.5,KNIGHT_IVORY,.48);
+      knightShockRing(player.position,4.2,KNIGHT_GOLD,.52);
+      spawnKnightGuardBurst(player.position,4.8,KNIGHT_GOLD);
+      triggerCombatShake(12,160);
+      if(navigator.vibrate)navigator.vibrate([35,12,35,12,60]);
     }else{
-      // Every non-boss inside the full energy sector dies in this cast.
-      z.userData.hp=0;
-      z.userData.dead=false;
-      killZombie(z);
+      spawnCloudSkybreakerWave(w,yaw,0);
+      cloudCrossbreakerStreak=Math.min(3,cloudCrossbreakerStreak+1);
+      if(cloudCrossbreakerStreak===3)toast('TRIPLE CROSSBREAKER READY');
     }
-
-    hitCount++;
-    if(hitCount<=(isMobile?10:18)){
-      knightShockRing(z.position,2.0,KNIGHT_IVORY,.26);
-      spawnKnightGuardBurst(z.position,1.7,KNIGHT_GOLD);
-    }
+  }catch(err){
+    console.error('Crossbreaker direct cast recovered:',err);
+    return false;
   }
 
-  return hitCount;
+  // No delayed charge state remains to get stuck.
+  cloudSkybreakerCharge=null;
+  return true;
 }
 function spawnCloudSkybreakerWave(w,yaw,fanIndex=0){
   if(!player||!scene)return null;
@@ -22548,84 +22566,47 @@ function spawnCloudSkybreakerWave(w,yaw,fanIndex=0){
   return wv;
 }
 function updateCloudSkybreaker(dt){
-  if(cloudSkybreakerCharge){
-    const c=cloudSkybreakerCharge;
-    c.timer-=dt;
-
-    if(c.timer<=0&&!c.released){
-      c.released=true;
+  // Visual motion only. Collision already resolved at cast time.
+    for(let i=cloudSkybreakerWaves.length-1;i>=0;i--){
+      const wv=cloudSkybreakerWaves[i];
+      if(!wv||wv.destroyed){
+        cloudSkybreakerWaves.splice(i,1);
+        continue;
+      }
+  
       try{
-        if(c.tripleFan){
-          const sideAngle=65*Math.PI/180;
-
-          spawnCloudSkybreakerWave(c.weapon,c.yaw-sideAngle,-1);
-          spawnCloudSkybreakerWave(c.weapon,c.yaw,0);
-          spawnCloudSkybreakerWave(c.weapon,c.yaw+sideAngle,1);
-
-          toast('TRIPLE CROSSBREAKER');
-          knightShockRing(player.position,5.5,KNIGHT_IVORY,.48);
-          knightShockRing(player.position,4.2,KNIGHT_GOLD,.52);
-          spawnKnightGuardBurst(player.position,4.8,KNIGHT_GOLD);
-          triggerCombatShake(12,160);
-          if(navigator.vibrate)navigator.vibrate([35,12,35,12,60]);
-
-          cloudCrossbreakerStreak=0;
-        }else{
-          spawnCloudSkybreakerWave(c.weapon,c.yaw,0);
-          cloudCrossbreakerStreak=Math.min(3,cloudCrossbreakerStreak+1);
-          if(cloudCrossbreakerStreak===3){
-            toast('TRIPLE CROSSBREAKER READY');
+        const step=wv.speed*dt;
+        wv.group.position.x+=wv.dirX*step;
+        wv.group.position.z+=wv.dirZ*step;
+        wv.travelled+=step;
+        wv.life-=dt;
+  
+        const q=Math.max(0,wv.life/(wv.maxLife||.58));
+        const pulse=(wv.baseScale||1)*(1+Math.sin(performance.now()*.035+(wv.fanIndex||0))*.06);
+        wv.group.scale.setScalar(pulse);
+  
+        // Store original opacity once and fade from that value, avoiding the old
+        // multiplicative fade that could make the wave effectively invisible instantly.
+        for(const child of wv.group.children){
+          if(child.material&&'opacity' in child.material){
+            if(child.userData.crossBaseOpacity===undefined){
+              child.userData.crossBaseOpacity=child.material.opacity;
+            }
+            child.material.opacity=child.userData.crossBaseOpacity*Math.min(1,q*1.8);
           }
+        }
+  
+        if(wv.life<=0||wv.travelled>=wv.range){
+          cloudCrossbreakerDestroyWave(wv);
         }
       }catch(err){
-        console.error('Crossbreaker release recovered:',err);
-      }finally{
-        cloudSkybreakerCharge=null;
-        if(player&&player.userData)player.userData.secondaryAttackCooldown=0;
-        cloudResetCombatPoseState(true);
-      }
-    }
-  }
-
-  // Visual motion only. Collision already resolved at cast time.
-  for(let i=cloudSkybreakerWaves.length-1;i>=0;i--){
-    const wv=cloudSkybreakerWaves[i];
-    if(!wv||wv.destroyed){
-      cloudSkybreakerWaves.splice(i,1);
-      continue;
-    }
-
-    try{
-      const step=wv.speed*dt;
-      wv.group.position.x+=wv.dirX*step;
-      wv.group.position.z+=wv.dirZ*step;
-      wv.travelled+=step;
-      wv.life-=dt;
-
-      const q=Math.max(0,wv.life/(wv.maxLife||.58));
-      const pulse=(wv.baseScale||1)*(1+Math.sin(performance.now()*.035+(wv.fanIndex||0))*.06);
-      wv.group.scale.setScalar(pulse);
-
-      // Store original opacity once and fade from that value, avoiding the old
-      // multiplicative fade that could make the wave effectively invisible instantly.
-      for(const child of wv.group.children){
-        if(child.material&&'opacity' in child.material){
-          if(child.userData.crossBaseOpacity===undefined){
-            child.userData.crossBaseOpacity=child.material.opacity;
-          }
-          child.material.opacity=child.userData.crossBaseOpacity*Math.min(1,q*1.8);
-        }
-      }
-
-      if(wv.life<=0||wv.travelled>=wv.range){
+        console.error('Crossbreaker visual cleanup recovered:',err);
         cloudCrossbreakerDestroyWave(wv);
       }
-    }catch(err){
-      console.error('Crossbreaker visual cleanup recovered:',err);
-      cloudCrossbreakerDestroyWave(wv);
     }
-  }
+  
 }
+
 function clearCloudSkybreaker(){
   cloudSkybreakerCharge=null;
   cloudSkybreakerNextReadyAt=0;
@@ -24934,7 +24915,6 @@ function updateCloudNativeRigPost(dt){
     if(bones.leftArm)bones.leftArm.rotateY(.36*first-.36*second);
     if(bones.spine){
       bones.spine.rotateY(-.48*first+.48*second);
-      bones.spine.rotateX(-.10*(first+second));
     }
     if(bones.hips)bones.hips.rotateY(-.18*first+.18*second);
     // Head and neck intentionally remain at the clean mixer pose for Crossbreaker.
