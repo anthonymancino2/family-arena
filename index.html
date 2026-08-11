@@ -1434,7 +1434,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.19.09 - Wolverine Bone Name Fix';
+const GAME_VERSION='22.19.10 - Wolverine Vector Edges';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -10348,10 +10348,13 @@ function getKayKitAssetPromise(characterId){
 // The embedded Wolverine GLB ships a corrupt diffuse map: the atlas is a field
 // of random blue/orange/pink polygons rather than a character skin, which is why
 // he rendered as a psychedelic blur no matter how the material was tuned. The
-// rig itself is intact, so the suit is painted here from the 44-joint mixamorig
-// skeleton instead. Every vertex takes the colour of the body part its dominant
-// bone belongs to, giving true flat colour with no texture, no lighting response
-// and no baked shading -- the same intensity as the reference art.
+// rig is intact, so the suit is painted procedurally instead.
+//
+// The paint is evaluated PER PIXEL in the fragment shader, not per vertex.
+// Per-vertex colouring forces every colour boundary to zig-zag along triangle
+// edges and smear across the triangles it crosses, which reads as ragged, furry
+// edges. Evaluating the same rules per fragment gives boundaries that are
+// mathematically exact and resolution independent -- clean vector-art lines.
 const WOLVERINE_COLORS = {
   suit:  0xf5c31b,  // yellow costume panels
   panel: 0x3e4757,  // dark blue-grey: mask wings, shoulders, gloves, boots
@@ -10372,9 +10375,10 @@ function wolverineBoneRegion(rawName){
   if(/Spine\d*$/.test(n))return 'torso';
   if(/Shoulder$/.test(n))return 'shoulder';
   if(/(Left|Right)Arm$/.test(n))return 'upperArm';
-  // Finger joints past the first knuckle are the extended claws on this model,
-  // so they are split out before the general glove test.
-  if(/Hand(Thumb|Index|Middle|Ring|Pinky)[234]$/.test(n))return 'claw';
+  // Only the outer finger joints are the extended blades. The thumb chain sits
+  // on top of the fist -- colouring it as a claw turned both hands into white
+  // blobs -- so the thumb stays part of the glove.
+  if(/Hand(Index|Middle|Ring|Pinky)[234]$/.test(n))return 'claw';
   if(/ForeArm/.test(n)||/Hand/.test(n))return 'glove';
   if(/Hips$/.test(n))return 'hips';
   if(/UpLeg$/.test(n))return 'thigh';
@@ -10382,61 +10386,163 @@ function wolverineBoneRegion(rawName){
   return 'boot';
 }
 
-// Regions that are two-tone get split by bind-pose position. Bind pose is
-// Z-up and roughly +/-0.6 tall, and these are raw geometry coordinates, so the
-// cuts stay correct no matter how the avatar is later scaled or rotated.
-function wolverineColorKey(region,x,z){
-  switch(region){
-    case 'head':     return Math.abs(x)>0.120 ? 'panel' : 'suit';  // wings vs crown stripe
-    case 'torso':    return Math.abs(x)>0.115 ? 'panel' : 'suit';  // rib panels vs chest
-    case 'hips':     return (z>=-0.150&&z<=-0.070) ? 'belt' : 'suit';
-    case 'shin':     return z<-0.440 ? 'panel' : 'suit';           // boot cuff
-    case 'face':
-    case 'upperArm': return 'skin';
-    case 'claw':     return 'claw';
-    case 'thigh':    return 'suit';
-    default:         return 'panel';
-  }
-}
-
-// Writes the colour attribute once per geometry. SkeletonUtils.clone() shares
-// geometry between instances, so later clones reuse the same buffer.
-function paintWolverineGeometry(mesh,THREEAsset){
+// Builds the two attributes the shader paints from:
+//   aPaintPos  - a Laplacian-smoothed copy of the bind pose. The raw surface is
+//                slightly pebbled, and a plane cut across a pebbled surface
+//                wanders; cutting against a smoothed copy keeps the seams clean
+//                while the rendered geometry itself is untouched.
+//   aPaintMask - x = claw, y = arm chain. Anatomical splits that no position
+//                rule can express, taken from the skeleton, then smoothed so
+//                their boundaries are smooth curves too. The claw field gets far
+//                less smoothing because the blades are thin enough to dissolve.
+// Runs once per geometry; SkeletonUtils.clone() shares geometry between clones.
+function buildWolverinePaintData(mesh,THREEAsset){
   const geo=mesh&&mesh.geometry;
   if(!geo)return false;
-  if(geo.userData&&geo.userData.wolverinePaintedV2)return true;
+  if(geo.userData&&geo.userData.wolverinePaintV3)return true;
 
   const pos=geo.getAttribute('position');
+  const index=geo.getIndex();
   const skinIndex=geo.getAttribute('skinIndex');
   const skinWeight=geo.getAttribute('skinWeight');
   const bones=mesh.skeleton&&mesh.skeleton.bones;
-  if(!pos||!skinIndex||!skinWeight||!bones||!bones.length)return false;
+  if(!pos||!index||!skinIndex||!skinWeight||!bones||!bones.length)return false;
 
-  // Resolve the palette through THREE.Color so the sRGB hex above lands in the
-  // renderer's working colour space, matching every other material in the game.
-  const rgb={};
-  Object.keys(WOLVERINE_COLORS).forEach(key=>{
-    const c=new THREEAsset.Color(WOLVERINE_COLORS[key]);
-    rgb[key]=[c.r,c.g,c.b];
-  });
+  const N=pos.count;
+
+  // Weld coincident vertices. The mesh splits vertices along UV seams, and
+  // smoothing across an unwelded seam would leave a visible discontinuity.
+  const lookup=new Map(); const group=new Int32Array(N); let G=0; const Q=1e5;
+  for(let i=0;i<N;i++){
+    const key=Math.round(pos.getX(i)*Q)+'_'+Math.round(pos.getY(i)*Q)+'_'+Math.round(pos.getZ(i)*Q);
+    let g=lookup.get(key);
+    if(g===undefined){g=G++;lookup.set(key,g);}
+    group[i]=g;
+  }
+
+  // Neighbour lists in CSR form.
+  const ia=index.array;
+  const degree=new Int32Array(G);
+  for(let t=0;t<ia.length;t+=3){
+    degree[group[ia[t]]]+=2; degree[group[ia[t+1]]]+=2; degree[group[ia[t+2]]]+=2;
+  }
+  const offset=new Int32Array(G+1);
+  for(let g=0;g<G;g++)offset[g+1]=offset[g]+degree[g];
+  const neighbour=new Int32Array(offset[G]);
+  const cursor=Int32Array.from(offset.subarray(0,G));
+  for(let t=0;t<ia.length;t+=3){
+    const a=group[ia[t]],b=group[ia[t+1]],c=group[ia[t+2]];
+    neighbour[cursor[a]++]=b; neighbour[cursor[a]++]=c;
+    neighbour[cursor[b]++]=a; neighbour[cursor[b]++]=c;
+    neighbour[cursor[c]++]=a; neighbour[cursor[c]++]=b;
+  }
+
+  function smooth(values,stride,iterations){
+    let read=values, write=new Float32Array(G*stride);
+    for(let it=0;it<iterations;it++){
+      for(let g=0;g<G;g++){
+        const s=offset[g], e=offset[g+1];
+        if(e===s){for(let c=0;c<stride;c++)write[g*stride+c]=read[g*stride+c];continue;}
+        for(let c=0;c<stride;c++){
+          let sum=0;
+          for(let k=s;k<e;k++)sum+=read[neighbour[k]*stride+c];
+          write[g*stride+c]=sum/(e-s);
+        }
+      }
+      const swap=read; read=write; write=swap;
+    }
+    return read;
+  }
+
+  // Seed the per-group values.
+  const gPos=new Float32Array(G*3), gClaw=new Float32Array(G),
+        gLimb=new Float32Array(G), gCount=new Float32Array(G);
   const regionOf=bones.map(b=>wolverineBoneRegion(b&&b.name));
-
-  const colors=new Float32Array(pos.count*3);
-  for(let i=0;i<pos.count;i++){
+  for(let i=0;i<N;i++){
     let bone=0,bestWeight=-1;
     for(let k=0;k<4;k++){
       const w=skinWeight.getComponent(i,k);
       if(w>bestWeight){bestWeight=w;bone=skinIndex.getComponent(i,k);}
     }
-    const region=regionOf[bone]||'panel';
-    const c=rgb[wolverineColorKey(region,pos.getX(i),pos.getZ(i))]||rgb.suit;
-    colors[i*3]=c[0];colors[i*3+1]=c[1];colors[i*3+2]=c[2];
+    const region=regionOf[bone]||'boot';
+    const g=group[i];
+    gPos[g*3]+=pos.getX(i); gPos[g*3+1]+=pos.getY(i); gPos[g*3+2]+=pos.getZ(i);
+    if(region==='claw')gClaw[g]+=1;
+    if(region==='shoulder'||region==='upperArm'||region==='glove'||region==='claw')gLimb[g]+=1;
+    gCount[g]+=1;
+  }
+  for(let g=0;g<G;g++){
+    const c=gCount[g]||1;
+    gPos[g*3]/=c; gPos[g*3+1]/=c; gPos[g*3+2]/=c; gClaw[g]/=c; gLimb[g]/=c;
   }
 
-  geo.setAttribute('color',new THREEAsset.BufferAttribute(colors,3));
+  const sPos=smooth(gPos,3,16), sClaw=smooth(gClaw,1,3), sLimb=smooth(gLimb,1,12);
+
+  const paintPos=new Float32Array(N*3), paintMask=new Float32Array(N*2);
+  for(let i=0;i<N;i++){
+    const g=group[i];
+    paintPos[i*3]=sPos[g*3]; paintPos[i*3+1]=sPos[g*3+1]; paintPos[i*3+2]=sPos[g*3+2];
+    paintMask[i*2]=sClaw[g]; paintMask[i*2+1]=sLimb[g];
+  }
+  geo.setAttribute('aPaintPos',new THREEAsset.BufferAttribute(paintPos,3));
+  geo.setAttribute('aPaintMask',new THREEAsset.BufferAttribute(paintMask,2));
   geo.userData=geo.userData||{};
-  geo.userData.wolverinePaintedV2=true;
+  geo.userData.wolverinePaintV3=true;
   return true;
+}
+
+// MeshBasicMaterial is fully unlit, so the painted colour reaches the screen at
+// exactly the authored intensity: no directional dark side, no specular, no
+// shadow darkening. Colours are resolved through THREE.Color first so the sRGB
+// hex values above land in the renderer's working colour space.
+function makeWolverinePaintMaterial(THREEAsset,src){
+  function rgb(key){
+    const c=new THREEAsset.Color(WOLVERINE_COLORS[key]);
+    return 'vec3('+c.r.toFixed(5)+','+c.g.toFixed(5)+','+c.b.toFixed(5)+')';
+  }
+  const mat=new THREEAsset.MeshBasicMaterial({
+    color:0xffffff,
+    toneMapped:false,
+    transparent:src?!!src.transparent:false,
+    opacity:(src&&src.opacity!==undefined)?src.opacity:1,
+    side:(src&&src.side!==undefined)?src.side:THREEAsset.FrontSide
+  });
+  mat.depthWrite=src?src.depthWrite!==false:true;
+
+  mat.onBeforeCompile=function(shader){
+    shader.vertexShader=shader.vertexShader
+      .replace('#include <common>',
+        '#include <common>\n'+
+        'attribute vec3 aPaintPos;\nattribute vec2 aPaintMask;\n'+
+        'varying vec3 vPaintPos;\nvarying vec2 vPaintMask;')
+      .replace('#include <begin_vertex>',
+        '#include <begin_vertex>\nvPaintPos = aPaintPos;\nvPaintMask = aPaintMask;');
+
+    // step(edge,x) is 1.0 when x >= edge. Written with step/mix rather than
+    // branches so every GPU takes the same path.
+    shader.fragmentShader=shader.fragmentShader
+      .replace('#include <common>',
+        '#include <common>\nvarying vec3 vPaintPos;\nvarying vec2 vPaintMask;')
+      .replace('#include <color_fragment>',[
+        'vec3 wp = vPaintPos;',
+        'float ax = abs( wp.x );',
+        // Dark rib panels flanking the yellow chest, tapering to a point below
+        // the waist; the same cut narrows to the mask's centre stripe up top.
+        'vec3 pc = mix( '+rgb('suit')+', '+rgb('panel')+', step( 0.118 + max( 0.0, -wp.z ) * 1.20, ax ) );',
+        // Bare lower face inside the cowl.
+        'pc = mix( pc, '+rgb('skin')+', step(0.135,wp.z) * step(wp.z,0.300) * step(ax,0.170) * step(wp.y,-0.085) );',
+        // Waist belt, kept off the hands hanging at the same height.
+        'pc = mix( pc, '+rgb('belt')+', step(-0.150,wp.z) * step(wp.z,-0.070) * step(ax,0.235) );',
+        'pc = mix( pc, '+rgb('panel')+', step( wp.z, -0.440 ) );',
+        // Arm chain: shoulder pad, bare upper arm, then the long glove.
+        'vec3 lc = mix( '+rgb('panel')+', '+rgb('skin')+', step(0.020,wp.z) * step(wp.z,0.155) );',
+        'pc = mix( pc, lc, step( 0.5, vPaintMask.y ) );',
+        'pc = mix( pc, '+rgb('claw')+', step( 0.5, vPaintMask.x ) );',
+        'diffuseColor.rgb = pc;'
+      ].join('\n'));
+  };
+  mat.customProgramCacheKey=function(){return 'wolverinePaintV3';};
+  return mat;
 }
 
 function tuneWolverineVisuals(root,THREEAsset,activeRenderer){
@@ -10445,32 +10551,29 @@ function tuneWolverineVisuals(root,THREEAsset,activeRenderer){
   root.traverse(obj=>{
     if(!obj||!obj.isMesh)return;
 
-    // Flat-lighting philosophy shared with the rest of the stylized roster:
-    // no directional dark side, no specular highlight, no shadow darkening.
+    // Flat-lighting philosophy shared with the rest of the stylized roster.
     obj.castShadow=false;
     obj.receiveShadow=false;
 
-    const painted=paintWolverineGeometry(obj,THREEAsset);
+    const painted=buildWolverinePaintData(obj,THREEAsset);
     const sourceMats=Array.isArray(obj.material)?obj.material:[obj.material];
     const flatMats=sourceMats.map(src=>{
-      // MeshBasicMaterial with no map is fully unlit, so the vertex colours
-      // reach the screen at exactly the authored intensity.
-      const mat=new THREEAsset.MeshBasicMaterial({
-        color:painted?0xffffff:WOLVERINE_COLORS.suit,
-        vertexColors:painted,
-        transparent:src?!!src.transparent:false,
-        opacity:(src&&src.opacity!==undefined)?src.opacity:1,
-        side:(src&&src.side!==undefined)?src.side:THREEAsset.FrontSide,
-        toneMapped:false
-      });
-      mat.depthWrite=src?src.depthWrite!==false:true;
-      mat.needsUpdate=true;
-      return mat;
+      // Without the paint attributes the custom shader would read zeroes and
+      // flood the model, so fall back to a plain flat suit colour instead.
+      if(!painted){
+        return new THREEAsset.MeshBasicMaterial({
+          color:WOLVERINE_COLORS.suit,
+          toneMapped:false,
+          side:(src&&src.side!==undefined)?src.side:THREEAsset.FrontSide
+        });
+      }
+      return makeWolverinePaintMaterial(THREEAsset,src);
     });
 
     obj.material=Array.isArray(obj.material)?flatMats:flatMats[0];
   });
 }
+
 function cleanHeroEquipment(root, characterId){
   const hidePattern = characterId==='hooded'
     ? /(crossbow|xbow|bow_cross)/i
