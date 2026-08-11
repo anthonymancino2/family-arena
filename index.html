@@ -11,6 +11,7 @@ preview, gameplay, abilities, Arcane Echoes, lifecycle cleanup, and save migrati
 Legacy ninefox IDs remain migration-only. The original KayKit Mage remains available
 only as an emergency visual fallback if the native fox asset fails.
 -->
+<!-- V22.19.03 Remove Zulu + Wolverine Fix + Cat Grounded: removes Zulu from the selectable/playable roster, corrects Wolverine's inverted embedded root before visible-mesh fitting and grounding, keeps Wolverine mesh-only bounds so helper bones cannot distort placement, grounds Cat lower so it sits on the arena floor, and preserves Cat's 180-degree forward-axis correction plus full Knight test kit. -->
 <!-- V22.19.02 Knight Test + Avatar Visual Repairs: routes Zulu and Cat through the complete Knight gameplay shell for testing, updates knightIsActive() to respect gameplayAvatarType(), fits Cat to Cloud's 1.48-unit visible height, rotates Cat 180 degrees so movement and facing agree, replaces Wolverine's skeleton-wide fit/placement with visible-mesh-only bounds so remote Mixamo helper bones cannot push the actual body off-camera, and locks Zulu to its upright bind pose because the merged animation set is still incompatible with the rig. -->
 <!-- V22.19.01 Roster Repair + Rogue Kits: fixes Wolverine's invisible-dot preview/gameplay scaling by bypassing remote Mixamo helper-bone bounds; routes Zulu and the cat avatar to the actual Hooded Rogue combat slot ("hooded", not the Archer slot named "rogue"); removes Zulu from Archer-only passive routing; and prevents Zulu's incompatible merged Idle clip from folding the rig onto the ground. -->
 <!-- V22.19.00 Carrot Scout: adds the Carrot as a ninth playable avatar running the Tempest Archer kit, so it can be compared against the Rogue directly before deciding whether to replace it. The source is a Blender 2.79 file holding three duplicate scene rigs; assimp reads the geometry but drops Blender armatures entirely, so the export went through Blender 4.0 instead. Kept the main Armature and Carrot mesh, applied Mirror and Subsurf at level 1 for 3,919 verts on a 44-bone rig with a full nine-joint tail chain, and rebuilt the shipped Walk and Jog as Walk and Running_A. The file has no Idle, so one was authored as a two-second breathing loop written through direct fcurve construction. Vertex coloured with no texture, which the shared material pass now preserves. Embedded GLB is 363KB. -->
@@ -1433,7 +1434,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.19.02 - Knight Test + Avatar Visual Repairs';
+const GAME_VERSION='22.19.03 - Remove Zulu + Wolverine Fix + Cat Grounded';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -1797,7 +1798,7 @@ const SKINS = ['#ffe3c4','#f2c9a0','#c68a5a','#8d5a3c','#5a3826','#2b1d16'];
 const OUTFITS = ['#3fa9d6','#e0533d','#4caf50','#9b59b6','#f1c40f','#ecf0f1'];
 const HAIR_STYLES = ['short','medium','long'];
 const HAIR_STYLE_LABELS = {short:'Short', medium:'Medium', long:'Long'};
-const AVATAR_TYPES = ['rogue','hooded','mage','knight','barbarian','cloud','zulu','wolverine','carrot'];
+const AVATAR_TYPES = ['rogue','hooded','mage','knight','barbarian','cloud','wolverine','carrot'];
 const AVATAR_TYPE_LABELS = {
   rogue:'🏹 Archer',
   hooded:'🥷 Hooded Rogue',
@@ -1805,7 +1806,6 @@ const AVATAR_TYPE_LABELS = {
   knight:'🛡️ Knight',
   barbarian:'🪓 Barbarian',
   cloud:'⚔️ Cloud Test',
-  zulu:'🗡️ Zulu Warrior',
   wolverine:'🐾 Wolverine',
   carrot:'🥕 Carrot'
 };
@@ -1815,9 +1815,8 @@ const HERO_ROSTER_INFO = {
   mage:{title:'Nine-Tailed Fox Mage',role:'RANGED • MEDIUM',desc:'Native-rigged fox using the complete Arcane Mage combat system, elemental magic, and Arcane Echo clones.'},
   knight:{title:'Knight of Dawn',role:'MELEE • DEFENDER',desc:'An armored royal defender. Sword-and-shield combos, Magical Armor, guarding and counterattacks. Strongest class for surviving while surrounded.'},
   barbarian:{title:'Fury Barbarian',role:'MELEE • MEDIUM',desc:'A durable heavy hitter with extended axe reach. Every third defeat erupts into a Shockwave; every fifth grants 3 seconds of Invincibility.'},
-  carrot:{title:'Cat · Knight Test',role:'MELEE • KNIGHT TEST',desc:'Cat avatar temporarily runs the complete Knight move set for testing.'},
+  carrot:{title:'Cat · Knight Test',role:'MELEE • KNIGHT TEST',desc:'Cat avatar temporarily runs the complete Knight move set for testing. Grounding and forward-facing orientation are corrected for this test build.'},
   wolverine:{title:'Berserker Wolverine',role:'MELEE • BERSERKER',desc:'A relentless close-range berserker. Adamantium claw chains, a leaping pounce, a fear-inducing rage roar, and a spinning claw cyclone. Two map-clearing ultimates and five invincible shadow clones.'},
-  zulu:{title:'Zulu Warrior · Knight Test',role:'MELEE • KNIGHT TEST',desc:'Zulu temporarily runs the complete Knight move set while its imported rig is evaluated.'},
   cloud:{title:'Cloud · Knight Combat Test',role:'MELEE • KNIGHT MOVE SET',desc:'Cloud uses his native 43-joint skeleton and Walk animation with added knee, stride and body-motion enhancement while temporarily running the complete Knight combat kit for replacement testing. Model by Robukan, CC-BY-4.0.'}
 };
 
@@ -1848,7 +1847,6 @@ function archerIsActive(){ return state.avatarType==='rogue'; }
 function gameplayAvatarType(type=state.avatarType){
   if(type==='ninefox')return 'mage';
   if(type==='cloud')return 'knight';
-  if(type==='zulu')return 'knight';   // TESTING: Zulu visual + full Knight combat
   if(type==='carrot')return 'knight'; // TESTING: Cat visual + full Knight combat
   return type;
 }
@@ -1861,7 +1859,7 @@ function passiveForAvatar(type=state.avatarType){
 // Archer / Hooded Rogue / Mage = small
 // Knight = medium (larger than those three)
 // Barbarian = largest, exactly 2x its previous 1.08 scale
-const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:1.0, knight:1.18, barbarian:2.16, cloud:1.0, zulu:0.95, wolverine:1.10, carrot:0.92 };
+const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:1.0, knight:1.18, barbarian:2.16, cloud:1.0, wolverine:1.10, carrot:0.92 };
 const FREE_AVATAR_TYPES = [...AVATAR_TYPES];
 // TESTING ONLY: sET this back to false to re-lock Bunny/Dog/all 15 heroes
 // behind crystals. Everything else about the unlock system (CATALOG
@@ -2528,14 +2526,17 @@ async function updateAvatarPreview(characterId){
     const root=cloneSkinned(gltf.scene);
     cleanHeroEquipment(root,characterId);
     root.rotation.y=AVATAR_MODEL_YAW[characterId]||0;
+    if(characterId==='wolverine'){
+      root.rotation.x=Math.PI;
+    }
 
-    if(characterId==='zulu'||characterId==='carrot'||characterId==='wolverine'){
+    if(characterId==='carrot'||characterId==='wolverine'){
       // Preview uses the same visible-mesh fit as gameplay. Do not apply the
       // gameplay parent scale here because previewRoot has no player wrapper.
       root.updateMatrixWorld(true);
       let meshBox=importedVisibleMeshBounds(root,THREEAsset);
       const meshSize=meshBox.getSize(new THREEAsset.Vector3());
-      const previewHeight=(characterId==='carrot'||characterId==='wolverine')?1.48:1.42;
+      const previewHeight=characterId==='carrot'?1.48:(characterId==='wolverine'?1.42:1.42);
       root.scale.multiplyScalar(previewHeight/Math.max(.001,meshSize.y));
       root.updateMatrixWorld(true);
       meshBox=importedVisibleMeshBounds(root,THREEAsset);
@@ -2543,6 +2544,9 @@ async function updateAvatarPreview(characterId){
       root.position.x-=meshCenter.x;
       root.position.z-=meshCenter.z;
       root.position.y-=meshBox.min.y;
+
+      if(characterId==='carrot')root.position.y-=0.16;
+      if(characterId==='wolverine')root.position.y+=0.035;
     }else{
       const box=new THREEAsset.Box3().setFromObject(root);
       const size=box.getSize(new THREEAsset.Vector3());
@@ -2558,10 +2562,8 @@ async function updateAvatarPreview(characterId){
     root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
     previewRoot=root;previewScene.add(root);
     previewMixer=new THREEAsset.AnimationMixer(root);
-    if(characterId!=='zulu'){
-      const idle=gltf.animations.find(c=>c.name.toLowerCase()==='idle')||gltf.animations[0];
-      if(idle)previewMixer.clipAction(idle).play();
-    }
+    const idle=gltf.animations.find(c=>c.name.toLowerCase()==='idle')||gltf.animations[0];
+    if(idle)previewMixer.clipAction(idle).play();
     if(status)status.textContent=AVATAR_TYPE_LABELS[characterId].replace(/^.\s/,'');
   }catch(e){
     // Production Mage preview fallback: the old KayKit Mage is used only when
@@ -10304,7 +10306,7 @@ function getMiniZuluAssetPromise(){
 
 // Imported rigs do not all agree on which way is forward. One value per
 // character keeps that a data fix rather than a code change.
-const AVATAR_MODEL_YAW = { zulu:0, wolverine:0, carrot:Math.PI };
+const AVATAR_MODEL_YAW = { wolverine:Math.PI, carrot:Math.PI };
 
 const KAYKIT_CHARACTER_URLS = {
   hooded: 'https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/main/addons/kaykit_character_pack_adventures/Characters/gltf/Rogue_Hooded.glb',
@@ -10318,7 +10320,6 @@ const kayKitRemoteCache = {};
 function getKayKitAssetPromise(characterId){
   if(characterId === 'carrot') return getCarrotAssetPromise();
   if(characterId === 'wolverine') return getWolverineAssetPromise();
-  if(characterId === 'zulu') return getMiniZuluAssetPromise();
   if(characterId === 'rogue') return kayKitAssetPromise;
   if(kayKitRemoteCache[characterId]) return kayKitRemoteCache[characterId];
 
@@ -10899,12 +10900,14 @@ function importedVisibleMeshBounds(root,THREEAsset){
 function normalizeImportedPlayableRoot(root,characterId,THREEAsset){
   root.updateMatrixWorld(true);
 
-  // Cat and Wolverine are fitted to Cloud's approved gameplay body height.
-  // Divide by parent AVATAR_SCALE because spawnPlayer() applies it afterward.
   const parentScale=AVATAR_SCALE[characterId]||1;
-  const desiredWorldHeight=(characterId==='carrot'||characterId==='wolverine')
+
+  // Cat should match Cloud's approved 1.48-unit height.
+  // Wolverine gets a slightly shorter visible fit so the claws/head stay in frame.
+  const desiredWorldHeight=characterId==='carrot'
     ? 1.48
-    : 1.42;
+    : (characterId==='wolverine'?1.42:1.42);
+
   const desiredRootHeight=desiredWorldHeight/Math.max(.001,parentScale);
 
   let box=importedVisibleMeshBounds(root,THREEAsset);
@@ -10919,9 +10922,23 @@ function normalizeImportedPlayableRoot(root,characterId,THREEAsset){
 
   root.position.x-=center.x;
   root.position.z-=center.z;
-  root.position.y-=box.min.y;
-  root.updateMatrixWorld(true);
 
+  // Ground by visible mesh only.
+  root.position.y-=box.min.y;
+
+  // Cat's imported bind pose has its visible feet/body slightly above the
+  // measured mesh floor. Pull it down so it visually sits on the arena.
+  if(characterId==='carrot'){
+    root.position.y-=0.16/Math.max(.001,parentScale);
+  }
+
+  // Wolverine needs a tiny positive lift after the X-flip so boots/claws
+  // don't clip into the floor.
+  if(characterId==='wolverine'){
+    root.position.y+=0.035/Math.max(.001,parentScale);
+  }
+
+  root.updateMatrixWorld(true);
   return {scale:s,height:desiredWorldHeight};
 }
 
@@ -10962,13 +10979,18 @@ function buildKayKitPlayer(characterId, options={}){
 
     const root = cloneSkinned(gltf.scene);
     cleanHeroEquipment(root, characterId);
-    // KayKit's forward direction already matches the game's +Z facing.
     // Imported rigs get their correction from AVATAR_MODEL_YAW.
     root.rotation.y = AVATAR_MODEL_YAW[characterId] || 0;
 
+    // Wolverine's embedded import arrives inverted relative to the game world.
+    // Flip the entire imported root upright before any mesh-fit/grounding pass.
+    if(characterId==='wolverine'){
+      root.rotation.x = Math.PI;
+    }
+
     // Imported custom avatars use visible mesh geometry only. This avoids
     // Wolverine's remote Mixamo helper bones and gives Cat a Cloud-height fit.
-    if(characterId==='zulu'||characterId==='carrot'||characterId==='wolverine'){
+    if(characterId==='carrot'||characterId==='wolverine'){
       normalizeImportedPlayableRoot(root,characterId,THREEAsset);
     }else{
       const rawBox=new THREEAsset.Box3().setFromObject(root);
@@ -11026,18 +11048,6 @@ function buildKayKitPlayer(characterId, options={}){
     wrapper.userData.playKayClip = function(name, force=false, oneShot=false, lockSeconds=0){
       if(this.kayActionLock > 0 && !force) return;
 
-      // Zulu's merged Mixamo clips currently do not match the imported bind
-      // orientation reliably. Keep the actual skinned body upright in bind pose
-      // while we test the Knight combat kit; do not allow a bad clip to fold it.
-      if(characterId==='zulu'){
-        if(this.kayCurrentAction)this.kayCurrentAction.stop();
-        this.kayMixer.stopAllAction();
-        this.kayCurrentAction=null;
-        this.kayCurrentName='ZuluBindPose';
-        this.kayActionLock=0;
-        return;
-      }
-
       if(this.kayCurrentName === name && !force && !oneShot) return;
       const clip = this.kayClips[name] || this.kayClips.Idle;
       if(!clip) return;
@@ -11058,15 +11068,7 @@ function buildKayKitPlayer(characterId, options={}){
       this.kayCurrentName = clip.name;
       if(lockSeconds > 0) this.kayActionLock = Math.max(this.kayActionLock || 0, lockSeconds);
     };
-
-    if(characterId==='zulu'){
-      // Test-safe upright bind pose until the Zulu animation retarget is repaired.
-      mixer.stopAllAction();
-      wrapper.userData.kayCurrentAction=null;
-      wrapper.userData.kayCurrentName='ZuluBindPose';
-    }else{
-      wrapper.userData.playKayClip('Idle', true);
-    }
+    wrapper.userData.playKayClip('Idle', true);
     if(!options.silent) toast(AVATAR_TYPE_LABELS[characterId] + ' loaded');
   }).catch(err => {
     console.error('KayKit asset load failed:', err);
