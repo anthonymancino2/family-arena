@@ -1434,7 +1434,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.19.07 - Wolverine Color Intensity Match';
+const GAME_VERSION='22.19.08 - Wolverine Suit Repaint';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -10345,60 +10345,120 @@ function getKayKitAssetPromise(characterId){
 
 
 
+// The embedded Wolverine GLB ships a corrupt diffuse map: the atlas is a field
+// of random blue/orange/pink polygons rather than a character skin, which is why
+// he rendered as a psychedelic blur no matter how the material was tuned. The
+// rig itself is intact, so the suit is painted here from the 44-joint mixamorig
+// skeleton instead. Every vertex takes the colour of the body part its dominant
+// bone belongs to, giving true flat colour with no texture, no lighting response
+// and no baked shading -- the same intensity as the reference art.
+const WOLVERINE_COLORS = {
+  suit:  0xf5c31b,  // yellow costume panels
+  panel: 0x3e4757,  // dark blue-grey: mask wings, shoulders, gloves, boots
+  skin:  0xd8a184,  // bare face and upper arms
+  claw:  0xe6ecf4,  // adamantium
+  belt:  0xb6bdc8   // waist belt
+};
+
+// Bone name -> body region. Mixamo finger joints past the first knuckle are the
+// extended claws on this model, so they are split out before the glove test.
+function wolverineBoneRegion(rawName){
+  const n=(rawName||'').replace('mixamorig:','');
+  if(n==='Head')return 'head';
+  if(n==='Neck')return 'face';          // this rig weights the face to Neck
+  if(n.indexOf('Spine')===0)return 'torso';
+  if(/Shoulder$/.test(n))return 'shoulder';
+  if(/^(Left|Right)Arm$/.test(n))return 'upperArm';
+  if(/Hand(Thumb|Index|Middle|Ring)[23]$/.test(n))return 'claw';
+  if(n.indexOf('ForeArm')>=0||n.indexOf('Hand')>=0)return 'glove';
+  if(n==='Hips')return 'hips';
+  if(n.indexOf('UpLeg')>=0)return 'thigh';
+  if(/^(Left|Right)Leg$/.test(n))return 'shin';
+  return 'boot';
+}
+
+// Regions that are two-tone get split by bind-pose position. Bind pose is
+// Z-up and roughly +/-0.6 tall, and these are raw geometry coordinates, so the
+// cuts stay correct no matter how the avatar is later scaled or rotated.
+function wolverineColorKey(region,x,z){
+  switch(region){
+    case 'head':     return Math.abs(x)>0.120 ? 'panel' : 'suit';  // wings vs crown stripe
+    case 'torso':    return Math.abs(x)>0.115 ? 'panel' : 'suit';  // rib panels vs chest
+    case 'hips':     return (z>=-0.150&&z<=-0.070) ? 'belt' : 'suit';
+    case 'shin':     return z<-0.440 ? 'panel' : 'suit';           // boot cuff
+    case 'face':
+    case 'upperArm': return 'skin';
+    case 'claw':     return 'claw';
+    case 'thigh':    return 'suit';
+    default:         return 'panel';
+  }
+}
+
+// Writes the colour attribute once per geometry. SkeletonUtils.clone() shares
+// geometry between instances, so later clones reuse the same buffer.
+function paintWolverineGeometry(mesh,THREEAsset){
+  const geo=mesh&&mesh.geometry;
+  if(!geo)return false;
+  if(geo.userData&&geo.userData.wolverinePainted)return true;
+
+  const pos=geo.getAttribute('position');
+  const skinIndex=geo.getAttribute('skinIndex');
+  const skinWeight=geo.getAttribute('skinWeight');
+  const bones=mesh.skeleton&&mesh.skeleton.bones;
+  if(!pos||!skinIndex||!skinWeight||!bones||!bones.length)return false;
+
+  // Resolve the palette through THREE.Color so the sRGB hex above lands in the
+  // renderer's working colour space, matching every other material in the game.
+  const rgb={};
+  Object.keys(WOLVERINE_COLORS).forEach(key=>{
+    const c=new THREEAsset.Color(WOLVERINE_COLORS[key]);
+    rgb[key]=[c.r,c.g,c.b];
+  });
+  const regionOf=bones.map(b=>wolverineBoneRegion(b&&b.name));
+
+  const colors=new Float32Array(pos.count*3);
+  for(let i=0;i<pos.count;i++){
+    let bone=0,bestWeight=-1;
+    for(let k=0;k<4;k++){
+      const w=skinWeight.getComponent(i,k);
+      if(w>bestWeight){bestWeight=w;bone=skinIndex.getComponent(i,k);}
+    }
+    const region=regionOf[bone]||'panel';
+    const c=rgb[wolverineColorKey(region,pos.getX(i),pos.getZ(i))]||rgb.suit;
+    colors[i*3]=c[0];colors[i*3+1]=c[1];colors[i*3+2]=c[2];
+  }
+
+  geo.setAttribute('color',new THREEAsset.BufferAttribute(colors,3));
+  geo.userData=geo.userData||{};
+  geo.userData.wolverinePainted=true;
+  return true;
+}
+
 function tuneWolverineVisuals(root,THREEAsset,activeRenderer){
   if(!root)return;
-
-  let maxAniso=8;
-  try{
-    if(activeRenderer&&activeRenderer.capabilities&&activeRenderer.capabilities.getMaxAnisotropy){
-      maxAniso=Math.max(1,Math.min(8,activeRenderer.capabilities.getMaxAnisotropy()));
-    }
-  }catch(_){}
 
   root.traverse(obj=>{
     if(!obj||!obj.isMesh)return;
 
-    // Wolverine uses the same flat-lighting philosophy as the rest of the
-    // stylized roster. No directional-light dark side, no specular highlight,
-    // and no cast/receive shadow changing his suit brightness.
+    // Flat-lighting philosophy shared with the rest of the stylized roster:
+    // no directional dark side, no specular highlight, no shadow darkening.
     obj.castShadow=false;
     obj.receiveShadow=false;
 
+    const painted=paintWolverineGeometry(obj,THREEAsset);
     const sourceMats=Array.isArray(obj.material)?obj.material:[obj.material];
     const flatMats=sourceMats.map(src=>{
-      if(!src)return src;
-
-      const map=src.map||null;
-      if(map){
-        map.colorSpace=THREEAsset.SRGBColorSpace;
-        map.anisotropy=maxAniso;
-        map.magFilter=THREEAsset.LinearFilter;
-        map.minFilter=THREEAsset.LinearMipmapLinearFilter;
-        map.generateMipmaps=true;
-        map.needsUpdate=true;
-      }
-
+      // MeshBasicMaterial with no map is fully unlit, so the vertex colours
+      // reach the screen at exactly the authored intensity.
       const mat=new THREEAsset.MeshBasicMaterial({
-        map,
-        color:src.color?src.color.clone():new THREEAsset.Color(0xffffff),
-        transparent:!!src.transparent,
-        opacity:src.opacity===undefined?1:src.opacity,
-        alphaTest:src.alphaTest||0,
-        side:src.side===undefined?THREEAsset.FrontSide:src.side,
-        vertexColors:!!src.vertexColors,
+        color:painted?0xffffff:WOLVERINE_COLORS.suit,
+        vertexColors:painted,
+        transparent:src?!!src.transparent:false,
+        opacity:(src&&src.opacity!==undefined)?src.opacity:1,
+        side:(src&&src.side!==undefined)?src.side:THREEAsset.FrontSide,
         toneMapped:false
       });
-
-      // The source mesh's diffuse map/vertex colors carry baked-in shading
-      // from its original lit render, which reads as muddy/washed-out once
-      // rendered unlit. Push contrast (pull values away from mid-gray) and
-      // lift brightness so the yellow/blue suit reads as saturated and
-      // punchy, matching the reference art instead of the flattened look.
-      const CONTRAST=1.35, BRIGHTNESS=1.12;
-      mat.color.r=Math.min(THREEAsset.MathUtils.clamp((mat.color.r-.5)*CONTRAST+.5,0,1)*BRIGHTNESS,1);
-      mat.color.g=Math.min(THREEAsset.MathUtils.clamp((mat.color.g-.5)*CONTRAST+.5,0,1)*BRIGHTNESS,1);
-      mat.color.b=Math.min(THREEAsset.MathUtils.clamp((mat.color.b-.5)*CONTRAST+.5,0,1)*BRIGHTNESS,1);
-      mat.depthWrite=src.depthWrite!==false;
+      mat.depthWrite=src?src.depthWrite!==false:true;
       mat.needsUpdate=true;
       return mat;
     });
