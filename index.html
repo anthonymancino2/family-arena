@@ -1434,7 +1434,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.19.03 - Remove Zulu + Wolverine Fix + Cat Grounded';
+const GAME_VERSION='22.19.04 - Wolverine Focus';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -1798,7 +1798,7 @@ const SKINS = ['#ffe3c4','#f2c9a0','#c68a5a','#8d5a3c','#5a3826','#2b1d16'];
 const OUTFITS = ['#3fa9d6','#e0533d','#4caf50','#9b59b6','#f1c40f','#ecf0f1'];
 const HAIR_STYLES = ['short','medium','long'];
 const HAIR_STYLE_LABELS = {short:'Short', medium:'Medium', long:'Long'};
-const AVATAR_TYPES = ['rogue','hooded','mage','knight','barbarian','cloud','wolverine','carrot'];
+const AVATAR_TYPES = ['rogue','hooded','mage','knight','barbarian','cloud','wolverine'];
 const AVATAR_TYPE_LABELS = {
   rogue:'🏹 Archer',
   hooded:'🥷 Hooded Rogue',
@@ -1807,7 +1807,6 @@ const AVATAR_TYPE_LABELS = {
   barbarian:'🪓 Barbarian',
   cloud:'⚔️ Cloud Test',
   wolverine:'🐾 Wolverine',
-  carrot:'🥕 Carrot'
 };
 const HERO_ROSTER_INFO = {
   rogue:{title:'Tempest Archer',role:'RANGED • EASY',desc:'The speed-focused ranged avatar: fast movement, long-lived piercing arrows, and precise crowd control. Every fifth defeat triggers Tailwind for a short burst of movement and firing speed.'},
@@ -1815,7 +1814,6 @@ const HERO_ROSTER_INFO = {
   mage:{title:'Nine-Tailed Fox Mage',role:'RANGED • MEDIUM',desc:'Native-rigged fox using the complete Arcane Mage combat system, elemental magic, and Arcane Echo clones.'},
   knight:{title:'Knight of Dawn',role:'MELEE • DEFENDER',desc:'An armored royal defender. Sword-and-shield combos, Magical Armor, guarding and counterattacks. Strongest class for surviving while surrounded.'},
   barbarian:{title:'Fury Barbarian',role:'MELEE • MEDIUM',desc:'A durable heavy hitter with extended axe reach. Every third defeat erupts into a Shockwave; every fifth grants 3 seconds of Invincibility.'},
-  carrot:{title:'Cat · Knight Test',role:'MELEE • KNIGHT TEST',desc:'Cat avatar temporarily runs the complete Knight move set for testing. Grounding and forward-facing orientation are corrected for this test build.'},
   wolverine:{title:'Berserker Wolverine',role:'MELEE • BERSERKER',desc:'A relentless close-range berserker. Adamantium claw chains, a leaping pounce, a fear-inducing rage roar, and a spinning claw cyclone. Two map-clearing ultimates and five invincible shadow clones.'},
   cloud:{title:'Cloud · Knight Combat Test',role:'MELEE • KNIGHT MOVE SET',desc:'Cloud uses his native 43-joint skeleton and Walk animation with added knee, stride and body-motion enhancement while temporarily running the complete Knight combat kit for replacement testing. Model by Robukan, CC-BY-4.0.'}
 };
@@ -1847,7 +1845,6 @@ function archerIsActive(){ return state.avatarType==='rogue'; }
 function gameplayAvatarType(type=state.avatarType){
   if(type==='ninefox')return 'mage';
   if(type==='cloud')return 'knight';
-  if(type==='carrot')return 'knight'; // TESTING: Cat visual + full Knight combat
   return type;
 }
 function passiveForAvatar(type=state.avatarType){
@@ -1859,7 +1856,7 @@ function passiveForAvatar(type=state.avatarType){
 // Archer / Hooded Rogue / Mage = small
 // Knight = medium (larger than those three)
 // Barbarian = largest, exactly 2x its previous 1.08 scale
-const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:1.0, knight:1.18, barbarian:2.16, cloud:1.0, wolverine:1.10, carrot:0.92 };
+const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:1.0, knight:1.18, barbarian:2.16, cloud:1.0, wolverine:1.10 };
 const FREE_AVATAR_TYPES = [...AVATAR_TYPES];
 // TESTING ONLY: sET this back to false to re-lock Bunny/Dog/all 15 heroes
 // behind crystals. Everything else about the unlock system (CATALOG
@@ -2526,9 +2523,7 @@ async function updateAvatarPreview(characterId){
     const root=cloneSkinned(gltf.scene);
     cleanHeroEquipment(root,characterId);
     root.rotation.y=AVATAR_MODEL_YAW[characterId]||0;
-    if(characterId==='wolverine'){
-      root.rotation.x=Math.PI;
-    }
+
 
     if(characterId==='carrot'||characterId==='wolverine'){
       // Preview uses the same visible-mesh fit as gameplay. Do not apply the
@@ -2536,7 +2531,7 @@ async function updateAvatarPreview(characterId){
       root.updateMatrixWorld(true);
       let meshBox=importedVisibleMeshBounds(root,THREEAsset);
       const meshSize=meshBox.getSize(new THREEAsset.Vector3());
-      const previewHeight=characterId==='carrot'?1.48:(characterId==='wolverine'?1.42:1.42);
+      const previewHeight=characterId==='carrot'?1.48:(characterId==='wolverine'?1.48:1.42);
       root.scale.multiplyScalar(previewHeight/Math.max(.001,meshSize.y));
       root.updateMatrixWorld(true);
       meshBox=importedVisibleMeshBounds(root,THREEAsset);
@@ -2546,7 +2541,6 @@ async function updateAvatarPreview(characterId){
       root.position.y-=meshBox.min.y;
 
       if(characterId==='carrot')root.position.y-=0.16;
-      if(characterId==='wolverine')root.position.y+=0.035;
     }else{
       const box=new THREEAsset.Box3().setFromObject(root);
       const size=box.getSize(new THREEAsset.Vector3());
@@ -2562,8 +2556,15 @@ async function updateAvatarPreview(characterId){
     root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
     previewRoot=root;previewScene.add(root);
     previewMixer=new THREEAsset.AnimationMixer(root);
-    const idle=gltf.animations.find(c=>c.name.toLowerCase()==='idle')||gltf.animations[0];
-    if(idle)previewMixer.clipAction(idle).play();
+    if(characterId!=='wolverine'){
+      const idle=gltf.animations.find(c=>c.name.toLowerCase()==='idle')||gltf.animations[0];
+      if(idle)previewMixer.clipAction(idle).play();
+    }else{
+      // Keep Wolverine in the source bind/rest pose for the selection preview.
+      // This makes the intended upright yellow/blue masked silhouette readable
+      // while the imported animation basis is repaired separately.
+      previewMixer.stopAllAction();
+    }
     if(status)status.textContent=AVATAR_TYPE_LABELS[characterId].replace(/^.\s/,'');
   }catch(e){
     // Production Mage preview fallback: the old KayKit Mage is used only when
@@ -10306,7 +10307,7 @@ function getMiniZuluAssetPromise(){
 
 // Imported rigs do not all agree on which way is forward. One value per
 // character keeps that a data fix rather than a code change.
-const AVATAR_MODEL_YAW = { wolverine:Math.PI, carrot:Math.PI };
+const AVATAR_MODEL_YAW = { wolverine:0 };
 
 const KAYKIT_CHARACTER_URLS = {
   hooded: 'https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/main/addons/kaykit_character_pack_adventures/Characters/gltf/Rogue_Hooded.glb',
@@ -10906,7 +10907,7 @@ function normalizeImportedPlayableRoot(root,characterId,THREEAsset){
   // Wolverine gets a slightly shorter visible fit so the claws/head stay in frame.
   const desiredWorldHeight=characterId==='carrot'
     ? 1.48
-    : (characterId==='wolverine'?1.42:1.42);
+    : (characterId==='wolverine'?1.48:1.42);
 
   const desiredRootHeight=desiredWorldHeight/Math.max(.001,parentScale);
 
@@ -10932,11 +10933,6 @@ function normalizeImportedPlayableRoot(root,characterId,THREEAsset){
     root.position.y-=0.16/Math.max(.001,parentScale);
   }
 
-  // Wolverine needs a tiny positive lift after the X-flip so boots/claws
-  // don't clip into the floor.
-  if(characterId==='wolverine'){
-    root.position.y+=0.035/Math.max(.001,parentScale);
-  }
 
   root.updateMatrixWorld(true);
   return {scale:s,height:desiredWorldHeight};
@@ -10984,9 +10980,7 @@ function buildKayKitPlayer(characterId, options={}){
 
     // Wolverine's embedded import arrives inverted relative to the game world.
     // Flip the entire imported root upright before any mesh-fit/grounding pass.
-    if(characterId==='wolverine'){
-      root.rotation.x = Math.PI;
-    }
+
 
     // Imported custom avatars use visible mesh geometry only. This avoids
     // Wolverine's remote Mixamo helper bones and gives Cat a Cloud-height fit.
@@ -11047,6 +11041,15 @@ function buildKayKitPlayer(characterId, options={}){
 
     wrapper.userData.playKayClip = function(name, force=false, oneShot=false, lockSeconds=0){
       if(this.kayActionLock > 0 && !force) return;
+
+      if(characterId==='wolverine'){
+        if(this.kayCurrentAction)this.kayCurrentAction.stop();
+        this.kayMixer.stopAllAction();
+        this.kayCurrentAction=null;
+        this.kayCurrentName='WolverineBindPose';
+        this.kayActionLock=0;
+        return;
+      }
 
       if(this.kayCurrentName === name && !force && !oneShot) return;
       const clip = this.kayClips[name] || this.kayClips.Idle;
@@ -11236,7 +11239,7 @@ function fillEnemySlotsFromQueue(){
   }
 }
 function spawnZombie(){
-  const zombieRoster = AVATAR_TYPES.filter(t=>t!=='cloud'&&t!=='zulu'&&t!=='wolverine'&&t!=='carrot');
+  const zombieRoster = AVATAR_TYPES.filter(t=>t!=='cloud'&&t!=='zulu'&&t!=='wolverine');
   const zombieCharacter = zombieRoster[Math.floor(Math.random()*zombieRoster.length)];
   const archetype = chooseZombieArchetype();
   const spec = ZOMBIE_ARCHETYPES[archetype];
