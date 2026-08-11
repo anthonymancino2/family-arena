@@ -1434,7 +1434,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.19.06 - Wolverine Flat Lighting';
+const GAME_VERSION='22.19.07 - Wolverine Color Intensity Match';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -10389,9 +10389,15 @@ function tuneWolverineVisuals(root,THREEAsset,activeRenderer){
         toneMapped:false
       });
 
-      // Neutral brightness: slightly below pure white to avoid an overexposed
-      // yellow suit while staying clearly brighter than the dark environment.
-      mat.color.multiplyScalar(.96);
+      // The source mesh's diffuse map/vertex colors carry baked-in shading
+      // from its original lit render, which reads as muddy/washed-out once
+      // rendered unlit. Push contrast (pull values away from mid-gray) and
+      // lift brightness so the yellow/blue suit reads as saturated and
+      // punchy, matching the reference art instead of the flattened look.
+      const CONTRAST=1.35, BRIGHTNESS=1.12;
+      mat.color.r=Math.min(THREEAsset.MathUtils.clamp((mat.color.r-.5)*CONTRAST+.5,0,1)*BRIGHTNESS,1);
+      mat.color.g=Math.min(THREEAsset.MathUtils.clamp((mat.color.g-.5)*CONTRAST+.5,0,1)*BRIGHTNESS,1);
+      mat.color.b=Math.min(THREEAsset.MathUtils.clamp((mat.color.b-.5)*CONTRAST+.5,0,1)*BRIGHTNESS,1);
       mat.depthWrite=src.depthWrite!==false;
       mat.needsUpdate=true;
       return mat;
