@@ -1434,7 +1434,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='22.19.08 - Wolverine Suit Repaint';
+const GAME_VERSION='22.19.09 - Wolverine Bone Name Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -10360,20 +10360,25 @@ const WOLVERINE_COLORS = {
   belt:  0xb6bdc8   // waist belt
 };
 
-// Bone name -> body region. Mixamo finger joints past the first knuckle are the
-// extended claws on this model, so they are split out before the glove test.
+// Bone name -> body region. three.js runs every glTF node name through
+// PropertyBinding.sanitizeNodeName, which deletes ": . / [ ]", so Mixamo's
+// "mixamorig:Head" reaches us as "mixamorigHead". Strip the prefix with or
+// without its separator, and keep every test unanchored at the start so the
+// match still holds if a rig arrives with the prefix intact.
 function wolverineBoneRegion(rawName){
-  const n=(rawName||'').replace('mixamorig:','');
-  if(n==='Head')return 'head';
-  if(n==='Neck')return 'face';          // this rig weights the face to Neck
-  if(n.indexOf('Spine')===0)return 'torso';
+  const n=String(rawName||'').replace(/^mixamorig\d*[:_]?/i,'');
+  if(/Head$/.test(n))return 'head';
+  if(/Neck\d*$/.test(n))return 'face';          // this rig weights the face to Neck
+  if(/Spine\d*$/.test(n))return 'torso';
   if(/Shoulder$/.test(n))return 'shoulder';
-  if(/^(Left|Right)Arm$/.test(n))return 'upperArm';
-  if(/Hand(Thumb|Index|Middle|Ring)[23]$/.test(n))return 'claw';
-  if(n.indexOf('ForeArm')>=0||n.indexOf('Hand')>=0)return 'glove';
-  if(n==='Hips')return 'hips';
-  if(n.indexOf('UpLeg')>=0)return 'thigh';
-  if(/^(Left|Right)Leg$/.test(n))return 'shin';
+  if(/(Left|Right)Arm$/.test(n))return 'upperArm';
+  // Finger joints past the first knuckle are the extended claws on this model,
+  // so they are split out before the general glove test.
+  if(/Hand(Thumb|Index|Middle|Ring|Pinky)[234]$/.test(n))return 'claw';
+  if(/ForeArm/.test(n)||/Hand/.test(n))return 'glove';
+  if(/Hips$/.test(n))return 'hips';
+  if(/UpLeg$/.test(n))return 'thigh';
+  if(/(Left|Right)Leg$/.test(n))return 'shin';
   return 'boot';
 }
 
@@ -10399,7 +10404,7 @@ function wolverineColorKey(region,x,z){
 function paintWolverineGeometry(mesh,THREEAsset){
   const geo=mesh&&mesh.geometry;
   if(!geo)return false;
-  if(geo.userData&&geo.userData.wolverinePainted)return true;
+  if(geo.userData&&geo.userData.wolverinePaintedV2)return true;
 
   const pos=geo.getAttribute('position');
   const skinIndex=geo.getAttribute('skinIndex');
@@ -10430,7 +10435,7 @@ function paintWolverineGeometry(mesh,THREEAsset){
 
   geo.setAttribute('color',new THREEAsset.BufferAttribute(colors,3));
   geo.userData=geo.userData||{};
-  geo.userData.wolverinePainted=true;
+  geo.userData.wolverinePaintedV2=true;
   return true;
 }
 
