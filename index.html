@@ -1,3 +1,4 @@
+<!-- V23.03.15 Ranger Round Table Clones: replaces the one-hit Einherjar Echo signature with a persistent Green Ranger clone army following the Knight Knights-of-the-Round rules exactly. Round 10-15 summons 2 invincible clones for 8s with 10s cooldown; Round 16-20 summons 5 for 15s with 5s cooldown; Round 21+ summons 10 for 30s with 0.8s cooldown. Clones draw enemy aggro before the player, move at 2/3 of the Ranger's current movement speed, return to formation after being far away too long, and deal 10% player-scaled damage. They use the Green Rhino native rig, normal size even during Titan Rampage, and cycle the Ranger Primary plus the currently equipped Secondary in simplified clone-safe forms. The Ranger signature is blocked during Titan Rampage, matching Knight Titan's clone restriction. Old Einherjar Echo runtime/code/charge HUD is removed. Cleanup and syntax audit included. -->
 <!-- V23.03.14 Ranger Defensive Whirlwind: removes Freight Train Charge and replaces that Ranger Secondary slot with Cloud's Defensive Whirlwind combat behavior. The Ranger version reuses the existing Knight/Cloud whirlwind tuning and visual helpers: the same round-scaled active duration, 0.22s damage pulses, outward knockback, stagger, projectile deflection, layered sword/shield-style spin arcs, activation flare and ending guard burst. Ranger Secondary rules remain authoritative, so this version has zero post-use cooldown and can restart immediately while Secondary is held once the current Whirlwind duration ends. The same 0.55 movement multiplier applies while spinning. Titan Rampage scales Whirlwind radius/damage with the giant form but still uses only the equipped Secondary. Green Rhino's clean model-fit wrapper now receives the spin instead of rotating the native-rigged gameplay root. Old Freight Train trigger/update/runtime/dispatch code is removed. Cleanup and syntax audit included. -->
 <!-- V23.03.13 Armageddon Super Meteor Barrage: replaces Armageddon's custom low-poly stone rain and single final meteor with the Mage's actual Super Meteor visual system. After the Ranger's existing off-screen leap, center crash and 8-second map-wide stun, Mage-style Super Meteors repeatedly fall across the arena for 10 full seconds using the same giant meteor mesh, lava wire shell, aura, flame ring, fire trail, warning marker, orange atmosphere, impact flash, shock rings, molten debris, crater and surviving-enemy burn aura as Super Meteor. Armageddon meteor impacts instantly eliminate most normal enemies inside the enormous Super Meteor radius; any survivor is stunned for 3 seconds and burned for 5 seconds, including bosses. Bosses remain protected from one-shot damage. The old Armageddon stone geometry/material pools, stonefall code and 85%-map final meteor implementation are removed. Cleanup and syntax audit included. -->
 <!-- V23.03.12 Five-Hit Stormbreaker: upgrades Stormbreaker Overdrive from a slow three-target throw into a fast five-hit chain. The axe now acquires up to five nearest living enemies, travels substantially faster between hits, and snaps back to the Ranger at an even higher return speed after hit #5. Each contact gets a brighter dual-ring/spark impact, hit #5 gets a much larger finishing detonation and hit-stop, and the returning catch gets a stronger visual burst. The move still has zero cooldown; holding Secondary can activate it again immediately after the axe is caught. Old nearest-3 targeting logic is removed. Cleanup and syntax audit included. -->
@@ -1636,7 +1637,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.03.14 - Ranger Defensive Whirlwind';
+const GAME_VERSION='23.03.15 - Ranger Round Table Clones';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -2018,7 +2019,7 @@ const HERO_ROSTER_INFO = {
   barbarian:{title:'Aesir Barbarian',role:'SLOW • AREA BRUISER',desc:'A horned Norse berserker built around raw ground power. She is by far the SLOWEST avatar in the roster and cannot chase anything down - instead every single blow she lands throws a shockwave out of the impact point, so she is never fighting one enemy at a time. Two Primaries, three Secondaries, three selectable Ultimates, and a Berserker Kin clone special.'},
   
   cloud:{title:'Cloud',role:'MELEE • KNIGHT CLASS',desc:'Cloud is now the primary avatar for the Knight combat class. He uses his native 43-joint skeleton and Walk animation while running the complete Knight combat system. Future cosmetic skins can reuse this same Knight-class moveset without changing the combat logic.'},
-  rhino:{title:'Green Rhino Ranger',role:'WORLD-BREAKER • THUNDER GOD',desc:'A mobile Hulk-Thor style Ranger built around one giant axe and procedural power moves. Twin Boomerang remains the Primary. Secondaries are Stormbreaker Overdrive, Gamma Leap and Freight Train Charge. Ultimates are World-Breaker Crashing Bolt, Shattered Domain and Wrath of the Sky-Father. His signature is Einherjar Echo, one phantom berserker that appears only long enough to deliver a God-Shatter Chop.'}
+  rhino:{title:'Green Rhino Ranger',role:'WORLD-BREAKER • THUNDER GOD',desc:'A mobile Hulk-Thor style Ranger built around one giant axe and procedural power moves. Twin Boomerang remains the Primary. Secondaries are Stormbreaker Overdrive, Gamma Leap and Defensive Whirlwind. Ultimates are World-Breaker Crashing Bolt, Titan Rampage and Armageddon. His signature summons an invincible Green Ranger clone squad that follows the same round-scaled count, duration, cooldown, aggro and 10%-damage rules as the Knight\'s Knights of the Round.'}
 };
 
 // Data-driven hero passives. This object had accidentally been merged into
@@ -12735,7 +12736,9 @@ function spawnPlayer(){
 
 // ---- Zombies ----
 function livingPlayers(){
-  // Knight clones have first aggro priority and are invincible.
+  // Knight/Ranger clone signatures have first aggro priority and are invincible.
+  const rangerClones=rhinoRoyalClones.filter(e=>e&&e.parent&&e.userData&&!e.userData.dead);
+  if(rangerClones.length)return rangerClones;
   const knightClones=knightRoyalClones.filter(e=>e&&e.parent&&e.userData&&!e.userData.dead);
   if(knightClones.length)return knightClones;
   const volleyDecoys=mirrorVolleyDecoys.filter(e=>e&&e.parent);
@@ -14156,7 +14159,7 @@ function setupControls(){
       if(knightGuardianGiantActive()) return;
       triggerKnightRoyalGuardClones();
     }else if(barbarianIsActive()){
-      if(rhinoIsActive()){ triggerRhinoEinherjarEcho(); return; }
+      if(rhinoIsActive()){ if(rhinoTitanActive())return; triggerRhinoRoyalClones(); return; }
       if(barbarianUltimateActive>0)return;
       triggerBerserkerKin();
     }
@@ -16275,7 +16278,8 @@ function updateHoodedHud(){
   const isHooded=state.avatarType==='hooded', isArcher=archerIsActive(), isMage=mageGameplayActive(), isKnight=knightIsActive(), isBarbarian=barbarianIsActive();
   const mageEchoReady=isMage&&arcaneEchoesUnlocked();
   const knightCloneSpecialReady=isKnight&&Math.max(1,Number(round)||1)>=10;
-  const hasSignature=isHooded||isArcher||knightCloneSpecialReady||isBarbarian||mageEchoReady;
+  const rhinoCloneSpecialReady=rhinoIsActive()&&Math.max(1,Number(round)||1)>=10;
+  const hasSignature=isHooded||isArcher||knightCloneSpecialReady||rhinoCloneSpecialReady||(isBarbarian&&!rhinoIsActive())||mageEchoReady;
   btn.classList.toggle('hidden',!hasSignature); meter.classList.toggle('on',hasSignature);
   if(hasSignature){
     let pct=0;
@@ -16285,6 +16289,12 @@ function updateHoodedHud(){
     }else if(isArcher){
       const total=Math.max(.001,archerMirrorCycleDuration||archerMirrorCooldownForLevel());
       pct=archerMirrorCooldownTimer<=0?100:Math.max(0,Math.min(100,(1-archerMirrorCooldownTimer/total)*100));
+    }else if(rhinoCloneSpecialReady){
+      const cfg=rhinoRoyalCloneConfig();
+      const total=Math.max(.001,cfg.cooldown||1);
+      pct=rhinoRoyalCloneCooldown<=0
+        ? 100
+        : Math.max(0,Math.min(100,(1-rhinoRoyalCloneCooldown/total)*100));
     }else if(isKnight){
       const cfg=knightRoyalCloneConfig();
       const total=Math.max(.001,cfg.cooldown||1);
@@ -16307,6 +16317,18 @@ function updateHoodedHud(){
         ? `MIRRORS ${archerMirrorClones.length}/${ARCHER_MIRROR_COUNT} · HITS ${remainingHits}`
         : (pct>=100?'MIRROR CLONES READY':`CLONES ${archerMirrorCooldownTimer.toFixed(1)}s`);
     }
+    else if(rhinoCloneSpecialReady){
+      const activeCount=rhinoRoyalClones.length;
+      const activeTime=activeCount
+        ? Math.max(...rhinoRoyalClones.map(c=>Math.max(0,c.userData.life||0)))
+        : 0;
+      btn.textContent=activeCount?'RANGERS!':(pct>=100?'RANGERS!':'RANGERS');
+      meter.textContent=activeCount
+        ? `RANGERS ${activeCount} · ${activeTime.toFixed(1)}s`
+        : (rhinoRoyalCloneCooldown>0
+          ? `ROUND TABLE ${rhinoRoyalCloneCooldown.toFixed(1)}s`
+          : 'RANGERS OF THE ROUND READY');
+    }
     else if(isKnight){
       const activeCount=knightRoyalClones.length;
       const activeTime=activeCount
@@ -16320,11 +16342,7 @@ function updateHoodedHud(){
           : 'KNIGHTS OF THE ROUND READY');
     }
     else if(isBarbarian){
-      if(rhinoIsActive()){
-        const echoActive=!!(rhinoRuntime&&rhinoRuntime.echo);
-        btn.textContent=echoActive?'ECHO!':(pct>=100?'ECHO!':'ECHO');
-        meter.textContent=echoActive?'EINHERJAR CHOP':'ECHO '+Math.round(pct)+'%';
-      }else{
+      {
         const kinCount=barbarianKinClones.length;
         btn.textContent=kinCount?'KIN!':(pct>=100?'KIN!':'KIN');
         meter.textContent=kinCount
@@ -23518,11 +23536,17 @@ let rhinoRuntime = {
   crashing:null, crashingCooldown:0,
   titanTimer:0, titanCooldown:0, titanFx:null,
   armageddon:null, armageddonCooldown:0,
-  echo:null, echoCooldown:0
 };
+let rhinoRoyalClones=[];
+let rhinoRoyalCloneCooldown=0;
+let rhinoRoyalCloneCycleDuration=0;
+let rhinoRoyalCloneSummonEpoch=0;
+
 
 function rhinoResetRuntime(){
   try{rhinoWorldBreakerCleanup(true);}catch(_e){}
+  try{clearRhinoRoyalClones();}catch(_e){}
+  rhinoRoyalCloneCooldown=0;rhinoRoyalCloneCycleDuration=0;
   rhinoRuntime = {
     throwSide:0,
     overdrive:null, overdriveCooldown:0,
@@ -23531,8 +23555,7 @@ function rhinoResetRuntime(){
     crashing:null, crashingCooldown:0,
     titanTimer:0, titanCooldown:0, titanFx:null,
     armageddon:null, armageddonCooldown:0,
-    echo:null, echoCooldown:0
-  };
+    };
 }
 /* ---------------------------------------------------------------------
    BOOMERANG PROJECTILE
@@ -24730,19 +24753,332 @@ function updateRhinoArmageddon(dt){
   }
 }
 
-function triggerRhinoEinherjarEcho(){
-  const r=rhinoRuntime;if(!gameRunning||!rhinoIsActive()||!player||r.echo)return false;if(barbarianUltimateCharge<99.5){toast('Einherjar Echo still charging');return false;}barbarianUltimateCharge=0;updateHoodedHud();markUltimateUsed();
-  const target=findNearestEnemy(18);const dir=target?new THREE.Vector3(target.position.x-player.position.x,0,target.position.z-player.position.z).normalize():rhinoWBForward();const pos=target?target.position.clone():player.position.clone().addScaledVector(dir,4);pos.y=0;
-  const g=new THREE.Group(),body=new THREE.Mesh(new THREE.CapsuleGeometry(.55,1.15,4,8),new THREE.MeshBasicMaterial({color:0x46ff7c,transparent:true,opacity:.48,depthWrite:false,blending:THREE.AdditiveBlending})),axe=rhinoWBMakeAxe(0x48fff0);body.position.y=1.1;axe.position.set(.65,1.55,.25);axe.rotation.x=-THREE.MathUtils.degToRad(65);g.add(body,axe);g.position.copy(pos);g.rotation.y=Math.atan2(dir.x,dir.z);scene.add(g);r.echo={t:0,g,axe,startRot:axe.rotation.x,hit:false};toast('EINHERJAR ECHO');return true;
+
+/* ---------------------------------------------------------------------
+   SIGNATURE — RANGERS OF THE ROUND
+   Exact Knight clone count/duration/cooldown rules; Ranger-native body/moves.
+   --------------------------------------------------------------------- */
+function rhinoRoyalCloneConfig(){
+  // Deliberately reuse the Knight source of truth so future tuning stays synced.
+  return knightRoyalCloneConfig();
 }
-function updateRhinoEinherjarEcho(dt){
-  const r=rhinoRuntime;const s=r.echo;if(!s)return;s.t+=dt;
-  if(s.t<=.10){const u=s.t/.10,e=u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;s.axe.rotation.x=s.startRot+THREE.MathUtils.degToRad(90)*e;s.axe.scale.z=1+1.5*e;return;}
-  if(!s.hit){s.hit=true;const f=new THREE.Vector3(Math.sin(s.g.rotation.y),0,Math.cos(s.g.rotation.y)),impact=s.g.position.clone().addScaledVector(f,1.7);rhinoWBRadial(impact,3.5,4.0,8);rhinoWBShock(impact,3.5,RHINO_GREEN,.22);spawnEarthbreaker(impact,2.8);triggerCombatShake(15,150);}
-  const u=Math.min(1,(s.t-.10)/.08),sc=1-(1-Math.pow(1-u,3));s.g.scale.setScalar(Math.max(0,1-sc));if(u>=1){rhinoWBDispose(s.g);r.echo=null;}
+function rhinoRoyalCloneUnlocked(){
+  return rhinoIsActive() && Math.max(1,Number(round)||1)>=10;
+}
+function rhinoRoyalCloneMoveSpeed(){
+  const speedStat=(playerStats&&Number.isFinite(playerStats.speed))?playerStats.speed:1;
+  const characterMoveMult=(combatForAvatar().baseMoveMult||1);
+  const playerMoveSpeed=PLAYER_SPEED*characterMoveMult*barbarianMoveMultiplier()*(1+(speedStat-1)*.15);
+  return Math.max(0,playerMoveSpeed*(2/3));
+}
+function rhinoRoyalCloneFormationSlot(index,count,rotation=0){
+  count=Math.max(1,count||1);
+  const twoRings=count>=8;
+  let ringIndex=0,ringCount=count,radius=3.15;
+  if(twoRings){
+    const inner=Math.ceil(count*.4);
+    if(index<inner){ringIndex=index;ringCount=inner;radius=2.75;}
+    else{ringIndex=index-inner;ringCount=count-inner;radius=4.35;}
+  }else if(count>=5)radius=3.65;
+  else if(count<=2)radius=2.7;
+  const phase=twoRings&&index>=Math.ceil(count*.4)?Math.PI/Math.max(1,ringCount):0;
+  const a=rotation+phase+(ringIndex/Math.max(1,ringCount))*Math.PI*2;
+  return {x:Math.cos(a)*radius,z:Math.sin(a)*radius,a};
+}
+function rhinoRoyalCloneTint(root,index){
+  root.traverse(o=>{
+    if(!o.isMesh||!o.material)return;
+    const source=Array.isArray(o.material)?o.material:[o.material];
+    const mats=source.map(m=>{
+      const c=m.clone();
+      c.transparent=true;c.opacity=.62;c.depthWrite=false;
+      if(c.color)c.color.lerp(new THREE.Color(index%2?RHINO_PALE:RHINO_GREEN),.32);
+      if(c.emissive)c.emissive.setHex(index%2?0x123f36:0x0c3320);
+      return c;
+    });
+    o.material=Array.isArray(o.material)?mats:mats[0];
+    o.castShadow=false;
+  });
+}
+function rhinoRoyalClonePlay(c,name){
+  if(!c||!c.userData||!c.userData.mixer)return;
+  const clips=c.userData.clips||{};
+  const clip=clips[name]||clips.Idle;
+  if(!clip)return;
+  const prev=c.userData.action;
+  if(prev&&prev.getClip&&prev.getClip()===clip)return;
+  if(prev)prev.fadeOut(.08);
+  const act=c.userData.mixer.clipAction(clip);
+  act.reset().fadeIn(.08).play();
+  if(name==='Attack'){
+    act.setLoop(THREE.LoopOnce,1);
+    act.clampWhenFinished=true;
+  }else act.setLoop(THREE.LoopRepeat,Infinity);
+  c.userData.action=act;
+}
+function clearRhinoRoyalClones(){
+  rhinoRoyalCloneSummonEpoch++;
+  for(const c of rhinoRoyalClones){
+    if(c&&c.parent){c.parent.remove(c);disposeGroup(c);}
+  }
+  rhinoRoyalClones=[];
+  for(const z of zombies){
+    if(z&&z.userData&&z.userData.targetPlayer&&z.userData.targetPlayer.userData&&
+       z.userData.targetPlayer.userData.isRhinoRoyalClone){
+      z.userData.targetPlayer=null;
+      z.userData.targetRefresh=0;
+    }
+  }
+}
+function removeRhinoRoyalClone(c){
+  if(!c)return;
+  for(const z of zombies){
+    if(z&&z.userData&&z.userData.targetPlayer===c){
+      z.userData.targetPlayer=null;
+      z.userData.targetRefresh=0;
+    }
+  }
+  if(c.parent)c.parent.remove(c);
+  disposeGroup(c);
+  rhinoRoyalClones=rhinoRoyalClones.filter(x=>x!==c);
+}
+function rhinoRoyalCloneBaseDamage(){
+  const primary=weaponForAvatar();
+  return Math.max(1,Number(primary&&primary.damage)||1.35)*playerStats.power*.10;
+}
+function rhinoRoyalCloneSecondaryKind(){
+  const w=secondaryWeaponForAvatar();
+  return w&&isRhinoWeaponKind(w.kind)?w.kind:null;
+}
+function rhinoRoyalCloneStrikeFx(c,target,kind){
+  if(!c||!target)return;
+  const pos=c.position;
+  if(kind==='rhino_cloud_whirlwind'){
+    const ring=new THREE.Mesh(new THREE.RingGeometry(1.2,2.45,36),knightMat(RHINO_PALE,.42));
+    ring.rotation.x=-Math.PI/2;ring.position.set(pos.x,pos.y+.05,pos.z);
+    knightBaseOpacity(ring);pushKnightFx(ring,{life:.30,grow:.30,from:.80,spin:12});
+  }else if(kind==='rhino_gamma_leap'){
+    rhinoWBShock(pos,2.8,RHINO_GREEN,.26);
+    spawnEarthbreaker(pos,2.2);
+  }else if(kind==='rhino_overdrive'){
+    const len=Math.max(1.5,c.position.distanceTo(target.position));
+    const line=new THREE.Mesh(new THREE.PlaneGeometry(.16,len),knightMat(RHINO_WHITE,.54));
+    line.rotation.x=-Math.PI/2;
+    line.position.set((c.position.x+target.position.x)*.5,c.position.y+.7,(c.position.z+target.position.z)*.5);
+    line.rotation.y=Math.atan2(target.position.x-c.position.x,target.position.z-c.position.z);
+    knightBaseOpacity(line);pushKnightFx(line,{life:.16,grow:.10,from:.94});
+    rhinoWBShock(target.position,1.5,RHINO_PALE,.18);
+  }else{
+    rhinoWBShock(target.position,1.25,RHINO_PALE,.14);
+  }
+}
+function rhinoRoyalClonePerformMove(c,target){
+  if(!c||!target||target.userData.dead)return;
+  const base=rhinoRoyalCloneBaseDamage();
+  const secondary=rhinoRoyalCloneSecondaryKind();
+  const useSecondary=secondary && (c.userData.moveIndex%2===1);
+  const kind=useSecondary?secondary:'rhino_boomerang';
+  c.userData.moveIndex=(c.userData.moveIndex+1)%2;
+
+  const dx=target.position.x-c.position.x,dz=target.position.z-c.position.z,dist=Math.hypot(dx,dz)||1;
+  c.rotation.y=Math.atan2(dx,dz);
+  rhinoRoyalClonePlay(c,'Attack');
+  rhinoRoyalCloneStrikeFx(c,target,kind);
+
+  if(kind==='rhino_cloud_whirlwind'){
+    for(const z of zombies){
+      if(!z||z.userData.dead||z.userData.spawnPending)continue;
+      if(Math.hypot(z.position.x-c.position.x,z.position.z-c.position.z)<=2.8){
+        applyBulletDamage(z,base*.72);
+        if(!z.userData.dead){
+          const qx=z.position.x-c.position.x,qz=z.position.z-c.position.z,qd=Math.hypot(qx,qz)||1;
+          z.userData.knockbackX=(qx/qd)*2.4;
+          z.userData.knockbackZ=(qz/qd)*2.4;
+        }
+      }
+    }
+    c.userData.attackCooldown=.76;
+  }else if(kind==='rhino_gamma_leap'){
+    for(const z of zombies){
+      if(!z||z.userData.dead||z.userData.spawnPending)continue;
+      if(Math.hypot(z.position.x-target.position.x,z.position.z-target.position.z)<=3.2){
+        applyBulletDamage(z,base*1.10);
+        if(!z.userData.dead)z.userData.hitStun=Math.max(z.userData.hitStun||0,.28);
+      }
+    }
+    c.userData.attackCooldown=1.05;
+  }else if(kind==='rhino_overdrive'){
+    applyBulletDamage(target,base*1.08);
+    if(!target.userData.dead){
+      target.userData.knockbackX=(dx/dist)*2.2;
+      target.userData.knockbackZ=(dz/dist)*2.2;
+    }
+    c.userData.attackCooldown=.68;
+  }else{
+    applyBulletDamage(target,base);
+    if(!target.userData.dead){
+      target.userData.knockbackX=(dx/dist)*1.5;
+      target.userData.knockbackZ=(dz/dist)*1.5;
+    }
+    c.userData.attackCooldown=.56;
+  }
+}
+function triggerRhinoRoyalClones(){
+  if(!gameRunning||!rhinoRoyalCloneUnlocked()||rhinoRoyalCloneCooldown>0||!player)return false;
+  if(rhinoTitanActive())return false;
+
+  const cfg=rhinoRoyalCloneConfig();
+  if(cfg.count<=0)return false;
+
+  markUltimateUsed();
+  clearRhinoRoyalClones();
+  const epoch=rhinoRoyalCloneSummonEpoch;
+  rhinoRoyalCloneCooldown=cfg.cooldown;
+  rhinoRoyalCloneCycleDuration=cfg.cooldown;
+
+  rhinoWBShock(player.position,3.4,RHINO_WHITE,.24);
+  rhinoWBShock(player.position,5.2,RHINO_GREEN,.38);
+  spawnBurst(player.position.x,player.position.y+.8,player.position.z,isMobile?16:28,FX_MAT_SPARK,4.6);
+  triggerCombatShake(13,210);
+
+  getGreenRhinoAssetPromise().then(({gltf,clips,THREEAsset,cloneSkinned})=>{
+    for(let i=0;i<cfg.count;i++)setTimeout(()=>{
+      if(epoch!==rhinoRoyalCloneSummonEpoch||!player||!rhinoIsActive()||!gameRunning)return;
+
+      const wrap=new THREE.Group();
+      const root=cloneSkinned(gltf.scene);
+      root.rotation.y=AVATAR_MODEL_YAW.rhino||0;
+
+      const strays=[];
+      root.traverse(o=>{if(o.isCamera||o.isLight)strays.push(o);});
+      strays.forEach(o=>o.parent&&o.parent.remove(o));
+
+      const fit=new THREEAsset.Group();
+      fit.add(root);
+      root.updateMatrixWorld(true);
+      const rawBox=importedVisibleMeshBounds(root,THREEAsset);
+      const rawSize=rawBox.getSize(new THREEAsset.Vector3());
+      fit.scale.setScalar(1.48/Math.max(.001,rawSize.y));
+      fit.updateMatrixWorld(true);
+      const placed=importedVisibleMeshBounds(fit,THREEAsset);
+      const center=placed.getCenter(new THREEAsset.Vector3());
+      fit.position.x-=center.x;fit.position.z-=center.z;fit.position.y-=placed.min.y;
+
+      rhinoRoyalCloneTint(root,i);
+      wrap.add(fit);
+
+      const slot=rhinoRoyalCloneFormationSlot(i,cfg.count,-Math.PI/2);
+      const safe=knightRoyalOnslaughtSafePosition(
+        player.position.x+slot.x,
+        player.position.z+slot.z,
+        player.position.y
+      );
+      wrap.position.set(safe.x,player.position.y,safe.z);
+      wrap.scale.setScalar(AVATAR_SCALE.rhino||1);
+
+      Object.assign(wrap.userData,{
+        isRhinoRoyalClone:true,
+        invincible:true,hp:Infinity,maxHp:Infinity,dead:false,
+        cloneIndex:i,life:cfg.duration,
+        attackCooldown:.18+i*.06,moveIndex:i,
+        farTimer:0,returning:false,
+        mixer:new THREEAsset.AnimationMixer(root),
+        clips
+      });
+
+      scene.add(wrap);
+      rhinoRoyalClones.push(wrap);
+      rhinoRoyalClonePlay(wrap,'Idle');
+      rhinoWBShock(wrap.position,1.55,i%2?RHINO_PALE:RHINO_GREEN,.22);
+      if(knightFxBudget(1))
+        spawnBurst(wrap.position.x,wrap.position.y+.7,wrap.position.z,isMobile?5:8,FX_MAT_SPARK,2.5);
+    },i*105);
+  });
+
+  toast('RANGERS OF THE ROUND · '+cfg.count+' CLONES');
+  if(navigator.vibrate)navigator.vibrate([28,18,52]);
+  updateHoodedHud();
+  return true;
+}
+function updateRhinoRoyalClones(dt){
+  if(rhinoRoyalCloneCooldown>0)
+    rhinoRoyalCloneCooldown=Math.max(0,rhinoRoyalCloneCooldown-dt);
+  if(!player)return;
+
+  const now=performance.now()*.001;
+  for(const c of [...rhinoRoyalClones]){
+    if(!c||!c.parent)continue;
+
+    c.userData.life-=dt;
+    if(c.userData.life<=0){
+      rhinoWBShock(c.position,1.4,RHINO_PALE,.18);
+      removeRhinoRoyalClone(c);
+      continue;
+    }
+
+    if(c.userData.mixer)c.userData.mixer.update(dt);
+    c.userData.attackCooldown=Math.max(0,(c.userData.attackCooldown||0)-dt);
+
+    const playerDist=Math.hypot(c.position.x-player.position.x,c.position.z-player.position.z);
+    if(playerDist>11)c.userData.farTimer=(c.userData.farTimer||0)+dt;
+    else{c.userData.farTimer=0;c.userData.returning=false;}
+    if(c.userData.farTimer>=10)c.userData.returning=true;
+
+    let target=null,best=12*12;
+    if(!c.userData.returning){
+      for(const z of zombies){
+        if(!z||z.userData.dead||z.userData.spawnPending||!z.visible)continue;
+        const d=c.position.distanceToSquared(z.position);
+        if(d<best){best=d;target=z;}
+      }
+    }
+
+    let desired=null;
+    if(c.userData.returning){
+      const slot=rhinoRoyalCloneFormationSlot(c.userData.cloneIndex||0,Math.max(1,rhinoRoyalClones.length),now*.18);
+      desired=new THREE.Vector3(player.position.x+slot.x,player.position.y,player.position.z+slot.z);
+      if(playerDist<5.2){c.userData.returning=false;c.userData.farTimer=0;}
+    }else if(target){
+      const toward=target.position.clone().sub(c.position);toward.y=0;
+      const d=toward.length();
+      if(d>1.9){
+        toward.normalize();
+        desired=c.position.clone().addScaledVector(toward,Math.min(3,d-1.5));
+        desired.y=player.position.y;
+      }
+    }else{
+      const slot=rhinoRoyalCloneFormationSlot(c.userData.cloneIndex||0,Math.max(1,rhinoRoyalClones.length),now*.14);
+      desired=new THREE.Vector3(player.position.x+slot.x,player.position.y,player.position.z+slot.z);
+    }
+
+    if(desired){
+      const dist=c.position.distanceTo(desired);
+      if(dist>18)c.position.copy(desired);
+      else{
+        const moveSpeed=rhinoRoyalCloneMoveSpeed();
+        const dx=desired.x-c.position.x,dz=desired.z-c.position.z;
+        const planar=Math.hypot(dx,dz);
+        const travel=Math.min(planar,moveSpeed*dt);
+        const nx=planar>1e-5?c.position.x+(dx/planar)*travel:c.position.x;
+        const nz=planar>1e-5?c.position.z+(dz/planar)*travel:c.position.z;
+        const resolved=resolveCollision(nx,nz,c.position.y);
+        c.position.x=resolved.x;c.position.z=resolved.z;c.position.y=player.position.y;
+        rhinoRoyalClonePlay(c,'Run');
+      }
+    }else rhinoRoyalClonePlay(c,'Idle');
+
+    if(target&&target.parent&&!target.userData.dead){
+      c.rotation.y=Math.atan2(target.position.x-c.position.x,target.position.z-c.position.z);
+      if(c.position.distanceToSquared(target.position)<=3.3*3.3&&c.userData.attackCooldown<=0)
+        rhinoRoyalClonePerformMove(c,target);
+    }else{
+      c.rotation.y=player.rotation.y;
+    }
+  }
 }
 function rhinoWorldBreakerCleanup(force=false){
-  const r=rhinoRuntime||{};for(const key of ['overdrive','crashing','echo']){
+  if(force&&rhinoRoyalClones.length)clearRhinoRoyalClones();
+  const r=rhinoRuntime||{};for(const key of ['overdrive','crashing']){
     const s=r[key];if(!s)continue;
     for(const obj of [s.axe,s.ret,s.seal,s.g,s.sky&&s.sky.g,s.fireSphere,s.activeWave&&s.activeWave.mesh])if(obj)rhinoWBDispose(obj);
     if(s.rocks)for(const q of s.rocks)rhinoWBDispose(q.m);
@@ -24761,7 +25097,7 @@ function rhinoWorldBreakerCleanup(force=false){
     rhinoTitanSyncScale(false);
   }
   if(r.cloudWhirlTimer>0||r.cloudWhirlTimer===Infinity)endRhinoCloudWhirlwind();
-  r.overdrive=r.gamma=r.crashing=r.armageddon=r.echo=null;
+  r.overdrive=r.gamma=r.crashing=r.armageddon=null;
   r.cloudWhirlTimer=0;r.cloudWhirlPulse=0;
   r.titanTimer=0;
   }
@@ -24794,7 +25130,7 @@ function updateRhinoCombat(dt){
     updateRhinoCrashingBolt(dt);
     updateRhinoTitanRampage(dt);
     updateRhinoArmageddon(dt);
-    updateRhinoEinherjarEcho(dt);
+    updateRhinoRoyalClones(dt);
   }catch(err){ console.error('Ranger World-Breaker update recovered:',err); }
 }
 
@@ -29426,7 +29762,7 @@ function clearBarbarianKinClones(){
   barbarianKinTimer=0;
 }
 function triggerBerserkerKin(){
-  if(rhinoIsActive())return triggerRhinoEinherjarEcho();
+  if(rhinoIsActive())return triggerRhinoRoyalClones();
   if(!gameRunning||!barbarianIsActive()||!player)return false;
   if(barbarianKinCooldown>0)return false;
   if(barbarianUltimateCharge<99.5){toast('Berserker Kin still charging');return false;}
@@ -32330,6 +32666,11 @@ function update(dt){
         else if(target.userData&&target.userData.isArcherMirror)damageArcherMirrorClone(target);
         else if(target.userData&&target.userData.isKnightRoyalClone){
           spawnKnightGuardBurst(target.position,1.15,KNIGHT_STEEL);
+        }else if(target.userData&&target.userData.isRhinoRoyalClone){
+          rhinoWBShock(target.position,1.15,RHINO_PALE,.18);
+          spawnBurst(target.position.x,target.position.y+.6,target.position.z,4,FX_MAT_SPARK,1.8);
+          target.userData.hp=Infinity;
+          target.userData.dead=false;
         }else playerTakeHit(type);
       }
     });
