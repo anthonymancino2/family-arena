@@ -74,6 +74,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <!-- V22.17.00 Mini Zulu Warrior: adds the Mini Zulu Warrior (RektoCraft Studios) as a seventh playable avatar running the complete Tempest Archer move set through gameplayAvatarType(). The source pack is an FBX character plus roughly fifty loose Mixamo animation files; those were converted to glTF, eleven clips merged onto the shared 65-bone skeleton and renamed to the names findClipByWords() looks for, redundant scale and per-bone translation tracks stripped, and the 2K texture resampled to 512, giving a 1.9MB embedded GLB instead of 4.4MB. Two archer passive checks that tested state.avatarType==='rogue' directly were switched to gameplayAvatarType() so Tailwind fires for him as well. -->
 <!-- V22.16.00 Crossbreaker X-Wave + Onslaught Launch: fixes the two crashes behind both broken moves. (1) isMobile was referenced by twelve effect functions but never declared anywhere in the file, so every one of those calls threw a ReferenceError - during Royal Onslaught the throw landed inside the per-frame perimeter update, which stopped renderer.render() and froze the screen permanently at the first point. isMobile is now defined and the frame loop survives any single update error. (2) cloudCrossbreakerCapVisuals() and cloudCrossbreakerDestroyWave() were called but never defined, so the Crossbreaker X wave threw on creation and was silently swallowed - the projectile literally never existed. Both are now implemented and the wave is a real growing X-shaped projectile that carries its own damage, expands and dims as it leaves the arena, and self-destructs through three independent paths. Royal Onslaught crosses the map to five designated perimeter endpoints at half the old launch speed, each at least 115 degrees around the perimeter from the previous endpoint and never near the point two back, executing everything crossed on the line while the slow pace gathers the crowd behind an invulnerable Knight. Royal Onslaught is now three endpoints, no damage during the crossings, and a full time stop: every enemy inside the playable area is frozen solid from activation until the third endpoint lands, while enemies outside the arena close at full speed and freeze as they cross in. The Knight then takes the centre, in-area enemies resume at 50%, and three cycles of five slash waves fire two seconds apart, wiping the arena on each cycle. Royal bullet time is scoped to the playable area rather than the whole world. The contact-kill and play-area purge paths are retained but no longer called: detection is uncapped and marks enemies on touch, so no enemy can survive by being late in a rate-limited kill queue. After the fifth endpoint he takes the centre of the map and fires five X slash waves outward past the arena boundary, executing every enemy inside it, then repeats that volley on a 1.5 second cooldown for up to six turns total or until the last enemy is dead. The finale waves run on an independent clock with a setTimeout backstop, so they finish their flight after the arena wipe stops the gameplay loop and can never be left in the scene. Crossbreaker Slash now stops and disappears at the weapon's declared 50ft range instead of flying up to 72ft across the long axis, with the fade retimed to reach zero exactly at whichever limit ends the flight. It is also halved in size and its travel speed is cut to 8.625 ft/s, 18.75% of the original, while the Onslaught centre slashes drop to 29 u/s. Lifetime ceilings and concurrent-wave caps are raised to match so no wave expires in mid-air, and overlapping Onslaught volleys now own their waves independently instead of the newest volley culling the previous one. Enemies remain at 50% speed for the whole move, including any that spawn mid-move. -->
 <!-- V22.13.99 Royal Onslaught Shadow Trail: adds lightweight avatar afterimage clones during Royal Onslaught dashes. Each dash now leaves several short-lived Knight shadow images at roughly 15% opacity between the start and end of the dash, creating a super-speed silhouette without restoring the removed ground trail. Gameplay, damage, cooldowns, capture rules, and version-label synchronization are unchanged. -->
+<!-- V23.01.01 Ranger impact fix. FIXES the crash that made the whole kit look broken: spawnRhinoBoomerang() reused the Aesir bullet kind 'barbarian_slash_wave', whose branch in updateBullets() reads b.userData - a field fireBullet() never creates - so every frame a blade was airborne threw a TypeError and aborted the entire update pass (enemies, timers, FX, shake). Blades now carry kind 'rhino_boomerang' with their own userData and motion, and the shared read site is guarded so the Aesir's Primal Axe cannot hit the same fault. FIXES the ultimate leaving document.body.style.filter permanently at brightness(1.18) saturate(1.35), which bleached the rest of the run. ADDS the warrior weight the class was missing: every blade contact lands a ring, spark burst, travel-line knockback, stagger and a throttled camera kick + hit-stop; Twin Boomerang gains crossing swing trails, a release shake, a hit-scaled kick and a planted forward step; Rhino Charge gains per-body impact FX, camera kick and knockback-field throw (one hit-stop per charge so the plough cannot stall); Boomerang Cyclone now renders two real orbiting blades instead of two one-frame sparks, kicks per connecting tick and closes on a heavy release burst. No damage, cooldown, range or balance values changed. -->
 <!-- V23.01.00 Ranger Boomerang Kit. The Green Rhino Ranger previously ran the Aesir's weapon list verbatim, so the two skins played identically. It now has its own CHARACTER_COMBAT entry, reached by making combatForAvatar/passiveForAvatar/HERO_ABILITIES prefer an exact state.avatarType match before falling back to the gameplay class - so the Ranger keeps the whole barbarian chassis (stat shop, cooldown scaling, HUD, ultimate slot, Fury passive) while carrying different moves. NEW: Twin Boomerang (primary) throws both blades in a shallow V as real curving projectiles that pierce out and sweep back, plus a feet shockwave; Rhino Charge (secondary) is a committed 9-unit plough that hits each enemy once and shoves it sideways rather than backwards, ending in a horn toss; Boomerang Cyclone (secondary) orbits two blades around you for 3.4s WITHOUT the Aesir cyclone's movement penalty; Ricochet Bladestorm (ultimate) throws eight curving blades in a star that turn at full extension and recall into one detonation. Identity: baseMoveMult 1.06 against the Aesir's 0.68. The Aesir's own kit is untouched. -->
 <!-- V23.00.01 Ranger fixes. Adds the missing updateAvatarPreview() branch for the Ranger, which previously fell through to the remote KayKit URL table and threw "undefined is not an object (evaluating 'url.lastIndexOf')" on the avatar card. Matches the Aesir's size exactly by moving AVATAR_SCALE.rhino to 1.5 and fitting the local root to 2.22/1.5, so Primal Rage's x3, the contact shadow and the locator ring all behave identically for both skins. Fixes the moveset: V23.00.00 only converted the positive avatarType==='barbarian' checks, leaving nineteen negated guards that silently disabled Rage Cleave, Rending Slash, War Axe Cyclone, the shockwave passive, all three ultimates and Berserker Kin for the Ranger. Those now route through barbarianIsActive(), and barbarianStartPose() drives the Ranger's native Attack take for every beat that would pose the Aesir. -->
 <!-- V23.00.00 Green Rhino Ranger + payload reduction. ADDS the Green Rhino Ranger, a native-rigged avatar that runs the complete Aesir Barbarian combat class through gameplayAvatarType(), the same way Cloud runs the Knight class. The source FBX ships one take with four ranges baked in (Idle 0-55, Run 58-77, Attack 80-125, Death 128-204 at 30fps); these are sliced apart with AnimationUtils.subclip and driven by the model's own 27-joint skeleton, with a boomerang bone-attached to each hand. Attack playback rate varies per requested move so one baked swing covers fast chops through heavy slams, and Run playback tracks measured displacement. All fourteen direct state.avatarType==='barbarian' checks now route through a new barbarianIsActive() class predicate so both skins keep Relentless Fury, War Axe Cyclone, targeting and the ultimate effects. REMOVES three model payloads no code path could reach - Wolverine (roster-removed in V22.19.07), Zulu (V22.19.03) and the Cat/carrot avatar - prunes the shared KayKit rig from 76 clips to the 15 the game actually names, and re-encodes the title-screen background from PNG to JPEG. No gameplay, balance, cooldown or save behaviour changes. -->
@@ -1514,7 +1515,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.01.00 - Ranger Boomerang Kit';
+const GAME_VERSION='23.01.01 - Ranger Impact Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -23061,7 +23062,8 @@ const RHINO_PALE  = 0xbdf5d8;
 const RHINO_WHITE = 0xf2fffa;
 
 let rhinoRuntime = {
-  charge:0, chargeDir:{x:0,z:0}, chargeHits:null, chargeCooldown:0,
+  charge:0, chargeDir:{x:0,z:0}, chargeHits:null, chargeCooldown:0, chargeStopUsed:false,
+  chargeDamage:0, orbitDamage:0, orbiters:null,
   orbit:0, orbitAngle:0, orbitCooldown:0, orbitTick:0,
   bsActive:0, bsStage:0, bsTimer:0, bsOriginX:0, bsOriginZ:0, bsYaw:0, bsReach:0,
   bsCooldown:0,
@@ -23069,9 +23071,13 @@ let rhinoRuntime = {
 };
 
 function rhinoResetRuntime(){
+  // Drop any live cyclone blades before the runtime that owns them is replaced,
+  // otherwise they are orphaned in the scene on avatar change or round reset.
+  rhinoClearOrbiters();
   rhinoRuntime = {
-    charge:0, chargeDir:{x:0,z:0}, chargeHits:null, chargeCooldown:0,
-    orbit:0, orbitAngle:0, orbitCooldown:0, orbitTick:0,
+    charge:0, chargeDir:{x:0,z:0}, chargeHits:null, chargeCooldown:0, chargeStopUsed:false,
+    chargeDamage:0,
+    orbit:0, orbitAngle:0, orbitCooldown:0, orbitTick:0, orbitDamage:0, orbiters:null,
     bsActive:0, bsStage:0, bsTimer:0, bsOriginX:0, bsOriginZ:0, bsYaw:0, bsReach:0,
     bsCooldown:0,
     throwSide:0
@@ -23093,7 +23099,14 @@ function spawnRhinoBoomerang(origin,ang,dist,dmg,inbound,curve=0){
     {damage:dmg,kind:'barbarian_slash_wave',mat:new THREE.MeshBasicMaterial({color:RHINO_GREEN})});
   const b=bullets[bullets.length-1];
   if(!b)return null;
-  b.kind='barbarian_slash_wave';
+  // The blade needs its OWN bullet kind. Borrowing 'barbarian_slash_wave' sent
+  // it into Aesir's crescent-animation branch in updateBullets(), which reads
+  // b.userData - a field fireBullet() never creates. That threw every single
+  // frame a blade was in the air and aborted the entire update pass, which is
+  // why nothing else in the Ranger's kit appeared to work either.
+  b.kind='rhino_boomerang';
+  b.userData={};
+  b.rhinoInbound=!!inbound;
 
   // Flat spinning disc rather than the Aesir's torus of axe heads.
   if(b.mesh.geometry)b.mesh.geometry.dispose();
@@ -23145,6 +23158,43 @@ function rhinoCurveBullets(dt){
 }
 
 /* ---------------------------------------------------------------------
+   BLADE IMPACT
+   A connect that produces nothing but a damage number is why the class did
+   not read as a warrior. Every blade contact now lands with a ring, a spark
+   burst, real knockback along the blade's travel line and a stagger, and the
+   camera kicks with it. Camera/haptics are throttled so an eight-blade
+   Bladestorm cannot machine-gun the screen.
+   --------------------------------------------------------------------- */
+let rhinoLastImpactKick = 0;
+
+function rhinoBoomerangImpact(z,b){
+  if(!z||!z.position||!z.userData)return;
+  const y=z.position.y+.85;
+
+  if(knightFxBudget(2)){
+    knightShockRing({x:z.position.x,y:z.position.y,z:z.position.z},1.25,RHINO_PALE,.20);
+    spawnBurst(z.position.x,y,z.position.z,isMobile?5:9,FX_MAT_SPARK,3.4);
+  }
+
+  // Shove along the blade's travel direction so a pierced line visibly opens
+  // instead of enemies simply standing in place taking damage.
+  const dx=(b&&Number.isFinite(b.dx))?b.dx:0;
+  const dz=(b&&Number.isFinite(b.dz))?b.dz:0;
+  const l=Math.hypot(dx,dz)||1;
+  z.userData.knockbackX=(z.userData.knockbackX||0)+(dx/l)*5.2;
+  z.userData.knockbackZ=(z.userData.knockbackZ||0)+(dz/l)*5.2;
+  z.userData.hitStun=Math.max(z.userData.hitStun||0,.20);
+
+  const now=(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
+  if(now-rhinoLastImpactKick>70){
+    rhinoLastImpactKick=now;
+    knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.028);
+    triggerCombatShake(8,95);
+    if(navigator.vibrate)navigator.vibrate(9);
+  }
+}
+
+/* ---------------------------------------------------------------------
    PRIMARY — TWIN BOOMERANG
    Both hands throw at once in a shallow V. The pair curve apart, cross
    back through the lane and expire behind the player, so a single press
@@ -23164,10 +23214,27 @@ function doRhinoBoomerangThrow(w){
   spawnRhinoBoomerang(origin,yaw+0.20*lead,reach,dmg,false,-1.55*lead);
   spawnRhinoBoomerang(origin,yaw-0.20*lead,reach,dmg,false, 1.55*lead);
 
+  // Both arms come across the body on release. Two crossing trails sell the
+  // throw as a committed warrior swing rather than a wrist flick.
+  spawnAxeSwingTrail(origin,yaw,-lead,1.05,RHINO_GREEN);
+  spawnAxeSwingTrail(origin,yaw+0.10*lead,lead,0.92,RHINO_WHITE);
+
   // Feet shockwave: small radius, real damage, keeps crowds off the body.
-  barbarianShockwave(origin,yaw,{radius:2.6,damage:dmg*0.55,force:4.6,stun:.18,color:RHINO_GREEN});
+  const hits=barbarianShockwave(origin,yaw,{radius:2.6,damage:dmg*0.55,force:4.6,stun:.18,color:RHINO_GREEN});
   knightShockRing(player.position,1.9,RHINO_PALE,.26);
-  if(navigator.vibrate)navigator.vibrate(18);
+
+  // Release kick. The Ranger's most-used move previously had no camera
+  // feedback whatsoever, which is the single biggest reason the class felt
+  // weightless next to the Aesir.
+  triggerCombatShake(hits?12:7,hits?135:100);
+  knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,hits?.038:.020);
+  if(navigator.vibrate)navigator.vibrate(hits?[16,8,22]:18);
+
+  // Small planted step into the throw so the body commits forward.
+  const step=resolveCollision(player.position.x+Math.sin(yaw)*.10,
+                              player.position.z+Math.cos(yaw)*.10,
+                              player.position.y);
+  player.position.x=step.x;player.position.z=step.z;
 }
 
 /* ---------------------------------------------------------------------
@@ -23184,6 +23251,7 @@ function triggerRhinoCharge(w){
   if(r.charge>0) return;
   r.charge=RHINO_CHARGE.time;
   r.chargeHits=new Set();
+  r.chargeStopUsed=false;
   r.chargeDir={x:Math.sin(player.rotation.y), z:Math.cos(player.rotation.y)};
   r.chargeDamage=w.damage!=null?w.damage:2.2;
   invincibleTimer=Math.max(invincibleTimer||0,RHINO_CHARGE.time+0.1);
@@ -23215,17 +23283,40 @@ function updateRhinoCharge(dt){
   // Plough: each enemy is hit once per charge, then thrown aside rather
   // than straight back, so the Ranger opens a corridor through a pack.
   for(const z of zombies){
-    if(!z||!z.position||z.userData.dead)continue;
+    if(!z||!z.position||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
     if(r.chargeHits.has(z))continue;
     const ex=z.position.x-player.position.x, ez=z.position.z-player.position.z;
     if(Math.hypot(ex,ez)>RHINO_CHARGE.radius)continue;
     r.chargeHits.add(z);
     applyBulletDamage(z,r.chargeDamage*playerStats.power);
-    // Sideways shove: cross product against the charge direction.
+    // Sideways shove: cross product against the charge direction. The throw is
+    // now carried on the knockback fields as well as the immediate offset, so
+    // the body keeps travelling instead of snapping to a new spot.
     const side=(ex*r.chargeDir.z-ez*r.chargeDir.x)>=0?1:-1;
-    z.position.x+=(r.chargeDir.z*side)*3.1+r.chargeDir.x*1.2;
-    z.position.z+=(-r.chargeDir.x*side)*3.1+r.chargeDir.z*1.2;
-    if(knightFxBudget(1))spawnBurst(z.position.x,z.position.y+.9,z.position.z,5,FX_MAT_SPARK,3.2);
+    const kx=r.chargeDir.z*side, kz=-r.chargeDir.x*side;
+    z.position.x+=kx*2.0+r.chargeDir.x*0.8;
+    z.position.z+=kz*2.0+r.chargeDir.z*0.8;
+    z.userData.knockbackX=(z.userData.knockbackX||0)+kx*7.5+r.chargeDir.x*3.0;
+    z.userData.knockbackZ=(z.userData.knockbackZ||0)+kz*7.5+r.chargeDir.z*3.0;
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,.30);
+
+    // Contact has to be felt, not just seen.
+    if(knightFxBudget(2)){
+      spawnBurst(z.position.x,z.position.y+.9,z.position.z,isMobile?6:10,FX_MAT_SPARK,3.6);
+      knightShockRing({x:z.position.x,y:z.position.y,z:z.position.z},1.5,RHINO_WHITE,.22);
+    }
+    const nowHit=(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
+    if(nowHit-rhinoLastImpactKick>70){
+      rhinoLastImpactKick=nowHit;
+      triggerCombatShake(11,115);
+      if(navigator.vibrate)navigator.vibrate(11);
+    }
+    // Exactly one bite of the clock per charge. Hit-stop scales global dt, so
+    // firing it per body would stall the plough mid-run.
+    if(!r.chargeStopUsed){
+      r.chargeStopUsed=true;
+      knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.034);
+    }
   }
 
   // Dust trail so the speed reads on screen.
@@ -23256,6 +23347,42 @@ function updateRhinoCharge(dt){
    --------------------------------------------------------------------- */
 const RHINO_ORBIT = { time:3.4, radius:3.5, speed:7.2, tick:0.18, cooldown:3.0 };
 
+// Two REAL blades on scene-level groups. The old version drew nothing but two
+// one-frame sparks per 0.18s tick, so the strongest secondary looked like it
+// had failed to fire even while it was quietly dealing damage.
+function rhinoBuildOrbiter(){
+  const g=new THREE.Group();
+  const disc=new THREE.Mesh(new THREE.TorusGeometry(.60,.10,5,14),
+    new THREE.MeshBasicMaterial({color:RHINO_GREEN,transparent:true,opacity:.95,
+      depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));
+  disc.rotation.x=Math.PI/2;
+  g.add(disc);
+  for(let i=0;i<2;i++){
+    const blade=new THREE.Mesh(new THREE.BoxGeometry(.16,.09,1.10),
+      new THREE.MeshBasicMaterial({color:i?RHINO_WHITE:RHINO_PALE,transparent:true,
+        opacity:.95,depthWrite:false,blending:THREE.AdditiveBlending}));
+    blade.rotation.y=i?Math.PI/2.6:-Math.PI/2.6;
+    g.add(blade);
+  }
+  const halo=new THREE.Mesh(new THREE.RingGeometry(.74,1.06,18),
+    new THREE.MeshBasicMaterial({color:RHINO_GREEN,transparent:true,opacity:.30,
+      depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));
+  halo.rotation.x=-Math.PI/2;
+  g.add(halo);
+  return g;
+}
+
+function rhinoClearOrbiters(){
+  const r=rhinoRuntime;
+  if(!r||!r.orbiters)return;
+  for(const m of r.orbiters){
+    if(!m)continue;
+    if(m.parent)m.parent.remove(m);
+    disposeGroup(m);
+  }
+  r.orbiters=null;
+}
+
 function triggerRhinoOrbit(w){
   const r=rhinoRuntime;
   if(r.orbit>0||(r.orbitCooldown||0)>0) return;
@@ -23263,15 +23390,29 @@ function triggerRhinoOrbit(w){
   r.orbitAngle=player.rotation.y;
   r.orbitTick=0;
   r.orbitDamage=w.damage!=null?w.damage:1.1;
+
+  rhinoClearOrbiters();
+  r.orbiters=[];
+  if(scene){
+    for(let i=0;i<2;i++){
+      const m=rhinoBuildOrbiter();
+      scene.add(m);
+      r.orbiters.push(m);
+    }
+  }
+
   if(player.userData.playKayClip)player.userData.playKayClip('spin',true,true,.34);
   knightShockRing(player.position,RHINO_ORBIT.radius,RHINO_PALE,.4);
+  triggerCombatShake(10,150);
+  knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.030);
+  if(navigator.vibrate)navigator.vibrate([22,10,28]);
   toast('BOOMERANG CYCLONE');
 }
 
 function updateRhinoOrbit(dt){
   const r=rhinoRuntime;
   if((r.orbitCooldown||0)>0)r.orbitCooldown=Math.max(0,r.orbitCooldown-dt);
-  if(!(r.orbit>0)||!player)return;
+  if(!(r.orbit>0)||!player){ if(!(r.orbit>0))rhinoClearOrbiters(); return; }
 
   r.orbitAngle+=RHINO_ORBIT.speed*dt;
   r.orbit-=dt;
@@ -23285,34 +23426,58 @@ function updateRhinoOrbit(dt){
               z:player.position.z+Math.cos(a)*RHINO_ORBIT.radius});
   }
 
-  // Visible orbiters, drawn as short-lived sparks so no meshes leak.
-  if(knightFxBudget(2)){
-    for(const p of pts) spawnBurst(p.x,player.position.y+1.0,p.z,2,FX_MAT_SPARK,1.1);
+  if(r.orbiters){
+    const fade=Math.min(1,r.orbit/0.35);
+    for(let i=0;i<r.orbiters.length;i++){
+      const m=r.orbiters[i],p=pts[i];
+      if(!m||!p)continue;
+      m.position.set(p.x,player.position.y+1.0+Math.sin(r.orbitAngle*2+i*Math.PI)*.10,p.z);
+      m.rotation.y+=dt*19;
+      m.scale.setScalar(1.05*fade);
+    }
+  }
+  if(knightFxBudget(2)&&Math.random()<Math.min(1,dt*14)){
+    for(const p of pts) spawnBurst(p.x,player.position.y+1.0,p.z,1,FX_MAT_SPARK,1.3);
   }
 
   r.orbitTick-=dt;
   if(r.orbitTick<=0){
     r.orbitTick=RHINO_ORBIT.tick;
+    let tickHits=0;
     for(const z of zombies){
-      if(!z||!z.position||z.userData.dead)continue;
+      if(!z||!z.position||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
       for(const p of pts){
         if(Math.hypot(z.position.x-p.x,z.position.z-p.z)>1.7)continue;
         applyBulletDamage(z,r.orbitDamage*playerStats.power);
+        tickHits++;
         const ax=z.position.x-player.position.x, az=z.position.z-player.position.z;
         const m=Math.hypot(ax,az)||1;
-        z.position.x+=(ax/m)*1.5;
-        z.position.z+=(az/m)*1.5;
+        z.userData.knockbackX=(z.userData.knockbackX||0)+(ax/m)*6.0;
+        z.userData.knockbackZ=(z.userData.knockbackZ||0)+(az/m)*6.0;
+        z.userData.hitStun=Math.max(z.userData.hitStun||0,.16);
+        if(knightFxBudget(1))spawnBurst(z.position.x,z.position.y+.85,z.position.z,isMobile?3:5,FX_MAT_SPARK,2.8);
         break;
       }
+    }
+    // The cyclone chews rather than slams: a light repeating kick on ticks
+    // that actually connected, never a full slam shake.
+    if(tickHits){
+      triggerCombatShake(Math.min(9,4+tickHits*2),80);
+      knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.018);
+      if(navigator.vibrate)navigator.vibrate(8);
     }
   }
 
   if(r.orbit<=0){
     r.orbit=0;
     r.orbitCooldown=RHINO_ORBIT.cooldown;
+    rhinoClearOrbiters();
     knightShockRing(player.position,RHINO_ORBIT.radius+.6,RHINO_GREEN,.34);
     barbarianShockwave({x:player.position.x,y:player.position.y,z:player.position.z},
-      player.rotation.y,{radius:RHINO_ORBIT.radius,damage:r.orbitDamage,force:8,stun:.3,color:RHINO_GREEN});
+      player.rotation.y,{radius:RHINO_ORBIT.radius,damage:r.orbitDamage,force:11,stun:.4,color:RHINO_GREEN,push:0});
+    triggerCombatShake(15,210);
+    knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.050);
+    if(navigator.vibrate)navigator.vibrate([30,12,44]);
   }
 }
 
@@ -23346,7 +23511,7 @@ function triggerRhinoBladestorm(){
 
   if(player.userData.playKayClip)player.userData.playKayClip('attack',true,true,.5);
   document.body.style.filter='brightness(1.18) saturate(1.35)';
-  setTimeout(()=>{if(rhinoIsActive()&&rhinoRuntime.bsActive<=0)document.body.style.filter='';},170);
+  setTimeout(()=>{if(rhinoIsActive())document.body.style.filter='';},170);
 
   const reach=Math.max(14,(arenaSize||18)*1.15);
   r.bsReach=reach;
@@ -23395,7 +23560,11 @@ function updateRhinoBladestorm(dt){
     triggerCombatShake(16,230);
   }
 
-  if(r.bsTimer>=1.95){r.bsActive=0;r.bsStage=0;}
+  if(r.bsTimer>=1.95){
+    r.bsActive=0;r.bsStage=0;
+    // Safety net: never leave the run bleached if the timer above was missed.
+    if(rhinoIsActive())document.body.style.filter='';
+  }
 }
 
 /* ---------------------------------------------------------------------
@@ -29713,7 +29882,20 @@ function updateBullets(dt){
       spawnArcherSpark(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z);
       if(Math.random()<.35) spawnBurst(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,2,FX_MAT_DUST,1.7);
     }
-    if(b.kind==='barbarian_slash_wave'){
+    if(b.kind==='rhino_boomerang'){
+      // Light per-frame life so a thrown blade never reads as a static sprite.
+      if(!b.userData)b.userData={};
+      const bt=(b.userData.rhinoClock=(b.userData.rhinoClock||0)+dt);
+      const wob=1.15*(1+Math.sin(bt*17)*0.06);
+      b.mesh.scale.set(wob,wob,wob);
+      if(knightFxBudget(1)&&Math.random()<Math.min(1,dt*20)){
+        spawnBurst(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,1,FX_MAT_SPARK,1.3);
+      }
+    }else if(b.kind==='barbarian_slash_wave'){
+      // Same hazard here: Aesir's Primal Axe also sets this kind through
+      // fireBullet() without userData, so guard once at the read site rather
+      // than trusting every spawner.
+      if(!b.userData)b.userData={};
       const t=(b.userData.waveClock=(b.userData.waveClock||0)+dt*8.6);
       const blade=b.mesh.getObjectByName('barbarianWaveBlade');
       const core=b.mesh.getObjectByName('barbarianWaveCore');
@@ -29802,6 +29984,8 @@ function updateBullets(dt){
         }
         if(b.isArcherArrow){
           spawnArcherHitFeedback(z.position.x,z.position.y+.82,z.position.z,b.damage>=2.5);
+        } else if(b.kind==='rhino_boomerang'){
+          rhinoBoomerangImpact(z,b);
         } else if(b.kind==='arcane_lance'){
           spawnArcaneImpact(z.position.x,z.position.y+.08,z.position.z,'ice');
           z.arcaneResonanceUntil=performance.now()+5000;
