@@ -1,3 +1,4 @@
+<!-- V23.03.18 Heavier Twin Boomerang: slightly slows Green Ranger's Primary without changing damage, range, hit radius, piercing or impact behavior. Twin Boomerang fire cadence increases modestly from 0.52s to 0.62s, and projectile travel multiplier drops from 1.25x to 1.12x so the blades read as heavier rather than twitchy. Projectile lifetime is recalculated from the new speed so range remains unchanged. Cleanup and syntax audit included. -->
 <!-- V23.03.17 Titan Deactivation Fix: fixes Titan Rampage remaining visually giant after its timer expires. Root cause was Gamma Leap caching the player's giant scale at jump start and continuing to restore that cached scale after Titan Rampage had already ended. Gamma Leap now resolves its scale from the CURRENT Titan state every frame and at landing, so an in-progress leap cannot reapply expired Titan size. Titan shutdown is also centralized in endRhinoTitanRampage(), which disposes Titan FX, clears the timer, restores normal Ranger scale/helper scales, applies the Knight-matched cooldown and emits the ending feedback exactly once. Cleanup/syntax audit included. -->
 <!-- V23.03.16 Clean Gamma Leap Arc: removes Gamma Leap's warp-like airborne squash/stretch and body-tilt effect so Green Ranger now stays visually solid throughout the jump. The physical Bezier jump arc is raised from +4.35 to +5.25 Y while retaining the deliberate 1.30-second heavyweight timing, zero cooldown, Titan scaling, damage and landing impact. Cleanup and syntax audit included. -->
 <!-- V23.03.15 Ranger Round Table Clones: replaces the one-hit Einherjar Echo signature with a persistent Green Ranger clone army following the Knight Knights-of-the-Round rules exactly. Round 10-15 summons 2 invincible clones for 8s with 10s cooldown; Round 16-20 summons 5 for 15s with 5s cooldown; Round 21+ summons 10 for 30s with 0.8s cooldown. Clones draw enemy aggro before the player, move at 2/3 of the Ranger's current movement speed, return to formation after being far away too long, and deal 10% player-scaled damage. They use the Green Rhino native rig, normal size even during Titan Rampage, and cycle the Ranger Primary plus the currently equipped Secondary in simplified clone-safe forms. The Ranger signature is blocked during Titan Rampage, matching Knight Titan's clone restriction. Old Einherjar Echo runtime/code/charge HUD is removed. Cleanup and syntax audit included. -->
@@ -1639,7 +1640,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.03.17 - Titan Deactivation Fix';
+const GAME_VERSION='23.03.18 - Heavier Twin Boomerang';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3367,7 +3368,7 @@ const CHARACTER_COMBAT = {
     defaultId:'twin_boomerang',
     baseMoveMult:1.06,
     weapons:{
-      twin_boomerang:{name:'Twin Boomerang', price:0, slot:'primary', kind:'rhino_boomerang', cooldown:0.52, damage:1.4, radius:2.6, range:16, auto:true,
+      twin_boomerang:{name:'Twin Boomerang', price:0, slot:'primary', kind:'rhino_boomerang', cooldown:0.62, damage:1.4, radius:2.6, range:16, auto:true,
         desc:'Throw both Ranger blades in a shallow V. They curve out, pierce their lanes and sweep back home.'},
       stormbreaker_overdrive:{name:'Stormbreaker Overdrive', price:260, slot:'secondary', kind:'rhino_overdrive', cooldown:0, damage:2.0, radius:1.25, range:18,
         desc:'Detach one giant axe, violently spin it through the three nearest enemies in sequence using live vector steering, then pull it back to your hand.'},
@@ -23609,8 +23610,8 @@ function spawnRhinoBoomerang(origin,ang,dist,dmg,inbound,curve=0){
   b.mesh.scale.set(1.15*titanVisual,1.15*titanVisual,1.15*titanVisual);
   b.pierces=99;
   b.hitRadius=1.55*(rhinoTitanActive()?rhinoTitanCombatScale():1);
-  b.speedMult=1.25;               // lighter and faster than a thrown axe
-  b.life=dist/(BARBARIAN_WAVE_SPEED*1.25);
+  b.speedMult=1.12;               // still responsive, but heavier than before
+  b.life=dist/(BARBARIAN_WAVE_SPEED*1.12);
   b.spinSpeed=inbound?-26:26;     // the bullet loop reads this field
 
   // The arc. Rotating the velocity a little each frame is what turns a
