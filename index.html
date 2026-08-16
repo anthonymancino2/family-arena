@@ -74,6 +74,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <!-- V22.17.00 Mini Zulu Warrior: adds the Mini Zulu Warrior (RektoCraft Studios) as a seventh playable avatar running the complete Tempest Archer move set through gameplayAvatarType(). The source pack is an FBX character plus roughly fifty loose Mixamo animation files; those were converted to glTF, eleven clips merged onto the shared 65-bone skeleton and renamed to the names findClipByWords() looks for, redundant scale and per-bone translation tracks stripped, and the 2K texture resampled to 512, giving a 1.9MB embedded GLB instead of 4.4MB. Two archer passive checks that tested state.avatarType==='rogue' directly were switched to gameplayAvatarType() so Tailwind fires for him as well. -->
 <!-- V22.16.00 Crossbreaker X-Wave + Onslaught Launch: fixes the two crashes behind both broken moves. (1) isMobile was referenced by twelve effect functions but never declared anywhere in the file, so every one of those calls threw a ReferenceError - during Royal Onslaught the throw landed inside the per-frame perimeter update, which stopped renderer.render() and froze the screen permanently at the first point. isMobile is now defined and the frame loop survives any single update error. (2) cloudCrossbreakerCapVisuals() and cloudCrossbreakerDestroyWave() were called but never defined, so the Crossbreaker X wave threw on creation and was silently swallowed - the projectile literally never existed. Both are now implemented and the wave is a real growing X-shaped projectile that carries its own damage, expands and dims as it leaves the arena, and self-destructs through three independent paths. Royal Onslaught crosses the map to five designated perimeter endpoints at half the old launch speed, each at least 115 degrees around the perimeter from the previous endpoint and never near the point two back, executing everything crossed on the line while the slow pace gathers the crowd behind an invulnerable Knight. Royal Onslaught is now three endpoints, no damage during the crossings, and a full time stop: every enemy inside the playable area is frozen solid from activation until the third endpoint lands, while enemies outside the arena close at full speed and freeze as they cross in. The Knight then takes the centre, in-area enemies resume at 50%, and three cycles of five slash waves fire two seconds apart, wiping the arena on each cycle. Royal bullet time is scoped to the playable area rather than the whole world. The contact-kill and play-area purge paths are retained but no longer called: detection is uncapped and marks enemies on touch, so no enemy can survive by being late in a rate-limited kill queue. After the fifth endpoint he takes the centre of the map and fires five X slash waves outward past the arena boundary, executing every enemy inside it, then repeats that volley on a 1.5 second cooldown for up to six turns total or until the last enemy is dead. The finale waves run on an independent clock with a setTimeout backstop, so they finish their flight after the arena wipe stops the gameplay loop and can never be left in the scene. Crossbreaker Slash now stops and disappears at the weapon's declared 50ft range instead of flying up to 72ft across the long axis, with the fade retimed to reach zero exactly at whichever limit ends the flight. It is also halved in size and its travel speed is cut to 8.625 ft/s, 18.75% of the original, while the Onslaught centre slashes drop to 29 u/s. Lifetime ceilings and concurrent-wave caps are raised to match so no wave expires in mid-air, and overlapping Onslaught volleys now own their waves independently instead of the newest volley culling the previous one. Enemies remain at 50% speed for the whole move, including any that spawn mid-move. -->
 <!-- V22.13.99 Royal Onslaught Shadow Trail: adds lightweight avatar afterimage clones during Royal Onslaught dashes. Each dash now leaves several short-lived Knight shadow images at roughly 15% opacity between the start and end of the dash, creating a super-speed silhouette without restoring the removed ground trail. Gameplay, damage, cooldowns, capture rules, and version-label synchronization are unchanged. -->
+<!-- V23.01.00 Ranger Boomerang Kit. The Green Rhino Ranger previously ran the Aesir's weapon list verbatim, so the two skins played identically. It now has its own CHARACTER_COMBAT entry, reached by making combatForAvatar/passiveForAvatar/HERO_ABILITIES prefer an exact state.avatarType match before falling back to the gameplay class - so the Ranger keeps the whole barbarian chassis (stat shop, cooldown scaling, HUD, ultimate slot, Fury passive) while carrying different moves. NEW: Twin Boomerang (primary) throws both blades in a shallow V as real curving projectiles that pierce out and sweep back, plus a feet shockwave; Rhino Charge (secondary) is a committed 9-unit plough that hits each enemy once and shoves it sideways rather than backwards, ending in a horn toss; Boomerang Cyclone (secondary) orbits two blades around you for 3.4s WITHOUT the Aesir cyclone's movement penalty; Ricochet Bladestorm (ultimate) throws eight curving blades in a star that turn at full extension and recall into one detonation. Identity: baseMoveMult 1.06 against the Aesir's 0.68. The Aesir's own kit is untouched. -->
 <!-- V23.00.01 Ranger fixes. Adds the missing updateAvatarPreview() branch for the Ranger, which previously fell through to the remote KayKit URL table and threw "undefined is not an object (evaluating 'url.lastIndexOf')" on the avatar card. Matches the Aesir's size exactly by moving AVATAR_SCALE.rhino to 1.5 and fitting the local root to 2.22/1.5, so Primal Rage's x3, the contact shadow and the locator ring all behave identically for both skins. Fixes the moveset: V23.00.00 only converted the positive avatarType==='barbarian' checks, leaving nineteen negated guards that silently disabled Rage Cleave, Rending Slash, War Axe Cyclone, the shockwave passive, all three ultimates and Berserker Kin for the Ranger. Those now route through barbarianIsActive(), and barbarianStartPose() drives the Ranger's native Attack take for every beat that would pose the Aesir. -->
 <!-- V23.00.00 Green Rhino Ranger + payload reduction. ADDS the Green Rhino Ranger, a native-rigged avatar that runs the complete Aesir Barbarian combat class through gameplayAvatarType(), the same way Cloud runs the Knight class. The source FBX ships one take with four ranges baked in (Idle 0-55, Run 58-77, Attack 80-125, Death 128-204 at 30fps); these are sliced apart with AnimationUtils.subclip and driven by the model's own 27-joint skeleton, with a boomerang bone-attached to each hand. Attack playback rate varies per requested move so one baked swing covers fast chops through heavy slams, and Run playback tracks measured displacement. All fourteen direct state.avatarType==='barbarian' checks now route through a new barbarianIsActive() class predicate so both skins keep Relentless Fury, War Axe Cyclone, targeting and the ultimate effects. REMOVES three model payloads no code path could reach - Wolverine (roster-removed in V22.19.07), Zulu (V22.19.03) and the Cat/carrot avatar - prunes the shared KayKit rig from 76 clips to the 15 the game actually names, and re-encodes the title-screen background from PNG to JPEG. No gameplay, balance, cooldown or save behaviour changes. -->
 <!-- V22.13.98 Version Label Synchronization: synchronizes the static browser title and all visible landing-page/build labels to V22.13.98 using the centralized GAME_VERSION value. Gameplay, Royal Onslaught behavior, visuals, cooldowns, and balance are unchanged. -->
@@ -1513,7 +1514,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.00.01 - Green Rhino Ranger';
+const GAME_VERSION='23.01.00 - Ranger Boomerang Kit';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -1895,7 +1896,7 @@ const HERO_ROSTER_INFO = {
   barbarian:{title:'Aesir Barbarian',role:'SLOW • AREA BRUISER',desc:'A horned Norse berserker built around raw ground power. She is by far the SLOWEST avatar in the roster and cannot chase anything down - instead every single blow she lands throws a shockwave out of the impact point, so she is never fighting one enemy at a time. Two Primaries, three Secondaries, three selectable Ultimates, and a Berserker Kin clone special.'},
   
   cloud:{title:'Cloud',role:'MELEE • KNIGHT CLASS',desc:'Cloud is now the primary avatar for the Knight combat class. He uses his native 43-joint skeleton and Walk animation while running the complete Knight combat system. Future cosmetic skins can reuse this same Knight-class moveset without changing the combat logic.'},
-  rhino:{title:'Green Rhino Ranger',role:'MELEE • BARBARIAN CLASS',desc:'A green-armoured rhino warrior who runs the complete Aesir Barbarian combat system, so every blow still throws a shockwave out of its impact point. Where the Aesir is posed procedurally, the Ranger uses its own 27-joint skeleton and the four animations baked into the source rig - Idle, Run, Attack and Death - with a boomerang bone-attached to each hand so they sweep with every swing. Run playback is driven by real movement speed so it never skates.'}
+  rhino:{title:'Green Rhino Ranger',role:'MOBILE • SKIRMISHER',desc:'The mobile counterpart to the Aesir, and her deliberate inverse: where she is the slowest avatar in the roster and fights where she stands, the Ranger is fast and its damage leaves the body and comes back. Twin Boomerang throws both blades in a V that pierces out and sweeps home. Rhino Charge ploughs a corridor straight through a pack. Boomerang Cyclone orbits you without slowing you down. Ricochet Bladestorm sends eight blades out in a star and recalls them into one detonation. Uses its own 27-joint skeleton and the four animations baked into the source rig.'}
 };
 
 // Data-driven hero passives. This object had accidentally been merged into
@@ -1905,6 +1906,7 @@ const HERO_PASSIVES = {
   rogue:{name:'Eagle Eye',icon:'🎯',desc:'Arrows fly 18% faster and remain active 15% longer. Every fifth defeat triggers 3 seconds of Tailwind.',projectileSpeedMult:1.18,projectileLifeMult:1.15,tailwindKills:5,tailwindDuration:3,tailwindMoveMult:1.35,tailwindAttackMult:1.40},
   hooded:{name:'Shadowstep',icon:'💨',desc:'Defeating an enemy grants 20% movement speed for 2.5 seconds.',killMoveMult:1.20,killMoveDuration:2.5},
   knight:{name:'Royal Guardian',icon:'🛡️',desc:'Two regenerating Magical Armor charges, Royal Discipline stacks, Fortified Position, Last Stand, and a defensive Whirlwind every fifth defeat.',armorMax:2,armorRegenDelay:5,armorRegenInterval:3,whirlwindKills:5,whirlwindDuration:3,whirlwindRadius:3.25,whirlwindDamage:.72,whirlwindStun:.20,whirlwindPulse:.22,whirlwindKnockback:3.4,whirlwindSpinSpeed:22},
+  rhino:{name:'Trample Momentum',icon:'💨',desc:'Every third defeat releases a ground Shockwave. Every fifth defeat grants 3 seconds of Invincibility. Built on the same Fury chassis as the Aesir, tuned for a body that keeps moving.',shockwaveKills:3,shockwaveRadius:4.6,shockwaveDamage:1.1,shockwaveStun:.5,invincibleKills:5,invincibleDuration:3.0},
   barbarian:{name:'Relentless Fury',icon:'🔥',desc:'Every third defeat releases a ground Shockwave. Every fifth defeat grants 3 seconds of Invincibility.',shockwaveKills:3,shockwaveRadius:5.2,shockwaveDamage:1.25,shockwaveStun:.65,invincibleKills:5,invincibleDuration:3.0},
   mage:{
     name:'Arcane Flow',icon:'✨',
@@ -1936,7 +1938,7 @@ function gameplayAvatarType(type=state.avatarType){
   return type;
 }
 function passiveForAvatar(type=state.avatarType){
-  return HERO_PASSIVES[gameplayAvatarType(type)] || HERO_PASSIVES.rogue;
+  return HERO_PASSIVES[type] || HERO_PASSIVES[gameplayAvatarType(type)] || HERO_PASSIVES.rogue;
 }
 
 // Uniform scale applied on top of each avatar's own build — every value
@@ -3185,6 +3187,20 @@ const CHARACTER_COMBAT = {
         desc:'Cloud swings the Buster Sword twice, releasing two giant diagonal energy blades that cross into an X. The attack pierces through the full 50-foot lane and instantly kills every non-boss enemy it touches.'}
     }
   },
+  rhino: {
+    defaultId:'twin_boomerang',
+    // The deliberate inverse of the Aesir's 0.68. The Ranger trades her reach
+    // and area denial for mobility and damage that travels.
+    baseMoveMult:1.06,
+    weapons:{
+      twin_boomerang:{name:'Twin Boomerang', price:0, slot:'primary', kind:'rhino_boomerang', cooldown:0.52, damage:1.4, radius:2.6, range:16, auto:true,
+        desc:'Throw both boomerangs at once in a shallow V. They curve apart, pierce everything in their lanes and sweep back across the same ground on the way home, so one press covers the lane twice. A short horn shockwave fires at your feet on release.'},
+      rhino_charge:{name:'Rhino Charge', price:240, slot:'secondary', kind:'rhino_charge', cooldown:1.15, damage:2.2, radius:2.3,
+        desc:'Commit to a forward plough. You keep your own momentum for the whole run, hitting everything you pass through exactly once and throwing it sideways rather than backwards, so you open a corridor straight through a pack. Plants into a wide horn toss on arrival.'},
+      boomerang_cyclone:{name:'Boomerang Cyclone', price:420, slot:'secondary', kind:'rhino_orbit', cooldown:3.0, damage:1.1, radius:3.5,
+        desc:'Both boomerangs leave your hands and orbit you for three and a half seconds, chewing and shoving anything they sweep through. Unlike the Aesir\'s cyclone it does not slow you down - you keep running while it works - and it closes with a release burst.'}
+    }
+  },
   barbarian: {
     defaultId:'rage_cleave',
     // V22.27.00: Aesir is the slowest avatar in the roster by a wide margin.
@@ -3238,7 +3254,14 @@ function arcaneEchoesUnlocked(){
   return mageGameplayActive() && (UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING || avatarLevel()>=10);
 }
 let previewRenderer=null, previewScene=null, previewCamera=null, previewRoot=null, previewMixer=null, previewRAF=0;
-function combatForAvatar(){ return CHARACTER_COMBAT[gameplayAvatarType()] || CHARACTER_COMBAT.rogue; }
+function combatForAvatar(){
+  // Exact skin first, then the gameplay class. This is what lets the Green
+  // Rhino Ranger carry its own weapon list while still running the whole
+  // barbarian-class chassis (stats, cooldown scaling, HUD, ultimate slot).
+  return CHARACTER_COMBAT[state.avatarType]
+      || CHARACTER_COMBAT[gameplayAvatarType()]
+      || CHARACTER_COMBAT.rogue;
+}
 function weaponForAvatar(){
   const c=combatForAvatar();
   const selected=currentPrimaryWeaponId&&c.weapons[currentPrimaryWeaponId];
@@ -3275,7 +3298,7 @@ function resetAbilityLoadout(){
   equippedAbilityId = null;
   ownedAbilities = {};
   if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING){
-    for(const ability of (HERO_ABILITIES[gameplayAvatarType()]||[])) ownedAbilities[ability.id]=true;
+    for(const ability of (HERO_ABILITIES[state.avatarType]||HERO_ABILITIES[gameplayAvatarType()]||[])) ownedAbilities[ability.id]=true;
   }
 }
 
@@ -13330,7 +13353,9 @@ const BARBARIAN_WORLD_BREAKER = {id:'barbarian_world_breaker', name:'World Break
 const BARBARIAN_RAGNAROK_WAVE = {id:'barbarian_ragnarok_wave', name:'Primal Axe Wave', price:900, avatar:'barbarian', unlockLevel:18,
   desc:'THROWN WEAPON. Hurl six giant spinning axes outward in a full star, piercing every enemy in their lanes. At full extension they turn around and come flying back in, landing together in one recall slam at your feet. The only barbarian ultimate whose damage leaves you.'};
 
-const HERO_ABILITIES = { mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
+const RHINO_BLADESTORM = {id:'rhino_bladestorm', name:'Ricochet Bladestorm', price:640,
+  desc:'THROWN WEAPON. Hurl eight boomerangs outward in a full star. They curve as they fly, pierce every enemy in their lane, turn around at full extension and come curving back in, landing together in one recall detonation at your feet. The Ranger ultimate whose damage leaves the body.'};
+const HERO_ABILITIES = { rhino:[RHINO_BLADESTORM], mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
   knight:[KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER, KNIGHT_JUDGMENT_ULTIMATE],
   wolverine:[WOLVERINE_SHADOW_CLONES, WOLVERINE_BERSERKER_FRENZY, WOLVERINE_ADAMANTIUM_QUAKE],
   barbarian:[BARBARIAN_PRIMAL_RAGE, BARBARIAN_WORLD_BREAKER, BARBARIAN_RAGNAROK_WAVE] };
@@ -13362,7 +13387,7 @@ function sanitizeRemovedAbilitySelection(){
 }
 sanitizeRemovedAbilitySelection();
 function renderAbilityShopList(list){
-  const abilities = HERO_ABILITIES[gameplayAvatarType()];
+  const abilities = HERO_ABILITIES[state.avatarType] || HERO_ABILITIES[gameplayAvatarType()];
   if(!abilities || !abilities.length) return;
   const header = document.createElement('div');
   header.className = 'wName';
@@ -13993,6 +14018,7 @@ let barbarianRuntime = {
   rfCooldown:0, rfActive:0, rfStage:0, rfTimer:0, rfOriginX:0, rfOriginZ:0
 };
 function barbarianResetRuntime(){
+  rhinoResetRuntime();
   try{barbarianClearWhirlVisual();}catch(_err){}
   try{barbarianClearPrimalRageVisual();}catch(_err){}
   try{barbarianSyncPrimalRageScale(false);}catch(_err){}
@@ -22560,6 +22586,14 @@ function knightAbilityCooldownInfo(){
         activeTime:active?barbarianRuntime.wbActive:undefined
       };
     }
+    case 'rhino_bladestorm': {
+      const active=rhinoRuntime.bsActive>0;
+      return {
+        label:'BLADESTORM',
+        cd:rhinoRuntime.bsCooldown||0, active,
+        activeTime:active?rhinoRuntime.bsTimer:undefined
+      };
+    }
     case 'barbarian_ragnarok_wave': {
       const active=barbarianRuntime.rfActive>0;
       return {
@@ -22579,6 +22613,8 @@ function triggerWolverineEquippedAbility(){
 }
 function triggerBarbarianEquippedAbility(){
   if(!barbarianIsActive())return;
+  // The Ranger shares the class chassis but not the ultimate.
+  if(rhinoIsActive()){ triggerRhinoBladestorm(); return; }
   // During Primal Rage, only Primary and Secondary combat is allowed.
   if(barbarianUltimateActive>0)return;
   if(equippedAbilityId==='barbarian_primal_rage') triggerPrimalRage();
@@ -22996,6 +23032,404 @@ function spawnSavageRoarFront(origin,yaw,range,color=0xff7a20,life=.42){
     const x=origin.x+Math.sin(a)*d,z=origin.z+Math.cos(a)*d;
     if(knightFxBudget(1))spawnBurst(x,(origin.y||0)+.16,z,2,FX_MAT_SPARK,1.4+Math.random()*1.3);
   }
+}
+
+/* =====================================================================
+   GREEN RHINO RANGER — dedicated moveset  (V23.01.00)
+   ---------------------------------------------------------------------
+   The Ranger previously ran the Aesir's weapon list verbatim, which made
+   the two skins identical to play. This gives it its own identity built
+   around the two things the source asset actually has: a boomerang
+   bone-attached to each hand, and a rhino.
+
+   IDENTITY — the deliberate inverse of the Aesir.
+     Aesir  : baseMoveMult 0.68, slowest in the roster, static area denial,
+              everything happens where she is standing.
+     Ranger : baseMoveMult 1.06, mobile skirmisher, damage that LEAVES and
+              comes back, and a charge that repositions through a crowd.
+
+   What carries over from the class chassis is deliberate: Relentless Fury,
+   the HUD, cooldown scaling, stat shop and ultimate slot all still work
+   because gameplayAvatarType('rhino') is still 'barbarian'. Only the
+   weapons and the ability differ.
+   ===================================================================== */
+
+function rhinoIsActive(){ return state.avatarType==='rhino'; }
+
+const RHINO_GREEN = 0x2fbf78;
+const RHINO_PALE  = 0xbdf5d8;
+const RHINO_WHITE = 0xf2fffa;
+
+let rhinoRuntime = {
+  charge:0, chargeDir:{x:0,z:0}, chargeHits:null, chargeCooldown:0,
+  orbit:0, orbitAngle:0, orbitCooldown:0, orbitTick:0,
+  bsActive:0, bsStage:0, bsTimer:0, bsOriginX:0, bsOriginZ:0, bsYaw:0, bsReach:0,
+  bsCooldown:0,
+  throwSide:0
+};
+
+function rhinoResetRuntime(){
+  rhinoRuntime = {
+    charge:0, chargeDir:{x:0,z:0}, chargeHits:null, chargeCooldown:0,
+    orbit:0, orbitAngle:0, orbitCooldown:0, orbitTick:0,
+    bsActive:0, bsStage:0, bsTimer:0, bsOriginX:0, bsOriginZ:0, bsYaw:0, bsReach:0,
+    bsCooldown:0,
+    throwSide:0
+  };
+}
+
+/* ---------------------------------------------------------------------
+   BOOMERANG PROJECTILE
+   Built on the same bullet plumbing as the Aesir's Primal Axe so it
+   inherits piercing, collision and cleanup for free. The differences are
+   all presentation plus a curved flight path: a boomerang that travels in
+   a dead straight line does not read as a boomerang, so the bullet gets a
+   lateral drift that flips sign on the return leg.
+   --------------------------------------------------------------------- */
+function spawnRhinoBoomerang(origin,ang,dist,dmg,inbound,curve=0){
+  if(!player||!scene)return null;
+  const dx=Math.sin(ang), dz=Math.cos(ang);
+  fireBullet(dx,0,dz,origin.x+dx*.8,origin.y+1.05,origin.z+dz*.8,
+    {damage:dmg,kind:'barbarian_slash_wave',mat:new THREE.MeshBasicMaterial({color:RHINO_GREEN})});
+  const b=bullets[bullets.length-1];
+  if(!b)return null;
+  b.kind='barbarian_slash_wave';
+
+  // Flat spinning disc rather than the Aesir's torus of axe heads.
+  if(b.mesh.geometry)b.mesh.geometry.dispose();
+  b.mesh.geometry=new THREE.TorusGeometry(.62,.10,5,14);
+  b.mesh.material=new THREE.MeshBasicMaterial({color:inbound?RHINO_PALE:RHINO_GREEN,
+    transparent:true,opacity:.95,depthWrite:false,side:THREE.DoubleSide,
+    blending:THREE.AdditiveBlending});
+
+  // Two angled blades give the silhouette the boomerang's bent-V read.
+  for(let i=0;i<2;i++){
+    const blade=new THREE.Mesh(new THREE.BoxGeometry(.16,.09,1.15),
+      new THREE.MeshBasicMaterial({color:i?RHINO_WHITE:RHINO_PALE,transparent:true,
+        opacity:.95,depthWrite:false,blending:THREE.AdditiveBlending}));
+    blade.rotation.y=i?Math.PI/2.6:-Math.PI/2.6;
+    blade.rotation.x=Math.PI/2;
+    b.mesh.add(blade);
+  }
+  const halo=new THREE.Mesh(new THREE.RingGeometry(.78,1.14,20),
+    new THREE.MeshBasicMaterial({color:RHINO_GREEN,transparent:true,opacity:.34,
+      depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));
+  halo.rotation.x=Math.PI/2;
+  b.mesh.add(halo);
+
+  b.mesh.scale.set(1.15,1.15,1.15);
+  b.pierces=99;
+  b.hitRadius=1.55;
+  b.speedMult=1.25;               // lighter and faster than a thrown axe
+  b.life=dist/(BARBARIAN_WAVE_SPEED*1.25);
+  b.spinSpeed=inbound?-26:26;     // the bullet loop reads this field
+
+  // The arc. Rotating the velocity a little each frame is what turns a
+  // straight shot into a returning curve, and it costs two trig calls.
+  if(curve){
+    b.rhinoCurve=curve*(inbound?-1:1);
+  }
+  return b;
+}
+
+/* Applied from the main bullet update so the curve is frame-rate correct. */
+function rhinoCurveBullets(dt){
+  for(const b of bullets){
+    if(!b || !b.rhinoCurve) continue;
+    const a=b.rhinoCurve*dt;
+    const c=Math.cos(a), s=Math.sin(a);
+    const nx=b.dx*c - b.dz*s;
+    const nz=b.dx*s + b.dz*c;
+    b.dx=nx; b.dz=nz;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   PRIMARY — TWIN BOOMERANG
+   Both hands throw at once in a shallow V. The pair curve apart, cross
+   back through the lane and expire behind the player, so a single press
+   covers the same ground twice. A short horn shockwave fires at the feet
+   on release, which keeps the class rule that no Ranger hit is ever
+   single-target.
+   --------------------------------------------------------------------- */
+function doRhinoBoomerangThrow(w){
+  const origin={x:player.position.x,y:player.position.y,z:player.position.z};
+  const yaw=player.rotation.y;
+  const reach=w.range||16;
+  const dmg=w.damage!=null?w.damage:1.4;
+
+  // Alternate which hand leads so consecutive throws are not identical.
+  const lead=(rhinoRuntime.throwSide=(rhinoRuntime.throwSide+1)%2)?1:-1;
+
+  spawnRhinoBoomerang(origin,yaw+0.20*lead,reach,dmg,false,-1.55*lead);
+  spawnRhinoBoomerang(origin,yaw-0.20*lead,reach,dmg,false, 1.55*lead);
+
+  // Feet shockwave: small radius, real damage, keeps crowds off the body.
+  barbarianShockwave(origin,yaw,{radius:2.6,damage:dmg*0.55,force:4.6,stun:.18,color:RHINO_GREEN});
+  knightShockRing(player.position,1.9,RHINO_PALE,.26);
+  if(navigator.vibrate)navigator.vibrate(18);
+}
+
+/* ---------------------------------------------------------------------
+   SECONDARY — RHINO CHARGE
+   A committed forward plough. The Ranger keeps moving under its own
+   momentum for the whole window, damaging and shoving everything it
+   passes through exactly once, then plants and horn-tosses on arrival.
+   This is the move the Aesir structurally cannot have.
+   --------------------------------------------------------------------- */
+const RHINO_CHARGE = { time:0.44, distance:9.2, radius:2.3 };
+
+function triggerRhinoCharge(w){
+  const r=rhinoRuntime;
+  if(r.charge>0) return;
+  r.charge=RHINO_CHARGE.time;
+  r.chargeHits=new Set();
+  r.chargeDir={x:Math.sin(player.rotation.y), z:Math.cos(player.rotation.y)};
+  r.chargeDamage=w.damage!=null?w.damage:2.2;
+  invincibleTimer=Math.max(invincibleTimer||0,RHINO_CHARGE.time+0.1);
+  if(player.userData.playKayClip)player.userData.playKayClip('run',true,false,RHINO_CHARGE.time);
+  knightShockRing(player.position,2.2,RHINO_WHITE,.34);
+  triggerCombatShake(9,140);
+  toast('RHINO CHARGE');
+  if(navigator.vibrate)navigator.vibrate([30,15,45]);
+}
+
+function updateRhinoCharge(dt){
+  const r=rhinoRuntime;
+  if((r.chargeCooldown||0)>0)r.chargeCooldown=Math.max(0,r.chargeCooldown-dt);
+  if(!(r.charge>0)||!player)return;
+
+  const step=(RHINO_CHARGE.distance/RHINO_CHARGE.time)*dt;
+  player.position.x+=r.chargeDir.x*step;
+  player.position.z+=r.chargeDir.z*step;
+
+  // Stay inside the arena rather than ploughing off the edge.
+  const lim=(arenaSize||30)-1.4;
+  const d=Math.hypot(player.position.x,player.position.z);
+  if(d>lim){
+    player.position.x*=lim/d;
+    player.position.z*=lim/d;
+    r.charge=Math.min(r.charge,0.04);
+  }
+
+  // Plough: each enemy is hit once per charge, then thrown aside rather
+  // than straight back, so the Ranger opens a corridor through a pack.
+  for(const z of zombies){
+    if(!z||!z.position||z.userData.dead)continue;
+    if(r.chargeHits.has(z))continue;
+    const ex=z.position.x-player.position.x, ez=z.position.z-player.position.z;
+    if(Math.hypot(ex,ez)>RHINO_CHARGE.radius)continue;
+    r.chargeHits.add(z);
+    applyBulletDamage(z,r.chargeDamage*playerStats.power);
+    // Sideways shove: cross product against the charge direction.
+    const side=(ex*r.chargeDir.z-ez*r.chargeDir.x)>=0?1:-1;
+    z.position.x+=(r.chargeDir.z*side)*3.1+r.chargeDir.x*1.2;
+    z.position.z+=(-r.chargeDir.x*side)*3.1+r.chargeDir.z*1.2;
+    if(knightFxBudget(1))spawnBurst(z.position.x,z.position.y+.9,z.position.z,5,FX_MAT_SPARK,3.2);
+  }
+
+  // Dust trail so the speed reads on screen.
+  if(knightFxBudget(1)&&Math.random()<.55){
+    spawnBurst(player.position.x,player.position.y+.2,player.position.z,2,FX_MAT_SPARK,1.6);
+  }
+
+  r.charge-=dt;
+  if(r.charge<=0){
+    r.charge=0;
+    r.chargeCooldown=1.15;
+    // Horn toss: the plant at the end of the run.
+    const origin={x:player.position.x,y:player.position.y,z:player.position.z};
+    barbarianShockwave(origin,player.rotation.y,
+      {radius:4.4,damage:r.chargeDamage*0.9,force:10.5,stun:.5,color:RHINO_GREEN});
+    knightShockRing(origin,4.0,RHINO_WHITE,.42);
+    triggerCombatShake(14,200);
+    if(player.userData.playKayClip)player.userData.playKayClip('attack',true,true,.3);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   SECONDARY — BOOMERANG CYCLONE
+   Both boomerangs come off the hands and orbit the Ranger. Unlike the
+   Aesir's War Axe Cyclone this does not slow you down — the whole point
+   of the class is that it keeps moving — so it trades that hold-forever
+   uptime for a fixed window and a real cooldown.
+   --------------------------------------------------------------------- */
+const RHINO_ORBIT = { time:3.4, radius:3.5, speed:7.2, tick:0.18, cooldown:3.0 };
+
+function triggerRhinoOrbit(w){
+  const r=rhinoRuntime;
+  if(r.orbit>0||(r.orbitCooldown||0)>0) return;
+  r.orbit=RHINO_ORBIT.time;
+  r.orbitAngle=player.rotation.y;
+  r.orbitTick=0;
+  r.orbitDamage=w.damage!=null?w.damage:1.1;
+  if(player.userData.playKayClip)player.userData.playKayClip('spin',true,true,.34);
+  knightShockRing(player.position,RHINO_ORBIT.radius,RHINO_PALE,.4);
+  toast('BOOMERANG CYCLONE');
+}
+
+function updateRhinoOrbit(dt){
+  const r=rhinoRuntime;
+  if((r.orbitCooldown||0)>0)r.orbitCooldown=Math.max(0,r.orbitCooldown-dt);
+  if(!(r.orbit>0)||!player)return;
+
+  r.orbitAngle+=RHINO_ORBIT.speed*dt;
+  r.orbit-=dt;
+
+  // Two orbiters 180 degrees apart. Positions are computed fresh each
+  // frame from the player, so the ring follows you while you run.
+  const pts=[];
+  for(let i=0;i<2;i++){
+    const a=r.orbitAngle+i*Math.PI;
+    pts.push({x:player.position.x+Math.sin(a)*RHINO_ORBIT.radius,
+              z:player.position.z+Math.cos(a)*RHINO_ORBIT.radius});
+  }
+
+  // Visible orbiters, drawn as short-lived sparks so no meshes leak.
+  if(knightFxBudget(2)){
+    for(const p of pts) spawnBurst(p.x,player.position.y+1.0,p.z,2,FX_MAT_SPARK,1.1);
+  }
+
+  r.orbitTick-=dt;
+  if(r.orbitTick<=0){
+    r.orbitTick=RHINO_ORBIT.tick;
+    for(const z of zombies){
+      if(!z||!z.position||z.userData.dead)continue;
+      for(const p of pts){
+        if(Math.hypot(z.position.x-p.x,z.position.z-p.z)>1.7)continue;
+        applyBulletDamage(z,r.orbitDamage*playerStats.power);
+        const ax=z.position.x-player.position.x, az=z.position.z-player.position.z;
+        const m=Math.hypot(ax,az)||1;
+        z.position.x+=(ax/m)*1.5;
+        z.position.z+=(az/m)*1.5;
+        break;
+      }
+    }
+  }
+
+  if(r.orbit<=0){
+    r.orbit=0;
+    r.orbitCooldown=RHINO_ORBIT.cooldown;
+    knightShockRing(player.position,RHINO_ORBIT.radius+.6,RHINO_GREEN,.34);
+    barbarianShockwave({x:player.position.x,y:player.position.y,z:player.position.z},
+      player.rotation.y,{radius:RHINO_ORBIT.radius,damage:r.orbitDamage,force:8,stun:.3,color:RHINO_GREEN});
+  }
+}
+
+/* ---------------------------------------------------------------------
+   ULTIMATE — RICOCHET BLADESTORM
+   Eight boomerangs in a full star. They pierce their lanes on the way
+   out, turn at full extension and come home, and the recall lands as one
+   simultaneous slam. Staged like the Aesir's Primal Axe Wave because
+   that structure already reads well, but the Ranger's version curves.
+   --------------------------------------------------------------------- */
+// RHINO_BLADESTORM is declared up next to HERO_ABILITIES instead of here:
+// the ability table is an object literal evaluated at load, so declaring it
+// this far down the file puts it in the temporal dead zone and throws.
+
+function rhinoBladestormCooldownForRound(){
+  const rd=Math.max(1,Number(round)||1);
+  return Math.max(6, 18 - (rd-1)*0.45);
+}
+
+function triggerRhinoBladestorm(){
+  if(!gameRunning||!rhinoIsActive()||!player)return false;
+  const r=rhinoRuntime;
+  if(r.bsActive>0||(r.bsCooldown||0)>0)return false;
+
+  markUltimateUsed();
+  r.bsCooldown=rhinoBladestormCooldownForRound();
+  r.bsActive=2.1; r.bsStage=0; r.bsTimer=0;
+  r.bsOriginX=player.position.x; r.bsOriginZ=player.position.z;
+  r.bsYaw=player.rotation.y;
+  invincibleTimer=Math.max(invincibleTimer||0,1.3);
+
+  if(player.userData.playKayClip)player.userData.playKayClip('attack',true,true,.5);
+  document.body.style.filter='brightness(1.18) saturate(1.35)';
+  setTimeout(()=>{if(rhinoIsActive()&&rhinoRuntime.bsActive<=0)document.body.style.filter='';},170);
+
+  const reach=Math.max(14,(arenaSize||18)*1.15);
+  r.bsReach=reach;
+  const origin={x:r.bsOriginX,y:player.position.y,z:r.bsOriginZ};
+  for(let i=0;i<8;i++){
+    const ang=r.bsYaw+(i*(Math.PI*2/8));
+    spawnRhinoBoomerang(origin,ang,reach,3.0,false,0.55);
+  }
+  knightShockRing(player.position,2.6,RHINO_WHITE,.44);
+  triggerCombatShake(18,280);
+  toast('RICOCHET BLADESTORM');
+  if(navigator.vibrate)navigator.vibrate([50,20,50,20,80]);
+  return true;
+}
+
+function updateRhinoBladestorm(dt){
+  const r=rhinoRuntime;
+  if((r.bsCooldown||0)>0)r.bsCooldown=Math.max(0,r.bsCooldown-dt);
+  if(!(r.bsActive>0))return;
+  r.bsTimer=(r.bsTimer||0)+dt;
+
+  if(r.bsStage===0&&r.bsTimer>=.60){
+    // Turn at full extension. Spawned at the rim aimed inward so the
+    // return leg is something you actually watch arrive.
+    r.bsStage=2;
+    const reach=r.bsReach||18;
+    const back={x:r.bsOriginX,y:player.position.y,z:r.bsOriginZ};
+    for(let i=0;i<8;i++){
+      const ang=(r.bsYaw||0)+(i*(Math.PI*2/8));
+      const rim={x:back.x+Math.sin(ang)*reach,y:back.y,z:back.z+Math.cos(ang)*reach};
+      spawnRhinoBoomerang(rim,ang+Math.PI,reach*1.05,2.6,true,0.55);
+    }
+    knightShockRing(back,reach*.9,RHINO_PALE,.5);
+    triggerCombatShake(11,170);
+  }
+
+  if(r.bsStage===2&&r.bsTimer>=1.58){
+    r.bsStage=1;
+    const origin={x:player.position.x,y:player.position.y,z:player.position.z};
+    spawnEarthbreaker(origin,3.4);
+    knightShockRing(origin,4.2,RHINO_GREEN,.45);
+    if(knightFxBudget(2))spawnBurst(origin.x,origin.y+1,origin.z,isMobile?12:18,FX_MAT_SPARK,4.6);
+    damageNearby(origin,3.4,2.6);
+    barbarianKnockbackRing(origin,3.6,11,.5);
+    knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.05);
+    triggerCombatShake(16,230);
+  }
+
+  if(r.bsTimer>=1.95){r.bsActive=0;r.bsStage=0;}
+}
+
+/* ---------------------------------------------------------------------
+   DISPATCH
+   --------------------------------------------------------------------- */
+function doRhinoAttack(w){
+  spawnHeroIdentityAura();
+  if(barbarianUltimateActive>0){
+    w={...w};
+    if(Number.isFinite(w.damage))w.damage*=1.5;
+  }
+  faceEnemyTarget(findNearestEnemy(Math.max(10,(w.range||w.radius||6)*1.4)));
+
+  if(w.kind==='rhino_boomerang'){
+    if(player.userData.playKayClip)player.userData.playKayClip('attack',true,true,.30);
+    doRhinoBoomerangThrow(w);
+  } else if(w.kind==='rhino_charge'){
+    triggerRhinoCharge(w);
+  } else if(w.kind==='rhino_orbit'){
+    triggerRhinoOrbit(w);
+  }
+}
+
+function isRhinoWeaponKind(kind){
+  return kind==='rhino_boomerang'||kind==='rhino_charge'||kind==='rhino_orbit';
+}
+
+function updateRhinoCombat(dt){
+  if(!rhinoIsActive())return;
+  try{
+    updateRhinoCharge(dt);
+    updateRhinoOrbit(dt);
+    updateRhinoBladestorm(dt);
+  }catch(err){ console.error('Ranger update recovered:',err); }
 }
 
 function doBarbarianAttack(w){
@@ -27743,6 +28177,8 @@ function performWeaponAttack(w, countsAsPrimary=true){
   if(!w) return;
   if(isWolverineWeaponKind(w.kind)){
     doWolverineAttack(w);
+  } else if(isRhinoWeaponKind(w.kind)){
+    doRhinoAttack(w);
   } else if(w.kind==='barbarian_roar_slash_combo'){
     doBarbarianRoarSlashCombo(w);
   } else if(w.kind==='barbarian_melee' || w.kind==='earthbreaker' || w.kind==='barbarian_spin' || w.kind==='barbarian_flurry' || w.kind==='barbarian_slash_wave' || w.kind==='barbarian_roar'){
@@ -29950,6 +30386,7 @@ function update(dt){
   updatePrimalRage(dt);
   if(barbarianIsActive()){
     try{
+      updateRhinoCombat(dt);
       updateBerserkerKin(dt);
       barbarianUpdateWhirlwind(dt);
       updateWorldBreaker(dt);
@@ -30285,6 +30722,7 @@ function update(dt){
       player.userData.spinBaseY=undefined;
     }
   }
+  if(rhinoIsActive())rhinoCurveBullets(dt);
   updateBullets(dt);
   updatePhoenixFireball(dt);
   updatePhoenixAfterEffects(dt);
