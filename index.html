@@ -1,3 +1,4 @@
+<!-- V23.03.17 Titan Deactivation Fix: fixes Titan Rampage remaining visually giant after its timer expires. Root cause was Gamma Leap caching the player's giant scale at jump start and continuing to restore that cached scale after Titan Rampage had already ended. Gamma Leap now resolves its scale from the CURRENT Titan state every frame and at landing, so an in-progress leap cannot reapply expired Titan size. Titan shutdown is also centralized in endRhinoTitanRampage(), which disposes Titan FX, clears the timer, restores normal Ranger scale/helper scales, applies the Knight-matched cooldown and emits the ending feedback exactly once. Cleanup/syntax audit included. -->
 <!-- V23.03.16 Clean Gamma Leap Arc: removes Gamma Leap's warp-like airborne squash/stretch and body-tilt effect so Green Ranger now stays visually solid throughout the jump. The physical Bezier jump arc is raised from +4.35 to +5.25 Y while retaining the deliberate 1.30-second heavyweight timing, zero cooldown, Titan scaling, damage and landing impact. Cleanup and syntax audit included. -->
 <!-- V23.03.15 Ranger Round Table Clones: replaces the one-hit Einherjar Echo signature with a persistent Green Ranger clone army following the Knight Knights-of-the-Round rules exactly. Round 10-15 summons 2 invincible clones for 8s with 10s cooldown; Round 16-20 summons 5 for 15s with 5s cooldown; Round 21+ summons 10 for 30s with 0.8s cooldown. Clones draw enemy aggro before the player, move at 2/3 of the Ranger's current movement speed, return to formation after being far away too long, and deal 10% player-scaled damage. They use the Green Rhino native rig, normal size even during Titan Rampage, and cycle the Ranger Primary plus the currently equipped Secondary in simplified clone-safe forms. The Ranger signature is blocked during Titan Rampage, matching Knight Titan's clone restriction. Old Einherjar Echo runtime/code/charge HUD is removed. Cleanup and syntax audit included. -->
 <!-- V23.03.14 Ranger Defensive Whirlwind: removes Freight Train Charge and replaces that Ranger Secondary slot with Cloud's Defensive Whirlwind combat behavior. The Ranger version reuses the existing Knight/Cloud whirlwind tuning and visual helpers: the same round-scaled active duration, 0.22s damage pulses, outward knockback, stagger, projectile deflection, layered sword/shield-style spin arcs, activation flare and ending guard burst. Ranger Secondary rules remain authoritative, so this version has zero post-use cooldown and can restart immediately while Secondary is held once the current Whirlwind duration ends. The same 0.55 movement multiplier applies while spinning. Titan Rampage scales Whirlwind radius/damage with the giant form but still uses only the equipped Secondary. Green Rhino's clean model-fit wrapper now receives the spin instead of rotating the native-rigged gameplay root. Old Freight Train trigger/update/runtime/dispatch code is removed. Cleanup and syntax audit included. -->
@@ -1638,7 +1639,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.03.16 - Clean Gamma Leap Arc';
+const GAME_VERSION='23.03.17 - Titan Deactivation Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -23870,10 +23871,13 @@ function updateRhinoGammaLeap(dt){
   player.position.set(v*v*s.start.x+2*v*u*s.control.x+u*u*s.end.x,v*v*s.start.y+2*v*u*s.control.y+u*u*s.end.y,v*v*s.start.z+2*v*u*s.control.z+u*u*s.end.z);
   // Keep the imported Ranger visually solid in the air. The jump itself is
   // entirely the physical Bezier translation; no squash/stretch or warp tilt.
-  player.scale.copy(s.baseScale);
+  // Never restore the cached launch scale blindly: if Titan expired in
+  // midair, s.baseScale may still be the old giant scale.
+  if(rhinoTitanActive())player.scale.copy(s.baseScale);
+  else player.scale.setScalar(rhinoNormalScale());
   player.rotation.x=0;
   if(u>=1){
-    player.position.copy(s.end);player.scale.copy(s.baseScale);player.rotation.x=0;
+    player.position.copy(s.end);if(rhinoTitanActive())player.scale.copy(s.baseScale);else player.scale.setScalar(rhinoNormalScale());player.rotation.x=0;
     const hits=rhinoWBRadial(s.end,s.radius,s.damage,10);
     rhinoWBShatteredGround(s.end,s.radius);
     // Layered tectonic finish: tight white impact, main green wave, then a
@@ -24383,6 +24387,23 @@ function rhinoTitanCombatScale(){
 function rhinoTitanActive(){
   return rhinoIsActive() && (rhinoRuntime.titanTimer||0)>0;
 }
+function rhinoNormalScale(){
+  if(!player)return AVATAR_SCALE.rhino||1;
+  return player.userData.baseAvatarScale||AVATAR_SCALE.rhino||1;
+}
+function rhinoApplyCurrentTransformScale(){
+  if(!player||!rhinoIsActive())return;
+  const mult=rhinoTitanActive()?rhinoTitanSizeMult():1;
+  const target=rhinoNormalScale()*mult;
+  player.scale.setScalar(target);
+  player.userData.avatarScale=target;
+  player.userData.currentSizeMult=mult;
+
+  const inv=mult>1?1/mult:1;
+  if(player.userData.visibilityRing)player.userData.visibilityRing.scale.setScalar(inv);
+  if(player.userData.locator)player.userData.locator.scale.setScalar(inv);
+  if(player.userData.contactShadow)player.userData.contactShadow.scale.setScalar(inv);
+}
 function rhinoTitanSecondaryBusy(){
   return !!(rhinoRuntime.overdrive||rhinoRuntime.gamma||rhinoCloudWhirlwindActive());
 }
@@ -24399,9 +24420,8 @@ function rhinoTitanScaledWeapon(w){
 }
 function rhinoTitanSyncScale(active=rhinoTitanActive()){
   if(!player||!rhinoIsActive())return;
-  const base=player.userData.baseAvatarScale||AVATAR_SCALE.rhino||1;
   const mult=active?rhinoTitanSizeMult():1;
-  const target=base*mult;
+  const target=rhinoNormalScale()*mult;
   player.scale.setScalar(target);
   player.userData.avatarScale=target;
   player.userData.currentSizeMult=mult;
@@ -24458,6 +24478,32 @@ function triggerRhinoTitanRampage(){
   toast('TITAN RAMPAGE');
   return true;
 }
+function endRhinoTitanRampage(){
+  const r=rhinoRuntime;
+  if(!r)return;
+
+  const wasActive=(r.titanTimer||0)>0 || !!r.titanFx;
+  r.titanTimer=0;
+
+  if(r.titanFx){
+    rhinoWBDispose(r.titanFx);
+    r.titanFx=null;
+  }
+
+  // Force normal scale now. Gamma/Whirlwind updates also consult current
+  // Titan state, so no active move can restore an expired giant scale.
+  rhinoTitanSyncScale(false);
+
+  if(wasActive){
+    r.titanCooldown=rhinoTitanCooldownDuration();
+    if(player){
+      rhinoWBShock(player.position,5.0,RHINO_PALE,.34);
+      triggerCombatShake(12,210);
+    }
+    toast('TITAN RAMPAGE ENDED');
+  }
+}
+
 function updateRhinoTitanRampage(dt){
   const r=rhinoRuntime;
   if(r.titanCooldown>0)r.titanCooldown=Math.max(0,r.titanCooldown-dt);
@@ -24472,18 +24518,11 @@ function updateRhinoTitanRampage(dt){
     r.titanFx.scale.setScalar(p);
   }
 
-  // Do not continuously force scale while Gamma Leap is actively doing its
-  // squash/stretch. Gamma starts from the giant base scale and restores it.
+  // Keep the giant scale authoritative while active. Gamma Leap now also
+  // checks Titan state itself, so both systems agree on the same scale.
   if(!r.gamma)rhinoTitanSyncScale(true);
 
-  if(r.titanTimer<=0){
-    if(r.titanFx){rhinoWBDispose(r.titanFx);r.titanFx=null;}
-    rhinoTitanSyncScale(false);
-    r.titanCooldown=rhinoTitanCooldownDuration();
-        rhinoWBShock(player.position,5.0,RHINO_PALE,.34);
-    triggerCombatShake(12,210);
-    toast('TITAN RAMPAGE ENDED');
-  }
+  if(r.titanTimer<=0)endRhinoTitanRampage();
 }
 
 /* ---------------------------------------------------------------------
@@ -25097,6 +25136,8 @@ function rhinoWorldBreakerCleanup(force=false){
   if(player&&rhinoIsActive()){
     player.rotation.x=0;
     r.titanTimer=0;
+  if(r.titanFx){rhinoWBDispose(r.titanFx);r.titanFx=null;}
+  if(player&&rhinoIsActive())rhinoTitanSyncScale(false);
     r.titanFx=null;
     rhinoTitanSyncScale(false);
   }
