@@ -1,3 +1,4 @@
+<!-- V23.03.11 Armageddon Ultimate: replaces Wrath of the Sky-Father with ARMAGEDDON while preserving the legacy rhino_sky_father save ID. Activation sends Green Ranger extremely high off-screen, relocates him to exact arena center while hidden, then returns him in a violent center crash. The landing immediately stuns every enemy already on the map for 8.0 seconds. A five-second bombardment follows with many giant round stone projectiles using shared low-poly geometry/materials for iPhone efficiency; each stone has its own ground warning and impact burst. After the stone rain ends, one enormous meteor whose diameter is about 85% of the playable map diameter descends slowly onto center. Its final impact creates a huge map-wide shockwave and eliminates every normal enemy on the map. Bosses retain the project's anti-one-shot rule and instead receive the existing capped boss-safe damage. Old Sky-Father lightning/glow code and runtime state are removed. Cleanup and syntax audit included. -->
 <!-- V23.03.10 Equipped Titan Secondary + Steerable Long Charge: Titan Rampage no longer cycles through all Ranger Secondaries. While transformed, the Secondary button uses only the Secondary actually equipped before the match, with Titan damage/radius scaling applied to that move. Freight Train Charge distance is doubled from 6 to 12 units and rebuilt as a steerable heavy charge: it no longer follows one frozen activation direction. The charge advances incrementally each frame while its travel vector eases toward the Ranger's current facing, allowing responsive left/right steering without twitchy snapping. Duration is 1.45s to preserve heavyweight motion across the longer distance. Dragged enemies follow the curved charge path in stable lanes. Removed the now-unused Titan Secondary rotation index/helpers and stale NEXT-move toast logic. Cleanup and syntax audit included. -->
 <!-- V23.03.09 Ranger Titan Rotation Ultimate: replaces The Shattered Domain with TITAN RAMPAGE. The Green Rhino Ranger grows to the exact same size multiplier as Knight Guardian Titan (5x), uses the same 15-second active duration, and dynamically reuses the Knight Titan cooldown curve so both transformations stay synchronized if Knight tuning changes later. During Titan Rampage the Ranger can still use Twin Boomerang Primary, while every Secondary press ignores the equipped Secondary and rotates Stormbreaker Overdrive -> Gamma Leap -> Freight Train Charge -> repeat. Giant combat uses the Knight Titan's 5x damage multiplier and 2.6x combat reach/radius standard; movement timing itself remains heavy rather than becoming 2.6x faster. The old Shattered Domain meshes/runtime/update code are removed, legacy saves keep the same rhino_shattered_domain ID so no migration is required, and Titan scale/helper presentation is fully restored on expiration/reset. Cleanup and syntax audit included. -->
 <!-- V23.03.08 Full Arena Waves + Heavy Secondary Motion: fixes Crashing Bolt's kill wave stopping halfway across the arena. arenaSize is already the playable radius (~30), but the prior helper incorrectly multiplied it by 0.5, capping the wave near 15. The wave now travels slightly beyond the real playable boundary and uses a swept-radius contact test so enemies cannot be skipped between frames. Gamma Leap is slowed to a deliberate 1.30s arc. Freight Train Charge is slowed to 0.90s for its six-unit drive and no longer rotates the entire gameplay player root; only the Green Rhino model-fit wrapper receives a restrained forward lean, preventing the native rig from visually breaking. Dragged enemies ease into stable lanes instead of being hard-teleported into one overlapping cluster. Both moves keep zero cooldown/no post-move delay and receive stronger end impacts. Cleanup removes stale fast-timing comments/logic. -->
@@ -1632,7 +1633,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.03.10 - Equipped Titan Secondary + Steerable Long Charge';
+const GAME_VERSION='23.03.11 - Armageddon Ultimate';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -13710,8 +13711,8 @@ const RHINO_CRASHING_BOLT = {id:'rhino_crashing_bolt', name:'World-Breaker Crash
   desc:'Dash to arena center, then perform four complete leap-and-crash cycles. Every crash launches one numbered circular kill wave; each wave takes about 3 seconds to reach the playable edge, and the next leap does not begin until the previous wave is completely finished.'};
 const RHINO_SHATTERED_DOMAIN = {id:'rhino_shattered_domain', name:'Titan Rampage', price:760, avatar:'rhino', unlockLevel:14,
   desc:'TRANSFORMATION. Grow to the exact same 5x size as Knight Guardian Titan for the same 15-second duration and use the same cooldown curve. Primary remains available. Secondary keeps using only the move you actually equipped before the match. Giant attacks use Knight Titan-scaled power and combat reach.'};
-const RHINO_SKY_FATHER = {id:'rhino_sky_father', name:'Wrath of the Sky-Father', price:900, avatar:'rhino', unlockLevel:18,
-  desc:'Lock into an overloaded green/cyan state for 3 seconds while twelve lightning bolts rain around the arena, each impact dealing area damage and shaking the camera.'};
+const RHINO_SKY_FATHER = {id:'rhino_sky_father', name:'Armageddon', price:900, avatar:'rhino', unlockLevel:18,
+  desc:'Leap impossibly high off-screen, return to the exact arena center and crash down, stunning every enemy already on the map for 8 seconds. Then giant round stones bombard the arena for 5 seconds before one meteor about 85% of the playable map diameter slowly falls into center for a final map-clearing impact.'};
 const HERO_ABILITIES = { rhino:[RHINO_CRASHING_BOLT,RHINO_SHATTERED_DOMAIN,RHINO_SKY_FATHER], mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
   knight:[KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER, KNIGHT_JUDGMENT_ULTIMATE],
   wolverine:[WOLVERINE_SHADOW_CLONES, WOLVERINE_BERSERKER_FRENZY, WOLVERINE_ADAMANTIUM_QUAKE],
@@ -23023,7 +23024,13 @@ function knightAbilityCooldownInfo(){
       };
     }
     case 'rhino_sky_father': {
-      const active=!!rhinoRuntime.sky;return {label:active?'TEMPEST':'SKY-FATHER',cd:rhinoRuntime.skyCooldown||0,active,activeTime:active?Math.max(0,3-rhinoRuntime.sky.t):undefined};
+      const active=!!rhinoRuntime.armageddon;
+      const s=rhinoRuntime.armageddon;
+      const label=!active?'ARMAGEDDON':
+        s.phase==='stones'?'STONEFALL '+Math.max(0,5-s.t).toFixed(1):
+        s.phase==='meteor'?'METEOR':
+        s.phase==='impact'?'IMPACT':'ARMAGEDDON';
+      return {label,cd:rhinoRuntime.armageddonCooldown||0,active,activeTime:active?s.t:undefined};
     }
     case 'barbarian_ragnarok_wave': {
       const active=barbarianRuntime.rfActive>0;
@@ -23049,7 +23056,7 @@ function triggerBarbarianEquippedAbility(){
     if(rhinoTitanActive()&&equippedAbilityId!=='rhino_shattered_domain')return;
     if(equippedAbilityId==='rhino_crashing_bolt')triggerRhinoCrashingBolt();
     else if(equippedAbilityId==='rhino_shattered_domain')triggerRhinoTitanRampage();
-    else if(equippedAbilityId==='rhino_sky_father')triggerRhinoSkyFather();
+    else if(equippedAbilityId==='rhino_sky_father')triggerRhinoArmageddon();
     return;
   }
   // During Primal Rage, only Primary and Secondary combat is allowed.
@@ -23504,7 +23511,7 @@ let rhinoRuntime = {
   freight:null, freightCooldown:0,
   crashing:null, crashingCooldown:0,
   titanTimer:0, titanCooldown:0, titanFx:null,
-  sky:null, skyCooldown:0,
+  armageddon:null, armageddonCooldown:0,
   echo:null, echoCooldown:0
 };
 
@@ -23517,7 +23524,7 @@ function rhinoResetRuntime(){
     freight:null, freightCooldown:0,
     crashing:null, crashingCooldown:0,
     titanTimer:0, titanCooldown:0, titanFx:null,
-    sky:null, skyCooldown:0,
+    armageddon:null, armageddonCooldown:0,
     echo:null, echoCooldown:0
   };
 }
@@ -24382,24 +24389,350 @@ function updateRhinoTitanRampage(dt){
     toast('TITAN RAMPAGE ENDED');
   }
 }
-function rhinoWBApplyGlow(enable){
-  if(!player)return;if(enable){if(player.userData.rhinoGlowBackup)return;const back=[];player.traverse(o=>{if(!o.isMesh||!o.material)return;const mats=Array.isArray(o.material)?o.material:[o.material];for(const m of mats){back.push([m,m.color?m.color.clone():null,m.emissive?m.emissive.clone():null,m.emissiveIntensity]);if(m.color)m.color.setHex(0x5dff8a);if(m.emissive)m.emissive.setHex(0x27ffe0);if('emissiveIntensity'in m)m.emissiveIntensity=1.8;}});player.userData.rhinoGlowBackup=back;}else{const b=player.userData.rhinoGlowBackup||[];for(const [m,c,e,ei] of b){if(c&&m.color)m.color.copy(c);if(e&&m.emissive)m.emissive.copy(e);if(ei!=null&&'emissiveIntensity'in m)m.emissiveIntensity=ei;}player.userData.rhinoGlowBackup=null;}
+
+/* ---------------------------------------------------------------------
+   ULTIMATE — ARMAGEDDON
+   One long readable sequence:
+   leap off-screen -> center crash + 8s stun -> 5s stonefall -> giant meteor.
+   Shared stone geometry/materials keep the many-projectile phase inexpensive.
+   --------------------------------------------------------------------- */
+const RHINO_ARMAGEDDON_COOLDOWN=24;
+const RHINO_ARMAGEDDON_STONE_TIME=5.0;
+const RHINO_ARMAGEDDON_STUN=8.0;
+const RHINO_ARMAGEDDON_STONE_CAP_MOBILE=24;
+const RHINO_ARMAGEDDON_STONE_CAP_DESKTOP=38;
+
+let RHINO_ARMAGEDDON_STONE_GEO=null;
+let RHINO_ARMAGEDDON_STONE_MAT=null;
+let RHINO_ARMAGEDDON_WARN_GEO=null;
+let RHINO_ARMAGEDDON_WARN_MAT=null;
+
+function rhinoArmageddonEnsureShared(){
+  if(!RHINO_ARMAGEDDON_STONE_GEO)
+    RHINO_ARMAGEDDON_STONE_GEO=new THREE.IcosahedronGeometry(1,1);
+  if(!RHINO_ARMAGEDDON_STONE_MAT)
+    RHINO_ARMAGEDDON_STONE_MAT=new THREE.MeshStandardMaterial({
+      color:0x625a50,roughness:.88,metalness:.02
+    });
+  if(!RHINO_ARMAGEDDON_WARN_GEO)
+    RHINO_ARMAGEDDON_WARN_GEO=new THREE.RingGeometry(.72,1,28);
+  if(!RHINO_ARMAGEDDON_WARN_MAT)
+    RHINO_ARMAGEDDON_WARN_MAT=new THREE.MeshBasicMaterial({
+      color:0xffb34a,transparent:true,opacity:.46,side:THREE.DoubleSide,depthWrite:false
+    });
 }
-function rhinoWBSpawnLightning(){
-  const a=Math.random()*Math.PI*2,d=Math.sqrt(Math.random())*Math.max(7,(arenaSize||18)*.72),x=player.position.x+Math.sin(a)*d,z=player.position.z+Math.cos(a)*d;const h=8;
-  const bolt=new THREE.Mesh(new THREE.CylinderGeometry(.08,.22,h,5),new THREE.MeshBasicMaterial({color:0x43fff0,transparent:true,opacity:.92,blending:THREE.AdditiveBlending,depthWrite:false}));bolt.position.set(x,10,z);scene.add(bolt);return {bolt,x,z,hit:false};
+
+function rhinoArmageddonArenaRadius(){
+  return Math.max(12,(arenaSize||18)-1.35);
 }
-function triggerRhinoSkyFather(){
-  const r=rhinoRuntime;if(r.sky||r.skyCooldown>0)return false;markUltimateUsed();r.sky={t:0,next:0,count:0,bolts:[]};
-  dashActive=false;dashTimer=0;invincibleTimer=Math.max(invincibleTimer||0,3.2);rhinoWBApplyGlow(true);toast('WRATH OF THE SKY-FATHER');return true;
+
+function rhinoArmageddonStunAll(seconds=RHINO_ARMAGEDDON_STUN){
+  let count=0;
+  for(const z of zombies){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,seconds);
+    z.userData.attackCooldown=Math.max(z.userData.attackCooldown||0,seconds);
+    if(Number.isFinite(z.userData.specialTimer))
+      z.userData.specialTimer=Math.max(z.userData.specialTimer,seconds);
+    count++;
+  }
+  return count;
 }
-function updateRhinoSkyFather(dt){
-  const r=rhinoRuntime;if(r.skyCooldown>0)r.skyCooldown=Math.max(0,r.skyCooldown-dt);const s=r.sky;if(!s)return;s.t+=dt;
-  while(s.count<12&&s.t>=s.next){s.bolts.push(rhinoWBSpawnLightning());s.count++;s.next=s.count*(3/12);}
-  const pulse=.85+.15*Math.sin(s.t*18);if(player)player.scale.setScalar((AVATAR_SCALE.rhino||1)*pulse);
-  for(let i=s.bolts.length-1;i>=0;i--){const b=s.bolts[i];b.bolt.position.y-=34*dt;if(b.bolt.position.y<=4){if(!b.hit){b.hit=true;const p={x:b.x,y:0,z:b.z};rhinoWBShock(p,2.4,RHINO_PALE,.20);rhinoWBRadial(p,2.2,3.8,6);triggerCombatShake(8,95);}rhinoWBDispose(b.bolt);s.bolts.splice(i,1);}}
-  if(s.t>=3.0&&s.bolts.length===0){rhinoWBApplyGlow(false);if(player)rhinoTitanSyncScale(rhinoTitanActive());r.sky=null;r.skyCooldown=24;}
+
+function rhinoArmageddonSpawnStone(s){
+  rhinoArmageddonEnsureShared();
+  const cap=isMobile?RHINO_ARMAGEDDON_STONE_CAP_MOBILE:RHINO_ARMAGEDDON_STONE_CAP_DESKTOP;
+  if(s.stones.length>=cap)return;
+
+  const R=rhinoArmageddonArenaRadius();
+  const a=Math.random()*Math.PI*2;
+  const d=Math.sqrt(Math.random())*R;
+  const x=Math.sin(a)*d;
+  const z=Math.cos(a)*d;
+  const radius=1.45+Math.random()*1.55;
+
+  const stone=new THREE.Mesh(RHINO_ARMAGEDDON_STONE_GEO,RHINO_ARMAGEDDON_STONE_MAT);
+  stone.scale.set(radius*(.9+Math.random()*.24),radius*(.9+Math.random()*.22),radius*(.9+Math.random()*.24));
+  stone.position.set(x,17+Math.random()*10,z);
+  stone.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+  stone.castShadow=true;
+  scene.add(stone);
+
+  const warn=new THREE.Mesh(RHINO_ARMAGEDDON_WARN_GEO,RHINO_ARMAGEDDON_WARN_MAT.clone());
+  warn.rotation.x=-Math.PI/2;
+  warn.position.set(x,.055,z);
+  warn.scale.setScalar(radius*1.45);
+  scene.add(warn);
+
+  s.stones.push({
+    stone,warn,x,z,
+    vy:12+Math.random()*7,
+    spinX:(Math.random()-.5)*3.5,
+    spinY:(Math.random()-.5)*4.5,
+    radius,
+    hit:false
+  });
 }
+
+function rhinoArmageddonImpactStone(entry){
+  const p={x:entry.x,y:0,z:entry.z};
+  rhinoWBShock(p,entry.radius*2.0,RHINO_PALE,.18);
+  spawnBurst(entry.x,.35,entry.z,isMobile?8:14,FX_MAT_SPARK,entry.radius*2.4);
+  // Stone rain hurts and keeps pressure on the stunned army, but the guaranteed
+  // full normal-enemy wipe is reserved for the final meteor.
+  rhinoWBRadial(p,Math.max(2.2,entry.radius*1.45),2.4,5.5);
+  triggerCombatShake(5,70);
+}
+
+function rhinoArmageddonMeteorRadius(){
+  // Diameter ~= 85% of playable map diameter.
+  return rhinoArmageddonArenaRadius()*.85;
+}
+
+function rhinoArmageddonMakeMeteor(){
+  const radius=rhinoArmageddonMeteorRadius();
+  const g=new THREE.Group();
+
+  const rock=new THREE.Mesh(
+    new THREE.IcosahedronGeometry(radius,2),
+    new THREE.MeshStandardMaterial({
+      color:0x3d2a24,
+      emissive:0xff4917,
+      emissiveIntensity:1.15,
+      roughness:.82,
+      metalness:.03
+    })
+  );
+  g.add(rock);
+
+  const shell=new THREE.Mesh(
+    new THREE.IcosahedronGeometry(radius*1.06,1),
+    new THREE.MeshBasicMaterial({
+      color:0xff7b21,transparent:true,opacity:.20,depthWrite:false,
+      blending:THREE.AdditiveBlending
+    })
+  );
+  g.add(shell);
+
+  const halo=new THREE.Mesh(
+    new THREE.SphereGeometry(radius*1.20,14,10),
+    new THREE.MeshBasicMaterial({
+      color:0xffb33c,transparent:true,opacity:.10,depthWrite:false,
+      side:THREE.DoubleSide,blending:THREE.AdditiveBlending
+    })
+  );
+  g.add(halo);
+
+  g.position.set(0,Math.max(42,radius*3.2),0);
+  scene.add(g);
+  return {g,rock,shell,halo,radius,startY:g.position.y};
+}
+
+function rhinoArmageddonFinalWipe(center){
+  let killed=0,bossesHit=0;
+  for(const z of [...zombies]){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    if(z.userData.archetype==='boss'){
+      // Preserve the project's explicit "bosses cannot be one-hit killed" rule.
+      applyBulletDamage(z,(z.userData.maxHp||z.userData.hp||1)*.08);
+      z.userData.hitStun=Math.max(z.userData.hitStun||0,3.0);
+      bossesHit++;
+    }else{
+      applyBulletDamage(z,Math.max(999999,(z.userData.maxHp||z.userData.hp||1)*20));
+      killed++;
+    }
+  }
+  return {killed,bossesHit};
+}
+
+function triggerRhinoArmageddon(){
+  const r=rhinoRuntime;
+  if(!gameRunning||!rhinoIsActive()||!player)return false;
+  if(r.armageddon||r.armageddonCooldown>0)return false;
+  if(r.crashing||rhinoTitanActive())return false;
+
+  markUltimateUsed();
+  dashActive=false;
+  dashTimer=0;
+
+  r.armageddon={
+    phase:'leap',
+    t:0,
+    start:player.position.clone(),
+    stones:[],
+    stoneSpawn:0,
+    meteor:null,
+    impactDone:false
+  };
+
+  invincibleTimer=Math.max(invincibleTimer||0,16);
+  if(player.userData.playKayClip)player.userData.playKayClip('jump',true,true,.72);
+  toast('ARMAGEDDON');
+  triggerCombatShake(9,150);
+  if(navigator.vibrate)navigator.vibrate([45,20,55]);
+  return true;
+}
+
+function updateRhinoArmageddon(dt){
+  const r=rhinoRuntime;
+  if(r.armageddonCooldown>0)r.armageddonCooldown=Math.max(0,r.armageddonCooldown-dt);
+  const s=r.armageddon;
+  if(!s||!player)return;
+
+  invincibleTimer=Math.max(invincibleTimer||0,.30);
+  s.t+=dt;
+
+  // 1) Extreme leap from wherever the Ranger was standing.
+  if(s.phase==='leap'){
+    const u=Math.min(1,s.t/.72);
+    const e=1-Math.pow(1-u,3);
+    player.position.x=s.start.x;
+    player.position.z=s.start.z;
+    player.position.y=THREE.MathUtils.lerp(s.start.y,48,e);
+
+    if(Math.random()<dt*16)
+      spawnBurst(player.position.x,Math.max(.2,player.position.y-.7),player.position.z,1,FX_MAT_SPARK,1.5);
+
+    if(u>=1){
+      // Hidden relocation: when he comes back, it is ALWAYS exact map center.
+      player.visible=false;
+      player.position.set(0,52,0);
+      s.phase='hang';
+      s.t=0;
+    }
+    return;
+  }
+
+  // 2) A brief off-screen beat makes the height unmistakable.
+  if(s.phase==='hang'){
+    if(s.t>=.36){
+      s.phase='descent';
+      s.t=0;
+      player.visible=true;
+      player.position.set(0,30,0);
+    }
+    return;
+  }
+
+  // 3) Fast but readable center descent.
+  if(s.phase==='descent'){
+    const u=Math.min(1,s.t/.82);
+    const e=u*u;
+    player.position.set(0,THREE.MathUtils.lerp(30,0,e),0);
+    triggerCombatShake(4+u*11,70);
+
+    if(u>=1){
+      player.position.set(0,0,0);
+      s.phase='stones';
+      s.t=0;
+      s.stoneSpawn=0;
+
+      const stunned=rhinoArmageddonStunAll(8.0);
+      rhinoWBFlash(2);
+      spawnEarthbreaker(player.position,10.5);
+      rhinoWBShock(player.position,5.5,RHINO_WHITE,.20);
+      rhinoWBShock(player.position,10.5,RHINO_PALE,.34);
+      rhinoWBShock(player.position,rhinoArmageddonArenaRadius(),RHINO_GREEN,.60);
+      spawnBurst(0,.45,0,isMobile?34:58,FX_MAT_SPARK,10);
+      triggerCombatShake(44,1050);
+      knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.12);
+      if(navigator.vibrate)navigator.vibrate([110,45,170]);
+      toast(`ARMAGEDDON · ${stunned} ENEMIES STUNNED`);
+    }
+    return;
+  }
+
+  // 4) Five full seconds of many giant round falling stones.
+  if(s.phase==='stones'){
+    const rate=isMobile?8.0:12.0; // spawns/sec; active list is capped.
+    s.stoneSpawn-=dt;
+    while(s.stoneSpawn<=0 && s.t<RHINO_ARMAGEDDON_STONE_TIME){
+      rhinoArmageddonSpawnStone(s);
+      s.stoneSpawn+=1/rate;
+    }
+
+    for(let i=s.stones.length-1;i>=0;i--){
+      const q=s.stones[i];
+      q.stone.position.y-=q.vy*dt;
+      q.stone.rotation.x+=q.spinX*dt;
+      q.stone.rotation.y+=q.spinY*dt;
+      const height=Math.max(.2,q.stone.position.y);
+      q.warn.material.opacity=.18+.30*Math.max(0,1-height/28);
+
+      if(q.stone.position.y<=q.radius*.72){
+        rhinoArmageddonImpactStone(q);
+        rhinoWBDispose(q.stone);
+        rhinoWBDispose(q.warn);
+        s.stones.splice(i,1);
+      }
+    }
+
+    if(s.t>=RHINO_ARMAGEDDON_STONE_TIME){
+      // Stop spawning, allow currently falling stones a brief cleanup window,
+      // then begin the giant center meteor.
+      s.phase='meteor';
+      s.t=0;
+      s.meteor=rhinoArmageddonMakeMeteor();
+      toast('ARMAGEDDON · FINAL METEOR');
+    }
+    return;
+  }
+
+  // 5) One huge meteor, ~85% of playable map diameter, descends slowly.
+  if(s.phase==='meteor'){
+    const m=s.meteor;
+    if(!m)return;
+    const duration=3.25;
+    const u=Math.min(1,s.t/duration);
+    const e=u*u*(3-2*u);
+    m.g.position.y=THREE.MathUtils.lerp(m.startY,m.radius*.52,e);
+    m.g.rotation.x+=dt*.18;
+    m.g.rotation.y+=dt*.26;
+    const pulse=1+.025*Math.sin(s.t*10);
+    m.shell.scale.setScalar(pulse);
+    m.halo.material.opacity=.08+.08*u;
+
+    // Increasing rumble makes the enormous slow descent feel dangerous.
+    triggerCombatShake(4+u*15,75);
+
+    if(u>=1&&!s.impactDone){
+      s.impactDone=true;
+      s.phase='impact';
+      s.t=0;
+
+      const result=rhinoArmageddonFinalWipe(player.position);
+      rhinoWBFlash(2);
+      spawnEarthbreaker(player.position,rhinoArmageddonArenaRadius());
+      rhinoWBShock(player.position,8,RHINO_WHITE,.20);
+      rhinoWBShock(player.position,rhinoArmageddonArenaRadius()*.55,0xff8a24,.38);
+      rhinoWBShock(player.position,rhinoArmageddonArenaRadius()+1.5,0xffd36a,.70);
+      spawnBurst(0,.6,0,isMobile?44:78,FX_MAT_SPARK,14);
+      triggerCombatShake(58,1450);
+      knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.16);
+      if(navigator.vibrate)navigator.vibrate([140,55,220]);
+
+      // Dispose any stones still airborne when the final meteor hits.
+      for(const q of s.stones){
+        rhinoWBDispose(q.stone);
+        rhinoWBDispose(q.warn);
+      }
+      s.stones.length=0;
+      if(s.meteor&&s.meteor.g)rhinoWBDispose(s.meteor.g);
+      s.meteor=null;
+
+      toast(`ARMAGEDDON · ${result.killed} ENEMIES ERASED`);
+    }
+    return;
+  }
+
+  if(s.phase==='impact'&&s.t>=1.15){
+    player.visible=true;
+    player.position.set(0,0,0);
+    r.armageddon=null;
+    r.armageddonCooldown=RHINO_ARMAGEDDON_COOLDOWN;
+  }
+}
+
 function triggerRhinoEinherjarEcho(){
   const r=rhinoRuntime;if(!gameRunning||!rhinoIsActive()||!player||r.echo)return false;if(barbarianUltimateCharge<99.5){toast('Einherjar Echo still charging');return false;}barbarianUltimateCharge=0;updateHoodedHud();markUltimateUsed();
   const target=findNearestEnemy(18);const dir=target?new THREE.Vector3(target.position.x-player.position.x,0,target.position.z-player.position.z).normalize():rhinoWBForward();const pos=target?target.position.clone():player.position.clone().addScaledVector(dir,4);pos.y=0;
@@ -24418,16 +24751,21 @@ function rhinoWorldBreakerCleanup(force=false){
     if(s.rocks)for(const q of s.rocks)rhinoWBDispose(q.m);
     if(s.waves)for(const w of s.waves)if(w&&w.mesh)rhinoWBDispose(w.mesh);
   }
-  if(r.sky&&r.sky.bolts)for(const b of r.sky.bolts)rhinoWBDispose(b.bolt);
+  if(r.armageddon){
+    if(r.armageddon.stones)for(const q of r.armageddon.stones){
+      if(q.stone)rhinoWBDispose(q.stone);
+      if(q.warn)rhinoWBDispose(q.warn);
+    }
+    if(r.armageddon.meteor&&r.armageddon.meteor.g)rhinoWBDispose(r.armageddon.meteor.g);
+  }
   if(r.titanFx)rhinoWBDispose(r.titanFx);
-  rhinoWBApplyGlow(false);
   if(player&&rhinoIsActive()){
     player.rotation.x=0;
     r.titanTimer=0;
     r.titanFx=null;
     rhinoTitanSyncScale(false);
   }
-  r.overdrive=r.gamma=r.freight=r.crashing=r.sky=r.echo=null;
+  r.overdrive=r.gamma=r.freight=r.crashing=r.armageddon=r.echo=null;
   r.titanTimer=0;
   }
 /* Retired V23.01 Rhino Charge / Boomerang Cyclone / Ricochet Bladestorm code removed in V23.03.01. */
@@ -24458,7 +24796,7 @@ function updateRhinoCombat(dt){
     updateRhinoFreightTrain(dt);
     updateRhinoCrashingBolt(dt);
     updateRhinoTitanRampage(dt);
-    updateRhinoSkyFather(dt);
+    updateRhinoArmageddon(dt);
     updateRhinoEinherjarEcho(dt);
   }catch(err){ console.error('Ranger World-Breaker update recovered:',err); }
 }
