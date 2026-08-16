@@ -1,3 +1,4 @@
+<!-- V23.03.16 Clean Gamma Leap Arc: removes Gamma Leap's warp-like airborne squash/stretch and body-tilt effect so Green Ranger now stays visually solid throughout the jump. The physical Bezier jump arc is raised from +4.35 to +5.25 Y while retaining the deliberate 1.30-second heavyweight timing, zero cooldown, Titan scaling, damage and landing impact. Cleanup and syntax audit included. -->
 <!-- V23.03.15 Ranger Round Table Clones: replaces the one-hit Einherjar Echo signature with a persistent Green Ranger clone army following the Knight Knights-of-the-Round rules exactly. Round 10-15 summons 2 invincible clones for 8s with 10s cooldown; Round 16-20 summons 5 for 15s with 5s cooldown; Round 21+ summons 10 for 30s with 0.8s cooldown. Clones draw enemy aggro before the player, move at 2/3 of the Ranger's current movement speed, return to formation after being far away too long, and deal 10% player-scaled damage. They use the Green Rhino native rig, normal size even during Titan Rampage, and cycle the Ranger Primary plus the currently equipped Secondary in simplified clone-safe forms. The Ranger signature is blocked during Titan Rampage, matching Knight Titan's clone restriction. Old Einherjar Echo runtime/code/charge HUD is removed. Cleanup and syntax audit included. -->
 <!-- V23.03.14 Ranger Defensive Whirlwind: removes Freight Train Charge and replaces that Ranger Secondary slot with Cloud's Defensive Whirlwind combat behavior. The Ranger version reuses the existing Knight/Cloud whirlwind tuning and visual helpers: the same round-scaled active duration, 0.22s damage pulses, outward knockback, stagger, projectile deflection, layered sword/shield-style spin arcs, activation flare and ending guard burst. Ranger Secondary rules remain authoritative, so this version has zero post-use cooldown and can restart immediately while Secondary is held once the current Whirlwind duration ends. The same 0.55 movement multiplier applies while spinning. Titan Rampage scales Whirlwind radius/damage with the giant form but still uses only the equipped Secondary. Green Rhino's clean model-fit wrapper now receives the spin instead of rotating the native-rigged gameplay root. Old Freight Train trigger/update/runtime/dispatch code is removed. Cleanup and syntax audit included. -->
 <!-- V23.03.13 Armageddon Super Meteor Barrage: replaces Armageddon's custom low-poly stone rain and single final meteor with the Mage's actual Super Meteor visual system. After the Ranger's existing off-screen leap, center crash and 8-second map-wide stun, Mage-style Super Meteors repeatedly fall across the arena for 10 full seconds using the same giant meteor mesh, lava wire shell, aura, flame ring, fire trail, warning marker, orange atmosphere, impact flash, shock rings, molten debris, crater and surviving-enemy burn aura as Super Meteor. Armageddon meteor impacts instantly eliminate most normal enemies inside the enormous Super Meteor radius; any survivor is stunned for 3 seconds and burned for 5 seconds, including bosses. Bosses remain protected from one-shot damage. The old Armageddon stone geometry/material pools, stonefall code and 85%-map final meteor implementation are removed. Cleanup and syntax audit included. -->
@@ -1637,7 +1638,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.03.15 - Ranger Round Table Clones';
+const GAME_VERSION='23.03.16 - Clean Gamma Leap Arc';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -23855,7 +23856,7 @@ function triggerRhinoGammaLeap(w){
   dashActive=false;dashTimer=0;
   const start=player.position.clone(),dir=rhinoWBForward();let dist=Math.min(w.range||10,10);const target=findNearestEnemy(14);let end;
   if(target){const dv=new THREE.Vector3(target.position.x-start.x,0,target.position.z-start.z);if(dv.length()>.001)dv.normalize();dist=Math.min(dist,Math.max(4,Math.hypot(target.position.x-start.x,target.position.z-start.z)));end=start.clone().addScaledVector(dv,dist);}else end=start.clone().addScaledVector(dir,dist);
-  end.y=player.position.y;const control=start.clone().lerp(end,.5);control.y=start.y+4.35;
+  end.y=player.position.y;const control=start.clone().lerp(end,.5);control.y=start.y+5.25;
   r.gamma={t:0,dur:1.30,start,control,end,baseScale:player.scale.clone(),damage:w.damage||2.4,radius:w.radius||6};
   invincibleTimer=Math.max(invincibleTimer||0,1.42);if(player.userData.playKayClip)player.userData.playKayClip('leap',true,false,1.30);toast('GAMMA LEAP');return true;
 }
@@ -23867,7 +23868,10 @@ function rhinoWBShatteredGround(center,radius){
 function updateRhinoGammaLeap(dt){
   const r=rhinoRuntime;if(r.gammaCooldown>0)r.gammaCooldown=Math.max(0,r.gammaCooldown-dt);const s=r.gamma;if(!s)return;s.t+=dt;const u=Math.min(1,s.t/s.dur),v=1-u;
   player.position.set(v*v*s.start.x+2*v*u*s.control.x+u*u*s.end.x,v*v*s.start.y+2*v*u*s.control.y+u*u*s.end.y,v*v*s.start.z+2*v*u*s.control.z+u*u*s.end.z);
-  const air=Math.sin(Math.PI*u);player.scale.set(s.baseScale.x*(1+.16*air),s.baseScale.y*(1-.40*air),s.baseScale.z*(1+.16*air));player.rotation.x=-.15*air;
+  // Keep the imported Ranger visually solid in the air. The jump itself is
+  // entirely the physical Bezier translation; no squash/stretch or warp tilt.
+  player.scale.copy(s.baseScale);
+  player.rotation.x=0;
   if(u>=1){
     player.position.copy(s.end);player.scale.copy(s.baseScale);player.rotation.x=0;
     const hits=rhinoWBRadial(s.end,s.radius,s.damage,10);
