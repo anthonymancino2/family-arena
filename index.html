@@ -1,3 +1,4 @@
+<!-- V23.02.00 Endless Enemy + Boss Progression: rebuilds survival progression without changing hero kits. Live survival remains uncapped beyond Round 50 (the Round Select menu still intentionally tops out at 50 for practice starts). Enemy counts now grow on a sustainable endless curve instead of +10 forever, normal-enemy HP/speed/attack cadence scale smoothly by round, and later rounds progressively favor Runners, Spitters, Brutes and Shadows. Every 5th round is a boss round: one dedicated boss spawns first, grows harder every boss tier through HP, movement, attack cadence and ranged pressure, and displays a live top-center boss health bar. Bosses have global per-hit protection: any single standard damage event is capped at 8% max HP, guaranteeing that a healthy boss cannot be one-hit killed. Boss rounds still include normal enemies, bosses count toward the round target, and all progression formulas continue indefinitely. -->
 <!-- V22.27.21 Primal Rage Giant Focus: Primal Rage is rebuilt around Aesir herself rather than impact effects. Activation now creates one stun-only shockwave with zero damage and zero knockback, then Aesir becomes exactly 3x her normal size for the full 15 seconds. Automatic burn zones, repeated area damage, random enemy damage pulses, damaging activation, and damaging expiration burst are removed. While transformed, Primary and Secondary attacks gain 50% damage and retain the existing faster attack cadence; only Primary and Secondary combat is allowed, so the Ability/Ultimate special routes and Berserker Kin signature are blocked until Primal Rage ends. The visual aura is reduced to a restrained foot-level rage ring so the enlarged avatar remains the clear visual focus. -->
 <!-- V22.27.20 Primal Rage Titan Form: Primal Rage only. Aesir now grows to the exact Guardian Titan size multiplier (5x) for the full 15-second transformation, with world-space rage aura rings, rising flame/energy columns, heavier activation and ending pulses, and extra visual accents on attacks while enraged. The transformation restores Aesir to her normal avatar scale when it expires or runtime state is reset. Existing Primal Rage burn-zone gameplay, damage pulses, cooldown, and every other move remain unchanged. -->
 <!-- V22.27.19 Primal Rage Titan Duration: changes only Primal Rage's active transformation time to exactly match the Knight Guardian Titan buffDuration of 15 seconds. The old 6.2-second runtime timer is now 15.0 seconds and the ability description is updated accordingly. No Primal Rage visual/size transformation has been added yet in this increment; all other moves are unchanged. -->
@@ -618,6 +619,17 @@ only as an emergency visual fallback if the native fox asset fails.
     background:rgba(44,18,64,0.78);border:1.5px solid rgba(205,126,255,0.78);
     border-radius:12px;padding:6px 11px;font-weight:900;font-size:12px;color:#f0d5ff;
     letter-spacing:.035em;box-shadow:0 0 10px rgba(172,74,255,0.22);}
+  .bossHealthHud{position:absolute;top:calc(101px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
+    width:min(58vw,460px);display:none;pointer-events:none;z-index:8;text-align:center;}
+  .bossHealthHud.show{display:block;}
+  .bossHealthName{font-size:11px;font-weight:1000;letter-spacing:.08em;color:#fff0f1;
+    text-shadow:0 2px 5px #000;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .bossHealthTrack{height:13px;border-radius:9px;background:rgba(24,2,8,.88);
+    border:2px solid rgba(255,203,211,.88);overflow:hidden;box-shadow:0 0 15px rgba(255,48,87,.48);}
+  .bossHealthFill{height:100%;width:100%;transform-origin:left center;
+    background:linear-gradient(90deg,#ff2449,#ff724d,#ffd38a);transition:width .10s linear;
+    box-shadow:0 0 10px rgba(255,107,87,.9);}
+  .bossHealthText{font-size:10px;font-weight:900;color:#ffdce2;margin-top:3px;text-shadow:0 1px 3px #000;}
   .enemyRadar{position:absolute;top:calc(204px + env(safe-area-inset-top));left:14px;width:92px;height:92px;border-radius:50%;background:rgba(5,12,22,.62);border:2px solid rgba(255,255,255,.38);box-shadow:0 0 14px rgba(0,0,0,.4);pointer-events:none;}
   /* Landscape phones: the left info stack (hearts/tokens/weapon/passive/
      enemy count) is text-width, not a fixed column, so it can't safely
@@ -1399,6 +1411,11 @@ only as an emergency visual fallback if the native fox asset fails.
         <div class="weaponPill" id="weaponPill">Pistol</div>
         <div class="weaponPill passivePill" id="passivePill">Passive</div>
         <div class="enemyCountPill" id="enemyCountPill">ENEMIES 0</div>
+        <div class="bossHealthHud" id="bossHealthHud">
+          <div class="bossHealthName" id="bossHealthName">BOSS</div>
+          <div class="bossHealthTrack"><div class="bossHealthFill" id="bossHealthFill"></div></div>
+          <div class="bossHealthText" id="bossHealthText">100%</div>
+        </div>
         <canvas class="enemyRadar" id="enemyRadar" width="184" height="184"></canvas>
         <div class="invinciblePill" id="invinciblePill">🛡 <span id="invincibleTime">0</span>s</div>
         <div class="toast" id="toast"></div>
@@ -1515,7 +1532,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.01.01 - Ranger Impact Fix';
+const GAME_VERSION='23.02.00 - Endless Enemy Boss Progression';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -1997,9 +2014,14 @@ function clampStartRound(r){
 //   R1 = 4, R2 = 5, R3 = 6, then +10 every round after that.
 function killTargetForRound(r){
   const n = Math.max(1, Math.floor(Number(r)) || 1);
+  // Endless survival needs difficulty to come from enemy quality as well as
+  // quantity. This keeps late rounds challenging without demanding 500-1000
+  // kills per round on a phone.
   if(n === 1) return 4;
-  if(n <= 3) return 3 + n;
-  return 6 + (n - 3) * 10;
+  if(n <= 3) return 3 + n;             // 4, 5, 6
+  if(n <= 20) return 10 + (n - 4) * 4; // R4=10, R20=74
+  if(n <= 50) return 74 + (n - 20) * 2;// R50=134
+  return 134 + (n - 50);               // R51+=135, 136... forever
 }
 
 // Overall score system. Every completed round contributes survival points,
@@ -2805,14 +2827,45 @@ const ZOMBIE_ARCHETYPES = {
   runner:{label:'Runner', hp:0.72, speed:1.72, scale:0.82, color:0xffd45e, glow:0x4d2600},
   brute:{label:'Brute', hp:3.1, speed:0.62, scale:1.42, color:0xef6a5b, glow:0x4a0904},
   spitter:{label:'Spitter', hp:1.15, speed:0.78, scale:0.96, color:0x59e9c2, glow:0x003f34},
-  shadow:{label:'Shadow', hp:1.45, speed:1.18, scale:1.02, color:0xb985e8, glow:0x3b0758}
+  shadow:{label:'Shadow', hp:1.45, speed:1.18, scale:1.02, color:0xb985e8, glow:0x3b0758},
+  boss:{label:'Boss', hp:1.0, speed:0.72, scale:1.72, color:0xff425c, glow:0x6b0014}
 };
+
+function bossRoundFor(r=round){
+  const n=Math.max(1,Math.floor(Number(r)||1));
+  return n%5===0;
+}
+function bossTierForRound(r=round){
+  return Math.max(1,Math.floor(Math.max(5,Number(r)||5)/5));
+}
+function bossNameForRound(r=round){
+  const names=['Grave Warden','Rotfang Alpha','Plague Colossus','Void Reaper','Bone Tyrant',
+               'Dread Behemoth','Night Sovereign','Ruin Bringer','Abyss Monarch','Deathless King'];
+  const tier=bossTierForRound(r);
+  const base=names[(tier-1)%names.length];
+  const cycle=Math.floor((tier-1)/names.length);
+  return cycle>0 ? `${base} · Ascendant ${cycle+1}` : base;
+}
+function enemyProgressForRound(r=round){
+  const n=Math.max(1,Math.floor(Number(r)||1));
+  // HP continues climbing forever. Speed and attack cadence are capped so
+  // late-game difficulty does not turn into physically unreadable teleporting.
+  const hpMult=1 + Math.min(2.4,(n-1)*0.045) + Math.max(0,n-50)*0.025;
+  const speedMult=1 + Math.min(0.75,(n-1)*0.018);
+  const attackCooldownMult=Math.max(0.58,1-(n-1)*0.008);
+  return {hpMult,speedMult,attackCooldownMult};
+}
 function chooseZombieArchetype(){
-  const r=Math.random();
+  const p=Math.random();
+  // The roster itself progresses: advanced enemies become a larger share of
+  // every wave while Walkers slowly become the minority.
   if(round<2) return 'walker';
-  if(round<4) return r<0.72?'walker':'runner';
-  if(round<6) return r<0.48?'walker':r<0.72?'runner':r<0.88?'spitter':'brute';
-  return r<0.34?'walker':r<0.58?'runner':r<0.80?'spitter':'brute';
+  if(round<4) return p<0.70?'walker':'runner';
+  if(round<6) return p<0.45?'walker':p<0.75?'runner':p<0.90?'spitter':'brute';
+  if(round<10) return p<0.30?'walker':p<0.55?'runner':p<0.75?'spitter':p<0.90?'brute':'shadow';
+  if(round<20) return p<0.20?'walker':p<0.42?'runner':p<0.64?'spitter':p<0.84?'brute':'shadow';
+  if(round<35) return p<0.12?'walker':p<0.30?'runner':p<0.53?'spitter':p<0.75?'brute':'shadow';
+  return p<0.08?'walker':p<0.24?'runner':p<0.48?'spitter':p<0.73?'brute':'shadow';
 }
 function styleZombieArchetype(z){
   const a=ZOMBIE_ARCHETYPES[z.userData.archetype]||ZOMBIE_ARCHETYPES.walker;
@@ -3020,7 +3073,8 @@ function renderLevelUnlockNotice(level){
   }
 }
 const MAX_CONCURRENT_ZOMBIES = 30; // hard cap on simultaneous zombies, regardless of round target
-let zombiesRemainingToSpawn = 0;   // queued zombies still owed this round, fed in as others die
+let zombiesRemainingToSpawn = 0;   // queued enemies still owed this round, fed in as others die
+let bossSpawnPending = false;       // every fifth round reserves the first spawn slot for its boss
 let enemySpawnRetryTimer = null;    // one shared retry timer prevents failed spawn attempts from piling up
 // ---- Reusable hero progression definitions. Each hero can independently
 // control its starting bonuses and how much each between-round choice grants.
@@ -12467,8 +12521,8 @@ function enemyEntryPointBlocked(x,z,clearance=0.7){
   return false;
 }
 function findEnemySpawnPosition(archetype){
-  const safeRadius = archetype==='brute' ? 18 : 14;
-  const clearance = archetype==='brute' ? 1.05 : 0.75;
+  const safeRadius = archetype==='boss' ? 20 : (archetype==='brute' ? 18 : 14);
+  const clearance = archetype==='boss' ? 1.45 : (archetype==='brute' ? 1.05 : 0.75);
   const players = livingPlayers();
   const facing = player ? player.rotation.y : 0;
 
@@ -12508,7 +12562,8 @@ function fillEnemySlotsFromQueue(){
 function spawnZombie(){
   const zombieRoster = AVATAR_TYPES.filter(t=>t!=='cloud'&&t!=='zulu'&&t!=='wolverine');
   const zombieCharacter = zombieRoster[Math.floor(Math.random()*zombieRoster.length)];
-  const archetype = chooseZombieArchetype();
+  const spawningBoss=!!bossSpawnPending;
+  const archetype = spawningBoss ? 'boss' : chooseZombieArchetype();
   const spec = ZOMBIE_ARCHETYPES[archetype];
   const spawnPos=findEnemySpawnPosition(archetype);
 
@@ -12519,23 +12574,39 @@ function spawnZombie(){
   z.position.set(spawnPos.x, 0, spawnPos.z);
   z.userData.spawnPending=true;
   z.visible=false;
-  const roundHp = 2 + Math.floor(round/3);
-  z.userData.hp = roundHp * spec.hp;
-  z.userData.maxHp = z.userData.hp;
-  z.userData.speed = (1.0 + Math.random()*0.35 + Math.max(0, round-5)*0.13) * spec.speed;
-  z.userData.attackCooldown = archetype==='spitter' ? 1.2+Math.random() : 0;
-  z.userData.specialTimer = archetype==='shadow' ? 1.8+Math.random()*1.5 : 0;
+  const progress=enemyProgressForRound(round);
+  const roundHp = 2 + Math.floor(round/4);
+  if(archetype==='boss'){
+    const tier=bossTierForRound(round);
+    const bossHp=Math.max(60,roundHp*progress.hpMult*(11+tier*1.2));
+    z.userData.hp=bossHp;
+    z.userData.maxHp=bossHp;
+    z.userData.speed=spec.speed*progress.speedMult*(1+Math.min(.25,tier*.015));
+    z.userData.attackCooldown=Math.max(.65,1.50-tier*.05);
+    z.userData.specialTimer=Math.max(1.6,4.3-tier*.12);
+    z.userData.bossTier=tier;
+    z.userData.bossName=bossNameForRound(round);
+    z.userData.isRoundBoss=true;
+  }else{
+    z.userData.hp = roundHp * spec.hp * progress.hpMult;
+    z.userData.maxHp = z.userData.hp;
+    z.userData.speed = (1.0 + Math.random()*0.25) * spec.speed * progress.speedMult;
+    z.userData.attackCooldown = archetype==='spitter' ? (1.2+Math.random())*progress.attackCooldownMult : 0;
+    z.userData.specialTimer = archetype==='shadow' ? (1.8+Math.random()*1.5)*progress.attackCooldownMult : 0;
+  }
   z.userData.archetype = archetype;
   z.userData.zombieCharacter = zombieCharacter;
-  z.userData.baseScale = spec.scale;
+  const bossScale=archetype==='boss' ? Math.min(2.25,spec.scale+(bossTierForRound(round)-1)*.035) : spec.scale;
+  z.userData.baseScale = bossScale;
   z.userData.lastSafePosition = z.position.clone();
   z.userData.stuckTimer = 0;
   z.userData.spawnedAt = performance.now();
-  z.scale.setScalar(spec.scale);
+  z.scale.setScalar(z.userData.baseScale);
   enableShadows(z, false);
-  addContactShadow(z, 0.45*spec.scale);
+  addContactShadow(z, 0.45*z.userData.baseScale);
   scene.add(z);
   zombies.push(z);
+  if(spawningBoss) bossSpawnPending=false;
   // Royal Onslaught includes all enemies created during its first 3 seconds,
   // even while their spawn warning is still resolving.
   if(knightRuntime && knightRuntime.royalOnslaughtEligibleIds &&
@@ -12543,16 +12614,17 @@ function spawnZombie(){
     knightRuntime.royalOnslaughtEligibleIds.add(z.uuid);
     if(typeof knightRoyalOnslaughtMarkEnemy==='function') knightRoyalOnslaughtMarkEnemy(z);
   }
-  const warnMat=new THREE.MeshBasicMaterial({color:archetype==='brute'?0xff7a35:0xffd84a,transparent:true,opacity:.9,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const warnColor=archetype==='boss'?0xff234d:(archetype==='brute'?0xff7a35:0xffd84a);
+  const warnMat=new THREE.MeshBasicMaterial({color:warnColor,transparent:true,opacity:.9,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
   const warn=new THREE.Mesh(new THREE.RingGeometry(.45,.85,28),warnMat);warn.rotation.x=-Math.PI/2;warn.position.set(z.position.x,.07,z.position.z);scene.add(warn);fx.push({kind:'spawnWarning',mesh:warn,life:.72,maxLife:.72,spin:7});
   setTimeout(()=>{
     if(z.userData.dead||!z.parent) return;
     // The player can move into a warning ring during its delay. Revalidate at
     // the exact reveal moment so a valid warning position never turns into an
     // enemy spawning on top of the player.
-    const revealSafeRadius=archetype==='brute'?18:14;
+    const revealSafeRadius=archetype==='boss'?20:(archetype==='brute'?18:14);
     const tooClose=livingPlayers().some(p=>Math.hypot(z.position.x-p.position.x,z.position.z-p.position.z)<revealSafeRadius);
-    if(tooClose||enemyEntryPointBlocked(z.position.x,z.position.z,archetype==='brute'?1.05:.75)){
+    if(tooClose||enemyEntryPointBlocked(z.position.x,z.position.z,archetype==='boss'?1.45:(archetype==='brute'?1.05:.75))){
       const replacement=findEnemySpawnPosition(archetype);
       if(replacement){
         z.position.set(replacement.x,0,replacement.z);
@@ -12563,7 +12635,7 @@ function spawnZombie(){
         setTimeout(()=>{
           if(z.userData.dead||!z.parent) return;
           const stillTooClose=livingPlayers().some(p=>Math.hypot(z.position.x-p.position.x,z.position.z-p.position.z)<revealSafeRadius);
-          if(stillTooClose){scene.remove(z);disposeGroup(z);zombies=zombies.filter(o=>o!==z);zombiesRemainingToSpawn++;scheduleEnemySpawnRetry();return;}
+          if(stillTooClose){if(z.userData.isRoundBoss)bossSpawnPending=true;if(z.userData.isRoundBoss)bossSpawnPending=true;scene.remove(z);disposeGroup(z);zombies=zombies.filter(o=>o!==z);zombiesRemainingToSpawn++;scheduleEnemySpawnRetry();return;}
           z.visible=true;z.userData.spawnPending=false;spawnBurst(z.position.x,z.position.y+.45,z.position.z,14,FX_MAT_ZOMBIE,3.2);
         },520);
         return;
@@ -12576,7 +12648,14 @@ function spawnZombie(){
   },650);
   addXray(z, spec.color);
   setTimeout(()=>{if(!z.userData.dead)styleZombieArchetype(z);},180);
-  if(archetype!=='walker') spawnBurst(z.position.x,z.position.y+.5,z.position.z,8,FX_MAT_ZOMBIE,2.5);
+  if(archetype==='boss'){
+    spawnBurst(z.position.x,z.position.y+1.0,z.position.z,28,FX_MAT_SPARK,6.5);
+    triggerCombatShake(13,260);
+    toast(`⚠️ BOSS · ${z.userData.bossName}`);
+  }else if(archetype!=='walker'){
+    spawnBurst(z.position.x,z.position.y+.5,z.position.z,8,FX_MAT_ZOMBIE,2.5);
+  }
+  updateBossHealthHud();
   return true;
 }
 
@@ -12609,6 +12688,8 @@ function clearZombies(){
   if(enemySpawnRetryTimer){clearTimeout(enemySpawnRetryTimer);enemySpawnRetryTimer=null;}
   zombies.forEach(z=>{ scene.remove(z); disposeGroup(z); });
   zombies = [];
+  bossSpawnPending=false;
+  updateBossHealthHud();
   enemyProjectiles.forEach(p=>{scene.remove(p.mesh);disposeGroup(p.mesh);if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}});
   enemyProjectiles=[];
 }
@@ -12657,6 +12738,7 @@ function startRound(){
   // tops up the rest as slots free up, so the total-kills goal for the
   // round stays the same but the concurrent crowd stays render-friendly.
   zombiesRemainingToSpawn = roundKillTarget;
+  bossSpawnPending = bossRoundFor(round);
   fillEnemySlotsFromQueue();
   spawnPowerUps();
   roundStartTime = performance.now();
@@ -12666,7 +12748,9 @@ function startRound(){
   updateEnemyRadar();
   const theme = themeForRound(round, state.themeIndex||0);
   updateHoodedHud();
-  toast('Round '+round+' · Level '+avatarLevel()+' · '+theme.name+' — '+roundKillTarget+' incoming · Mixed undead!');
+  toast(bossRoundFor(round)
+    ? `⚠️ BOSS ROUND ${round} · ${bossNameForRound(round)} · ${roundKillTarget} enemies`
+    : `Round ${round} · Level ${avatarLevel()} · ${theme.name} — ${roundKillTarget} incoming`);
 }
 
 // Round recovery watchdog. Long matches can expose rare cases where an
@@ -12723,6 +12807,7 @@ function recoverRoundIfNeeded(dt){
     const invalid=!z || z.userData.dead || !p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z);
     const escaped=!invalid && Math.hypot(p.x,p.z) > arenaSize+8;
     if(invalid || escaped){
+      if(z&&z.userData&&z.userData.archetype==='boss'&&!z.userData.dead)bossSpawnPending=true;
       if(z){ scene.remove(z); disposeGroup(z); }
       zombies.splice(i,1);
     }
@@ -12730,6 +12815,7 @@ function recoverRoundIfNeeded(dt){
 
   const needed=Math.max(0, roundKillTarget-roundKillsDone-zombies.length);
   if(zombiesRemainingToSpawn < needed) zombiesRemainingToSpawn=needed;
+  if(bossRoundFor(round) && bossSpawnPending && zombiesRemainingToSpawn<=0)zombiesRemainingToSpawn=1;
 
   // Never allow an active round to sit empty. Refill immediately up to the cap.
   fillEnemySlotsFromQueue();
@@ -13208,18 +13294,43 @@ function updateRoundTimerHud(){
   document.getElementById('roundTimerPill').textContent = txt;
 }
 
+function activeRoundBoss(){
+  return zombies.find(z=>z&&z.userData&&!z.userData.dead&&z.userData.archetype==='boss')||null;
+}
+function updateBossHealthHud(){
+  const hud=document.getElementById('bossHealthHud');
+  const name=document.getElementById('bossHealthName');
+  const fill=document.getElementById('bossHealthFill');
+  const txt=document.getElementById('bossHealthText');
+  if(!hud||!name||!fill||!txt)return;
+  const boss=activeRoundBoss();
+  if(!boss){
+    hud.classList.remove('show');
+    fill.style.width='0%';
+    return;
+  }
+  const maxHp=Math.max(1,Number(boss.userData.maxHp)||1);
+  const hp=Math.max(0,Number(boss.userData.hp)||0);
+  const pct=Math.max(0,Math.min(100,hp/maxHp*100));
+  hud.classList.add('show');
+  name.textContent=`☠ ${boss.userData.bossName||'BOSS'} · TIER ${boss.userData.bossTier||bossTierForRound(round)}`;
+  fill.style.width=pct.toFixed(2)+'%';
+  txt.textContent=`${Math.ceil(hp).toLocaleString()} / ${Math.ceil(maxHp).toLocaleString()} HP · ${pct.toFixed(0)}%`;
+}
+
 function updateEnemyCountHud(){
   const pill = document.getElementById('enemyCountPill');
   if(!pill) return;
   const remaining = Math.max(0, roundKillTarget - roundKillsDone);
   pill.textContent = 'ENEMIES ' + remaining;
   pill.setAttribute('aria-label', remaining + ' enemies remaining; ' + zombies.length + ' currently on the map');
+  updateBossHealthHud();
 }
 function updateEnemyRadar(){
   const c=document.getElementById('enemyRadar');if(!c||!player)return;const ctx=c.getContext('2d'),w=c.width,h=c.height,cx=w/2,cy=h/2;
   ctx.clearRect(0,0,w,h);ctx.save();ctx.translate(cx,cy);ctx.strokeStyle='rgba(255,255,255,.22)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,w*.46,0,Math.PI*2);ctx.stroke();
   ctx.fillStyle='#7ff4ff';ctx.beginPath();ctx.moveTo(0,-9);ctx.lineTo(6,7);ctx.lineTo(0,4);ctx.lineTo(-6,7);ctx.closePath();ctx.fill();
-  const scale=(w*.42)/Math.max(18,arenaSize);for(const z of zombies){if(z.userData.dead)continue;const dx=z.position.x-player.position.x,dz=z.position.z-player.position.z;const a=-player.rotation.y;const rx=dx*Math.cos(a)-dz*Math.sin(a),rz=dx*Math.sin(a)+dz*Math.cos(a);const px=Math.max(-w*.42,Math.min(w*.42,-rx*scale)),py=Math.max(-h*.42,Math.min(h*.42,rz*scale));ctx.fillStyle=z.userData.spawnPending?'#ffd84a':(z.userData.archetype==='brute'?'#ff7a35':'#ff4b68');ctx.beginPath();ctx.arc(px,py,z.userData.archetype==='brute'?5:3.5,0,Math.PI*2);ctx.fill();}ctx.restore();
+  const scale=(w*.42)/Math.max(18,arenaSize);for(const z of zombies){if(z.userData.dead)continue;const dx=z.position.x-player.position.x,dz=z.position.z-player.position.z;const a=-player.rotation.y;const rx=dx*Math.cos(a)-dz*Math.sin(a),rz=dx*Math.sin(a)+dz*Math.cos(a);const px=Math.max(-w*.42,Math.min(w*.42,-rx*scale)),py=Math.max(-h*.42,Math.min(h*.42,rz*scale));const type=z.userData.archetype||'walker';ctx.fillStyle=z.userData.spawnPending?'#ffd84a':(type==='boss'?'#ffffff':(type==='brute'?'#ff7a35':'#ff4b68'));ctx.beginPath();ctx.arc(px,py,type==='boss'?7:(type==='brute'?5:3.5),0,Math.PI*2);ctx.fill();if(type==='boss'){ctx.strokeStyle='#ff2449';ctx.lineWidth=2;ctx.stroke();}}ctx.restore();
 }
 
 // ---------------------------------------------------------------------
@@ -29003,6 +29114,14 @@ function bulletBlockedAt(x,y,z){
 function applyBulletDamage(z, dmg){
   if(!z || z.userData.dead) return;
 
+  // Boss integrity rule: no single standard damage event may remove more than
+  // 8% of max HP. A healthy boss therefore always requires at least 13
+  // successful damage events, regardless of player power or giant forms.
+  if(z.userData.archetype==='boss'){
+    const maxHp=Math.max(1,Number(z.userData.maxHp)||Number(z.userData.hp)||1);
+    dmg=Math.max(0,Math.min(Number(dmg)||0,maxHp*.08));
+  }
+
   if(knightIsActive() && knightRuntime.aegisWindow>0 && knightEnemyClass(z)!=='boss'){
     const impact={x:z.position.x,y:z.position.y||0,z:z.position.z};
 
@@ -29020,6 +29139,7 @@ function applyBulletDamage(z, dmg){
   }
 
   z.userData.hp -= dmg;
+  if(z.userData.archetype==='boss')updateBossHealthHud();
 
   // Shared impact response for every hero and weapon. The enemy is pushed
   // away from the player, briefly staggered, and visibly compressed so a
@@ -30303,14 +30423,22 @@ function killZombie(z){
   if(z.arcaneResonanceUntil && performance.now()<z.arcaneResonanceUntil){
     triggerArcaneManaRupture(z);
   }
+  const wasBoss=z.userData.archetype==='boss';
   z.userData.dead = true;
-  const deathCount=z.userData.archetype==='brute'?22:z.userData.archetype==='shadow'?16:9;
+  const deathCount=wasBoss?42:(z.userData.archetype==='brute'?22:z.userData.archetype==='shadow'?16:9);
   spawnBurst(z.position.x, z.position.y+0.7, z.position.z, deathCount, z.userData.archetype==='shadow'?FX_MAT_SHADOW:FX_MAT_ZOMBIE, z.userData.archetype==='brute'?5:3);
   scene.remove(z);
   disposeGroup(z);
   zombies = zombies.filter(o=>o!==z);
+  if(wasBoss){
+    spawnBurst(z.position.x,z.position.y+1.0,z.position.z,34,FX_MAT_SPARK,7.2);
+    triggerCombatShake(20,360);
+    navigator.vibrate&&navigator.vibrate([70,35,120]);
+    toast(`☠ ${z.userData.bossName||'BOSS'} DEFEATED`);
+  }
   kills++; roundKillsDone++;
   updateEnemyCountHud();
+  updateBossHealthHud();
   updateEnemyRadar();
   if(state.avatarType==='hooded'){spawnSoulOrb(z.position);hoodedUltimateCharge=Math.min(100,hoodedUltimateCharge+4);passiveState.shadowstepTimer=passiveForAvatar().killMoveDuration||0;updateHoodedHud();}
   if(archerIsActive()){
@@ -30970,6 +31098,16 @@ function update(dt){
       }
 
       let moveDir=1;
+      if(type==='boss'){
+        const tier=z.userData.bossTier||bossTierForRound(round);
+        if(z.userData.specialTimer<=0 && dist<13.5){
+          spawnEnemyShot(z);
+          z.userData.specialTimer=Math.max(1.6,4.3-tier*.12);
+          if(z.userData.playKayClip)z.userData.playKayClip('1H_Melee_Attack_Chop',true,true,.42);
+          spawnBurst(z.position.x,z.position.y+1.0,z.position.z,12,FX_MAT_ENEMY_SHOT,3.4);
+          triggerCombatShake(4,90);
+        }
+      }
       if(type==='spitter'){
         if(dist<3.4) moveDir=-1; else if(dist<6.2) moveDir=0;
         if(dist<8.5 && z.userData.attackCooldown<=0){
@@ -30983,11 +31121,11 @@ function update(dt){
         let mx=dx/dist,mz=dz/dist;
         // Stable per-enemy strafe/wander keeps the horde from moving in identical lines.
         const now=performance.now()*.001;
-        const swayBase=type==='runner'?.45:.16;
+        const swayBase=type==='boss'?.08:(type==='runner'?.45:.16);
         const sway=Math.sin(now*(type==='runner'?8:2.2)+z.id*.73)*swayBase;
         const sideX=-mz*sway,sideZ=mx*sway;
         const sep=enemySeparation(z);
-        const sepWeight=type==='brute'?.55:1.05;
+        const sepWeight=type==='boss'?.35:(type==='brute'?.55:1.05);
         mx+=sideX+sep.x*sepWeight;mz+=sideZ+sep.z*sepWeight;
         let ml=Math.hypot(mx,mz)||1;mx/=ml;mz/=ml;
 
@@ -31024,12 +31162,20 @@ function update(dt){
       }
 
       const verticalGap=Math.abs(target.position.y-z.position.y);
-      const hitRange=(type==='brute'?1.28:.9)+(target===player?knightGuardianGiantHitRadius():0);
-      if(dist<hitRange && verticalGap<1.0 && z.userData.attackCooldown<=0){
-        z.userData.attackCooldown=type==='brute'?1.65:1.0;
-        const attackClip=type==='brute'?'2H_Melee_Attack_Spin':'1H_Melee_Attack_Chop';
-        if(z.userData.playKayClip) z.userData.playKayClip(attackClip,true,true,type==='brute'?.55:.36);
-        if(type==='brute'){spawnBurst(z.position.x,z.position.y+.2,z.position.z,16,FX_MAT_SPARK,4.5);triggerCombatShake(10,150);}
+      const hitRange=(type==='boss'?1.65:(type==='brute'?1.28:.9))+(target===player?knightGuardianGiantHitRadius():0);
+      if(dist<hitRange && verticalGap<1.35 && z.userData.attackCooldown<=0){
+        const progress=enemyProgressForRound(round);
+        z.userData.attackCooldown=type==='boss'
+          ? Math.max(.65,1.50-(z.userData.bossTier||1)*.05)
+          : (type==='brute'?1.65:1.0)*progress.attackCooldownMult;
+        const attackClip=(type==='boss'||type==='brute')?'2H_Melee_Attack_Spin':'1H_Melee_Attack_Chop';
+        if(z.userData.playKayClip) z.userData.playKayClip(attackClip,true,true,type==='boss'?.62:(type==='brute'?.55:.36));
+        if(type==='boss'){
+          spawnBurst(z.position.x,z.position.y+.45,z.position.z,22,FX_MAT_SPARK,5.8);
+          triggerCombatShake(14,190);
+        }else if(type==='brute'){
+          spawnBurst(z.position.x,z.position.y+.2,z.position.z,16,FX_MAT_SPARK,4.5);triggerCombatShake(10,150);
+        }
         if(target.userData&&target.userData.isArcaneEcho){
           // Same survivability model as Knight clones: enemy attacks can connect
           // visually, but the clone is never damaged or removed.
