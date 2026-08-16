@@ -1,6 +1,7 @@
+<!-- V23.03.10 Equipped Titan Secondary + Steerable Long Charge: Titan Rampage no longer cycles through all Ranger Secondaries. While transformed, the Secondary button uses only the Secondary actually equipped before the match, with Titan damage/radius scaling applied to that move. Freight Train Charge distance is doubled from 6 to 12 units and rebuilt as a steerable heavy charge: it no longer follows one frozen activation direction. The charge advances incrementally each frame while its travel vector eases toward the Ranger's current facing, allowing responsive left/right steering without twitchy snapping. Duration is 1.45s to preserve heavyweight motion across the longer distance. Dragged enemies follow the curved charge path in stable lanes. Removed the now-unused Titan Secondary rotation index/helpers and stale NEXT-move toast logic. Cleanup and syntax audit included. -->
 <!-- V23.03.09 Ranger Titan Rotation Ultimate: replaces The Shattered Domain with TITAN RAMPAGE. The Green Rhino Ranger grows to the exact same size multiplier as Knight Guardian Titan (5x), uses the same 15-second active duration, and dynamically reuses the Knight Titan cooldown curve so both transformations stay synchronized if Knight tuning changes later. During Titan Rampage the Ranger can still use Twin Boomerang Primary, while every Secondary press ignores the equipped Secondary and rotates Stormbreaker Overdrive -> Gamma Leap -> Freight Train Charge -> repeat. Giant combat uses the Knight Titan's 5x damage multiplier and 2.6x combat reach/radius standard; movement timing itself remains heavy rather than becoming 2.6x faster. The old Shattered Domain meshes/runtime/update code are removed, legacy saves keep the same rhino_shattered_domain ID so no migration is required, and Titan scale/helper presentation is fully restored on expiration/reset. Cleanup and syntax audit included. -->
 <!-- V23.03.08 Full Arena Waves + Heavy Secondary Motion: fixes Crashing Bolt's kill wave stopping halfway across the arena. arenaSize is already the playable radius (~30), but the prior helper incorrectly multiplied it by 0.5, capping the wave near 15. The wave now travels slightly beyond the real playable boundary and uses a swept-radius contact test so enemies cannot be skipped between frames. Gamma Leap is slowed to a deliberate 1.30s arc. Freight Train Charge is slowed to 0.90s for its six-unit drive and no longer rotates the entire gameplay player root; only the Green Rhino model-fit wrapper receives a restrained forward lean, preventing the native rig from visually breaking. Dragged enemies ease into stable lanes instead of being hard-teleported into one overlapping cluster. Both moves keep zero cooldown/no post-move delay and receive stronger end impacts. Cleanup removes stale fast-timing comments/logic. -->
-<!-- V23.03.07 2s Landing Stun + Heavy Zero-Delay Secondaries: every World-Breaker Crashing Bolt landing now immediately stuns every enemy already present on the map for a full 2.0 seconds, including bosses, before that cycle's kill wave begins. Crashing Bolt wave travel time is reduced from ~5 seconds to exactly ~3 seconds from center to playable edge; the four leap/crash cycles remain fully sequential and numbered. Green Rhino Ranger Secondaries keep zero cooldown, and their runtime no longer writes hidden post-move cooldown values: holding Secondary starts the next activation on the very next eligible gameplay frame after the current move finishes. The individual moves are deliberately NOT sped up into twitch attacks: Stormbreaker Overdrive uses heavier 17/20-unit travel speeds and ends in a guarded catch shock burst; Gamma Leap uses a 1.30s weighted vault and ends with a layered tectonic impact; Freight Train Charge uses a deliberate 0.90s six-unit drive and ends in a heavy forward rupture, radial burst and stronger camera stop. Cleanup removes stale 1.5s runtime cooldown remnants and old 5-second wave wording. -->
+<!-- V23.03.07 2s Landing Stun + Heavy Zero-Delay Secondaries: every World-Breaker Crashing Bolt landing now immediately stuns every enemy already present on the map for a full 2.0 seconds, including bosses, before that cycle's kill wave begins. Crashing Bolt wave travel time is reduced from ~5 seconds to exactly ~3 seconds from center to playable edge; the four leap/crash cycles remain fully sequential and numbered. Green Rhino Ranger Secondaries keep zero cooldown, and their runtime no longer writes hidden post-move cooldown values: holding Secondary starts the next activation on the very next eligible gameplay frame after the current move finishes. The individual moves are deliberately NOT sped up into twitch attacks: Stormbreaker Overdrive uses heavier 17/20-unit travel speeds and ends in a guarded catch shock burst; Gamma Leap uses a 1.30s weighted vault and ends with a layered tectonic impact; Freight Train Charge uses a deliberate 1.45s twelve-unit steerable drive and ends in a heavy forward rupture, radial burst and stronger camera stop. Cleanup removes stale 1.5s runtime cooldown remnants and old 5-second wave wording. -->
 <!-- V23.03.06 Zero Secondary Cooldown + Four Leap Waves: removes cooldown entirely from all three Green Rhino Ranger Secondary attacks. Hold Secondary now immediately starts the next use whenever the current move itself finishes, with no post-move cooldown. Rebuilds World-Breaker Crashing Bolt for unmistakable wave readability: the Ranger dashes to arena center once, then performs FOUR complete leap-and-crash cycles. Each cycle visibly leaps out of view, hangs overhead, descends inside the fiery force field, crashes into center, and launches exactly ONE kill wave. That wave must complete its full ~3-second trip to the playable edge before the next leap begins. Each impact announces WAVE 1/4 through WAVE 4/4. Normal enemies die only when contacted by the moving wave front; bosses remain protected by the existing per-hit cap. Cleanup and syntax audit included. -->
 <!-- V23.03.05 Ranger Cooldowns + Centerfall Crashing Bolt: sets all Green Rhino Ranger Secondary cooldowns to a no cooldown and makes their HUD/loadout metadata show the real cooldown. Rebuilds World-Breaker Crashing Bolt around a center-stage execution: the Ranger first dashes to the exact arena center, then performs a huge vertical leap completely out of view, descends back into center inside a giant fiery energy sphere, and crashes into the floor. The impact launches four total arena-wide circular kill waves (initial wave plus three repeats). Each wave expands slowly from center to the playable edge over ~5 seconds and instantly defeats normal enemies as the wave front touches them; bosses are never one-shot and instead take capped boss-safe wave damage. Waves are staggered so the arena repeatedly clears outward. Adds live Ultimate cooldown text so the player can always see when the equipped Ultimate is ready again. Cleanup and syntax audit included. -->
 <!-- V23.03.04 Hold Auto + Crashing Bolt Spectacle: standardizes all four combat controls around the same iPhone-safe hold behavior. Primary and Secondary keep their existing main-loop retry. The equipped Ultimate/Ability button and the large Signature button now also use persistent pointer ownership plus main-loop retry instead of setInterval/pointerleave behavior, so keeping a finger down automatically casts again the instant the move becomes ready. WORLD-BREAKER CRASHING BOLT receives a major spectacle rebuild: an expanding triple target seal, rotating radial runes, a vertical cyan-green sky column, descending lightning filaments, a visible overhead falling core, impact flash, crater, 12 rising rock spires, three staged shock fronts, radial lightning lances, debris bursts, delayed aftershock damage and a stronger decaying camera rumble. Effects are capped and short-lived for iPhone readability/performance. Other Ranger ultimates and combat balance are unchanged in this increment. -->
@@ -1631,7 +1632,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.03.09 - Ranger Titan Rotation Ultimate';
+const GAME_VERSION='23.03.10 - Equipped Titan Secondary + Steerable Long Charge';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -13708,7 +13709,7 @@ const BARBARIAN_RAGNAROK_WAVE = {id:'barbarian_ragnarok_wave', name:'Primal Axe 
 const RHINO_CRASHING_BOLT = {id:'rhino_crashing_bolt', name:'World-Breaker Crashing Bolt', price:640, avatar:'rhino', unlockLevel:5,
   desc:'Dash to arena center, then perform four complete leap-and-crash cycles. Every crash launches one numbered circular kill wave; each wave takes about 3 seconds to reach the playable edge, and the next leap does not begin until the previous wave is completely finished.'};
 const RHINO_SHATTERED_DOMAIN = {id:'rhino_shattered_domain', name:'Titan Rampage', price:760, avatar:'rhino', unlockLevel:14,
-  desc:'TRANSFORMATION. Grow to the exact same 5x size as Knight Guardian Titan for the same 15-second duration and use the same cooldown curve. Primary remains available. Secondary ignores the equipped move and rotates Stormbreaker Overdrive, Gamma Leap and Freight Train Charge on every activation. Giant attacks use Knight Titan-scaled power and combat reach.'};
+  desc:'TRANSFORMATION. Grow to the exact same 5x size as Knight Guardian Titan for the same 15-second duration and use the same cooldown curve. Primary remains available. Secondary keeps using only the move you actually equipped before the match. Giant attacks use Knight Titan-scaled power and combat reach.'};
 const RHINO_SKY_FATHER = {id:'rhino_sky_father', name:'Wrath of the Sky-Father', price:900, avatar:'rhino', unlockLevel:18,
   desc:'Lock into an overloaded green/cyan state for 3 seconds while twelve lightning bolts rain around the arena, each impact dealing area damage and shaking the camera.'};
 const HERO_ABILITIES = { rhino:[RHINO_CRASHING_BOLT,RHINO_SHATTERED_DOMAIN,RHINO_SKY_FATHER], mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
@@ -23502,7 +23503,7 @@ let rhinoRuntime = {
   gamma:null, gammaCooldown:0,
   freight:null, freightCooldown:0,
   crashing:null, crashingCooldown:0,
-  titanTimer:0, titanCooldown:0, titanSecondaryIndex:0, titanFx:null,
+  titanTimer:0, titanCooldown:0, titanFx:null,
   sky:null, skyCooldown:0,
   echo:null, echoCooldown:0
 };
@@ -23515,7 +23516,7 @@ function rhinoResetRuntime(){
     gamma:null, gammaCooldown:0,
     freight:null, freightCooldown:0,
     crashing:null, crashingCooldown:0,
-    titanTimer:0, titanCooldown:0, titanSecondaryIndex:0, titanFx:null,
+    titanTimer:0, titanCooldown:0, titanFx:null,
     sky:null, skyCooldown:0,
     echo:null, echoCooldown:0
   };
@@ -23791,80 +23792,127 @@ function updateRhinoGammaLeap(dt){
   }
 }
 function triggerRhinoFreightTrain(w){
-  const r=rhinoRuntime;if(r.freight||r.freightCooldown>0)return false;const dir=rhinoWBForward();
-  dashActive=false;dashTimer=0;
-  r.freight={t:0,dur:.90,start:player.position.clone(),dir,drag:new Set(),damage:w.damage||2.8};invincibleTimer=Math.max(invincibleTimer||0,1.02);
-  if(player.userData.playKayClip)player.userData.playKayClip('run',true,false,.90);toast('FREIGHT TRAIN CHARGE');return true;
+  const r=rhinoRuntime;
+  if(r.freight||r.freightCooldown>0)return false;
+
+  const dir=rhinoWBForward().normalize();
+  dashActive=false;
+  dashTimer=0;
+
+  r.freight={
+    t:0,
+    dur:1.45,
+    distance:12,
+    travelled:0,
+    dir:dir.clone(),
+    drag:new Set(),
+    damage:w.damage||2.8
+  };
+
+  invincibleTimer=Math.max(invincibleTimer||0,1.58);
+  if(player.userData.playKayClip)player.userData.playKayClip('run',true,false,1.45);
+  toast('FREIGHT TRAIN CHARGE');
+  return true;
 }
 function updateRhinoFreightTrain(dt){
   const r=rhinoRuntime;
   if(r.freightCooldown>0)r.freightCooldown=Math.max(0,r.freightCooldown-dt);
-  const s=r.freight;if(!s)return;
+  const s=r.freight;
+  if(!s||!player)return;
+
   s.t+=dt;
   const u=Math.min(1,s.t/s.dur);
-  // Smoothstep acceleration/deceleration reads as mass. The old ease-out
-  // covered most of the six units immediately and looked like a teleport.
-  const e=u*u*(3-2*u);
-  player.position.copy(s.start).addScaledVector(s.dir,6*e);
 
-  // Never tilt the gameplay/root group of a native-rigged model. Lean only
-  // the independent fit wrapper so collision, feet placement and skeleton
-  // presentation remain stable.
+  // Read the CURRENT facing every frame. Steering is eased instead of snapped,
+  // so the huge Ranger can bend the charge left/right without looking twitchy.
+  const targetDir=new THREE.Vector3(
+    Math.sin(player.rotation.y),
+    0,
+    Math.cos(player.rotation.y)
+  ).normalize();
+  const steer=1-Math.exp(-5.2*dt);
+  s.dir.lerp(targetDir,steer).normalize();
+
+  // Heavy speed curve across the full 12-unit drive.
+  const weight=0.62+0.58*Math.sin(Math.PI*u);
+  const baseSpeed=s.distance/s.dur;
+  let step=baseSpeed*weight*dt;
+  step=Math.min(step,Math.max(0,s.distance-s.travelled));
+
+  player.position.addScaledVector(s.dir,step);
+  s.travelled+=step;
+
+  // Respect arena boundary while steering.
+  const radial=Math.hypot(player.position.x,player.position.z);
+  const maxR=Math.max(1,(arenaSize||18)-1);
+  if(radial>maxR){
+    player.position.x*=maxR/radial;
+    player.position.z*=maxR/radial;
+  }
+
+  // Visual lean only. Never rotate the native-rigged gameplay root.
   const fit=player.userData&&player.userData.greenRhinoFit;
   if(fit)fit.rotation.x=-THREE.MathUtils.degToRad(10)*Math.sin(Math.PI*u);
 
+  const titanReach=rhinoTitanActive()?rhinoTitanCombatScale():1;
+
+  // Pick up enemies along the curved path.
   for(const z of zombies){
     if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-    if(Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=1.55*(rhinoTitanActive()?rhinoTitanCombatScale():1))
+    if(Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=1.55*titanReach)
       s.drag.add(z);
   }
 
+  // Keep dragged enemies in stable front lanes that rotate with the charge.
   const side=new THREE.Vector3(s.dir.z,0,-s.dir.x);
   let i=0;
   for(const z of s.drag){
     if(z.userData.dead)continue;
     const count=Math.max(1,s.drag.size);
-    const lane=(i-(count-1)/2);
-    const sideOff=lane*.48;
-    const depth=1.55+(Math.abs(lane)%2)*.28;
+    const lane=i-(count-1)/2;
+    const sideOff=lane*.48*titanReach;
+    const depth=(1.55+(Math.abs(lane)%2)*.28)*titanReach;
     const tx=player.position.x+s.dir.x*depth+side.x*sideOff;
     const tz=player.position.z+s.dir.z*depth+side.z*sideOff;
-    // Ease enemies toward organized front lanes instead of teleporting every
-    // frame into one point. This prevents the broken-looking enemy pile.
-    const follow=Math.min(1,dt*9);
+    const follow=Math.min(1,dt*8);
     z.position.x=THREE.MathUtils.lerp(z.position.x,tx,follow);
     z.position.z=THREE.MathUtils.lerp(z.position.z,tz,follow);
     z.userData.hitStun=Math.max(z.userData.hitStun||0,.16);
     i++;
   }
 
-  // Low capped dust beats make the travel itself readable at the slower speed.
   if(Math.random()<dt*13)
     spawnBurst(player.position.x,.12,player.position.z,isMobile?1:2,FX_MAT_SPARK,1.6);
 
-  if(u>=1){
+  if(s.travelled>=s.distance-0.001||u>=1){
     if(fit)fit.rotation.x=0;
+
     for(const z of s.drag){
       if(z.userData.dead)continue;
       applyBulletDamage(z,s.damage*playerStats.power);
-      z.userData.knockbackX=s.dir.x*9;
-      z.userData.knockbackZ=s.dir.z*9;
+      z.userData.knockbackX=s.dir.x*9*titanReach;
+      z.userData.knockbackZ=s.dir.z*9*titanReach;
       z.userData.hitStun=Math.max(z.userData.hitStun||0,.38);
     }
-    const end=player.position.clone();
-    // Heavy stop + forward rupture. This gives the charge a readable payoff
-    // without adding a cooldown or making the travel itself unnaturally fast.
-    const titanReach=rhinoTitanActive()?rhinoTitanCombatScale():1;
+
+    const impact=player.position.clone();
     const titanDamage=rhinoTitanActive()?rhinoTitanDamageMult():1;
-    rhinoWBShock(end,2.6*titanReach,RHINO_WHITE,.18);
-    rhinoWBShock(end,4.6*titanReach,RHINO_GREEN,.34);
-    rhinoWBShock(end,6.2*titanReach,RHINO_PALE,.48);
-    spawnEarthbreaker(end,4.5*titanReach);
-    spawnBurst(end.x,.38,end.z,isMobile?24:38,FX_MAT_SPARK,6.4*titanReach);
-    barbarianShockwave(end,player.rotation.y,{radius:5.0*titanReach,damage:.55*titanDamage,force:9.0*titanReach,stun:.38,color:RHINO_PALE});
+
+    rhinoWBShock(impact,2.6*titanReach,RHINO_WHITE,.18);
+    rhinoWBShock(impact,4.6*titanReach,RHINO_GREEN,.34);
+    rhinoWBShock(impact,6.2*titanReach,RHINO_PALE,.48);
+    spawnEarthbreaker(impact,4.5*titanReach);
+    spawnBurst(impact.x,.38,impact.z,isMobile?24:38,FX_MAT_SPARK,6.4*titanReach);
+    barbarianShockwave(
+      impact,
+      player.rotation.y,
+      {radius:5.0*titanReach,damage:.55*titanDamage,force:9.0*titanReach,stun:.38,color:RHINO_PALE}
+    );
+
     triggerCombatShake(30,390);
     knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.085);
     if(navigator.vibrate)navigator.vibrate([34,18,48]);
+
     r.freight=null;
     r.freightCooldown=0;
   }
@@ -24235,9 +24283,6 @@ function rhinoTitanActive(){
 function rhinoTitanSecondaryBusy(){
   return !!(rhinoRuntime.overdrive||rhinoRuntime.gamma||rhinoRuntime.freight);
 }
-function rhinoTitanSecondaryIds(){
-  return ['stormbreaker_overdrive','gamma_leap','freight_train'];
-}
 function rhinoTitanScaledWeapon(w){
   if(!w||!rhinoTitanActive())return w;
   const out={...w};
@@ -24291,12 +24336,11 @@ function triggerRhinoTitanRampage(){
 
   markUltimateUsed();
   r.titanTimer=rhinoTitanDuration();
-  r.titanSecondaryIndex=0;
-  r.titanFx=rhinoTitanBuildFx();
+    r.titanFx=rhinoTitanBuildFx();
   rhinoTitanSyncScale(true);
 
   // Transformation arrival is deliberately stun-only; combat power comes from
-  // the giant Primary/rotating Secondaries rather than a free activation nuke.
+  // the giant Primary/equipped Secondary rather than a free activation nuke.
   for(const z of zombies){
     if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
     if(Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=7.5){
@@ -24333,28 +24377,11 @@ function updateRhinoTitanRampage(dt){
     if(r.titanFx){rhinoWBDispose(r.titanFx);r.titanFx=null;}
     rhinoTitanSyncScale(false);
     r.titanCooldown=rhinoTitanCooldownDuration();
-    r.titanSecondaryIndex=0;
-    rhinoWBShock(player.position,5.0,RHINO_PALE,.34);
+        rhinoWBShock(player.position,5.0,RHINO_PALE,.34);
     triggerCombatShake(12,210);
     toast('TITAN RAMPAGE ENDED');
   }
 }
-function triggerRhinoTitanRotatingSecondary(){
-  if(!rhinoTitanActive()||rhinoTitanSecondaryBusy())return false;
-  const ids=rhinoTitanSecondaryIds();
-  const c=combatForAvatar();
-  const index=(rhinoRuntime.titanSecondaryIndex||0)%ids.length;
-  const base=c.weapons[ids[index]];
-  if(!base)return false;
-
-  doRhinoAttack(base);
-  rhinoRuntime.titanSecondaryIndex=(index+1)%ids.length;
-
-  const nextName=(c.weapons[ids[rhinoRuntime.titanSecondaryIndex]]||{}).name||'Secondary';
-  toast(`${base.name} · NEXT: ${nextName}`);
-  return true;
-}
-
 function rhinoWBApplyGlow(enable){
   if(!player)return;if(enable){if(player.userData.rhinoGlowBackup)return;const back=[];player.traverse(o=>{if(!o.isMesh||!o.material)return;const mats=Array.isArray(o.material)?o.material:[o.material];for(const m of mats){back.push([m,m.color?m.color.clone():null,m.emissive?m.emissive.clone():null,m.emissiveIntensity]);if(m.color)m.color.setHex(0x5dff8a);if(m.emissive)m.emissive.setHex(0x27ffe0);if('emissiveIntensity'in m)m.emissiveIntensity=1.8;}});player.userData.rhinoGlowBackup=back;}else{const b=player.userData.rhinoGlowBackup||[];for(const [m,c,e,ei] of b){if(c&&m.color)m.color.copy(c);if(e&&m.emissive)m.emissive.copy(e);if(ei!=null&&'emissiveIntensity'in m)m.emissiveIntensity=ei;}player.userData.rhinoGlowBackup=null;}
 }
@@ -24402,8 +24429,7 @@ function rhinoWorldBreakerCleanup(force=false){
   }
   r.overdrive=r.gamma=r.freight=r.crashing=r.sky=r.echo=null;
   r.titanTimer=0;
-  r.titanSecondaryIndex=0;
-}
+  }
 /* Retired V23.01 Rhino Charge / Boomerang Cyclone / Ricochet Bladestorm code removed in V23.03.01. */
 
 /* ---------------------------------------------------------------------
@@ -29769,12 +29795,13 @@ function clearCloudSkybreaker(){
 function doSecondaryShoot(){
   if(!gameRunning)return;
 
-  // Titan Rampage owns the Secondary button. Ignore the player's equipped
-  // Secondary and rotate through all three Ranger tactical attacks.
+  // Titan Rampage keeps the player's actual equipped Secondary.
   if(rhinoTitanActive()){
     if(rhinoTitanSecondaryBusy())return;
+    const titanEquipped=secondaryWeaponForAvatar();
+    if(!titanEquipped)return;
     markSecondaryUsed();
-    triggerRhinoTitanRotatingSecondary();
+    doRhinoAttack(titanEquipped);
     if(player&&player.userData)player.userData.secondaryAttackCooldown=0;
     return;
   }
