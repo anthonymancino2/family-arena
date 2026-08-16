@@ -1,3 +1,4 @@
+<!-- V23.03.09 Ranger Titan Rotation Ultimate: replaces The Shattered Domain with TITAN RAMPAGE. The Green Rhino Ranger grows to the exact same size multiplier as Knight Guardian Titan (5x), uses the same 15-second active duration, and dynamically reuses the Knight Titan cooldown curve so both transformations stay synchronized if Knight tuning changes later. During Titan Rampage the Ranger can still use Twin Boomerang Primary, while every Secondary press ignores the equipped Secondary and rotates Stormbreaker Overdrive -> Gamma Leap -> Freight Train Charge -> repeat. Giant combat uses the Knight Titan's 5x damage multiplier and 2.6x combat reach/radius standard; movement timing itself remains heavy rather than becoming 2.6x faster. The old Shattered Domain meshes/runtime/update code are removed, legacy saves keep the same rhino_shattered_domain ID so no migration is required, and Titan scale/helper presentation is fully restored on expiration/reset. Cleanup and syntax audit included. -->
 <!-- V23.03.08 Full Arena Waves + Heavy Secondary Motion: fixes Crashing Bolt's kill wave stopping halfway across the arena. arenaSize is already the playable radius (~30), but the prior helper incorrectly multiplied it by 0.5, capping the wave near 15. The wave now travels slightly beyond the real playable boundary and uses a swept-radius contact test so enemies cannot be skipped between frames. Gamma Leap is slowed to a deliberate 1.30s arc. Freight Train Charge is slowed to 0.90s for its six-unit drive and no longer rotates the entire gameplay player root; only the Green Rhino model-fit wrapper receives a restrained forward lean, preventing the native rig from visually breaking. Dragged enemies ease into stable lanes instead of being hard-teleported into one overlapping cluster. Both moves keep zero cooldown/no post-move delay and receive stronger end impacts. Cleanup removes stale fast-timing comments/logic. -->
 <!-- V23.03.07 2s Landing Stun + Heavy Zero-Delay Secondaries: every World-Breaker Crashing Bolt landing now immediately stuns every enemy already present on the map for a full 2.0 seconds, including bosses, before that cycle's kill wave begins. Crashing Bolt wave travel time is reduced from ~5 seconds to exactly ~3 seconds from center to playable edge; the four leap/crash cycles remain fully sequential and numbered. Green Rhino Ranger Secondaries keep zero cooldown, and their runtime no longer writes hidden post-move cooldown values: holding Secondary starts the next activation on the very next eligible gameplay frame after the current move finishes. The individual moves are deliberately NOT sped up into twitch attacks: Stormbreaker Overdrive uses heavier 17/20-unit travel speeds and ends in a guarded catch shock burst; Gamma Leap uses a 1.30s weighted vault and ends with a layered tectonic impact; Freight Train Charge uses a deliberate 0.90s six-unit drive and ends in a heavy forward rupture, radial burst and stronger camera stop. Cleanup removes stale 1.5s runtime cooldown remnants and old 5-second wave wording. -->
 <!-- V23.03.06 Zero Secondary Cooldown + Four Leap Waves: removes cooldown entirely from all three Green Rhino Ranger Secondary attacks. Hold Secondary now immediately starts the next use whenever the current move itself finishes, with no post-move cooldown. Rebuilds World-Breaker Crashing Bolt for unmistakable wave readability: the Ranger dashes to arena center once, then performs FOUR complete leap-and-crash cycles. Each cycle visibly leaps out of view, hangs overhead, descends inside the fiery force field, crashes into center, and launches exactly ONE kill wave. That wave must complete its full ~3-second trip to the playable edge before the next leap begins. Each impact announces WAVE 1/4 through WAVE 4/4. Normal enemies die only when contacted by the moving wave front; bosses remain protected by the existing per-hit cap. Cleanup and syntax audit included. -->
@@ -1630,7 +1631,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.03.08 - Full Arena Waves + Heavy Secondary Motion';
+const GAME_VERSION='23.03.09 - Ranger Titan Rotation Ultimate';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -13706,8 +13707,8 @@ const BARBARIAN_RAGNAROK_WAVE = {id:'barbarian_ragnarok_wave', name:'Primal Axe 
 
 const RHINO_CRASHING_BOLT = {id:'rhino_crashing_bolt', name:'World-Breaker Crashing Bolt', price:640, avatar:'rhino', unlockLevel:5,
   desc:'Dash to arena center, then perform four complete leap-and-crash cycles. Every crash launches one numbered circular kill wave; each wave takes about 3 seconds to reach the playable edge, and the next leap does not begin until the previous wave is completely finished.'};
-const RHINO_SHATTERED_DOMAIN = {id:'rhino_shattered_domain', name:'The Shattered Domain', price:760, avatar:'rhino', unlockLevel:14,
-  desc:'Rip a long strip of earth into two physical halves and force them apart, exposing a glowing cyan continental chasm underneath.'};
+const RHINO_SHATTERED_DOMAIN = {id:'rhino_shattered_domain', name:'Titan Rampage', price:760, avatar:'rhino', unlockLevel:14,
+  desc:'TRANSFORMATION. Grow to the exact same 5x size as Knight Guardian Titan for the same 15-second duration and use the same cooldown curve. Primary remains available. Secondary ignores the equipped move and rotates Stormbreaker Overdrive, Gamma Leap and Freight Train Charge on every activation. Giant attacks use Knight Titan-scaled power and combat reach.'};
 const RHINO_SKY_FATHER = {id:'rhino_sky_father', name:'Wrath of the Sky-Father', price:900, avatar:'rhino', unlockLevel:18,
   desc:'Lock into an overloaded green/cyan state for 3 seconds while twelve lightning bolts rain around the arena, each impact dealing area damage and shaking the camera.'};
 const HERO_ABILITIES = { rhino:[RHINO_CRASHING_BOLT,RHINO_SHATTERED_DOMAIN,RHINO_SKY_FATHER], mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
@@ -23012,7 +23013,13 @@ function knightAbilityCooldownInfo(){
       const active=!!rhinoRuntime.crashing;return {label:active?'CRASHING':'CRASH BOLT',cd:rhinoRuntime.crashingCooldown||0,active,activeTime:active?rhinoRuntime.crashing.t:undefined};
     }
     case 'rhino_shattered_domain': {
-      const active=!!rhinoRuntime.domain;return {label:active?'CHASM':'DOMAIN',cd:rhinoRuntime.domainCooldown||0,active,activeTime:active?rhinoRuntime.domain.t:undefined};
+      const active=rhinoTitanActive();
+      return {
+        label:active?'TITAN '+Math.max(0,rhinoRuntime.titanTimer||0).toFixed(1):'TITAN',
+        cd:rhinoRuntime.titanCooldown||0,
+        active,
+        activeTime:active?rhinoRuntime.titanTimer:undefined
+      };
     }
     case 'rhino_sky_father': {
       const active=!!rhinoRuntime.sky;return {label:active?'TEMPEST':'SKY-FATHER',cd:rhinoRuntime.skyCooldown||0,active,activeTime:active?Math.max(0,3-rhinoRuntime.sky.t):undefined};
@@ -23038,8 +23045,9 @@ function triggerBarbarianEquippedAbility(){
   if(!barbarianIsActive())return;
   // Green Ranger owns a dedicated three-ultimate World-Breaker kit.
   if(rhinoIsActive()){
+    if(rhinoTitanActive()&&equippedAbilityId!=='rhino_shattered_domain')return;
     if(equippedAbilityId==='rhino_crashing_bolt')triggerRhinoCrashingBolt();
-    else if(equippedAbilityId==='rhino_shattered_domain')triggerRhinoShatteredDomain();
+    else if(equippedAbilityId==='rhino_shattered_domain')triggerRhinoTitanRampage();
     else if(equippedAbilityId==='rhino_sky_father')triggerRhinoSkyFather();
     return;
   }
@@ -23494,7 +23502,7 @@ let rhinoRuntime = {
   gamma:null, gammaCooldown:0,
   freight:null, freightCooldown:0,
   crashing:null, crashingCooldown:0,
-  domain:null, domainCooldown:0,
+  titanTimer:0, titanCooldown:0, titanSecondaryIndex:0, titanFx:null,
   sky:null, skyCooldown:0,
   echo:null, echoCooldown:0
 };
@@ -23507,7 +23515,7 @@ function rhinoResetRuntime(){
     gamma:null, gammaCooldown:0,
     freight:null, freightCooldown:0,
     crashing:null, crashingCooldown:0,
-    domain:null, domainCooldown:0,
+    titanTimer:0, titanCooldown:0, titanSecondaryIndex:0, titanFx:null,
     sky:null, skyCooldown:0,
     echo:null, echoCooldown:0
   };
@@ -23558,9 +23566,10 @@ function spawnRhinoBoomerang(origin,ang,dist,dmg,inbound,curve=0){
   halo.rotation.x=Math.PI/2;
   b.mesh.add(halo);
 
-  b.mesh.scale.set(1.15,1.15,1.15);
+  const titanVisual=rhinoTitanActive()?2.15:1;
+  b.mesh.scale.set(1.15*titanVisual,1.15*titanVisual,1.15*titanVisual);
   b.pierces=99;
-  b.hitRadius=1.55;
+  b.hitRadius=1.55*(rhinoTitanActive()?rhinoTitanCombatScale():1);
   b.speedMult=1.25;               // lighter and faster than a thrown axe
   b.life=dist/(BARBARIAN_WAVE_SPEED*1.25);
   b.spinSpeed=inbound?-26:26;     // the bullet loop reads this field
@@ -23648,8 +23657,9 @@ function doRhinoBoomerangThrow(w){
   spawnAxeSwingTrail(origin,yaw+0.10*lead,lead,0.92,RHINO_WHITE);
 
   // Feet shockwave: small radius, real damage, keeps crowds off the body.
-  const hits=barbarianShockwave(origin,yaw,{radius:2.6,damage:dmg*0.55,force:4.6,stun:.18,color:RHINO_GREEN});
-  knightShockRing(player.position,1.9,RHINO_PALE,.26);
+  const titanReach=rhinoTitanActive()?rhinoTitanCombatScale():1;
+  const hits=barbarianShockwave(origin,yaw,{radius:2.6*titanReach,damage:dmg*0.55,force:4.6*titanReach,stun:.18,color:RHINO_GREEN});
+  knightShockRing(player.position,1.9*titanReach,RHINO_PALE,.26);
 
   // Release kick. The Ranger's most-used move previously had no camera
   // feedback whatsoever, which is the single biggest reason the class felt
@@ -23722,7 +23732,7 @@ function updateRhinoOverdrive(dt){
   if(knightFxBudget(1)&&Math.random()<dt*24)spawnBurst(axe.position.x,axe.position.y,axe.position.z,1,FX_MAT_SPARK,1.3);
   if(d<.72){
     if(s.phase==='targets'){
-      const z=s.targets[s.index];if(z&&!s.hit.has(z)){s.hit.add(z);applyBulletDamage(z,s.damage*playerStats.power);const f=rhinoWBForward();z.userData.knockbackX=f.x*5;z.userData.knockbackZ=f.z*5;z.userData.hitStun=Math.max(z.userData.hitStun||0,.22);rhinoWBShock(z.position,1.25,RHINO_PALE,.18);triggerCombatShake(6,70);}
+      const z=s.targets[s.index];if(z&&!s.hit.has(z)){s.hit.add(z);applyBulletDamage(z,s.damage*playerStats.power);const f=rhinoWBForward();z.userData.knockbackX=f.x*5;z.userData.knockbackZ=f.z*5;z.userData.hitStun=Math.max(z.userData.hitStun||0,.22);rhinoWBShock(z.position,1.25*(rhinoTitanActive()?rhinoTitanCombatScale():1),RHINO_PALE,.18);triggerCombatShake(6,70);}
       s.index++;if(s.index>=s.targets.length)s.phase='return';
     }else{
       const catchPos=player.position.clone();catchPos.y=.12;
@@ -23730,10 +23740,11 @@ function updateRhinoOverdrive(dt){
       // Heavy guarded catch: the move visibly ENDS instead of silently deleting
       // the returning weapon. This is presentation only except for a light
       // close-range shove to sell the warrior's weight.
-      rhinoWBShock(catchPos,2.1,RHINO_WHITE,.20);
-      rhinoWBShock(catchPos,3.3,RHINO_PALE,.32);
+      const titanReach=rhinoTitanActive()?rhinoTitanCombatScale():1;
+      rhinoWBShock(catchPos,2.1*titanReach,RHINO_WHITE,.20);
+      rhinoWBShock(catchPos,3.3*titanReach,RHINO_PALE,.32);
       spawnBurst(catchPos.x,.55,catchPos.z,isMobile?10:18,FX_MAT_SPARK,3.8);
-      barbarianKnockbackRing(catchPos,3.0,4.2,.18);
+      barbarianKnockbackRing(catchPos,3.0*titanReach,4.2*titanReach,.18);
       triggerCombatShake(12,180);
       if(navigator.vibrate)navigator.vibrate(32);
       r.overdrive=null;
@@ -23804,7 +23815,7 @@ function updateRhinoFreightTrain(dt){
 
   for(const z of zombies){
     if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-    if(Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=1.55)
+    if(Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=1.55*(rhinoTitanActive()?rhinoTitanCombatScale():1))
       s.drag.add(z);
   }
 
@@ -23843,12 +23854,14 @@ function updateRhinoFreightTrain(dt){
     const end=player.position.clone();
     // Heavy stop + forward rupture. This gives the charge a readable payoff
     // without adding a cooldown or making the travel itself unnaturally fast.
-    rhinoWBShock(end,2.6,RHINO_WHITE,.18);
-    rhinoWBShock(end,4.6,RHINO_GREEN,.34);
-    rhinoWBShock(end,6.2,RHINO_PALE,.48);
-    spawnEarthbreaker(end,4.5);
-    spawnBurst(end.x,.38,end.z,isMobile?24:38,FX_MAT_SPARK,6.4);
-    barbarianShockwave(end,player.rotation.y,{radius:5.0,damage:.55,force:9.0,stun:.38,color:RHINO_PALE});
+    const titanReach=rhinoTitanActive()?rhinoTitanCombatScale():1;
+    const titanDamage=rhinoTitanActive()?rhinoTitanDamageMult():1;
+    rhinoWBShock(end,2.6*titanReach,RHINO_WHITE,.18);
+    rhinoWBShock(end,4.6*titanReach,RHINO_GREEN,.34);
+    rhinoWBShock(end,6.2*titanReach,RHINO_PALE,.48);
+    spawnEarthbreaker(end,4.5*titanReach);
+    spawnBurst(end.x,.38,end.z,isMobile?24:38,FX_MAT_SPARK,6.4*titanReach);
+    barbarianShockwave(end,player.rotation.y,{radius:5.0*titanReach,damage:.55*titanDamage,force:9.0*titanReach,stun:.38,color:RHINO_PALE});
     triggerCombatShake(30,390);
     knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.085);
     if(navigator.vibrate)navigator.vibrate([34,18,48]);
@@ -24185,16 +24198,163 @@ function updateRhinoCrashingBolt(dt){
     }
   }
 }
-function triggerRhinoShatteredDomain(){
-  const r=rhinoRuntime;if(r.domain||r.domainCooldown>0)return false;markUltimateUsed();const dir=rhinoWBForward(),yaw=player.rotation.y,g=new THREE.Group();
-  const mat=new THREE.MeshBasicMaterial({color:0x3a332e});const left=new THREE.Mesh(new THREE.BoxGeometry(2.5,.12,10),mat.clone()),right=left.clone(),energy=new THREE.Mesh(new THREE.BoxGeometry(1.1,.05,10),new THREE.MeshBasicMaterial({color:0x2ffff0,transparent:true,opacity:.78,blending:THREE.AdditiveBlending,depthWrite:false}));left.position.x=-1.25;right.position.x=1.25;energy.position.y=-.06;g.add(left,right,energy);g.position.copy(player.position).addScaledVector(dir,5);g.position.y=.03;g.rotation.y=yaw;scene.add(g);
-  r.domain={t:0,g,left,right,energy,hit:false};if(player.userData.playKayClip)player.userData.playKayClip('attack',true,true,.52);toast('THE SHATTERED DOMAIN');return true;
+
+/* ---------------------------------------------------------------------
+   ULTIMATE — TITAN RAMPAGE
+   Reuses Knight Guardian Titan's actual tuning constants rather than copying
+   numbers. If Knight Titan size/duration/cooldown tuning changes later, this
+   transformation follows automatically.
+   --------------------------------------------------------------------- */
+function rhinoTitanSizeMult(){
+  return (typeof KNIGHT_CFG!=='undefined'&&KNIGHT_CFG.guardianQuakeGiant)
+    ? KNIGHT_CFG.guardianQuakeGiant.sizeMult
+    : 5;
 }
-function updateRhinoShatteredDomain(dt){
-  const r=rhinoRuntime;if(r.domainCooldown>0)r.domainCooldown=Math.max(0,r.domainCooldown-dt);const s=r.domain;if(!s)return;s.t+=dt;const u=Math.min(1,s.t/.42),e=1-Math.pow(1-u,3);s.left.position.x=-1.25-1.5*e;s.right.position.x=1.25+1.5*e;s.energy.material.opacity=.58+.20*Math.sin(s.t*18);
-  if(!s.hit&&s.t>.18){s.hit=true;const dir=rhinoWBForward(),origin=player.position.clone();for(const z of zombies){if(!z||!z.userData||z.userData.dead)continue;const rel=new THREE.Vector3(z.position.x-origin.x,0,z.position.z-origin.z);const forward=rel.dot(dir),side=Math.abs(rel.x*dir.z-rel.z*dir.x);if(forward>=0&&forward<=10&&side<=3.2){applyBulletDamage(z,5.0*playerStats.power);z.userData.hitStun=Math.max(z.userData.hitStun||0,.7);}}triggerCombatShake(20,420);}
-  if(s.t>=2.0){rhinoWBDispose(s.g);r.domain=null;r.domainCooldown=20;}
+function rhinoTitanDuration(){
+  return (typeof KNIGHT_CFG!=='undefined'&&KNIGHT_CFG.guardianQuakeGiant)
+    ? KNIGHT_CFG.guardianQuakeGiant.buffDuration
+    : 15;
 }
+function rhinoTitanCooldownDuration(){
+  return typeof knightGuardianQuakeCooldownDuration==='function'
+    ? knightGuardianQuakeCooldownDuration()
+    : 10;
+}
+function rhinoTitanDamageMult(){
+  return (typeof KNIGHT_CFG!=='undefined'&&KNIGHT_CFG.guardianQuakeGiant)
+    ? KNIGHT_CFG.guardianQuakeGiant.damageMult
+    : 5;
+}
+function rhinoTitanCombatScale(){
+  // Match Knight Guardian Titan's approved gameplay reach standard.
+  return 2.6;
+}
+function rhinoTitanActive(){
+  return rhinoIsActive() && (rhinoRuntime.titanTimer||0)>0;
+}
+function rhinoTitanSecondaryBusy(){
+  return !!(rhinoRuntime.overdrive||rhinoRuntime.gamma||rhinoRuntime.freight);
+}
+function rhinoTitanSecondaryIds(){
+  return ['stormbreaker_overdrive','gamma_leap','freight_train'];
+}
+function rhinoTitanScaledWeapon(w){
+  if(!w||!rhinoTitanActive())return w;
+  const out={...w};
+  const dmg=rhinoTitanDamageMult();
+  const reach=rhinoTitanCombatScale();
+  if(Number.isFinite(out.damage))out.damage*=dmg;
+  if(Number.isFinite(out.waveDamage))out.waveDamage*=dmg;
+  if(Number.isFinite(out.radius))out.radius*=reach;
+  if(Number.isFinite(out.range))out.range*=reach;
+  return out;
+}
+function rhinoTitanSyncScale(active=rhinoTitanActive()){
+  if(!player||!rhinoIsActive())return;
+  const base=player.userData.baseAvatarScale||AVATAR_SCALE.rhino||1;
+  const mult=active?rhinoTitanSizeMult():1;
+  const target=base*mult;
+  player.scale.setScalar(target);
+  player.userData.avatarScale=target;
+  player.userData.currentSizeMult=mult;
+
+  // Keep helper rings/shadows at normal world size just like Knight Titan.
+  const inv=mult>1?1/mult:1;
+  if(player.userData.visibilityRing)player.userData.visibilityRing.scale.setScalar(inv);
+  if(player.userData.locator)player.userData.locator.scale.setScalar(inv);
+  if(player.userData.contactShadow)player.userData.contactShadow.scale.setScalar(inv);
+}
+function rhinoTitanBuildFx(){
+  if(!scene||!player)return null;
+  const g=new THREE.Group();
+  const ring1=new THREE.Mesh(
+    new THREE.RingGeometry(2.3,3.0,48),
+    new THREE.MeshBasicMaterial({color:RHINO_GREEN,transparent:true,opacity:.45,
+      side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending})
+  );
+  ring1.rotation.x=-Math.PI/2; ring1.position.y=.08; g.add(ring1);
+  const ring2=new THREE.Mesh(
+    new THREE.RingGeometry(3.2,3.75,48),
+    new THREE.MeshBasicMaterial({color:RHINO_PALE,transparent:true,opacity:.28,
+      side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending})
+  );
+  ring2.rotation.x=-Math.PI/2; ring2.position.y=.10; g.add(ring2);
+  g.position.set(player.position.x,0,player.position.z);
+  scene.add(g);
+  return g;
+}
+function triggerRhinoTitanRampage(){
+  const r=rhinoRuntime;
+  if(!gameRunning||!rhinoIsActive()||!player)return false;
+  if(r.titanTimer>0||r.titanCooldown>0)return false;
+  if(r.crashing||r.sky)return false;
+
+  markUltimateUsed();
+  r.titanTimer=rhinoTitanDuration();
+  r.titanSecondaryIndex=0;
+  r.titanFx=rhinoTitanBuildFx();
+  rhinoTitanSyncScale(true);
+
+  // Transformation arrival is deliberately stun-only; combat power comes from
+  // the giant Primary/rotating Secondaries rather than a free activation nuke.
+  for(const z of zombies){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    if(Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=7.5){
+      z.userData.hitStun=Math.max(z.userData.hitStun||0,.8);
+    }
+  }
+  rhinoWBShock(player.position,4.5,RHINO_WHITE,.24);
+  rhinoWBShock(player.position,7.0,RHINO_GREEN,.42);
+  spawnBurst(player.position.x,.55,player.position.z,isMobile?22:36,FX_MAT_SPARK,6.4);
+  triggerCombatShake(26,420);
+  if(navigator.vibrate)navigator.vibrate([60,25,95]);
+  toast('TITAN RAMPAGE');
+  return true;
+}
+function updateRhinoTitanRampage(dt){
+  const r=rhinoRuntime;
+  if(r.titanCooldown>0)r.titanCooldown=Math.max(0,r.titanCooldown-dt);
+  if(!(r.titanTimer>0))return;
+
+  r.titanTimer=Math.max(0,r.titanTimer-dt);
+
+  if(r.titanFx&&player){
+    r.titanFx.position.set(player.position.x,0,player.position.z);
+    r.titanFx.rotation.y+=dt*.65;
+    const p=.94+.06*Math.sin(performance.now()*.006);
+    r.titanFx.scale.setScalar(p);
+  }
+
+  // Do not continuously force scale while Gamma Leap is actively doing its
+  // squash/stretch. Gamma starts from the giant base scale and restores it.
+  if(!r.gamma)rhinoTitanSyncScale(true);
+
+  if(r.titanTimer<=0){
+    if(r.titanFx){rhinoWBDispose(r.titanFx);r.titanFx=null;}
+    rhinoTitanSyncScale(false);
+    r.titanCooldown=rhinoTitanCooldownDuration();
+    r.titanSecondaryIndex=0;
+    rhinoWBShock(player.position,5.0,RHINO_PALE,.34);
+    triggerCombatShake(12,210);
+    toast('TITAN RAMPAGE ENDED');
+  }
+}
+function triggerRhinoTitanRotatingSecondary(){
+  if(!rhinoTitanActive()||rhinoTitanSecondaryBusy())return false;
+  const ids=rhinoTitanSecondaryIds();
+  const c=combatForAvatar();
+  const index=(rhinoRuntime.titanSecondaryIndex||0)%ids.length;
+  const base=c.weapons[ids[index]];
+  if(!base)return false;
+
+  doRhinoAttack(base);
+  rhinoRuntime.titanSecondaryIndex=(index+1)%ids.length;
+
+  const nextName=(c.weapons[ids[rhinoRuntime.titanSecondaryIndex]]||{}).name||'Secondary';
+  toast(`${base.name} · NEXT: ${nextName}`);
+  return true;
+}
+
 function rhinoWBApplyGlow(enable){
   if(!player)return;if(enable){if(player.userData.rhinoGlowBackup)return;const back=[];player.traverse(o=>{if(!o.isMesh||!o.material)return;const mats=Array.isArray(o.material)?o.material:[o.material];for(const m of mats){back.push([m,m.color?m.color.clone():null,m.emissive?m.emissive.clone():null,m.emissiveIntensity]);if(m.color)m.color.setHex(0x5dff8a);if(m.emissive)m.emissive.setHex(0x27ffe0);if('emissiveIntensity'in m)m.emissiveIntensity=1.8;}});player.userData.rhinoGlowBackup=back;}else{const b=player.userData.rhinoGlowBackup||[];for(const [m,c,e,ei] of b){if(c&&m.color)m.color.copy(c);if(e&&m.emissive)m.emissive.copy(e);if(ei!=null&&'emissiveIntensity'in m)m.emissiveIntensity=ei;}player.userData.rhinoGlowBackup=null;}
 }
@@ -24211,7 +24371,7 @@ function updateRhinoSkyFather(dt){
   while(s.count<12&&s.t>=s.next){s.bolts.push(rhinoWBSpawnLightning());s.count++;s.next=s.count*(3/12);}
   const pulse=.85+.15*Math.sin(s.t*18);if(player)player.scale.setScalar((AVATAR_SCALE.rhino||1)*pulse);
   for(let i=s.bolts.length-1;i>=0;i--){const b=s.bolts[i];b.bolt.position.y-=34*dt;if(b.bolt.position.y<=4){if(!b.hit){b.hit=true;const p={x:b.x,y:0,z:b.z};rhinoWBShock(p,2.4,RHINO_PALE,.20);rhinoWBRadial(p,2.2,3.8,6);triggerCombatShake(8,95);}rhinoWBDispose(b.bolt);s.bolts.splice(i,1);}}
-  if(s.t>=3.0&&s.bolts.length===0){rhinoWBApplyGlow(false);if(player)player.scale.setScalar(AVATAR_SCALE.rhino||1);r.sky=null;r.skyCooldown=24;}
+  if(s.t>=3.0&&s.bolts.length===0){rhinoWBApplyGlow(false);if(player)rhinoTitanSyncScale(rhinoTitanActive());r.sky=null;r.skyCooldown=24;}
 }
 function triggerRhinoEinherjarEcho(){
   const r=rhinoRuntime;if(!gameRunning||!rhinoIsActive()||!player||r.echo)return false;if(barbarianUltimateCharge<99.5){toast('Einherjar Echo still charging');return false;}barbarianUltimateCharge=0;updateHoodedHud();markUltimateUsed();
@@ -24225,12 +24385,24 @@ function updateRhinoEinherjarEcho(dt){
   const u=Math.min(1,(s.t-.10)/.08),sc=1-(1-Math.pow(1-u,3));s.g.scale.setScalar(Math.max(0,1-sc));if(u>=1){rhinoWBDispose(s.g);r.echo=null;}
 }
 function rhinoWorldBreakerCleanup(force=false){
-  const r=rhinoRuntime||{};for(const key of ['overdrive','crashing','domain','echo']){
+  const r=rhinoRuntime||{};for(const key of ['overdrive','crashing','echo']){
     const s=r[key];if(!s)continue;
     for(const obj of [s.axe,s.ret,s.seal,s.g,s.sky&&s.sky.g,s.fireSphere,s.activeWave&&s.activeWave.mesh])if(obj)rhinoWBDispose(obj);
     if(s.rocks)for(const q of s.rocks)rhinoWBDispose(q.m);
     if(s.waves)for(const w of s.waves)if(w&&w.mesh)rhinoWBDispose(w.mesh);
-  }if(r.sky&&r.sky.bolts)for(const b of r.sky.bolts)rhinoWBDispose(b.bolt);rhinoWBApplyGlow(false);if(player&&rhinoIsActive()){player.rotation.x=0;player.scale.setScalar(AVATAR_SCALE.rhino||1);}r.overdrive=r.gamma=r.freight=r.crashing=r.domain=r.sky=r.echo=null;
+  }
+  if(r.sky&&r.sky.bolts)for(const b of r.sky.bolts)rhinoWBDispose(b.bolt);
+  if(r.titanFx)rhinoWBDispose(r.titanFx);
+  rhinoWBApplyGlow(false);
+  if(player&&rhinoIsActive()){
+    player.rotation.x=0;
+    r.titanTimer=0;
+    r.titanFx=null;
+    rhinoTitanSyncScale(false);
+  }
+  r.overdrive=r.gamma=r.freight=r.crashing=r.sky=r.echo=null;
+  r.titanTimer=0;
+  r.titanSecondaryIndex=0;
 }
 /* Retired V23.01 Rhino Charge / Boomerang Cyclone / Ricochet Bladestorm code removed in V23.03.01. */
 
@@ -24239,6 +24411,7 @@ function rhinoWorldBreakerCleanup(force=false){
    --------------------------------------------------------------------- */
 function doRhinoAttack(w){
   spawnHeroIdentityAura();
+  w=rhinoTitanScaledWeapon(w);
   faceEnemyTarget(findNearestEnemy(Math.max(10,(w.range||w.radius||6)*1.4)));
   if(w.kind==='rhino_boomerang'){
     if(player.userData.playKayClip)player.userData.playKayClip('attack',true,true,.30);
@@ -24258,7 +24431,7 @@ function updateRhinoCombat(dt){
     updateRhinoGammaLeap(dt);
     updateRhinoFreightTrain(dt);
     updateRhinoCrashingBolt(dt);
-    updateRhinoShatteredDomain(dt);
+    updateRhinoTitanRampage(dt);
     updateRhinoSkyFather(dt);
     updateRhinoEinherjarEcho(dt);
   }catch(err){ console.error('Ranger World-Breaker update recovered:',err); }
@@ -29594,8 +29767,20 @@ function clearCloudSkybreaker(){
   }
 }
 function doSecondaryShoot(){
+  if(!gameRunning)return;
+
+  // Titan Rampage owns the Secondary button. Ignore the player's equipped
+  // Secondary and rotate through all three Ranger tactical attacks.
+  if(rhinoTitanActive()){
+    if(rhinoTitanSecondaryBusy())return;
+    markSecondaryUsed();
+    triggerRhinoTitanRotatingSecondary();
+    if(player&&player.userData)player.userData.secondaryAttackCooldown=0;
+    return;
+  }
+
   const w=secondaryWeaponForAvatar();
-  if(!gameRunning||!w)return;
+  if(!w)return;
   if(state.avatarType==='cloud'&&w.kind!=='cloud_great_sword_slash') resetCloudCrossbreakerChain();
   // Chain-Lightning Javelin launches without a target or charge, but uses a fixed
   // one-second cooldown so repeated casts remain powerful without becoming spammy.
