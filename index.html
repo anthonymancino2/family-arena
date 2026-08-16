@@ -1,3 +1,4 @@
+<!-- V23.03.04 Hold Auto + Crashing Bolt Spectacle: standardizes all four combat controls around the same iPhone-safe hold behavior. Primary and Secondary keep their existing main-loop retry. The equipped Ultimate/Ability button and the large Signature button now also use persistent pointer ownership plus main-loop retry instead of setInterval/pointerleave behavior, so keeping a finger down automatically casts again the instant the move becomes ready. WORLD-BREAKER CRASHING BOLT receives a major spectacle rebuild: an expanding triple target seal, rotating radial runes, a vertical cyan-green sky column, descending lightning filaments, a visible overhead falling core, impact flash, crater, 12 rising rock spires, three staged shock fronts, radial lightning lances, debris bursts, delayed aftershock damage and a stronger decaying camera rumble. Effects are capped and short-lived for iPhone readability/performance. Other Ranger ultimates and combat balance are unchanged in this increment. -->
 <!-- V23.03.03 iPhone Loadout Scroll Fix: fixes the pre-game move screen becoming difficult or impossible to scroll in Safari. The root cause was the game's global button{touch-action:none} rule: every move card is a button, so vertical swipes beginning on a card were blocked and scrolling only worked randomly from gaps. The loadout screen now owns one native vertical scroll surface with momentum scrolling and pan-y touch handling, move cards explicitly allow vertical pan gestures, Back is fixed outside the scroll flow, the Continue button gets a reserved footer area, and the loadout summary is no longer sticky/overlaid on top of Ultimate cards. No combat or loadout behavior changed. -->
 <!-- V23.03.02 Pre-Game Move Loadout: adds a dedicated move-selection screen immediately after avatar selection and before Round Select/Theme. During development testing, every move for the selected avatar is available here at no cost. The player chooses one Primary, one Secondary and one Ultimate, sees a compact summary, then continues to the existing round/map flow. A small pending-loadout handoff reapplies those choices after startSurvival() performs its normal fresh-run reset, so the map actually starts with the selected moves. Existing pause/shop loadout swapping remains available. No combat balance changed. -->
 <!-- V23.03.01 Ranger Cooldown + Ultimate Fix: fixes the Green Ranger Ability-button routing so all three rhino_ World-Breaker ultimates actually reach their trigger functions. Stormbreaker Overdrive, Gamma Leap and Freight Train Charge now use one fixed 1.5-second Secondary cooldown each; Ranger speed stats/Fury no longer shorten that 1.5-second tactical cooldown. Internal per-move cooldown gates are synchronized to the same value. Cleanup removes the retired Rhino Charge, Boomerang Cyclone and Ricochet Bladestorm implementations plus their stale runtime fields; Twin Boomerang and the active World-Breaker kit remain. -->
@@ -1625,7 +1626,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.03.03 - iPhone Loadout Scroll Fix';
+const GAME_VERSION='23.03.04 - Hold Auto + Crashing Bolt Spectacle';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -13700,7 +13701,7 @@ const BARBARIAN_RAGNAROK_WAVE = {id:'barbarian_ragnarok_wave', name:'Primal Axe 
   desc:'THROWN WEAPON. Hurl six giant spinning axes outward in a full star, piercing every enemy in their lanes. At full extension they turn around and come flying back in, landing together in one recall slam at your feet. The only barbarian ultimate whose damage leaves you.'};
 
 const RHINO_CRASHING_BOLT = {id:'rhino_crashing_bolt', name:'World-Breaker Crashing Bolt', price:640, avatar:'rhino', unlockLevel:5,
-  desc:'Launch off-screen, telegraph the impact for 0.8 seconds, then crash down with a two-frame flash, heavy camera rumble and eight rising rock spikes.'};
+  desc:'Launch beyond the camera as a triple ground seal and sky column charge below. A visible falling thunder core descends into a catastrophic slam with a crater, rising rock field, lightning lances, three expanding shock fronts and a delayed arena-wide aftershock.'};
 const RHINO_SHATTERED_DOMAIN = {id:'rhino_shattered_domain', name:'The Shattered Domain', price:760, avatar:'rhino', unlockLevel:14,
   desc:'Rip a long strip of earth into two physical halves and force them apart, exposing a glowing cyan continental chasm underneath.'};
 const RHINO_SKY_FATHER = {id:'rhino_sky_father', name:'Wrath of the Sky-Father', price:900, avatar:'rhino', unlockLevel:18,
@@ -13853,6 +13854,10 @@ let moveVec = {x:0,y:0};
 let lookActive = false, lookLast = {x:0,y:0};
 let secondaryInputHeld = false;
 let primaryInputHeld = false;
+let abilityInputHeld = false;
+let abilityPointerId = null;
+let signatureInputHeld = false;
+let signaturePointerId = null;
 
 
 function updateDisplayModeClass(){
@@ -14076,7 +14081,6 @@ function setupControls(){
   const dashBtnEl=document.getElementById('dashBtn');
   dashBtnEl.addEventListener('touchstart',e=>{e.preventDefault();doDash();});
   const abilityBtnEl=document.getElementById('abilityBtn');
-  let equippedAbilityHoldInterval=null;
   const activateEquippedAbilityNow=()=>{
     if(equippedAbilityId==='arcane_laser') startArcaneLaser();
     else if(equippedAbilityId==='blizzard_storm') triggerBlizzardStorm();
@@ -14088,59 +14092,103 @@ function setupControls(){
     else if(String(equippedAbilityId||'').indexOf('rhino_')===0) triggerBarbarianEquippedAbility();
     else if(String(equippedAbilityId||'').indexOf('barbarian_')===0) triggerBarbarianEquippedAbility();
   };
-  const beginEquippedAbility=e=>{
-    e.preventDefault();
-    if(equippedAbilityId==='knight_guardian_quake') knightGuardianQuakeHeld=true;
-    activateEquippedAbilityNow();
-    clearInterval(equippedAbilityHoldInterval);
-    const knightAbility=String(equippedAbilityId||'').indexOf('knight_')===0;
-    if(equippedAbilityId!=='arcane_laser' && !knightAbility){
-      equippedAbilityHoldInterval=setInterval(activateEquippedAbilityNow,100);
-    }
-  };
-  const endEquippedAbility=e=>{
-    if(e) e.preventDefault();
+  const releaseEquippedAbility=e=>{
+    if(e&&e.preventDefault)e.preventDefault();
+    if(e&&abilityPointerId!==null&&Number.isFinite(e.pointerId)&&e.pointerId!==abilityPointerId)return;
+    abilityInputHeld=false;
+    abilityPointerId=null;
     knightGuardianQuakeHeld=false;
-    clearInterval(equippedAbilityHoldInterval);
-    equippedAbilityHoldInterval=null;
     if(equippedAbilityId==='arcane_laser') stopArcaneLaser();
+  };
+  const beginEquippedAbility=e=>{
+    if(e){e.preventDefault();e.stopPropagation();}
+    if(abilityInputHeld)return;
+    abilityInputHeld=true;
+    abilityPointerId=e&&Number.isFinite(e.pointerId)
+      ? e.pointerId
+      : (e&&e.changedTouches&&e.changedTouches[0]?e.changedTouches[0].identifier:null);
+    if(equippedAbilityId==='knight_guardian_quake')knightGuardianQuakeHeld=true;
+    if(e&&e.currentTarget&&e.currentTarget.setPointerCapture&&Number.isFinite(e.pointerId)){
+      try{e.currentTarget.setPointerCapture(e.pointerId);}catch(_err){}
+    }
+    activateEquippedAbilityNow();
   };
   if(window.PointerEvent){
     abilityBtnEl.addEventListener('pointerdown',beginEquippedAbility,{passive:false});
-    abilityBtnEl.addEventListener('pointerup',endEquippedAbility,{passive:false});
-    abilityBtnEl.addEventListener('pointercancel',endEquippedAbility,{passive:false});
-    abilityBtnEl.addEventListener('pointerleave',endEquippedAbility,{passive:false});
+    abilityBtnEl.addEventListener('pointerup',releaseEquippedAbility,{passive:false});
+    abilityBtnEl.addEventListener('pointercancel',releaseEquippedAbility,{passive:false});
+    window.addEventListener('pointerup',releaseEquippedAbility,{passive:false});
+    window.addEventListener('pointercancel',releaseEquippedAbility,{passive:false});
   }else{
     abilityBtnEl.addEventListener('touchstart',beginEquippedAbility,{passive:false});
-    abilityBtnEl.addEventListener('touchend',endEquippedAbility,{passive:false});
-    abilityBtnEl.addEventListener('touchcancel',endEquippedAbility,{passive:false});
+    const releaseAbilityTouch=e=>{
+      const changed=[...(e.changedTouches||[])];
+      if(abilityPointerId!==null&&!changed.some(t=>t.identifier===abilityPointerId))return;
+      releaseEquippedAbility(e);
+    };
+    abilityBtnEl.addEventListener('touchend',releaseAbilityTouch,{passive:false});
+    abilityBtnEl.addEventListener('touchcancel',releaseAbilityTouch,{passive:false});
+    window.addEventListener('touchend',releaseAbilityTouch,{passive:false});
+    window.addEventListener('touchcancel',releaseAbilityTouch,{passive:false});
   }
-  window.addEventListener('mouseup',endEquippedAbility);
+  window.addEventListener('blur',()=>releaseEquippedAbility());
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseEquippedAbility();});
   const laserBtnEl=document.getElementById('laserBtn');
   laserBtnEl.classList.add('hidden');
   const ultimateBtnEl=document.getElementById('ultimateBtn');
-  const activateUltimate=e=>{
-    if(e){ e.preventDefault(); e.stopPropagation(); }
+  const activateUltimate=()=>{
     if(state.avatarType==='cloud') resetCloudCrossbreakerChain();
     if(mageGameplayActive()) triggerArcaneEchoes();
     else if(archerIsActive()) triggerArcherMirrorClones();
     else if(knightIsActive()){
-      // Guardian Titan is the active special during its sequence and Titan state.
-      // Keep normal Primary/Secondary combat available, but prevent chaining the
-      // separate Knights of the Round signature until Titan mode is over.
       if(knightGuardianGiantActive()) return;
       triggerKnightRoyalGuardClones();
     }else if(barbarianIsActive()){
       if(rhinoIsActive()){ triggerRhinoEinherjarEcho(); return; }
-      // Primal Rage locks every special/signature route except Primary/Secondary.
       if(barbarianUltimateActive>0)return;
       triggerBerserkerKin();
     }
     else if(state.avatarType==='hooded') triggerShadowEclipse();
   };
-  if(window.PointerEvent) ultimateBtnEl.addEventListener('pointerdown',activateUltimate,{passive:false});
-  else ultimateBtnEl.addEventListener('touchstart',activateUltimate,{passive:false});
+  const releaseSignatureInput=e=>{
+    if(e&&e.preventDefault)e.preventDefault();
+    if(e&&signaturePointerId!==null&&Number.isFinite(e.pointerId)&&e.pointerId!==signaturePointerId)return;
+    signatureInputHeld=false;
+    signaturePointerId=null;
+  };
+  const beginSignatureInput=e=>{
+    if(e){e.preventDefault();e.stopPropagation();}
+    if(signatureInputHeld)return;
+    signatureInputHeld=true;
+    signaturePointerId=e&&Number.isFinite(e.pointerId)
+      ?e.pointerId
+      :(e&&e.changedTouches&&e.changedTouches[0]?e.changedTouches[0].identifier:null);
+    if(e&&e.currentTarget&&e.currentTarget.setPointerCapture&&Number.isFinite(e.pointerId)){
+      try{e.currentTarget.setPointerCapture(e.pointerId);}catch(_err){}
+    }
+    activateUltimate();
+  };
+  if(window.PointerEvent){
+    ultimateBtnEl.addEventListener('pointerdown',beginSignatureInput,{passive:false});
+    ultimateBtnEl.addEventListener('pointerup',releaseSignatureInput,{passive:false});
+    ultimateBtnEl.addEventListener('pointercancel',releaseSignatureInput,{passive:false});
+    window.addEventListener('pointerup',releaseSignatureInput,{passive:false});
+    window.addEventListener('pointercancel',releaseSignatureInput,{passive:false});
+  }else{
+    ultimateBtnEl.addEventListener('touchstart',beginSignatureInput,{passive:false});
+    const releaseSignatureTouch=e=>{
+      const changed=[...(e.changedTouches||[])];
+      if(signaturePointerId!==null&&!changed.some(t=>t.identifier===signaturePointerId))return;
+      releaseSignatureInput(e);
+    };
+    ultimateBtnEl.addEventListener('touchend',releaseSignatureTouch,{passive:false});
+    ultimateBtnEl.addEventListener('touchcancel',releaseSignatureTouch,{passive:false});
+    window.addEventListener('touchend',releaseSignatureTouch,{passive:false});
+    window.addEventListener('touchcancel',releaseSignatureTouch,{passive:false});
+  }
   ultimateBtnEl.addEventListener('click',e=>e.preventDefault());
+  window.addEventListener('blur',()=>releaseSignatureInput());
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseSignatureInput();});
   const upBtnEl = document.getElementById('upBtn');
   const downBtnEl = document.getElementById('downBtn');
   upBtnEl.addEventListener('touchstart', e=>{ e.preventDefault(); freeUp = true; });
@@ -23711,20 +23759,197 @@ function rhinoWBFlash(frames=2){
   const c=renderer&&renderer.domElement;if(!c)return;const old=c.style.filter;c.style.filter='invert(1) brightness(2.4) contrast(1.35)';setTimeout(()=>{c.style.filter=old;},Math.max(16,frames*16));
 }
 function rhinoWBSpawnRocks(center){
-  const arr=[];for(let i=0;i<8;i++){const a=i*Math.PI*2/8,h=2.2+(i%3)*.55,m=new THREE.Mesh(new THREE.ConeGeometry(.55,h,5),new THREE.MeshBasicMaterial({color:0x51453c}));m.position.set(center.x+Math.sin(a)*4.0,-h*.5,center.z+Math.cos(a)*4.0);m.rotation.z=(i%2?1:-1)*.12;scene.add(m);arr.push({m,h,startY:m.position.y});}return arr;
+  const arr=[];
+  const count=isMobile?10:12;
+  for(let i=0;i<count;i++){
+    const a=i*Math.PI*2/count,h=2.8+(i%4)*.72,rad=4.1+(i%2)*1.15;
+    const m=new THREE.Mesh(
+      new THREE.ConeGeometry(.62+(i%3)*.10,h,5),
+      new THREE.MeshBasicMaterial({color:i%2?0x4b443d:0x605045})
+    );
+    m.position.set(center.x+Math.sin(a)*rad,-h*.58,center.z+Math.cos(a)*rad);
+    m.rotation.z=(i%2?1:-1)*(.12+(i%3)*.04);
+    m.rotation.x=(i%3-1)*.07;
+    scene.add(m);
+    arr.push({m,h,startY:m.position.y,delay:(i%3)*.035});
+  }
+  return arr;
 }
+function rhinoWBCrashingSeal(center){
+  const g=new THREE.Group();
+  g.position.set(center.x,.045,center.z);
+  const rings=[
+    [1.25,1.55,RHINO_WHITE,.74],
+    [2.15,2.36,RHINO_PALE,.54],
+    [3.12,3.28,RHINO_GREEN,.42]
+  ];
+  for(const [a,b,c,o] of rings){
+    const m=new THREE.Mesh(new THREE.RingGeometry(a,b,48),new THREE.MeshBasicMaterial({
+      color:c,transparent:true,opacity:o,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending
+    }));
+    m.rotation.x=-Math.PI/2;g.add(m);
+  }
+  const rays=isMobile?8:12;
+  for(let i=0;i<rays;i++){
+    const ray=new THREE.Mesh(new THREE.PlaneGeometry(.065,3.1),new THREE.MeshBasicMaterial({
+      color:i%2?RHINO_PALE:RHINO_WHITE,transparent:true,opacity:.42,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending
+    }));
+    ray.rotation.x=-Math.PI/2;ray.rotation.z=i*Math.PI*2/rays;ray.position.y=.018;g.add(ray);
+  }
+  scene.add(g);return g;
+}
+function rhinoWBCrashingSkyColumn(center){
+  const g=new THREE.Group();g.position.set(center.x,0,center.z);
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.34,1.20,22,8,1,true),new THREE.MeshBasicMaterial({
+    color:0x49ffe8,transparent:true,opacity:.20,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending
+  }));
+  beam.position.y=11;g.add(beam);
+  const core=new THREE.Mesh(new THREE.CylinderGeometry(.10,.26,22,6),new THREE.MeshBasicMaterial({
+    color:0xeaffff,transparent:true,opacity:.78,depthWrite:false,blending:THREE.AdditiveBlending
+  }));
+  core.position.y=11;g.add(core);
+  const falling=new THREE.Mesh(new THREE.IcosahedronGeometry(.55,1),new THREE.MeshBasicMaterial({
+    color:0xc9fff3,transparent:true,opacity:.95,depthWrite:false,blending:THREE.AdditiveBlending
+  }));
+  falling.position.y=18;falling.scale.set(1.25,2.8,1.25);g.add(falling);
+  scene.add(g);return {g,beam,core,falling};
+}
+function rhinoWBCrashingLightning(center,count=8){
+  for(let i=0;i<count;i++){
+    const a=i*Math.PI*2/count+(i%2)*.16,len=5.5+(i%3)*1.3;
+    const m=new THREE.Mesh(new THREE.BoxGeometry(.07,.08,len),new THREE.MeshBasicMaterial({
+      color:i%2?0x54ffe8:0xf1ffff,transparent:true,opacity:.82,depthWrite:false,blending:THREE.AdditiveBlending
+    }));
+    m.position.set(center.x+Math.sin(a)*len*.5,.14,center.z+Math.cos(a)*len*.5);
+    m.rotation.y=a;m.rotation.x=(i%2?1:-1)*.025;scene.add(m);
+    fx.push({kind:'rhinoBoltLance',mesh:m,life:.30,maxLife:.30,dispose:true});
+  }
+}
+
 function triggerRhinoCrashingBolt(){
-  const r=rhinoRuntime;if(r.crashing||r.crashingCooldown>0)return false;markUltimateUsed();const land=player.position.clone();
+  const r=rhinoRuntime;
+  if(r.crashing||r.crashingCooldown>0)return false;
+  markUltimateUsed();
+  const land=player.position.clone();
   dashActive=false;dashTimer=0;
-  const ret=new THREE.Mesh(new THREE.RingGeometry(.75,1,48),new THREE.MeshBasicMaterial({color:RHINO_PALE,transparent:true,opacity:.85,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));ret.rotation.x=-Math.PI/2;ret.position.set(land.x,.05,land.z);ret.scale.setScalar(.1);scene.add(ret);
-  r.crashing={t:0,land,ret,impacted:false,rocks:null};player.position.y+=25;invincibleTimer=Math.max(invincibleTimer||0,1.2);toast('WORLD-BREAKER CRASHING BOLT');return true;
+
+  const ret=new THREE.Mesh(
+    new THREE.RingGeometry(.72,1,56),
+    new THREE.MeshBasicMaterial({color:RHINO_WHITE,transparent:true,opacity:.88,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending})
+  );
+  ret.rotation.x=-Math.PI/2;ret.position.set(land.x,.055,land.z);ret.scale.setScalar(.08);scene.add(ret);
+
+  const seal=rhinoWBCrashingSeal(land);
+  const sky=rhinoWBCrashingSkyColumn(land);
+
+  r.crashing={
+    t:0,land,ret,seal,sky,impacted:false,aftershock:false,rocks:null,
+    pulse1:false,pulse2:false,pulse3:false
+  };
+
+  // The body exits the camera, but the falling sky-core remains visible so the
+  // player can read where the god-impact is coming from.
+  player.position.y+=28;
+  invincibleTimer=Math.max(invincibleTimer||0,2.0);
+  document.body.style.filter='brightness(.78) saturate(1.32)';
+  toast('WORLD-BREAKER CRASHING BOLT');
+  if(navigator.vibrate)navigator.vibrate([38,22,38]);
+  return true;
 }
 function updateRhinoCrashingBolt(dt){
-  const r=rhinoRuntime;if(r.crashingCooldown>0)r.crashingCooldown=Math.max(0,r.crashingCooldown-dt);const s=r.crashing;if(!s)return;s.t+=dt;
-  if(s.t<.8){const u=s.t/.8,e=1-Math.pow(1-u,3);s.ret.scale.setScalar(.1+6.4*e);s.ret.rotation.z+=dt*4;return;}
-  if(!s.impacted){s.impacted=true;player.position.copy(s.land);rhinoWBDispose(s.ret);rhinoWBFlash(2);const hits=rhinoWBRadial(s.land,8,8.0,14);s.rocks=rhinoWBSpawnRocks(s.land);rhinoWBShock(s.land,8.5,RHINO_WHITE,.48);spawnEarthbreaker(s.land,7.2);triggerCombatShake(hits?30:22,850);if(player.userData.playKayClip)player.userData.playKayClip('attack',true,true,.55);}
-  if(s.rocks){const u=Math.min(1,(s.t-.8)/.22);for(const q of s.rocks)q.m.position.y=THREE.MathUtils.lerp(q.startY,q.h*.5,u);}
-  if(s.t>=1.55){if(s.rocks)for(const q of s.rocks)rhinoWBDispose(q.m);r.crashing=null;r.crashingCooldown=18;}
+  const r=rhinoRuntime;
+  if(r.crashingCooldown>0)r.crashingCooldown=Math.max(0,r.crashingCooldown-dt);
+  const s=r.crashing;if(!s)return;
+  s.t+=dt;
+
+  if(s.t<.8){
+    const u=s.t/.8,e=1-Math.pow(1-u,3);
+    s.ret.scale.setScalar(.08+7.2*e);
+    s.ret.rotation.z+=dt*(5+u*7);
+    if(s.seal){
+      s.seal.rotation.y+=dt*(1.6+u*2.8);
+      const pulse=.92+.12*Math.sin(s.t*22);
+      s.seal.scale.setScalar(pulse*(.35+.65*e));
+    }
+    if(s.sky){
+      s.sky.beam.material.opacity=.13+.17*u+.05*Math.sin(s.t*24);
+      s.sky.core.material.opacity=.62+.22*Math.sin(s.t*31);
+      s.sky.falling.position.y=THREE.MathUtils.lerp(18,7.5,e);
+      s.sky.falling.rotation.x+=dt*9;s.sky.falling.rotation.y+=dt*13;
+      s.sky.falling.scale.set(1.2+u*.9,2.7+u*2.2,1.2+u*.9);
+    }
+    // Sparse downward charge fragments make the sky feel electrically loaded
+    // without filling the screen.
+    if(Math.random()<dt*(isMobile?13:21)){
+      const a=Math.random()*Math.PI*2,d=1.2+Math.random()*5.2;
+      spawnBurst(s.land.x+Math.sin(a)*d,1.0+Math.random()*5.5,s.land.z+Math.cos(a)*d,1,FX_MAT_SPARK,1.4);
+    }
+    if(s.t>.52)triggerCombatShake(3.5+u*3.5,65);
+    return;
+  }
+
+  if(!s.impacted){
+    s.impacted=true;
+    player.position.copy(s.land);
+    rhinoWBDispose(s.ret);s.ret=null;
+    if(s.seal){rhinoWBDispose(s.seal);s.seal=null;}
+    if(s.sky){rhinoWBDispose(s.sky.g);s.sky=null;}
+    document.body.style.filter='';
+
+    rhinoWBFlash(2);
+    const hits=rhinoWBRadial(s.land,9.2,8.0,16);
+    s.rocks=rhinoWBSpawnRocks(s.land);
+
+    // Crater + immediate god-impact core.
+    spawnEarthbreaker(s.land,8.0);
+    rhinoWBShock(s.land,3.2,RHINO_WHITE,.22);
+    rhinoWBShock(s.land,6.0,RHINO_PALE,.34);
+    rhinoWBShock(s.land,9.2,RHINO_GREEN,.52);
+    rhinoWBCrashingLightning(s.land,isMobile?8:12);
+    spawnBurst(s.land.x,.45,s.land.z,isMobile?26:44,FX_MAT_SPARK,8.5);
+
+    triggerCombatShake(hits?38:30,980);
+    knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.105);
+    if(player.userData.playKayClip)player.userData.playKayClip('attack',true,true,.62);
+    if(navigator.vibrate)navigator.vibrate([90,38,150]);
+  }
+
+  // Rock spires do not all pop on the same frame. Three short stagger groups
+  // make the ground look like it is physically failing outward.
+  if(s.rocks){
+    for(const q of s.rocks){
+      const ru=Math.max(0,Math.min(1,(s.t-.80-q.delay)/.26));
+      const rise=1-Math.pow(1-ru,3);
+      q.m.position.y=THREE.MathUtils.lerp(q.startY,q.h*.5,rise);
+    }
+  }
+
+  // Three visible outward fronts. Damage is deliberately split into one main
+  // hit + one delayed aftershock, not every decorative ring, to keep bosses
+  // durable while still making the ultimate feel enormous.
+  if(!s.pulse1&&s.t>=.93){
+    s.pulse1=true;rhinoWBShock(s.land,11.2,RHINO_WHITE,.34);
+    triggerCombatShake(18,220);
+  }
+  if(!s.pulse2&&s.t>=1.08){
+    s.pulse2=true;rhinoWBShock(s.land,13.6,RHINO_PALE,.40);
+    rhinoWBCrashingLightning(s.land,isMobile?6:9);
+    triggerCombatShake(15,190);
+  }
+  if(!s.aftershock&&s.t>=1.22){
+    s.aftershock=true;
+    const afterHits=rhinoWBRadial(s.land,12.0,3.25,10);
+    rhinoWBShock(s.land,15.0,RHINO_GREEN,.48);
+    spawnBurst(s.land.x,.22,s.land.z,isMobile?16:28,FX_MAT_SPARK,6.2);
+    triggerCombatShake(afterHits?24:16,360);
+  }
+
+  if(s.t>=1.78){
+    if(s.rocks)for(const q of s.rocks)rhinoWBDispose(q.m);
+    document.body.style.filter='';
+    r.crashing=null;
+    r.crashingCooldown=18;
+  }
 }
 function triggerRhinoShatteredDomain(){
   const r=rhinoRuntime;if(r.domain||r.domainCooldown>0)return false;markUltimateUsed();const dir=rhinoWBForward(),yaw=player.rotation.y,g=new THREE.Group();
@@ -23766,7 +23991,7 @@ function updateRhinoEinherjarEcho(dt){
   const u=Math.min(1,(s.t-.10)/.08),sc=1-(1-Math.pow(1-u,3));s.g.scale.setScalar(Math.max(0,1-sc));if(u>=1){rhinoWBDispose(s.g);r.echo=null;}
 }
 function rhinoWorldBreakerCleanup(force=false){
-  const r=rhinoRuntime||{};for(const key of ['overdrive','crashing','domain','echo']){const s=r[key];if(!s)continue;for(const obj of [s.axe,s.ret,s.g])if(obj)rhinoWBDispose(obj);if(s.rocks)for(const q of s.rocks)rhinoWBDispose(q.m);}if(r.sky&&r.sky.bolts)for(const b of r.sky.bolts)rhinoWBDispose(b.bolt);rhinoWBApplyGlow(false);if(player&&rhinoIsActive()){player.rotation.x=0;player.scale.setScalar(AVATAR_SCALE.rhino||1);}r.overdrive=r.gamma=r.freight=r.crashing=r.domain=r.sky=r.echo=null;
+  const r=rhinoRuntime||{};for(const key of ['overdrive','crashing','domain','echo']){const s=r[key];if(!s)continue;for(const obj of [s.axe,s.ret,s.seal,s.g,s.sky&&s.sky.g])if(obj)rhinoWBDispose(obj);if(s.rocks)for(const q of s.rocks)rhinoWBDispose(q.m);}if(r.sky&&r.sky.bolts)for(const b of r.sky.bolts)rhinoWBDispose(b.bolt);rhinoWBApplyGlow(false);if(player&&rhinoIsActive()){player.rotation.x=0;player.scale.setScalar(AVATAR_SCALE.rhino||1);}r.overdrive=r.gamma=r.freight=r.crashing=r.domain=r.sky=r.echo=null;
 }
 /* Retired V23.01 Rhino Charge / Boomerang Cyclone / Ricochet Bladestorm code removed in V23.03.01. */
 
@@ -31083,6 +31308,14 @@ function update(dt){
     }else{
       doSecondaryShoot();
     }
+  }
+  // Ultimate/Ability and Signature now follow the same hold-to-auto rule as
+  // Primary/Secondary. Their own cooldown/charge gates remain authoritative.
+  if(abilityInputHeld && gameRunning && equippedAbilityId!=='arcane_laser'){
+    activateEquippedAbilityNow();
+  }
+  if(signatureInputHeld && gameRunning){
+    activateUltimate();
   }
   updateSecondaryButton();
   refreshPassiveState(dt);
