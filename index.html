@@ -1,4 +1,5 @@
-<!-- V23.03.07 2s Landing Stun + Heavy Zero-Delay Secondaries: every World-Breaker Crashing Bolt landing now immediately stuns every enemy already present on the map for a full 2.0 seconds, including bosses, before that cycle's kill wave begins. Crashing Bolt wave travel time is reduced from ~5 seconds to exactly ~3 seconds from center to playable edge; the four leap/crash cycles remain fully sequential and numbered. Green Rhino Ranger Secondaries keep zero cooldown, and their runtime no longer writes hidden post-move cooldown values: holding Secondary starts the next activation on the very next eligible gameplay frame after the current move finishes. The individual moves are deliberately NOT sped up into twitch attacks: Stormbreaker Overdrive uses heavier 17/20-unit travel speeds and ends in a guarded catch shock burst; Gamma Leap uses a 0.78s weighted vault and ends with a layered tectonic impact; Freight Train Charge is slowed from 0.20s to 0.46s and ends in a heavy forward rupture, radial burst and stronger camera stop. Cleanup removes stale 1.5s runtime cooldown remnants and old 5-second wave wording. -->
+<!-- V23.03.08 Full Arena Waves + Heavy Secondary Motion: fixes Crashing Bolt's kill wave stopping halfway across the arena. arenaSize is already the playable radius (~30), but the prior helper incorrectly multiplied it by 0.5, capping the wave near 15. The wave now travels slightly beyond the real playable boundary and uses a swept-radius contact test so enemies cannot be skipped between frames. Gamma Leap is slowed to a deliberate 1.30s arc. Freight Train Charge is slowed to 0.90s for its six-unit drive and no longer rotates the entire gameplay player root; only the Green Rhino model-fit wrapper receives a restrained forward lean, preventing the native rig from visually breaking. Dragged enemies ease into stable lanes instead of being hard-teleported into one overlapping cluster. Both moves keep zero cooldown/no post-move delay and receive stronger end impacts. Cleanup removes stale fast-timing comments/logic. -->
+<!-- V23.03.07 2s Landing Stun + Heavy Zero-Delay Secondaries: every World-Breaker Crashing Bolt landing now immediately stuns every enemy already present on the map for a full 2.0 seconds, including bosses, before that cycle's kill wave begins. Crashing Bolt wave travel time is reduced from ~5 seconds to exactly ~3 seconds from center to playable edge; the four leap/crash cycles remain fully sequential and numbered. Green Rhino Ranger Secondaries keep zero cooldown, and their runtime no longer writes hidden post-move cooldown values: holding Secondary starts the next activation on the very next eligible gameplay frame after the current move finishes. The individual moves are deliberately NOT sped up into twitch attacks: Stormbreaker Overdrive uses heavier 17/20-unit travel speeds and ends in a guarded catch shock burst; Gamma Leap uses a 1.30s weighted vault and ends with a layered tectonic impact; Freight Train Charge uses a deliberate 0.90s six-unit drive and ends in a heavy forward rupture, radial burst and stronger camera stop. Cleanup removes stale 1.5s runtime cooldown remnants and old 5-second wave wording. -->
 <!-- V23.03.06 Zero Secondary Cooldown + Four Leap Waves: removes cooldown entirely from all three Green Rhino Ranger Secondary attacks. Hold Secondary now immediately starts the next use whenever the current move itself finishes, with no post-move cooldown. Rebuilds World-Breaker Crashing Bolt for unmistakable wave readability: the Ranger dashes to arena center once, then performs FOUR complete leap-and-crash cycles. Each cycle visibly leaps out of view, hangs overhead, descends inside the fiery force field, crashes into center, and launches exactly ONE kill wave. That wave must complete its full ~3-second trip to the playable edge before the next leap begins. Each impact announces WAVE 1/4 through WAVE 4/4. Normal enemies die only when contacted by the moving wave front; bosses remain protected by the existing per-hit cap. Cleanup and syntax audit included. -->
 <!-- V23.03.05 Ranger Cooldowns + Centerfall Crashing Bolt: sets all Green Rhino Ranger Secondary cooldowns to a no cooldown and makes their HUD/loadout metadata show the real cooldown. Rebuilds World-Breaker Crashing Bolt around a center-stage execution: the Ranger first dashes to the exact arena center, then performs a huge vertical leap completely out of view, descends back into center inside a giant fiery energy sphere, and crashes into the floor. The impact launches four total arena-wide circular kill waves (initial wave plus three repeats). Each wave expands slowly from center to the playable edge over ~5 seconds and instantly defeats normal enemies as the wave front touches them; bosses are never one-shot and instead take capped boss-safe wave damage. Waves are staggered so the arena repeatedly clears outward. Adds live Ultimate cooldown text so the player can always see when the equipped Ultimate is ready again. Cleanup and syntax audit included. -->
 <!-- V23.03.04 Hold Auto + Crashing Bolt Spectacle: standardizes all four combat controls around the same iPhone-safe hold behavior. Primary and Secondary keep their existing main-loop retry. The equipped Ultimate/Ability button and the large Signature button now also use persistent pointer ownership plus main-loop retry instead of setInterval/pointerleave behavior, so keeping a finger down automatically casts again the instant the move becomes ready. WORLD-BREAKER CRASHING BOLT receives a major spectacle rebuild: an expanding triple target seal, rotating radial runes, a vertical cyan-green sky column, descending lightning filaments, a visible overhead falling core, impact flash, crater, 12 rising rock spires, three staged shock fronts, radial lightning lances, debris bursts, delayed aftershock damage and a stronger decaying camera rumble. Effects are capped and short-lived for iPhone readability/performance. Other Ranger ultimates and combat balance are unchanged in this increment. -->
@@ -1629,7 +1630,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.03.07 - 2s Landing Stun + Heavy Zero-Delay Secondaries';
+const GAME_VERSION='23.03.08 - Full Arena Waves + Heavy Secondary Motion';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -23745,9 +23746,9 @@ function triggerRhinoGammaLeap(w){
   dashActive=false;dashTimer=0;
   const start=player.position.clone(),dir=rhinoWBForward();let dist=Math.min(w.range||10,10);const target=findNearestEnemy(14);let end;
   if(target){const dv=new THREE.Vector3(target.position.x-start.x,0,target.position.z-start.z);if(dv.length()>.001)dv.normalize();dist=Math.min(dist,Math.max(4,Math.hypot(target.position.x-start.x,target.position.z-start.z)));end=start.clone().addScaledVector(dv,dist);}else end=start.clone().addScaledVector(dir,dist);
-  end.y=player.position.y;const control=start.clone().lerp(end,.5);control.y=start.y+5.0;
-  r.gamma={t:0,dur:.78,start,control,end,baseScale:player.scale.clone(),damage:w.damage||2.4,radius:w.radius||6};
-  invincibleTimer=Math.max(invincibleTimer||0,.90);if(player.userData.playKayClip)player.userData.playKayClip('run',true,false,.78);toast('GAMMA LEAP');return true;
+  end.y=player.position.y;const control=start.clone().lerp(end,.5);control.y=start.y+4.35;
+  r.gamma={t:0,dur:1.30,start,control,end,baseScale:player.scale.clone(),damage:w.damage||2.4,radius:w.radius||6};
+  invincibleTimer=Math.max(invincibleTimer||0,1.42);if(player.userData.playKayClip)player.userData.playKayClip('leap',true,false,1.30);toast('GAMMA LEAP');return true;
 }
 function rhinoWBShatteredGround(center,radius){
   const g=new THREE.Group();g.position.set(center.x,.025,center.z);scene.add(g);
@@ -23769,7 +23770,8 @@ function updateRhinoGammaLeap(dt){
     rhinoWBShock(s.end,s.radius,RHINO_GREEN,.38);
     rhinoWBShock(s.end,s.radius*1.18,RHINO_PALE,.46);
     spawnEarthbreaker(s.end,s.radius*.82);
-    spawnBurst(s.end.x,.35,s.end.z,isMobile?16:28,FX_MAT_SPARK,5.2);
+    spawnBurst(s.end.x,.35,s.end.z,isMobile?20:34,FX_MAT_SPARK,6.3);
+    spawnEarthbreaker(s.end,s.radius*.98);
     triggerCombatShake(hits?22:14,320);
     knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.055);
     if(navigator.vibrate)navigator.vibrate(42);
@@ -23780,15 +23782,57 @@ function updateRhinoGammaLeap(dt){
 function triggerRhinoFreightTrain(w){
   const r=rhinoRuntime;if(r.freight||r.freightCooldown>0)return false;const dir=rhinoWBForward();
   dashActive=false;dashTimer=0;
-  r.freight={t:0,dur:.46,start:player.position.clone(),dir,drag:new Set(),damage:w.damage||2.8};invincibleTimer=Math.max(invincibleTimer||0,.56);
-  if(player.userData.playKayClip)player.userData.playKayClip('run',true,false,.46);toast('FREIGHT TRAIN CHARGE');return true;
+  r.freight={t:0,dur:.90,start:player.position.clone(),dir,drag:new Set(),damage:w.damage||2.8};invincibleTimer=Math.max(invincibleTimer||0,1.02);
+  if(player.userData.playKayClip)player.userData.playKayClip('run',true,false,.90);toast('FREIGHT TRAIN CHARGE');return true;
 }
 function updateRhinoFreightTrain(dt){
-  const r=rhinoRuntime;if(r.freightCooldown>0)r.freightCooldown=Math.max(0,r.freightCooldown-dt);const s=r.freight;if(!s)return;s.t+=dt;const u=Math.min(1,s.t/s.dur),e=1-Math.pow(1-u,3);player.position.copy(s.start).addScaledVector(s.dir,6*e);player.rotation.x=-THREE.MathUtils.degToRad(25);
-  for(const z of zombies){if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;if(Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=1.35)s.drag.add(z);}
-  let i=0;const side=new THREE.Vector3(s.dir.z,0,-s.dir.x);for(const z of s.drag){if(z.userData.dead)continue;const off=(i-(s.drag.size-1)/2)*.34;z.position.set(player.position.x+s.dir.x*1.35+side.x*off,z.position.y,player.position.z+s.dir.z*1.35+side.z*off);z.userData.hitStun=Math.max(z.userData.hitStun||0,.12);i++;}
+  const r=rhinoRuntime;
+  if(r.freightCooldown>0)r.freightCooldown=Math.max(0,r.freightCooldown-dt);
+  const s=r.freight;if(!s)return;
+  s.t+=dt;
+  const u=Math.min(1,s.t/s.dur);
+  // Smoothstep acceleration/deceleration reads as mass. The old ease-out
+  // covered most of the six units immediately and looked like a teleport.
+  const e=u*u*(3-2*u);
+  player.position.copy(s.start).addScaledVector(s.dir,6*e);
+
+  // Never tilt the gameplay/root group of a native-rigged model. Lean only
+  // the independent fit wrapper so collision, feet placement and skeleton
+  // presentation remain stable.
+  const fit=player.userData&&player.userData.greenRhinoFit;
+  if(fit)fit.rotation.x=-THREE.MathUtils.degToRad(10)*Math.sin(Math.PI*u);
+
+  for(const z of zombies){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    if(Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=1.55)
+      s.drag.add(z);
+  }
+
+  const side=new THREE.Vector3(s.dir.z,0,-s.dir.x);
+  let i=0;
+  for(const z of s.drag){
+    if(z.userData.dead)continue;
+    const count=Math.max(1,s.drag.size);
+    const lane=(i-(count-1)/2);
+    const sideOff=lane*.48;
+    const depth=1.55+(Math.abs(lane)%2)*.28;
+    const tx=player.position.x+s.dir.x*depth+side.x*sideOff;
+    const tz=player.position.z+s.dir.z*depth+side.z*sideOff;
+    // Ease enemies toward organized front lanes instead of teleporting every
+    // frame into one point. This prevents the broken-looking enemy pile.
+    const follow=Math.min(1,dt*9);
+    z.position.x=THREE.MathUtils.lerp(z.position.x,tx,follow);
+    z.position.z=THREE.MathUtils.lerp(z.position.z,tz,follow);
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,.16);
+    i++;
+  }
+
+  // Low capped dust beats make the travel itself readable at the slower speed.
+  if(Math.random()<dt*13)
+    spawnBurst(player.position.x,.12,player.position.z,isMobile?1:2,FX_MAT_SPARK,1.6);
+
   if(u>=1){
-    player.rotation.x=0;
+    if(fit)fit.rotation.x=0;
     for(const z of s.drag){
       if(z.userData.dead)continue;
       applyBulletDamage(z,s.damage*playerStats.power);
@@ -23799,12 +23843,14 @@ function updateRhinoFreightTrain(dt){
     const end=player.position.clone();
     // Heavy stop + forward rupture. This gives the charge a readable payoff
     // without adding a cooldown or making the travel itself unnaturally fast.
-    rhinoWBShock(end,2.3,RHINO_WHITE,.18);
-    rhinoWBShock(end,4.0,RHINO_GREEN,.34);
-    spawnBurst(end.x,.38,end.z,isMobile?18:30,FX_MAT_SPARK,5.5);
-    barbarianShockwave(end,player.rotation.y,{radius:4.2,damage:.45,force:8.5,stun:.32,color:RHINO_PALE});
-    triggerCombatShake(24,300);
-    knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.065);
+    rhinoWBShock(end,2.6,RHINO_WHITE,.18);
+    rhinoWBShock(end,4.6,RHINO_GREEN,.34);
+    rhinoWBShock(end,6.2,RHINO_PALE,.48);
+    spawnEarthbreaker(end,4.5);
+    spawnBurst(end.x,.38,end.z,isMobile?24:38,FX_MAT_SPARK,6.4);
+    barbarianShockwave(end,player.rotation.y,{radius:5.0,damage:.55,force:9.0,stun:.38,color:RHINO_PALE});
+    triggerCombatShake(30,390);
+    knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.085);
     if(navigator.vibrate)navigator.vibrate([34,18,48]);
     r.freight=null;
     r.freightCooldown=0;
@@ -23826,8 +23872,10 @@ function rhinoArenaCenter(out=new THREE.Vector3()){
   return out;
 }
 function rhinoCrashingWaveRadius(){
-  // Use the playable radius, not decorative geometry outside the arena.
-  return Math.max(12,(arenaSize||18)*.5);
+  // arenaSize is already the arena RADIUS (player collision is arenaSize-1).
+  // Extend slightly past that wall so the visible ring unmistakably clears the
+  // whole playable floor instead of dying exactly on the curb.
+  return Math.max(12,(arenaSize||18)+1.5);
 }
 function rhinoSpawnFireSphere(center){
   const g=new THREE.Group();
@@ -23858,7 +23906,7 @@ function rhinoSpawnFireSphere(center){
   return g;
 }
 function rhinoSpawnKillWave(center,color=RHINO_WHITE){
-  const r0=.55;
+  const r0=.72;
   const mesh=new THREE.Mesh(
     new THREE.RingGeometry(r0*.88,r0,72),
     new THREE.MeshBasicMaterial({
@@ -23881,16 +23929,18 @@ function rhinoSpawnKillWave(center,color=RHINO_WHITE){
 }
 function rhinoCrashingWaveTouch(wave){
   if(!wave||wave.done)return;
-  const r=wave.lastRadius;
-  const band=Math.max(.9,wave.maxRadius*.035);
+  const prev=Math.max(0,wave._prevRadius||0);
+  const now=wave.lastRadius;
+  const band=Math.max(1.0,wave.maxRadius*.032);
   for(const z of zombies){
     if(!z||z.userData.dead||z.userData.spawnPending||wave.hit.has(z))continue;
-    const dx=z.position.x, dz=z.position.z;
-    const d=Math.hypot(dx,dz);
-    if(Math.abs(d-r)<=band || (d<r && r-wave._prevRadius>=band*.75)){
+    const d=Math.hypot(z.position.x,z.position.z);
+    // Swept annulus: anything whose radius was crossed between the previous
+    // and current frame is hit. This remains reliable during an iPhone frame
+    // hitch and cannot "step over" an enemy.
+    if(d>=prev-band && d<=now+band){
       wave.hit.add(z);
       if(z.userData.archetype==='boss'){
-        // Boss stays a boss: one wave cannot erase it.
         applyBulletDamage(z,(z.userData.maxHp||z.userData.hp||1)*.08);
       }else{
         applyBulletDamage(z,Math.max(9999,(z.userData.maxHp||z.userData.hp||1)*4));
@@ -23907,7 +23957,7 @@ function rhinoUpdateKillWave(wave,dt){
   // Nearly linear outward travel so contact timing is predictable.
   const radius=.6+(wave.maxRadius-.6)*t;
   wave.lastRadius=radius;
-  wave.mesh.scale.setScalar(radius/.55);
+  wave.mesh.scale.setScalar(radius/.72);
   wave.mesh.material.opacity=.84*(1-t*.72);
   wave.mesh.rotation.z+=dt*.18;
   rhinoCrashingWaveTouch(wave);
