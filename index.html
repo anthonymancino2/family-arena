@@ -1,3 +1,4 @@
+<!-- V23.03.00 Green Ranger World-Breaker Thunder God Kit: keeps Twin Boomerang as the Ranger Primary and replaces the Ranger's old Rhino Charge / Boomerang Cyclone / Ricochet Bladestorm package with the requested procedural World-Breaker kit. SECONDARIES: Stormbreaker Overdrive sequentially ricochets one detached spinning axe through the three nearest enemies and returns it; Gamma Leap follows a real quadratic Bezier arc, squashes the avatar in flight and lands with radial pushback plus expanding shattered-ground geometry; Freight Train Charge tilts the Ranger forward and drives exactly 6 units over 0.20s while enemies touched are physically pinned to a moving cluster in front until release. ULTIMATES: World-Breaker Crashing Bolt launches the Ranger off-screen, grows a landing reticle for 0.8s, snaps him down with a two-frame canvas inversion, decaying 3D camera rumble and eight rising rock spikes; Shattered Domain physically separates two long floor halves to expose a glowing cyan chasm; Wrath of the Sky-Father locks movement for 3s, applies a pulsing green/cyan body glow and drops twelve procedural lightning cylinders across the arena. SIGNATURE: Ranger's kill-charged special is now Einherjar Echo, a single translucent primitive phantom that performs one math-driven God-Shatter Chop then shrinks to zero and deletes itself. Native Ranger Attack/Run clips are used only as optional body flavor on the real procedural movement; all trajectory, deformation, collision and camera motion is runtime math. Enemy/boss progression from V23.02.00 is preserved. -->
 <!-- V23.02.00 Endless Enemy + Boss Progression: rebuilds survival progression without changing hero kits. Live survival remains uncapped beyond Round 50 (the Round Select menu still intentionally tops out at 50 for practice starts). Enemy counts now grow on a sustainable endless curve instead of +10 forever, normal-enemy HP/speed/attack cadence scale smoothly by round, and later rounds progressively favor Runners, Spitters, Brutes and Shadows. Every 5th round is a boss round: one dedicated boss spawns first, grows harder every boss tier through HP, movement, attack cadence and ranged pressure, and displays a live top-center boss health bar. Bosses have global per-hit protection: any single standard damage event is capped at 8% max HP, guaranteeing that a healthy boss cannot be one-hit killed. Boss rounds still include normal enemies, bosses count toward the round target, and all progression formulas continue indefinitely. -->
 <!-- V22.27.21 Primal Rage Giant Focus: Primal Rage is rebuilt around Aesir herself rather than impact effects. Activation now creates one stun-only shockwave with zero damage and zero knockback, then Aesir becomes exactly 3x her normal size for the full 15 seconds. Automatic burn zones, repeated area damage, random enemy damage pulses, damaging activation, and damaging expiration burst are removed. While transformed, Primary and Secondary attacks gain 50% damage and retain the existing faster attack cadence; only Primary and Secondary combat is allowed, so the Ability/Ultimate special routes and Berserker Kin signature are blocked until Primal Rage ends. The visual aura is reduced to a restrained foot-level rage ring so the enlarged avatar remains the clear visual focus. -->
 <!-- V22.27.20 Primal Rage Titan Form: Primal Rage only. Aesir now grows to the exact Guardian Titan size multiplier (5x) for the full 15-second transformation, with world-space rage aura rings, rising flame/energy columns, heavier activation and ending pulses, and extra visual accents on attacks while enraged. The transformation restores Aesir to her normal avatar scale when it expires or runtime state is reset. Existing Primal Rage burn-zone gameplay, damage pulses, cooldown, and every other move remain unchanged. -->
@@ -1532,7 +1533,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.02.00 - Endless Enemy Boss Progression';
+const GAME_VERSION='23.03.00 - Ranger World Breaker Kit';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -1914,7 +1915,7 @@ const HERO_ROSTER_INFO = {
   barbarian:{title:'Aesir Barbarian',role:'SLOW • AREA BRUISER',desc:'A horned Norse berserker built around raw ground power. She is by far the SLOWEST avatar in the roster and cannot chase anything down - instead every single blow she lands throws a shockwave out of the impact point, so she is never fighting one enemy at a time. Two Primaries, three Secondaries, three selectable Ultimates, and a Berserker Kin clone special.'},
   
   cloud:{title:'Cloud',role:'MELEE • KNIGHT CLASS',desc:'Cloud is now the primary avatar for the Knight combat class. He uses his native 43-joint skeleton and Walk animation while running the complete Knight combat system. Future cosmetic skins can reuse this same Knight-class moveset without changing the combat logic.'},
-  rhino:{title:'Green Rhino Ranger',role:'MOBILE • SKIRMISHER',desc:'The mobile counterpart to the Aesir, and her deliberate inverse: where she is the slowest avatar in the roster and fights where she stands, the Ranger is fast and its damage leaves the body and comes back. Twin Boomerang throws both blades in a V that pierces out and sweeps home. Rhino Charge ploughs a corridor straight through a pack. Boomerang Cyclone orbits you without slowing you down. Ricochet Bladestorm sends eight blades out in a star and recalls them into one detonation. Uses its own 27-joint skeleton and the four animations baked into the source rig.'}
+  rhino:{title:'Green Rhino Ranger',role:'WORLD-BREAKER • THUNDER GOD',desc:'A mobile Hulk-Thor style Ranger built around one giant axe and procedural power moves. Twin Boomerang remains the Primary. Secondaries are Stormbreaker Overdrive, Gamma Leap and Freight Train Charge. Ultimates are World-Breaker Crashing Bolt, Shattered Domain and Wrath of the Sky-Father. His signature is Einherjar Echo, one phantom berserker that appears only long enough to deliver a God-Shatter Chop.'}
 };
 
 // Data-driven hero passives. This object had accidentally been merged into
@@ -3244,16 +3245,16 @@ const CHARACTER_COMBAT = {
   },
   rhino: {
     defaultId:'twin_boomerang',
-    // The deliberate inverse of the Aesir's 0.68. The Ranger trades her reach
-    // and area denial for mobility and damage that travels.
     baseMoveMult:1.06,
     weapons:{
       twin_boomerang:{name:'Twin Boomerang', price:0, slot:'primary', kind:'rhino_boomerang', cooldown:0.52, damage:1.4, radius:2.6, range:16, auto:true,
-        desc:'Throw both boomerangs at once in a shallow V. They curve apart, pierce everything in their lanes and sweep back across the same ground on the way home, so one press covers the lane twice. A short horn shockwave fires at your feet on release.'},
-      rhino_charge:{name:'Rhino Charge', price:240, slot:'secondary', kind:'rhino_charge', cooldown:1.15, damage:2.2, radius:2.3,
-        desc:'Commit to a forward plough. You keep your own momentum for the whole run, hitting everything you pass through exactly once and throwing it sideways rather than backwards, so you open a corridor straight through a pack. Plants into a wide horn toss on arrival.'},
-      boomerang_cyclone:{name:'Boomerang Cyclone', price:420, slot:'secondary', kind:'rhino_orbit', cooldown:3.0, damage:1.1, radius:3.5,
-        desc:'Both boomerangs leave your hands and orbit you for three and a half seconds, chewing and shoving anything they sweep through. Unlike the Aesir\'s cyclone it does not slow you down - you keep running while it works - and it closes with a release burst.'}
+        desc:'Throw both Ranger blades in a shallow V. They curve out, pierce their lanes and sweep back home.'},
+      stormbreaker_overdrive:{name:'Stormbreaker Overdrive', price:260, slot:'secondary', kind:'rhino_overdrive', cooldown:2.0, damage:2.0, radius:1.25, range:18,
+        desc:'Detach one giant axe, violently spin it through the three nearest enemies in sequence using live vector steering, then pull it back to your hand.'},
+      gamma_leap:{name:'Gamma Leap', price:340, slot:'secondary', kind:'rhino_gamma_leap', cooldown:3.5, damage:2.4, radius:6.0, range:10,
+        desc:'Tectonic vault along a true quadratic Bezier arc. The Ranger compresses in mid-air and lands with a distance-scaled radial shove and shattered-ground burst.'},
+      freight_train:{name:'Freight Train Charge', price:420, slot:'secondary', kind:'rhino_freight_train', cooldown:4.0, damage:2.8, radius:1.35, range:6,
+        desc:'Tilt forward and blast exactly 6 units in 0.20 seconds. Enemies touched are physically dragged in a helpless cluster in front until the charge releases them.'}
     }
   },
   barbarian: {
@@ -13465,14 +13466,28 @@ const BARBARIAN_WORLD_BREAKER = {id:'barbarian_world_breaker', name:'World Break
 const BARBARIAN_RAGNAROK_WAVE = {id:'barbarian_ragnarok_wave', name:'Primal Axe Wave', price:900, avatar:'barbarian', unlockLevel:18,
   desc:'THROWN WEAPON. Hurl six giant spinning axes outward in a full star, piercing every enemy in their lanes. At full extension they turn around and come flying back in, landing together in one recall slam at your feet. The only barbarian ultimate whose damage leaves you.'};
 
-const RHINO_BLADESTORM = {id:'rhino_bladestorm', name:'Ricochet Bladestorm', price:640,
-  desc:'THROWN WEAPON. Hurl eight boomerangs outward in a full star. They curve as they fly, pierce every enemy in their lane, turn around at full extension and come curving back in, landing together in one recall detonation at your feet. The Ranger ultimate whose damage leaves the body.'};
-const HERO_ABILITIES = { rhino:[RHINO_BLADESTORM], mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
+const RHINO_CRASHING_BOLT = {id:'rhino_crashing_bolt', name:'World-Breaker Crashing Bolt', price:640, avatar:'rhino', unlockLevel:5,
+  desc:'Launch off-screen, telegraph the impact for 0.8 seconds, then crash down with a two-frame flash, heavy camera rumble and eight rising rock spikes.'};
+const RHINO_SHATTERED_DOMAIN = {id:'rhino_shattered_domain', name:'The Shattered Domain', price:760, avatar:'rhino', unlockLevel:14,
+  desc:'Rip a long strip of earth into two physical halves and force them apart, exposing a glowing cyan continental chasm underneath.'};
+const RHINO_SKY_FATHER = {id:'rhino_sky_father', name:'Wrath of the Sky-Father', price:900, avatar:'rhino', unlockLevel:18,
+  desc:'Lock into an overloaded green/cyan state for 3 seconds while twelve lightning bolts rain around the arena, each impact dealing area damage and shaking the camera.'};
+const HERO_ABILITIES = { rhino:[RHINO_CRASHING_BOLT,RHINO_SHATTERED_DOMAIN,RHINO_SKY_FATHER], mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
   knight:[KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER, KNIGHT_JUDGMENT_ULTIMATE],
   wolverine:[WOLVERINE_SHADOW_CLONES, WOLVERINE_BERSERKER_FRENZY, WOLVERINE_ADAMANTIUM_QUAKE],
   barbarian:[BARBARIAN_PRIMAL_RAGE, BARBARIAN_WORLD_BREAKER, BARBARIAN_RAGNAROK_WAVE] };
 const REMOVED_WEAPON_IDS=['radiant_cleave','blade_cyclone','holy_wave','shield_bash','banner_spear','knight_banner_spear','primal_wave'];
 function sanitizeRemovedAbilitySelection(){
+  // V23.03.00 Ranger kit migration: preserve old Ranger saves by mapping the
+  // retired Boomerang kit selections onto the first World-Breaker choices.
+  if(currentWeaponId==='rhino_charge'||currentWeaponId==='boomerang_cyclone'){
+    currentWeaponId='stormbreaker_overdrive';
+    if(ownedWeapons)ownedWeapons.stormbreaker_overdrive=true;
+  }
+  if(equippedAbilityId==='rhino_bladestorm'){
+    equippedAbilityId='rhino_crashing_bolt';
+    if(ownedAbilities)ownedAbilities.rhino_crashing_bolt=true;
+  }
   // V22.27.09: Rending Slash moved from Primary to Secondary. Preserve an
   // existing runtime selection instead of silently dropping it.
   if(currentPrimaryWeaponId==='feral_onslaught'){
@@ -13882,6 +13897,7 @@ function setupControls(){
       if(knightGuardianGiantActive()) return;
       triggerKnightRoyalGuardClones();
     }else if(barbarianIsActive()){
+      if(rhinoIsActive()){ triggerRhinoEinherjarEcho(); return; }
       // Primal Rage locks every special/signature route except Primary/Secondary.
       if(barbarianUltimateActive>0)return;
       triggerBerserkerKin();
@@ -16007,11 +16023,17 @@ function updateHoodedHud(){
           : 'KNIGHTS OF THE ROUND READY');
     }
     else if(isBarbarian){
-      const kinCount=barbarianKinClones.length;
-      btn.textContent=kinCount?'KIN!':(pct>=100?'KIN!':'KIN');
-      meter.textContent=kinCount
-        ? `KIN ${kinCount} · ${barbarianKinTimer.toFixed(1)}s`
-        : 'FURY '+Math.round(pct)+'%';
+      if(rhinoIsActive()){
+        const echoActive=!!(rhinoRuntime&&rhinoRuntime.echo);
+        btn.textContent=echoActive?'ECHO!':(pct>=100?'ECHO!':'ECHO');
+        meter.textContent=echoActive?'EINHERJAR CHOP':'ECHO '+Math.round(pct)+'%';
+      }else{
+        const kinCount=barbarianKinClones.length;
+        btn.textContent=kinCount?'KIN!':(pct>=100?'KIN!':'KIN');
+        meter.textContent=kinCount
+          ? `KIN ${kinCount} · ${barbarianKinTimer.toFixed(1)}s`
+          : 'FURY '+Math.round(pct)+'%';
+      }
     }
   }else{
     btn.classList.remove('ready');
@@ -22698,13 +22720,14 @@ function knightAbilityCooldownInfo(){
         activeTime:active?barbarianRuntime.wbActive:undefined
       };
     }
-    case 'rhino_bladestorm': {
-      const active=rhinoRuntime.bsActive>0;
-      return {
-        label:'BLADESTORM',
-        cd:rhinoRuntime.bsCooldown||0, active,
-        activeTime:active?rhinoRuntime.bsTimer:undefined
-      };
+    case 'rhino_crashing_bolt': {
+      const active=!!rhinoRuntime.crashing;return {label:active?'CRASHING':'CRASH BOLT',cd:rhinoRuntime.crashingCooldown||0,active,activeTime:active?rhinoRuntime.crashing.t:undefined};
+    }
+    case 'rhino_shattered_domain': {
+      const active=!!rhinoRuntime.domain;return {label:active?'CHASM':'DOMAIN',cd:rhinoRuntime.domainCooldown||0,active,activeTime:active?rhinoRuntime.domain.t:undefined};
+    }
+    case 'rhino_sky_father': {
+      const active=!!rhinoRuntime.sky;return {label:active?'TEMPEST':'SKY-FATHER',cd:rhinoRuntime.skyCooldown||0,active,activeTime:active?Math.max(0,3-rhinoRuntime.sky.t):undefined};
     }
     case 'barbarian_ragnarok_wave': {
       const active=barbarianRuntime.rfActive>0;
@@ -22725,8 +22748,13 @@ function triggerWolverineEquippedAbility(){
 }
 function triggerBarbarianEquippedAbility(){
   if(!barbarianIsActive())return;
-  // The Ranger shares the class chassis but not the ultimate.
-  if(rhinoIsActive()){ triggerRhinoBladestorm(); return; }
+  // Green Ranger owns a dedicated three-ultimate World-Breaker kit.
+  if(rhinoIsActive()){
+    if(equippedAbilityId==='rhino_crashing_bolt')triggerRhinoCrashingBolt();
+    else if(equippedAbilityId==='rhino_shattered_domain')triggerRhinoShatteredDomain();
+    else if(equippedAbilityId==='rhino_sky_father')triggerRhinoSkyFather();
+    return;
+  }
   // During Primal Rage, only Primary and Secondary combat is allowed.
   if(barbarianUltimateActive>0)return;
   if(equippedAbilityId==='barbarian_primal_rage') triggerPrimalRage();
@@ -23173,28 +23201,37 @@ const RHINO_PALE  = 0xbdf5d8;
 const RHINO_WHITE = 0xf2fffa;
 
 let rhinoRuntime = {
-  charge:0, chargeDir:{x:0,z:0}, chargeHits:null, chargeCooldown:0, chargeStopUsed:false,
-  chargeDamage:0, orbitDamage:0, orbiters:null,
-  orbit:0, orbitAngle:0, orbitCooldown:0, orbitTick:0,
-  bsActive:0, bsStage:0, bsTimer:0, bsOriginX:0, bsOriginZ:0, bsYaw:0, bsReach:0,
-  bsCooldown:0,
-  throwSide:0
+  throwSide:0,
+  overdrive:null, overdriveCooldown:0,
+  gamma:null, gammaCooldown:0,
+  freight:null, freightCooldown:0,
+  crashing:null, crashingCooldown:0,
+  domain:null, domainCooldown:0,
+  sky:null, skyCooldown:0,
+  echo:null, echoCooldown:0,
+  // retained compatibility fields for older helper code paths
+  charge:0, chargeDir:{x:0,z:0}, chargeHits:null, chargeCooldown:0, chargeStopUsed:false, chargeDamage:0,
+  orbit:0, orbitAngle:0, orbitCooldown:0, orbitTick:0, orbitDamage:0, orbiters:null,
+  bsActive:0, bsStage:0, bsTimer:0, bsOriginX:0, bsOriginZ:0, bsYaw:0, bsReach:0, bsCooldown:0
 };
 
 function rhinoResetRuntime(){
-  // Drop any live cyclone blades before the runtime that owns them is replaced,
-  // otherwise they are orphaned in the scene on avatar change or round reset.
-  rhinoClearOrbiters();
+  try{rhinoClearOrbiters();}catch(_e){}
+  try{rhinoWorldBreakerCleanup(true);}catch(_e){}
   rhinoRuntime = {
-    charge:0, chargeDir:{x:0,z:0}, chargeHits:null, chargeCooldown:0, chargeStopUsed:false,
-    chargeDamage:0,
+    throwSide:0,
+    overdrive:null, overdriveCooldown:0,
+    gamma:null, gammaCooldown:0,
+    freight:null, freightCooldown:0,
+    crashing:null, crashingCooldown:0,
+    domain:null, domainCooldown:0,
+    sky:null, skyCooldown:0,
+    echo:null, echoCooldown:0,
+    charge:0, chargeDir:{x:0,z:0}, chargeHits:null, chargeCooldown:0, chargeStopUsed:false, chargeDamage:0,
     orbit:0, orbitAngle:0, orbitCooldown:0, orbitTick:0, orbitDamage:0, orbiters:null,
-    bsActive:0, bsStage:0, bsTimer:0, bsOriginX:0, bsOriginZ:0, bsYaw:0, bsReach:0,
-    bsCooldown:0,
-    throwSide:0
+    bsActive:0, bsStage:0, bsTimer:0, bsOriginX:0, bsOriginZ:0, bsYaw:0, bsReach:0, bsCooldown:0
   };
 }
-
 /* ---------------------------------------------------------------------
    BOOMERANG PROJECTILE
    Built on the same bullet plumbing as the Aesir's Primal Axe so it
@@ -23348,6 +23385,161 @@ function doRhinoBoomerangThrow(w){
   player.position.x=step.x;player.position.z=step.z;
 }
 
+
+/* =====================================================================
+   GREEN RANGER — WORLD-BREAKER THUNDER GOD PROCEDURAL KIT  (V23.03.00)
+   ===================================================================== */
+function rhinoWBForward(){ return new THREE.Vector3(Math.sin(player.rotation.y),0,Math.cos(player.rotation.y)).normalize(); }
+function rhinoWorldBreakerMovementLocked(){ const r=rhinoRuntime;return !!(r&&(r.gamma||r.freight||r.crashing||r.sky)); }
+function rhinoWBDispose(root){ if(!root)return; try{if(root.parent)root.parent.remove(root);disposeGroup(root);}catch(_e){} }
+function rhinoWBMakeAxe(color=RHINO_PALE){
+  const g=new THREE.Group();
+  const handle=new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,2.15,6),new THREE.MeshBasicMaterial({color:0x3b3028}));
+  handle.rotation.x=Math.PI/2; handle.position.z=.15; g.add(handle);
+  const head=new THREE.Mesh(new THREE.BoxGeometry(1.15,.34,.50),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.96}));
+  head.position.z=1.05; g.add(head);
+  const edge=new THREE.Mesh(new THREE.BoxGeometry(1.42,.12,.18),new THREE.MeshBasicMaterial({color:RHINO_WHITE,transparent:true,opacity:.88,blending:THREE.AdditiveBlending,depthWrite:false}));
+  edge.position.set(0,.05,1.34);g.add(edge);
+  return g;
+}
+function rhinoWBShock(center,radius,color=RHINO_GREEN,life=.35){ knightShockRing(center,radius,color,life); }
+function rhinoWBRadial(center,radius,damage,force){
+  let hits=0;
+  for(const z of zombies){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    const dx=z.position.x-center.x,dz=z.position.z-center.z,d=Math.hypot(dx,dz);
+    if(d>radius)continue;
+    const fall=1-Math.min(1,d/radius);
+    applyBulletDamage(z,damage*playerStats.power*(.65+.35*fall));hits++;
+    const n=Math.max(.001,d);z.userData.knockbackX=(dx/n)*force*(.55+.45*fall);z.userData.knockbackZ=(dz/n)*force*(.55+.45*fall);
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,.25+.25*fall);
+  }
+  return hits;
+}
+function rhinoWBNearest3(){
+  return zombies.filter(z=>z&&z.userData&&!z.userData.dead&&!z.userData.spawnPending)
+    .sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position)).slice(0,3);
+}
+function triggerRhinoOverdrive(w){
+  const r=rhinoRuntime;if(r.overdrive||r.overdriveCooldown>0)return false;
+  const targets=rhinoWBNearest3();if(!targets.length)return false;
+  const axe=rhinoWBMakeAxe(RHINO_PALE);axe.position.copy(player.position);axe.position.y+=1.05;scene.add(axe);
+  r.overdrive={axe,targets,index:0,phase:'targets',speed:24,returnSpeed:30,hit:new Set(),damage:w.damage||2.0};
+  if(player.userData.playKayClip)player.userData.playKayClip('attack',true,true,.34);
+  triggerCombatShake(7,110);toast('STORMBREAKER OVERDRIVE');return true;
+}
+function updateRhinoOverdrive(dt){
+  const r=rhinoRuntime;if(r.overdriveCooldown>0)r.overdriveCooldown=Math.max(0,r.overdriveCooldown-dt);const s=r.overdrive;if(!s)return;
+  const axe=s.axe;if(!axe||!axe.parent){r.overdrive=null;return;}axe.rotation.z+=dt*36;axe.rotation.y+=dt*19;
+  let goal=null;
+  if(s.phase==='targets'){
+    while(s.index<s.targets.length&&(s.targets[s.index].userData.dead||!s.targets[s.index].parent))s.index++;
+    if(s.index>=s.targets.length)s.phase='return';else goal=s.targets[s.index].position;
+  }
+  if(s.phase==='return')goal=player.position;if(!goal)return;
+  const gy=(s.phase==='return'?player.position.y+1.0:goal.y+.85);const v=new THREE.Vector3(goal.x-axe.position.x,gy-axe.position.y,goal.z-axe.position.z);const d=v.length();if(d>.001)v.multiplyScalar(1/d);
+  axe.position.addScaledVector(v,(s.phase==='return'?s.returnSpeed:s.speed)*dt);
+  if(knightFxBudget(1)&&Math.random()<dt*24)spawnBurst(axe.position.x,axe.position.y,axe.position.z,1,FX_MAT_SPARK,1.3);
+  if(d<.72){
+    if(s.phase==='targets'){
+      const z=s.targets[s.index];if(z&&!s.hit.has(z)){s.hit.add(z);applyBulletDamage(z,s.damage*playerStats.power);const f=rhinoWBForward();z.userData.knockbackX=f.x*5;z.userData.knockbackZ=f.z*5;z.userData.hitStun=Math.max(z.userData.hitStun||0,.22);rhinoWBShock(z.position,1.25,RHINO_PALE,.18);triggerCombatShake(6,70);}
+      s.index++;if(s.index>=s.targets.length)s.phase='return';
+    }else{rhinoWBDispose(axe);r.overdrive=null;r.overdriveCooldown=2.0;triggerCombatShake(4,65);}
+  }
+}
+function triggerRhinoGammaLeap(w){
+  const r=rhinoRuntime;if(r.gamma||r.gammaCooldown>0)return false;
+  dashActive=false;dashTimer=0;
+  const start=player.position.clone(),dir=rhinoWBForward();let dist=Math.min(w.range||10,10);const target=findNearestEnemy(14);let end;
+  if(target){const dv=new THREE.Vector3(target.position.x-start.x,0,target.position.z-start.z);if(dv.length()>.001)dv.normalize();dist=Math.min(dist,Math.max(4,Math.hypot(target.position.x-start.x,target.position.z-start.z)));end=start.clone().addScaledVector(dv,dist);}else end=start.clone().addScaledVector(dir,dist);
+  end.y=player.position.y;const control=start.clone().lerp(end,.5);control.y=start.y+5.0;
+  r.gamma={t:0,dur:.62,start,control,end,baseScale:player.scale.clone(),damage:w.damage||2.4,radius:w.radius||6};
+  invincibleTimer=Math.max(invincibleTimer||0,.72);if(player.userData.playKayClip)player.userData.playKayClip('run',true,false,.62);toast('GAMMA LEAP');return true;
+}
+function rhinoWBShatteredGround(center,radius){
+  const g=new THREE.Group();g.position.set(center.x,.025,center.z);scene.add(g);
+  for(let i=0;i<10;i++){const a=i*Math.PI*2/10+(i%2)*.08,len=radius*(.38+(i%3)*.10);const m=new THREE.Mesh(new THREE.BoxGeometry(.08,.035,len),new THREE.MeshBasicMaterial({color:i%2?0x173c37:0x2d4a42,transparent:true,opacity:.88}));m.position.set(Math.sin(a)*len*.45,0,Math.cos(a)*len*.45);m.rotation.y=a;g.add(m);}
+  fx.push({kind:'rhinoWBGround',mesh:g,life:1.35,maxLife:1.35,dispose:true});
+}
+function updateRhinoGammaLeap(dt){
+  const r=rhinoRuntime;if(r.gammaCooldown>0)r.gammaCooldown=Math.max(0,r.gammaCooldown-dt);const s=r.gamma;if(!s)return;s.t+=dt;const u=Math.min(1,s.t/s.dur),v=1-u;
+  player.position.set(v*v*s.start.x+2*v*u*s.control.x+u*u*s.end.x,v*v*s.start.y+2*v*u*s.control.y+u*u*s.end.y,v*v*s.start.z+2*v*u*s.control.z+u*u*s.end.z);
+  const air=Math.sin(Math.PI*u);player.scale.set(s.baseScale.x*(1+.16*air),s.baseScale.y*(1-.40*air),s.baseScale.z*(1+.16*air));player.rotation.x=-.15*air;
+  if(u>=1){player.position.copy(s.end);player.scale.copy(s.baseScale);player.rotation.x=0;const hits=rhinoWBRadial(s.end,s.radius,s.damage,10);rhinoWBShatteredGround(s.end,s.radius);rhinoWBShock(s.end,s.radius,RHINO_GREEN,.38);spawnEarthbreaker(s.end,s.radius*.72);triggerCombatShake(hits?17:10,260);r.gamma=null;r.gammaCooldown=3.5;}
+}
+function triggerRhinoFreightTrain(w){
+  const r=rhinoRuntime;if(r.freight||r.freightCooldown>0)return false;const dir=rhinoWBForward();
+  dashActive=false;dashTimer=0;
+  r.freight={t:0,dur:.20,start:player.position.clone(),dir,drag:new Set(),damage:w.damage||2.8};invincibleTimer=Math.max(invincibleTimer||0,.30);
+  if(player.userData.playKayClip)player.userData.playKayClip('run',true,false,.25);toast('FREIGHT TRAIN CHARGE');return true;
+}
+function updateRhinoFreightTrain(dt){
+  const r=rhinoRuntime;if(r.freightCooldown>0)r.freightCooldown=Math.max(0,r.freightCooldown-dt);const s=r.freight;if(!s)return;s.t+=dt;const u=Math.min(1,s.t/s.dur),e=1-Math.pow(1-u,3);player.position.copy(s.start).addScaledVector(s.dir,6*e);player.rotation.x=-THREE.MathUtils.degToRad(25);
+  for(const z of zombies){if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;if(Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=1.35)s.drag.add(z);}
+  let i=0;const side=new THREE.Vector3(s.dir.z,0,-s.dir.x);for(const z of s.drag){if(z.userData.dead)continue;const off=(i-(s.drag.size-1)/2)*.34;z.position.set(player.position.x+s.dir.x*1.35+side.x*off,z.position.y,player.position.z+s.dir.z*1.35+side.z*off);z.userData.hitStun=Math.max(z.userData.hitStun||0,.12);i++;}
+  if(u>=1){player.rotation.x=0;for(const z of s.drag){if(z.userData.dead)continue;applyBulletDamage(z,s.damage*playerStats.power);z.userData.knockbackX=s.dir.x*9;z.userData.knockbackZ=s.dir.z*9;z.userData.hitStun=Math.max(z.userData.hitStun||0,.38);}rhinoWBShock(player.position,3.2,RHINO_GREEN,.28);triggerCombatShake(16,190);r.freight=null;r.freightCooldown=4.0;}
+}
+function rhinoWBFlash(frames=2){
+  const c=renderer&&renderer.domElement;if(!c)return;const old=c.style.filter;c.style.filter='invert(1) brightness(2.4) contrast(1.35)';setTimeout(()=>{c.style.filter=old;},Math.max(16,frames*16));
+}
+function rhinoWBSpawnRocks(center){
+  const arr=[];for(let i=0;i<8;i++){const a=i*Math.PI*2/8,h=2.2+(i%3)*.55,m=new THREE.Mesh(new THREE.ConeGeometry(.55,h,5),new THREE.MeshBasicMaterial({color:0x51453c}));m.position.set(center.x+Math.sin(a)*4.0,-h*.5,center.z+Math.cos(a)*4.0);m.rotation.z=(i%2?1:-1)*.12;scene.add(m);arr.push({m,h,startY:m.position.y});}return arr;
+}
+function triggerRhinoCrashingBolt(){
+  const r=rhinoRuntime;if(r.crashing||r.crashingCooldown>0)return false;markUltimateUsed();const land=player.position.clone();
+  dashActive=false;dashTimer=0;
+  const ret=new THREE.Mesh(new THREE.RingGeometry(.75,1,48),new THREE.MeshBasicMaterial({color:RHINO_PALE,transparent:true,opacity:.85,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));ret.rotation.x=-Math.PI/2;ret.position.set(land.x,.05,land.z);ret.scale.setScalar(.1);scene.add(ret);
+  r.crashing={t:0,land,ret,impacted:false,rocks:null};player.position.y+=25;invincibleTimer=Math.max(invincibleTimer||0,1.2);toast('WORLD-BREAKER CRASHING BOLT');return true;
+}
+function updateRhinoCrashingBolt(dt){
+  const r=rhinoRuntime;if(r.crashingCooldown>0)r.crashingCooldown=Math.max(0,r.crashingCooldown-dt);const s=r.crashing;if(!s)return;s.t+=dt;
+  if(s.t<.8){const u=s.t/.8,e=1-Math.pow(1-u,3);s.ret.scale.setScalar(.1+6.4*e);s.ret.rotation.z+=dt*4;return;}
+  if(!s.impacted){s.impacted=true;player.position.copy(s.land);rhinoWBDispose(s.ret);rhinoWBFlash(2);const hits=rhinoWBRadial(s.land,8,8.0,14);s.rocks=rhinoWBSpawnRocks(s.land);rhinoWBShock(s.land,8.5,RHINO_WHITE,.48);spawnEarthbreaker(s.land,7.2);triggerCombatShake(hits?30:22,850);if(player.userData.playKayClip)player.userData.playKayClip('attack',true,true,.55);}
+  if(s.rocks){const u=Math.min(1,(s.t-.8)/.22);for(const q of s.rocks)q.m.position.y=THREE.MathUtils.lerp(q.startY,q.h*.5,u);}
+  if(s.t>=1.55){if(s.rocks)for(const q of s.rocks)rhinoWBDispose(q.m);r.crashing=null;r.crashingCooldown=18;}
+}
+function triggerRhinoShatteredDomain(){
+  const r=rhinoRuntime;if(r.domain||r.domainCooldown>0)return false;markUltimateUsed();const dir=rhinoWBForward(),yaw=player.rotation.y,g=new THREE.Group();
+  const mat=new THREE.MeshBasicMaterial({color:0x3a332e});const left=new THREE.Mesh(new THREE.BoxGeometry(2.5,.12,10),mat.clone()),right=left.clone(),energy=new THREE.Mesh(new THREE.BoxGeometry(1.1,.05,10),new THREE.MeshBasicMaterial({color:0x2ffff0,transparent:true,opacity:.78,blending:THREE.AdditiveBlending,depthWrite:false}));left.position.x=-1.25;right.position.x=1.25;energy.position.y=-.06;g.add(left,right,energy);g.position.copy(player.position).addScaledVector(dir,5);g.position.y=.03;g.rotation.y=yaw;scene.add(g);
+  r.domain={t:0,g,left,right,energy,hit:false};if(player.userData.playKayClip)player.userData.playKayClip('attack',true,true,.52);toast('THE SHATTERED DOMAIN');return true;
+}
+function updateRhinoShatteredDomain(dt){
+  const r=rhinoRuntime;if(r.domainCooldown>0)r.domainCooldown=Math.max(0,r.domainCooldown-dt);const s=r.domain;if(!s)return;s.t+=dt;const u=Math.min(1,s.t/.42),e=1-Math.pow(1-u,3);s.left.position.x=-1.25-1.5*e;s.right.position.x=1.25+1.5*e;s.energy.material.opacity=.58+.20*Math.sin(s.t*18);
+  if(!s.hit&&s.t>.18){s.hit=true;const dir=rhinoWBForward(),origin=player.position.clone();for(const z of zombies){if(!z||!z.userData||z.userData.dead)continue;const rel=new THREE.Vector3(z.position.x-origin.x,0,z.position.z-origin.z);const forward=rel.dot(dir),side=Math.abs(rel.x*dir.z-rel.z*dir.x);if(forward>=0&&forward<=10&&side<=3.2){applyBulletDamage(z,5.0*playerStats.power);z.userData.hitStun=Math.max(z.userData.hitStun||0,.7);}}triggerCombatShake(20,420);}
+  if(s.t>=2.0){rhinoWBDispose(s.g);r.domain=null;r.domainCooldown=20;}
+}
+function rhinoWBApplyGlow(enable){
+  if(!player)return;if(enable){if(player.userData.rhinoGlowBackup)return;const back=[];player.traverse(o=>{if(!o.isMesh||!o.material)return;const mats=Array.isArray(o.material)?o.material:[o.material];for(const m of mats){back.push([m,m.color?m.color.clone():null,m.emissive?m.emissive.clone():null,m.emissiveIntensity]);if(m.color)m.color.setHex(0x5dff8a);if(m.emissive)m.emissive.setHex(0x27ffe0);if('emissiveIntensity'in m)m.emissiveIntensity=1.8;}});player.userData.rhinoGlowBackup=back;}else{const b=player.userData.rhinoGlowBackup||[];for(const [m,c,e,ei] of b){if(c&&m.color)m.color.copy(c);if(e&&m.emissive)m.emissive.copy(e);if(ei!=null&&'emissiveIntensity'in m)m.emissiveIntensity=ei;}player.userData.rhinoGlowBackup=null;}
+}
+function rhinoWBSpawnLightning(){
+  const a=Math.random()*Math.PI*2,d=Math.sqrt(Math.random())*Math.max(7,(arenaSize||18)*.72),x=player.position.x+Math.sin(a)*d,z=player.position.z+Math.cos(a)*d;const h=8;
+  const bolt=new THREE.Mesh(new THREE.CylinderGeometry(.08,.22,h,5),new THREE.MeshBasicMaterial({color:0x43fff0,transparent:true,opacity:.92,blending:THREE.AdditiveBlending,depthWrite:false}));bolt.position.set(x,10,z);scene.add(bolt);return {bolt,x,z,hit:false};
+}
+function triggerRhinoSkyFather(){
+  const r=rhinoRuntime;if(r.sky||r.skyCooldown>0)return false;markUltimateUsed();r.sky={t:0,next:0,count:0,bolts:[]};
+  dashActive=false;dashTimer=0;invincibleTimer=Math.max(invincibleTimer||0,3.2);rhinoWBApplyGlow(true);toast('WRATH OF THE SKY-FATHER');return true;
+}
+function updateRhinoSkyFather(dt){
+  const r=rhinoRuntime;if(r.skyCooldown>0)r.skyCooldown=Math.max(0,r.skyCooldown-dt);const s=r.sky;if(!s)return;s.t+=dt;
+  while(s.count<12&&s.t>=s.next){s.bolts.push(rhinoWBSpawnLightning());s.count++;s.next=s.count*(3/12);}
+  const pulse=.85+.15*Math.sin(s.t*18);if(player)player.scale.setScalar((AVATAR_SCALE.rhino||1)*pulse);
+  for(let i=s.bolts.length-1;i>=0;i--){const b=s.bolts[i];b.bolt.position.y-=34*dt;if(b.bolt.position.y<=4){if(!b.hit){b.hit=true;const p={x:b.x,y:0,z:b.z};rhinoWBShock(p,2.4,RHINO_PALE,.20);rhinoWBRadial(p,2.2,3.8,6);triggerCombatShake(8,95);}rhinoWBDispose(b.bolt);s.bolts.splice(i,1);}}
+  if(s.t>=3.0&&s.bolts.length===0){rhinoWBApplyGlow(false);if(player)player.scale.setScalar(AVATAR_SCALE.rhino||1);r.sky=null;r.skyCooldown=24;}
+}
+function triggerRhinoEinherjarEcho(){
+  const r=rhinoRuntime;if(!gameRunning||!rhinoIsActive()||!player||r.echo)return false;if(barbarianUltimateCharge<99.5){toast('Einherjar Echo still charging');return false;}barbarianUltimateCharge=0;updateHoodedHud();markUltimateUsed();
+  const target=findNearestEnemy(18);const dir=target?new THREE.Vector3(target.position.x-player.position.x,0,target.position.z-player.position.z).normalize():rhinoWBForward();const pos=target?target.position.clone():player.position.clone().addScaledVector(dir,4);pos.y=0;
+  const g=new THREE.Group(),body=new THREE.Mesh(new THREE.CapsuleGeometry(.55,1.15,4,8),new THREE.MeshBasicMaterial({color:0x46ff7c,transparent:true,opacity:.48,depthWrite:false,blending:THREE.AdditiveBlending})),axe=rhinoWBMakeAxe(0x48fff0);body.position.y=1.1;axe.position.set(.65,1.55,.25);axe.rotation.x=-THREE.MathUtils.degToRad(65);g.add(body,axe);g.position.copy(pos);g.rotation.y=Math.atan2(dir.x,dir.z);scene.add(g);r.echo={t:0,g,axe,startRot:axe.rotation.x,hit:false};toast('EINHERJAR ECHO');return true;
+}
+function updateRhinoEinherjarEcho(dt){
+  const r=rhinoRuntime;const s=r.echo;if(!s)return;s.t+=dt;
+  if(s.t<=.10){const u=s.t/.10,e=u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;s.axe.rotation.x=s.startRot+THREE.MathUtils.degToRad(90)*e;s.axe.scale.z=1+1.5*e;return;}
+  if(!s.hit){s.hit=true;const f=new THREE.Vector3(Math.sin(s.g.rotation.y),0,Math.cos(s.g.rotation.y)),impact=s.g.position.clone().addScaledVector(f,1.7);rhinoWBRadial(impact,3.5,4.0,8);rhinoWBShock(impact,3.5,RHINO_GREEN,.22);spawnEarthbreaker(impact,2.8);triggerCombatShake(15,150);}
+  const u=Math.min(1,(s.t-.10)/.08),sc=1-(1-Math.pow(1-u,3));s.g.scale.setScalar(Math.max(0,1-sc));if(u>=1){rhinoWBDispose(s.g);r.echo=null;}
+}
+function rhinoWorldBreakerCleanup(force=false){
+  const r=rhinoRuntime||{};for(const key of ['overdrive','crashing','domain','echo']){const s=r[key];if(!s)continue;for(const obj of [s.axe,s.ret,s.g])if(obj)rhinoWBDispose(obj);if(s.rocks)for(const q of s.rocks)rhinoWBDispose(q.m);}if(r.sky&&r.sky.bolts)for(const b of r.sky.bolts)rhinoWBDispose(b.bolt);rhinoWBApplyGlow(false);if(player&&rhinoIsActive()){player.rotation.x=0;player.scale.setScalar(AVATAR_SCALE.rhino||1);}r.overdrive=r.gamma=r.freight=r.crashing=r.domain=r.sky=r.echo=null;
+}
 /* ---------------------------------------------------------------------
    SECONDARY — RHINO CHARGE
    A committed forward plough. The Ranger keeps moving under its own
@@ -23683,33 +23875,29 @@ function updateRhinoBladestorm(dt){
    --------------------------------------------------------------------- */
 function doRhinoAttack(w){
   spawnHeroIdentityAura();
-  if(barbarianUltimateActive>0){
-    w={...w};
-    if(Number.isFinite(w.damage))w.damage*=1.5;
-  }
   faceEnemyTarget(findNearestEnemy(Math.max(10,(w.range||w.radius||6)*1.4)));
-
   if(w.kind==='rhino_boomerang'){
     if(player.userData.playKayClip)player.userData.playKayClip('attack',true,true,.30);
     doRhinoBoomerangThrow(w);
-  } else if(w.kind==='rhino_charge'){
-    triggerRhinoCharge(w);
-  } else if(w.kind==='rhino_orbit'){
-    triggerRhinoOrbit(w);
-  }
+  }else if(w.kind==='rhino_overdrive')triggerRhinoOverdrive(w);
+  else if(w.kind==='rhino_gamma_leap')triggerRhinoGammaLeap(w);
+  else if(w.kind==='rhino_freight_train')triggerRhinoFreightTrain(w);
 }
-
 function isRhinoWeaponKind(kind){
-  return kind==='rhino_boomerang'||kind==='rhino_charge'||kind==='rhino_orbit';
+  return kind==='rhino_boomerang'||kind==='rhino_overdrive'||kind==='rhino_gamma_leap'||kind==='rhino_freight_train';
 }
 
 function updateRhinoCombat(dt){
   if(!rhinoIsActive())return;
   try{
-    updateRhinoCharge(dt);
-    updateRhinoOrbit(dt);
-    updateRhinoBladestorm(dt);
-  }catch(err){ console.error('Ranger update recovered:',err); }
+    updateRhinoOverdrive(dt);
+    updateRhinoGammaLeap(dt);
+    updateRhinoFreightTrain(dt);
+    updateRhinoCrashingBolt(dt);
+    updateRhinoShatteredDomain(dt);
+    updateRhinoSkyFather(dt);
+    updateRhinoEinherjarEcho(dt);
+  }catch(err){ console.error('Ranger World-Breaker update recovered:',err); }
 }
 
 function doBarbarianAttack(w){
@@ -28320,6 +28508,7 @@ function clearBarbarianKinClones(){
   barbarianKinTimer=0;
 }
 function triggerBerserkerKin(){
+  if(rhinoIsActive())return triggerRhinoEinherjarEcho();
   if(!gameRunning||!barbarianIsActive()||!player)return false;
   if(barbarianKinCooldown>0)return false;
   if(barbarianUltimateCharge<99.5){toast('Berserker Kin still charging');return false;}
@@ -30818,7 +31007,7 @@ function update(dt){
   // Dash: a quick burst in the facing direction, overrides normal
   // movement input while active.
   if(dashCooldownTimer>0) dashCooldownTimer -= dt;
-  if(dashActive){
+  if(dashActive && !rhinoWorldBreakerMovementLocked()){
     if(state.avatarType==='hooded'){shadowAfterimageTimer-=dt;if(shadowAfterimageTimer<=0){spawnAfterimage();shadowAfterimageTimer=.045;spawnShadowSmoke(player.position.x,player.position.y+.45,player.position.z,3);}}
     const nx = player.position.x + dashDir.x*DASH_SPEED*dt;
     const nz = player.position.z + dashDir.z*DASH_SPEED*dt;
@@ -30831,7 +31020,7 @@ function update(dt){
       dashActive=false;
       dashTimer=0;
     }
-  } else if((moveVec.x || moveVec.y) && !knightMovementLocked()){
+  } else if((moveVec.x || moveVec.y) && !knightMovementLocked() && !rhinoWorldBreakerMovementLocked()){
     const forward = -moveVec.y, strafe = moveVec.x;
     const mx = Math.sin(camYaw)*forward - Math.cos(camYaw)*strafe;
     const mz = Math.cos(camYaw)*forward + Math.sin(camYaw)*strafe;
