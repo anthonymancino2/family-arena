@@ -1,3 +1,4 @@
+<!-- V23.03.13 Armageddon Super Meteor Barrage: replaces Armageddon's custom low-poly stone rain and single final meteor with the Mage's actual Super Meteor visual system. After the Ranger's existing off-screen leap, center crash and 8-second map-wide stun, Mage-style Super Meteors repeatedly fall across the arena for 10 full seconds using the same giant meteor mesh, lava wire shell, aura, flame ring, fire trail, warning marker, orange atmosphere, impact flash, shock rings, molten debris, crater and surviving-enemy burn aura as Super Meteor. Armageddon meteor impacts instantly eliminate most normal enemies inside the enormous Super Meteor radius; any survivor is stunned for 3 seconds and burned for 5 seconds, including bosses. Bosses remain protected from one-shot damage. The old Armageddon stone geometry/material pools, stonefall code and 85%-map final meteor implementation are removed. Cleanup and syntax audit included. -->
 <!-- V23.03.12 Five-Hit Stormbreaker: upgrades Stormbreaker Overdrive from a slow three-target throw into a fast five-hit chain. The axe now acquires up to five nearest living enemies, travels substantially faster between hits, and snaps back to the Ranger at an even higher return speed after hit #5. Each contact gets a brighter dual-ring/spark impact, hit #5 gets a much larger finishing detonation and hit-stop, and the returning catch gets a stronger visual burst. The move still has zero cooldown; holding Secondary can activate it again immediately after the axe is caught. Old nearest-3 targeting logic is removed. Cleanup and syntax audit included. -->
 <!-- V23.03.11 Armageddon Ultimate: replaces Wrath of the Sky-Father with ARMAGEDDON while preserving the legacy rhino_sky_father save ID. Activation sends Green Ranger extremely high off-screen, relocates him to exact arena center while hidden, then returns him in a violent center crash. The landing immediately stuns every enemy already on the map for 8.0 seconds. A five-second bombardment follows with many giant round stone projectiles using shared low-poly geometry/materials for iPhone efficiency; each stone has its own ground warning and impact burst. After the stone rain ends, one enormous meteor whose diameter is about 85% of the playable map diameter descends slowly onto center. Its final impact creates a huge map-wide shockwave and eliminates every normal enemy on the map. Bosses retain the project's anti-one-shot rule and instead receive the existing capped boss-safe damage. Old Sky-Father lightning/glow code and runtime state are removed. Cleanup and syntax audit included. -->
 <!-- V23.03.10 Equipped Titan Secondary + Steerable Long Charge: Titan Rampage no longer cycles through all Ranger Secondaries. While transformed, the Secondary button uses only the Secondary actually equipped before the match, with Titan damage/radius scaling applied to that move. Freight Train Charge distance is doubled from 6 to 12 units and rebuilt as a steerable heavy charge: it no longer follows one frozen activation direction. The charge advances incrementally each frame while its travel vector eases toward the Ranger's current facing, allowing responsive left/right steering without twitchy snapping. Duration is 1.45s to preserve heavyweight motion across the longer distance. Dragged enemies follow the curved charge path in stable lanes. Removed the now-unused Titan Secondary rotation index/helpers and stale NEXT-move toast logic. Cleanup and syntax audit included. -->
@@ -1634,7 +1635,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.03.12 - Five-Hit Stormbreaker';
+const GAME_VERSION='23.03.13 - Armageddon Super Meteor Barrage';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -13713,7 +13714,7 @@ const RHINO_CRASHING_BOLT = {id:'rhino_crashing_bolt', name:'World-Breaker Crash
 const RHINO_SHATTERED_DOMAIN = {id:'rhino_shattered_domain', name:'Titan Rampage', price:760, avatar:'rhino', unlockLevel:14,
   desc:'TRANSFORMATION. Grow to the exact same 5x size as Knight Guardian Titan for the same 15-second duration and use the same cooldown curve. Primary remains available. Secondary keeps using only the move you actually equipped before the match. Giant attacks use Knight Titan-scaled power and combat reach.'};
 const RHINO_SKY_FATHER = {id:'rhino_sky_father', name:'Armageddon', price:900, avatar:'rhino', unlockLevel:18,
-  desc:'Leap impossibly high off-screen, return to the exact arena center and crash down, stunning every enemy already on the map for 8 seconds. Then giant round stones bombard the arena for 5 seconds before one meteor about 85% of the playable map diameter slowly falls into center for a final map-clearing impact.'};
+  desc:'Leap impossibly high off-screen, return to exact arena center and crash down, stunning every enemy already on the map for 8 seconds. Then the Mage\'s giant Super Meteors continuously rain across the arena for 10 seconds. Most normal enemies caught by an impact are instantly erased; survivors, including bosses, are stunned and burned.'};
 const HERO_ABILITIES = { rhino:[RHINO_CRASHING_BOLT,RHINO_SHATTERED_DOMAIN,RHINO_SKY_FATHER], mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
   knight:[KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER, KNIGHT_JUDGMENT_ULTIMATE],
   wolverine:[WOLVERINE_SHADOW_CLONES, WOLVERINE_BERSERKER_FRENZY, WOLVERINE_ADAMANTIUM_QUAKE],
@@ -23028,9 +23029,9 @@ function knightAbilityCooldownInfo(){
       const active=!!rhinoRuntime.armageddon;
       const s=rhinoRuntime.armageddon;
       const label=!active?'ARMAGEDDON':
-        s.phase==='stones'?'STONEFALL '+Math.max(0,5-s.t).toFixed(1):
-        s.phase==='meteor'?'METEOR':
-        s.phase==='impact'?'IMPACT':'ARMAGEDDON';
+        s.phase==='barrage'?'METEORS '+Math.max(0,RHINO_ARMAGEDDON_BARRAGE_TIME-s.t).toFixed(1):
+        s.phase==='descent'?'DESCENT':
+        s.phase==='leap'||s.phase==='hang'?'ASCENDING':'ARMAGEDDON';
       return {label,cd:rhinoRuntime.armageddonCooldown||0,active,activeTime:active?s.t:undefined};
     }
     case 'barbarian_ragnarok_wave': {
@@ -24459,33 +24460,13 @@ function updateRhinoTitanRampage(dt){
    Shared stone geometry/materials keep the many-projectile phase inexpensive.
    --------------------------------------------------------------------- */
 const RHINO_ARMAGEDDON_COOLDOWN=24;
-const RHINO_ARMAGEDDON_STONE_TIME=5.0;
 const RHINO_ARMAGEDDON_STUN=8.0;
-const RHINO_ARMAGEDDON_STONE_CAP_MOBILE=24;
-const RHINO_ARMAGEDDON_STONE_CAP_DESKTOP=38;
-
-let RHINO_ARMAGEDDON_STONE_GEO=null;
-let RHINO_ARMAGEDDON_STONE_MAT=null;
-let RHINO_ARMAGEDDON_WARN_GEO=null;
-let RHINO_ARMAGEDDON_WARN_MAT=null;
-
-function rhinoArmageddonEnsureShared(){
-  if(!RHINO_ARMAGEDDON_STONE_GEO)
-    RHINO_ARMAGEDDON_STONE_GEO=new THREE.IcosahedronGeometry(1,1);
-  if(!RHINO_ARMAGEDDON_STONE_MAT)
-    RHINO_ARMAGEDDON_STONE_MAT=new THREE.MeshStandardMaterial({
-      color:0x625a50,roughness:.88,metalness:.02
-    });
-  if(!RHINO_ARMAGEDDON_WARN_GEO)
-    RHINO_ARMAGEDDON_WARN_GEO=new THREE.RingGeometry(.72,1,28);
-  if(!RHINO_ARMAGEDDON_WARN_MAT)
-    RHINO_ARMAGEDDON_WARN_MAT=new THREE.MeshBasicMaterial({
-      color:0xffb34a,transparent:true,opacity:.46,side:THREE.DoubleSide,depthWrite:false
-    });
-}
+const RHINO_ARMAGEDDON_BARRAGE_TIME=10.0;
+const RHINO_ARMAGEDDON_DROP_INTERVAL=.95;
+const RHINO_ARMAGEDDON_MAX_ACTIVE=3;
 
 function rhinoArmageddonArenaRadius(){
-  return Math.max(12,(arenaSize||18)-1.35);
+  return Math.max(10,(arenaSize||18)-2.0);
 }
 
 function rhinoArmageddonStunAll(seconds=RHINO_ARMAGEDDON_STUN){
@@ -24501,110 +24482,86 @@ function rhinoArmageddonStunAll(seconds=RHINO_ARMAGEDDON_STUN){
   return count;
 }
 
-function rhinoArmageddonSpawnStone(s){
-  rhinoArmageddonEnsureShared();
-  const cap=isMobile?RHINO_ARMAGEDDON_STONE_CAP_MOBILE:RHINO_ARMAGEDDON_STONE_CAP_DESKTOP;
-  if(s.stones.length>=cap)return;
-
+function rhinoArmageddonMeteorTarget(){
   const R=rhinoArmageddonArenaRadius();
   const a=Math.random()*Math.PI*2;
   const d=Math.sqrt(Math.random())*R;
-  const x=Math.sin(a)*d;
-  const z=Math.cos(a)*d;
-  const radius=1.45+Math.random()*1.55;
-
-  const stone=new THREE.Mesh(RHINO_ARMAGEDDON_STONE_GEO,RHINO_ARMAGEDDON_STONE_MAT);
-  stone.scale.set(radius*(.9+Math.random()*.24),radius*(.9+Math.random()*.22),radius*(.9+Math.random()*.24));
-  stone.position.set(x,17+Math.random()*10,z);
-  stone.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
-  stone.castShadow=true;
-  scene.add(stone);
-
-  const warn=new THREE.Mesh(RHINO_ARMAGEDDON_WARN_GEO,RHINO_ARMAGEDDON_WARN_MAT.clone());
-  warn.rotation.x=-Math.PI/2;
-  warn.position.set(x,.055,z);
-  warn.scale.setScalar(radius*1.45);
-  scene.add(warn);
-
-  s.stones.push({
-    stone,warn,x,z,
-    vy:12+Math.random()*7,
-    spinX:(Math.random()-.5)*3.5,
-    spinY:(Math.random()-.5)*4.5,
-    radius,
-    hit:false
-  });
+  return {x:Math.sin(a)*d,z:Math.cos(a)*d};
 }
 
-function rhinoArmageddonImpactStone(entry){
-  const p={x:entry.x,y:0,z:entry.z};
-  rhinoWBShock(p,entry.radius*2.0,RHINO_PALE,.18);
-  spawnBurst(entry.x,.35,entry.z,isMobile?8:14,FX_MAT_SPARK,entry.radius*2.4);
-  // Stone rain hurts and keeps pressure on the stunned army, but the guaranteed
-  // full normal-enemy wipe is reserved for the final meteor.
-  rhinoWBRadial(p,Math.max(2.2,entry.radius*1.45),2.4,5.5);
-  triggerCombatShake(5,70);
-}
+function rhinoArmageddonWarning(x,z){
+  // Same ground-warning visual language as Mage Super Meteor.
+  const group=new THREE.Group();
+  group.position.set(x,.04,z);
 
-function rhinoArmageddonMeteorRadius(){
-  // Diameter ~= 85% of playable map diameter.
-  return rhinoArmageddonArenaRadius()*.85;
-}
-
-function rhinoArmageddonMakeMeteor(){
-  const radius=rhinoArmageddonMeteorRadius();
-  const g=new THREE.Group();
-
-  const rock=new THREE.Mesh(
-    new THREE.IcosahedronGeometry(radius,2),
-    new THREE.MeshStandardMaterial({
-      color:0x3d2a24,
-      emissive:0xff4917,
-      emissiveIntensity:1.15,
-      roughness:.82,
-      metalness:.03
-    })
-  );
-  g.add(rock);
-
-  const shell=new THREE.Mesh(
-    new THREE.IcosahedronGeometry(radius*1.06,1),
+  const ring=new THREE.Mesh(
+    new THREE.RingGeometry(SUPER_METEOR_RADIUS*.72,SUPER_METEOR_RADIUS,64),
     new THREE.MeshBasicMaterial({
-      color:0xff7b21,transparent:true,opacity:.20,depthWrite:false,
+      color:0xff5c28,
+      transparent:true,
+      opacity:.62,
+      side:THREE.DoubleSide,
+      depthWrite:false,
       blending:THREE.AdditiveBlending
     })
   );
-  g.add(shell);
+  ring.rotation.x=-Math.PI/2;
+  group.add(ring);
 
-  const halo=new THREE.Mesh(
-    new THREE.SphereGeometry(radius*1.20,14,10),
+  const disc=new THREE.Mesh(
+    new THREE.CircleGeometry(SUPER_METEOR_RADIUS*.66,48),
     new THREE.MeshBasicMaterial({
-      color:0xffb33c,transparent:true,opacity:.10,depthWrite:false,
-      side:THREE.DoubleSide,blending:THREE.AdditiveBlending
+      color:0xff7b2b,
+      transparent:true,
+      opacity:.18,
+      side:THREE.DoubleSide,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending
     })
   );
-  g.add(halo);
+  disc.rotation.x=-Math.PI/2;
+  disc.position.y=.002;
+  group.add(disc);
 
-  g.position.set(0,Math.max(42,radius*3.2),0);
-  scene.add(g);
-  return {g,rock,shell,halo,radius,startY:g.position.y};
+  scene.add(group);
+  return {group,ring,disc};
 }
 
-function rhinoArmageddonFinalWipe(center){
-  let killed=0,bossesHit=0;
-  for(const z of [...zombies]){
-    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-    if(z.userData.archetype==='boss'){
-      // Preserve the project's explicit "bosses cannot be one-hit killed" rule.
-      applyBulletDamage(z,(z.userData.maxHp||z.userData.hp||1)*.08);
-      z.userData.hitStun=Math.max(z.userData.hitStun||0,3.0);
-      bossesHit++;
-    }else{
-      applyBulletDamage(z,Math.max(999999,(z.userData.maxHp||z.userData.hp||1)*20));
-      killed++;
-    }
+function rhinoArmageddonSpawnSuperMeteor(s){
+  if(s.meteors.length>=RHINO_ARMAGEDDON_MAX_ACTIVE)return false;
+
+  const target=rhinoArmageddonMeteorTarget();
+  // Exact Mage Super Meteor falling mesh.
+  const mesh=makeSuperMeteorMesh();
+  mesh.position.set(target.x,22,target.z);
+  scene.add(mesh);
+
+  const warning=rhinoArmageddonWarning(target.x,target.z);
+
+  s.meteors.push({
+    mesh,
+    marker:warning.group,
+    markerRing:warning.ring,
+    warningDisc:warning.disc,
+    x:target.x,
+    z:target.z,
+    fallSpeed:6.2
+  });
+
+  s.dropCount++;
+  return true;
+}
+
+function rhinoArmageddonClearMeteor(m){
+  if(!m)return;
+  if(m.mesh&&m.mesh.parent){
+    scene.remove(m.mesh);
+    disposeGroup(m.mesh);
   }
-  return {killed,bossesHit};
+  if(m.marker&&m.marker.parent){
+    scene.remove(m.marker);
+    disposeGroup(m.marker);
+  }
 }
 
 function triggerRhinoArmageddon(){
@@ -24621,10 +24578,9 @@ function triggerRhinoArmageddon(){
     phase:'leap',
     t:0,
     start:player.position.clone(),
-    stones:[],
-    stoneSpawn:0,
-    meteor:null,
-    impactDone:false
+    meteors:[],
+    spawnTimer:0,
+    dropCount:0
   };
 
   invincibleTimer=Math.max(invincibleTimer||0,16);
@@ -24637,14 +24593,16 @@ function triggerRhinoArmageddon(){
 
 function updateRhinoArmageddon(dt){
   const r=rhinoRuntime;
-  if(r.armageddonCooldown>0)r.armageddonCooldown=Math.max(0,r.armageddonCooldown-dt);
+  if(r.armageddonCooldown>0)
+    r.armageddonCooldown=Math.max(0,r.armageddonCooldown-dt);
+
   const s=r.armageddon;
   if(!s||!player)return;
 
   invincibleTimer=Math.max(invincibleTimer||0,.30);
   s.t+=dt;
 
-  // 1) Extreme leap from wherever the Ranger was standing.
+  // 1) Huge leap from the Ranger's current location.
   if(s.phase==='leap'){
     const u=Math.min(1,s.t/.72);
     const e=1-Math.pow(1-u,3);
@@ -24656,7 +24614,6 @@ function updateRhinoArmageddon(dt){
       spawnBurst(player.position.x,Math.max(.2,player.position.y-.7),player.position.z,1,FX_MAT_SPARK,1.5);
 
     if(u>=1){
-      // Hidden relocation: when he comes back, it is ALWAYS exact map center.
       player.visible=false;
       player.position.set(0,52,0);
       s.phase='hang';
@@ -24665,7 +24622,7 @@ function updateRhinoArmageddon(dt){
     return;
   }
 
-  // 2) A brief off-screen beat makes the height unmistakable.
+  // 2) Off-screen beat, then exact-center descent.
   if(s.phase==='hang'){
     if(s.t>=.36){
       s.phase='descent';
@@ -24676,7 +24633,6 @@ function updateRhinoArmageddon(dt){
     return;
   }
 
-  // 3) Fast but readable center descent.
   if(s.phase==='descent'){
     const u=Math.min(1,s.t/.82);
     const e=u*u;
@@ -24685,113 +24641,86 @@ function updateRhinoArmageddon(dt){
 
     if(u>=1){
       player.position.set(0,0,0);
-      s.phase='stones';
+      s.phase='barrage';
       s.t=0;
-      s.stoneSpawn=0;
+      s.spawnTimer=0;
 
       const stunned=rhinoArmageddonStunAll(8.0);
+
+      // Use the Mage meteor atmosphere itself.
+      beginMeteorAtmosphere();
       rhinoWBFlash(2);
       spawnEarthbreaker(player.position,10.5);
       rhinoWBShock(player.position,5.5,RHINO_WHITE,.20);
       rhinoWBShock(player.position,10.5,RHINO_PALE,.34);
-      rhinoWBShock(player.position,rhinoArmageddonArenaRadius(),RHINO_GREEN,.60);
+      rhinoWBShock(player.position,Math.max(12,arenaSize||18),RHINO_GREEN,.60);
       spawnBurst(0,.45,0,isMobile?34:58,FX_MAT_SPARK,10);
       triggerCombatShake(44,1050);
       knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.12);
       if(navigator.vibrate)navigator.vibrate([110,45,170]);
+
       toast(`ARMAGEDDON · ${stunned} ENEMIES STUNNED`);
     }
     return;
   }
 
-  // 4) Five full seconds of many giant round falling stones.
-  if(s.phase==='stones'){
-    const rate=isMobile?8.0:12.0; // spawns/sec; active list is capped.
-    s.stoneSpawn-=dt;
-    while(s.stoneSpawn<=0 && s.t<RHINO_ARMAGEDDON_STONE_TIME){
-      rhinoArmageddonSpawnStone(s);
-      s.stoneSpawn+=1/rate;
+  // 3) Ten full seconds of repeated ACTUAL Mage Super Meteors.
+  if(s.phase==='barrage'){
+    s.spawnTimer-=dt;
+
+    if(s.t<RHINO_ARMAGEDDON_BARRAGE_TIME && s.spawnTimer<=0){
+      if(rhinoArmageddonSpawnSuperMeteor(s))
+        s.spawnTimer+=RHINO_ARMAGEDDON_DROP_INTERVAL;
+      else
+        s.spawnTimer=.12; // wait briefly for an active meteor to impact
     }
 
-    for(let i=s.stones.length-1;i>=0;i--){
-      const q=s.stones[i];
-      q.stone.position.y-=q.vy*dt;
-      q.stone.rotation.x+=q.spinX*dt;
-      q.stone.rotation.y+=q.spinY*dt;
-      const height=Math.max(.2,q.stone.position.y);
-      q.warn.material.opacity=.18+.30*Math.max(0,1-height/28);
+    for(let i=s.meteors.length-1;i>=0;i--){
+      const m=s.meteors[i];
 
-      if(q.stone.position.y<=q.radius*.72){
-        rhinoArmageddonImpactStone(q);
-        rhinoWBDispose(q.stone);
-        rhinoWBDispose(q.warn);
-        s.stones.splice(i,1);
+      m.mesh.position.y-=m.fallSpeed*dt;
+      m.mesh.rotation.x+=dt*.75;
+      m.mesh.rotation.y+=dt*1.05;
+
+      if(m.mesh.userData.lava)
+        m.mesh.userData.lava.rotation.y-=dt*1.7;
+
+      if(m.mesh.userData.flameRing){
+        m.mesh.userData.flameRing.rotation.z+=dt*2.4;
+        m.mesh.userData.flameRing.material.opacity=.42+Math.sin(performance.now()*.018)*.12;
+      }
+
+      if(m.mesh.userData.trail){
+        const trailPulse=1+Math.sin(performance.now()*.015)*.08;
+        m.mesh.userData.trail.scale.set(trailPulse,1,trailPulse);
+        m.mesh.userData.trail.material.opacity=.24+Math.sin(performance.now()*.02)*.08;
+      }
+
+      const pulse=1+Math.sin(performance.now()*.012)*.06;
+      m.marker.scale.setScalar(pulse);
+      if(m.markerRing)
+        m.markerRing.material.opacity=.48+Math.sin(performance.now()*.015)*.14;
+      if(m.warningDisc)
+        m.warningDisc.material.opacity=.14+Math.sin(performance.now()*.013)*.06;
+      m.marker.rotation.y+=dt*.22;
+
+      if(m.mesh.position.y<=1.5){
+        // Same Mage impact visuals, Armageddon lethality/status mode.
+        impactSuperMeteor(m,'armageddon');
+        rhinoArmageddonClearMeteor(m);
+        s.meteors.splice(i,1);
       }
     }
 
-    if(s.t>=RHINO_ARMAGEDDON_STONE_TIME){
-      // Stop spawning, allow currently falling stones a brief cleanup window,
-      // then begin the giant center meteor.
-      s.phase='meteor';
-      s.t=0;
-      s.meteor=rhinoArmageddonMakeMeteor();
-      toast('ARMAGEDDON · FINAL METEOR');
+    // Spawn for exactly ten seconds; then let the last falling meteors finish.
+    if(s.t>=RHINO_ARMAGEDDON_BARRAGE_TIME && s.meteors.length===0){
+      endMeteorAtmosphere();
+      player.visible=true;
+      player.position.set(0,0,0);
+      toast(`ARMAGEDDON COMPLETE · ${s.dropCount} METEORS`);
+      r.armageddon=null;
+      r.armageddonCooldown=RHINO_ARMAGEDDON_COOLDOWN;
     }
-    return;
-  }
-
-  // 5) One huge meteor, ~85% of playable map diameter, descends slowly.
-  if(s.phase==='meteor'){
-    const m=s.meteor;
-    if(!m)return;
-    const duration=3.25;
-    const u=Math.min(1,s.t/duration);
-    const e=u*u*(3-2*u);
-    m.g.position.y=THREE.MathUtils.lerp(m.startY,m.radius*.52,e);
-    m.g.rotation.x+=dt*.18;
-    m.g.rotation.y+=dt*.26;
-    const pulse=1+.025*Math.sin(s.t*10);
-    m.shell.scale.setScalar(pulse);
-    m.halo.material.opacity=.08+.08*u;
-
-    // Increasing rumble makes the enormous slow descent feel dangerous.
-    triggerCombatShake(4+u*15,75);
-
-    if(u>=1&&!s.impactDone){
-      s.impactDone=true;
-      s.phase='impact';
-      s.t=0;
-
-      const result=rhinoArmageddonFinalWipe(player.position);
-      rhinoWBFlash(2);
-      spawnEarthbreaker(player.position,rhinoArmageddonArenaRadius());
-      rhinoWBShock(player.position,8,RHINO_WHITE,.20);
-      rhinoWBShock(player.position,rhinoArmageddonArenaRadius()*.55,0xff8a24,.38);
-      rhinoWBShock(player.position,rhinoArmageddonArenaRadius()+1.5,0xffd36a,.70);
-      spawnBurst(0,.6,0,isMobile?44:78,FX_MAT_SPARK,14);
-      triggerCombatShake(58,1450);
-      knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.16);
-      if(navigator.vibrate)navigator.vibrate([140,55,220]);
-
-      // Dispose any stones still airborne when the final meteor hits.
-      for(const q of s.stones){
-        rhinoWBDispose(q.stone);
-        rhinoWBDispose(q.warn);
-      }
-      s.stones.length=0;
-      if(s.meteor&&s.meteor.g)rhinoWBDispose(s.meteor.g);
-      s.meteor=null;
-
-      toast(`ARMAGEDDON · ${result.killed} ENEMIES ERASED`);
-    }
-    return;
-  }
-
-  if(s.phase==='impact'&&s.t>=1.15){
-    player.visible=true;
-    player.position.set(0,0,0);
-    r.armageddon=null;
-    r.armageddonCooldown=RHINO_ARMAGEDDON_COOLDOWN;
   }
 }
 
@@ -24814,11 +24743,9 @@ function rhinoWorldBreakerCleanup(force=false){
     if(s.waves)for(const w of s.waves)if(w&&w.mesh)rhinoWBDispose(w.mesh);
   }
   if(r.armageddon){
-    if(r.armageddon.stones)for(const q of r.armageddon.stones){
-      if(q.stone)rhinoWBDispose(q.stone);
-      if(q.warn)rhinoWBDispose(q.warn);
-    }
-    if(r.armageddon.meteor&&r.armageddon.meteor.g)rhinoWBDispose(r.armageddon.meteor.g);
+    if(r.armageddon.meteors)
+      for(const m of r.armageddon.meteors)rhinoArmageddonClearMeteor(m);
+    endMeteorAtmosphere();
   }
   if(r.titanFx)rhinoWBDispose(r.titanFx);
   if(player&&rhinoIsActive()){
@@ -27780,7 +27707,7 @@ function triggerSuperMeteor(){
   abilityButtonCooldown(SUPER_METEOR_COOLDOWN);
 }
 
-function impactSuperMeteor(m){
+function impactSuperMeteor(m,mode='mage'){
   const stressed=mageStressVisualLoad();
   spawnBurst(m.x,.7,m.z,stressed?34:120,FX_MAT_SPARK,34.0);
   spawnArcaneImpact(m.x,.18,m.z,'fire');
@@ -27934,16 +27861,36 @@ function impactSuperMeteor(m){
     if(Math.hypot(enemy.position.x-m.x,enemy.position.z-m.z)>SUPER_METEOR_RADIUS)continue;
 
     const type=enemy.userData.archetype||'walker';
-    const damage=type==='boss'
-      ? (enemy.userData.maxHp||enemy.userData.hp)*.20
-      : 6.5*playerStats.power;
+    const maxHp=Math.max(1,enemy.userData.maxHp||enemy.userData.hp||1);
 
-    applyBulletDamage(enemy,damage);
+    if(mode==='armageddon'){
+      // Armageddon is deliberately far more lethal than the Mage cast.
+      // Normal enemies have an 82% instant-elimination roll on each impact.
+      // Bosses never enter that roll and retain the project's boss anti-one-shot rule.
+      if(type!=='boss' && Math.random()<.82){
+        applyBulletDamage(enemy,Math.max(999999,maxHp*20));
+      }else{
+        const survivorHit=type==='boss'?maxHp*.08:maxHp*.42;
+        applyBulletDamage(enemy,survivorHit);
+      }
+    }else{
+      const damage=type==='boss'
+        ? maxHp*.20
+        : 6.5*playerStats.power;
+      applyBulletDamage(enemy,damage);
+    }
+
     if(enemy.userData.dead)continue;
 
+    // Every Armageddon survivor gets the SAME recognizable Super Meteor
+    // stun/burn presentation, including bosses.
     enemy.userData.hitStun=Math.max(enemy.userData.hitStun||0,SUPER_METEOR_STUN);
     enemy.userData.burnTimer=Math.max(enemy.userData.burnTimer||0,SUPER_METEOR_BURN);
-    enemy.userData.burnDps=Math.max(enemy.userData.burnDps||0,.55*playerStats.power);
+    const armageddonBurn=type==='boss'?maxHp*.018:Math.max(.85*playerStats.power,maxHp*.045);
+    enemy.userData.burnDps=Math.max(
+      enemy.userData.burnDps||0,
+      mode==='armageddon'?armageddonBurn:.55*playerStats.power
+    );
 
     if(!enemy.userData.superMeteorBurnFx){
       const burnAura=new THREE.Mesh(
