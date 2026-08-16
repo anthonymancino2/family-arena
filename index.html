@@ -1,3 +1,4 @@
+<!-- V23.03.14 Ranger Defensive Whirlwind: removes Freight Train Charge and replaces that Ranger Secondary slot with Cloud's Defensive Whirlwind combat behavior. The Ranger version reuses the existing Knight/Cloud whirlwind tuning and visual helpers: the same round-scaled active duration, 0.22s damage pulses, outward knockback, stagger, projectile deflection, layered sword/shield-style spin arcs, activation flare and ending guard burst. Ranger Secondary rules remain authoritative, so this version has zero post-use cooldown and can restart immediately while Secondary is held once the current Whirlwind duration ends. The same 0.55 movement multiplier applies while spinning. Titan Rampage scales Whirlwind radius/damage with the giant form but still uses only the equipped Secondary. Green Rhino's clean model-fit wrapper now receives the spin instead of rotating the native-rigged gameplay root. Old Freight Train trigger/update/runtime/dispatch code is removed. Cleanup and syntax audit included. -->
 <!-- V23.03.13 Armageddon Super Meteor Barrage: replaces Armageddon's custom low-poly stone rain and single final meteor with the Mage's actual Super Meteor visual system. After the Ranger's existing off-screen leap, center crash and 8-second map-wide stun, Mage-style Super Meteors repeatedly fall across the arena for 10 full seconds using the same giant meteor mesh, lava wire shell, aura, flame ring, fire trail, warning marker, orange atmosphere, impact flash, shock rings, molten debris, crater and surviving-enemy burn aura as Super Meteor. Armageddon meteor impacts instantly eliminate most normal enemies inside the enormous Super Meteor radius; any survivor is stunned for 3 seconds and burned for 5 seconds, including bosses. Bosses remain protected from one-shot damage. The old Armageddon stone geometry/material pools, stonefall code and 85%-map final meteor implementation are removed. Cleanup and syntax audit included. -->
 <!-- V23.03.12 Five-Hit Stormbreaker: upgrades Stormbreaker Overdrive from a slow three-target throw into a fast five-hit chain. The axe now acquires up to five nearest living enemies, travels substantially faster between hits, and snaps back to the Ranger at an even higher return speed after hit #5. Each contact gets a brighter dual-ring/spark impact, hit #5 gets a much larger finishing detonation and hit-stop, and the returning catch gets a stronger visual burst. The move still has zero cooldown; holding Secondary can activate it again immediately after the axe is caught. Old nearest-3 targeting logic is removed. Cleanup and syntax audit included. -->
 <!-- V23.03.11 Armageddon Ultimate: replaces Wrath of the Sky-Father with ARMAGEDDON while preserving the legacy rhino_sky_father save ID. Activation sends Green Ranger extremely high off-screen, relocates him to exact arena center while hidden, then returns him in a violent center crash. The landing immediately stuns every enemy already on the map for 8.0 seconds. A five-second bombardment follows with many giant round stone projectiles using shared low-poly geometry/materials for iPhone efficiency; each stone has its own ground warning and impact burst. After the stone rain ends, one enormous meteor whose diameter is about 85% of the playable map diameter descends slowly onto center. Its final impact creates a huge map-wide shockwave and eliminates every normal enemy on the map. Bosses retain the project's anti-one-shot rule and instead receive the existing capped boss-safe damage. Old Sky-Father lightning/glow code and runtime state are removed. Cleanup and syntax audit included. -->
@@ -1635,7 +1636,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.03.13 - Armageddon Super Meteor Barrage';
+const GAME_VERSION='23.03.14 - Ranger Defensive Whirlwind';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3369,8 +3370,8 @@ const CHARACTER_COMBAT = {
         desc:'Detach one giant axe, violently spin it through the three nearest enemies in sequence using live vector steering, then pull it back to your hand.'},
       gamma_leap:{name:'Gamma Leap', price:340, slot:'secondary', kind:'rhino_gamma_leap', cooldown:0, damage:2.4, radius:6.0, range:10,
         desc:'Tectonic vault along a true quadratic Bezier arc. The Ranger compresses in mid-air and lands with a distance-scaled radial shove and shattered-ground burst.'},
-      freight_train:{name:'Freight Train Charge', price:420, slot:'secondary', kind:'rhino_freight_train', cooldown:0, damage:2.8, radius:1.35, range:6,
-        desc:'Tilt forward and blast exactly 6 units in 0.20 seconds. Enemies touched are physically dragged in a helpless cluster in front until the charge releases them.'}
+      freight_train:{name:'Defensive Whirlwind', price:420, slot:'secondary', kind:'rhino_cloud_whirlwind', cooldown:0, damage:0, radius:3.25,
+        desc:'Cloud-style moving Defensive Whirlwind. Repeatedly damages and pushes enemies outward, deflects weak projectiles and uses the same round-scaled duration as Cloud. Green Ranger has no post-use cooldown, so holding Secondary can immediately restart it when the current spin ends.'}
     }
   },
   barbarian: {
@@ -13491,7 +13492,8 @@ function updateSecondaryButton(){
     cooldown=mirrorReadyCount>0?0:(pending.length?Math.min(...pending):0);
   }
   const whirlwindActive=!!(w&&((w.kind==='knight_whirlwind_secondary'&&knightRuntime.whirlwindTimer>0)
-                            ||(w.kind==='barbarian_whirlwind'&&barbarianRuntime.whirlTimer>0)));
+                            ||(w.kind==='barbarian_whirlwind'&&barbarianRuntime.whirlTimer>0)
+                            ||(w.kind==='rhino_cloud_whirlwind'&&rhinoCloudWhirlwindActive())));
   btn.classList.toggle('locked',!w);
   btn.classList.toggle('cooling',!!w&&cooldown>0);
   btn.classList.toggle('whirlwindActive',whirlwindActive);
@@ -13500,10 +13502,11 @@ function updateSecondaryButton(){
     btn.innerHTML='<span class="secondaryIcon">🔒</span><span class="secondaryLabel">SECONDARY</span>';
     return;
   }
-  const icon=w.kind==='giant_fireball'?'☄️':(w.kind==='cloud_great_sword_slash'?'⚔️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='barbarian_whirlwind'?'🌀':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'))))));
+  const icon=w.kind==='giant_fireball'?'☄️':(w.kind==='cloud_great_sword_slash'?'⚔️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='barbarian_whirlwind'?'🌀':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind==='rhino_cloud_whirlwind'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦')))))));
   if(whirlwindActive){
     const wTimer=(w.kind==='barbarian_whirlwind')
-      ? barbarianRuntime.whirlTimer : knightRuntime.whirlwindTimer;
+      ? barbarianRuntime.whirlTimer
+      : (w.kind==='rhino_cloud_whirlwind'?rhinoRuntime.cloudWhirlTimer:knightRuntime.whirlwindTimer);
     const remaining=(w.kind==='barbarian_whirlwind'&&!Number.isFinite(wTimer)) ? 'HOLD' : (Number.isFinite(wTimer) ? `${wTimer.toFixed(1)}s` : '∞');
     btn.innerHTML=`<span class="secondaryIcon">${icon}</span><span class="secondaryLabel">WHIRLWIND ACTIVE</span><span class="secondaryTimer">${remaining}</span>`;
     return;
@@ -14649,6 +14652,7 @@ function barbarianMoveMultiplier(){
   if(!barbarianIsActive()) return 1;
   let m=1;
   if((barbarianRuntime.whirlTimer||0)>0) m*=BARB_WHIRL.moveMult;
+  if(rhinoIsActive()&&rhinoCloudWhirlwindActive()) m*=KNIGHT_CFG.whirlwind.moveMult;
   return Math.max(0,m);
 }
 
@@ -16221,7 +16225,7 @@ function findClipByWords(parts, fallback='1H_Melee_Attack_Chop'){
 }
 function attackCooldownFor(w){
   // Green Ranger tactical Secondaries intentionally have NO post-move cooldown.
-  if(rhinoIsActive() && (w.kind==='rhino_overdrive'||w.kind==='rhino_gamma_leap'||w.kind==='rhino_freight_train')) return 0;
+  if(rhinoIsActive() && (w.kind==='rhino_overdrive'||w.kind==='rhino_gamma_leap'||w.kind==='rhino_cloud_whirlwind')) return 0;
   let factor = 1 + (playerStats.speed-1)*0.16;
   const passive=passiveForAvatar();
   if(archerIsActive() && (passiveState.archerTailwindTimer||0)>0) factor *= (passive.tailwindAttackMult||1);
@@ -23510,7 +23514,7 @@ let rhinoRuntime = {
   throwSide:0,
   overdrive:null, overdriveCooldown:0,
   gamma:null, gammaCooldown:0,
-  freight:null, freightCooldown:0,
+  cloudWhirlTimer:0, cloudWhirlPulse:0,
   crashing:null, crashingCooldown:0,
   titanTimer:0, titanCooldown:0, titanFx:null,
   armageddon:null, armageddonCooldown:0,
@@ -23523,7 +23527,7 @@ function rhinoResetRuntime(){
     throwSide:0,
     overdrive:null, overdriveCooldown:0,
     gamma:null, gammaCooldown:0,
-    freight:null, freightCooldown:0,
+    cloudWhirlTimer:0, cloudWhirlPulse:0,
     crashing:null, crashingCooldown:0,
     titanTimer:0, titanCooldown:0, titanFx:null,
     armageddon:null, armageddonCooldown:0,
@@ -23690,7 +23694,7 @@ function doRhinoBoomerangThrow(w){
    GREEN RANGER — WORLD-BREAKER THUNDER GOD PROCEDURAL KIT  (V23.03.00)
    ===================================================================== */
 function rhinoWBForward(){ return new THREE.Vector3(Math.sin(player.rotation.y),0,Math.cos(player.rotation.y)).normalize(); }
-function rhinoWorldBreakerMovementLocked(){ const r=rhinoRuntime;return !!(r&&(r.gamma||r.freight||r.crashing||r.sky)); }
+function rhinoWorldBreakerMovementLocked(){ const r=rhinoRuntime;return !!(r&&(r.gamma||r.crashing||r.armageddon)); }
 function rhinoWBDispose(root){ if(!root)return; try{if(root.parent)root.parent.remove(root);disposeGroup(root);}catch(_e){} }
 function rhinoWBMakeAxe(color=RHINO_PALE){
   const g=new THREE.Group();
@@ -23861,132 +23865,6 @@ function updateRhinoGammaLeap(dt){
     r.gammaCooldown=0;
   }
 }
-function triggerRhinoFreightTrain(w){
-  const r=rhinoRuntime;
-  if(r.freight||r.freightCooldown>0)return false;
-
-  const dir=rhinoWBForward().normalize();
-  dashActive=false;
-  dashTimer=0;
-
-  r.freight={
-    t:0,
-    dur:1.45,
-    distance:12,
-    travelled:0,
-    dir:dir.clone(),
-    drag:new Set(),
-    damage:w.damage||2.8
-  };
-
-  invincibleTimer=Math.max(invincibleTimer||0,1.58);
-  if(player.userData.playKayClip)player.userData.playKayClip('run',true,false,1.45);
-  toast('FREIGHT TRAIN CHARGE');
-  return true;
-}
-function updateRhinoFreightTrain(dt){
-  const r=rhinoRuntime;
-  if(r.freightCooldown>0)r.freightCooldown=Math.max(0,r.freightCooldown-dt);
-  const s=r.freight;
-  if(!s||!player)return;
-
-  s.t+=dt;
-  const u=Math.min(1,s.t/s.dur);
-
-  // Read the CURRENT facing every frame. Steering is eased instead of snapped,
-  // so the huge Ranger can bend the charge left/right without looking twitchy.
-  const targetDir=new THREE.Vector3(
-    Math.sin(player.rotation.y),
-    0,
-    Math.cos(player.rotation.y)
-  ).normalize();
-  const steer=1-Math.exp(-5.2*dt);
-  s.dir.lerp(targetDir,steer).normalize();
-
-  // Heavy speed curve across the full 12-unit drive.
-  const weight=0.62+0.58*Math.sin(Math.PI*u);
-  const baseSpeed=s.distance/s.dur;
-  let step=baseSpeed*weight*dt;
-  step=Math.min(step,Math.max(0,s.distance-s.travelled));
-
-  player.position.addScaledVector(s.dir,step);
-  s.travelled+=step;
-
-  // Respect arena boundary while steering.
-  const radial=Math.hypot(player.position.x,player.position.z);
-  const maxR=Math.max(1,(arenaSize||18)-1);
-  if(radial>maxR){
-    player.position.x*=maxR/radial;
-    player.position.z*=maxR/radial;
-  }
-
-  // Visual lean only. Never rotate the native-rigged gameplay root.
-  const fit=player.userData&&player.userData.greenRhinoFit;
-  if(fit)fit.rotation.x=-THREE.MathUtils.degToRad(10)*Math.sin(Math.PI*u);
-
-  const titanReach=rhinoTitanActive()?rhinoTitanCombatScale():1;
-
-  // Pick up enemies along the curved path.
-  for(const z of zombies){
-    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-    if(Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=1.55*titanReach)
-      s.drag.add(z);
-  }
-
-  // Keep dragged enemies in stable front lanes that rotate with the charge.
-  const side=new THREE.Vector3(s.dir.z,0,-s.dir.x);
-  let i=0;
-  for(const z of s.drag){
-    if(z.userData.dead)continue;
-    const count=Math.max(1,s.drag.size);
-    const lane=i-(count-1)/2;
-    const sideOff=lane*.48*titanReach;
-    const depth=(1.55+(Math.abs(lane)%2)*.28)*titanReach;
-    const tx=player.position.x+s.dir.x*depth+side.x*sideOff;
-    const tz=player.position.z+s.dir.z*depth+side.z*sideOff;
-    const follow=Math.min(1,dt*8);
-    z.position.x=THREE.MathUtils.lerp(z.position.x,tx,follow);
-    z.position.z=THREE.MathUtils.lerp(z.position.z,tz,follow);
-    z.userData.hitStun=Math.max(z.userData.hitStun||0,.16);
-    i++;
-  }
-
-  if(Math.random()<dt*13)
-    spawnBurst(player.position.x,.12,player.position.z,isMobile?1:2,FX_MAT_SPARK,1.6);
-
-  if(s.travelled>=s.distance-0.001||u>=1){
-    if(fit)fit.rotation.x=0;
-
-    for(const z of s.drag){
-      if(z.userData.dead)continue;
-      applyBulletDamage(z,s.damage*playerStats.power);
-      z.userData.knockbackX=s.dir.x*9*titanReach;
-      z.userData.knockbackZ=s.dir.z*9*titanReach;
-      z.userData.hitStun=Math.max(z.userData.hitStun||0,.38);
-    }
-
-    const impact=player.position.clone();
-    const titanDamage=rhinoTitanActive()?rhinoTitanDamageMult():1;
-
-    rhinoWBShock(impact,2.6*titanReach,RHINO_WHITE,.18);
-    rhinoWBShock(impact,4.6*titanReach,RHINO_GREEN,.34);
-    rhinoWBShock(impact,6.2*titanReach,RHINO_PALE,.48);
-    spawnEarthbreaker(impact,4.5*titanReach);
-    spawnBurst(impact.x,.38,impact.z,isMobile?24:38,FX_MAT_SPARK,6.4*titanReach);
-    barbarianShockwave(
-      impact,
-      player.rotation.y,
-      {radius:5.0*titanReach,damage:.55*titanDamage,force:9.0*titanReach,stun:.38,color:RHINO_PALE}
-    );
-
-    triggerCombatShake(30,390);
-    knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.085);
-    if(navigator.vibrate)navigator.vibrate([34,18,48]);
-
-    r.freight=null;
-    r.freightCooldown=0;
-  }
-}
 function rhinoWBFlash(frames=2){
   const c=renderer&&renderer.domElement;if(!c)return;const old=c.style.filter;c.style.filter='invert(1) brightness(2.4) contrast(1.35)';setTimeout(()=>{c.style.filter=old;},Math.max(16,frames*16));
 }
@@ -23995,6 +23873,134 @@ function rhinoWBFlash(frames=2){
 
 
 
+
+
+function rhinoCloudWhirlwindActive(){
+  return rhinoIsActive() && (rhinoRuntime.cloudWhirlTimer||0)>0;
+}
+function rhinoCloudWhirlwindDuration(){
+  return knightDefensiveWhirlwindDurationForRound();
+}
+function rhinoCloudWhirlwindCombatScale(){
+  return rhinoTitanActive()?rhinoTitanCombatScale():1;
+}
+function rhinoCloudWhirlwindDamageScale(){
+  return rhinoTitanActive()?rhinoTitanDamageMult():1;
+}
+function triggerRhinoCloudWhirlwind(){
+  const r=rhinoRuntime;
+  if(!gameRunning||!rhinoIsActive()||!player)return false;
+  if((r.cloudWhirlTimer||0)>0)return false;
+  const duration=rhinoCloudWhirlwindDuration();
+  r.cloudWhirlTimer=duration;
+  r.cloudWhirlPulse=0;
+  if(player.userData.playKayClip)player.userData.playKayClip('spin',true,true,.32);
+  player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,Number.isFinite(duration)?duration:9999);
+  player.userData.spinVisualSpeed=KNIGHT_CFG.whirlwind.spinSpeed;
+  knightWhirlwindStartFx('ability');
+  spawnKnightGuardBurst(player.position,KNIGHT_CFG.whirlwind.radius*rhinoCloudWhirlwindCombatScale(),KNIGHT_STEEL);
+  triggerCombatShake(9,150);
+  if(navigator.vibrate)navigator.vibrate([28,16,42]);
+  toast('DEFENSIVE WHIRLWIND');
+  return true;
+}
+function rhinoCloudWhirlwindPulse(){
+  if(!player)return;
+  const c=KNIGHT_CFG.whirlwind;
+  const scale=rhinoCloudWhirlwindCombatScale();
+  const damageScale=rhinoCloudWhirlwindDamageScale();
+  const radius=c.radius*scale;
+  const pos={x:player.position.x,y:player.position.y,z:player.position.z};
+
+  if(knightFxBudget(3)){
+    const g=new THREE.Group();
+    for(let i=0;i<4;i++){
+      const arcMesh=new THREE.Mesh(
+        new THREE.RingGeometry(c.radius*scale*(.45+i*.035),c.radius*scale*(.72+i*.065),38,1,i*1.57+.18,1.85),
+        knightMat(i%2?KNIGHT_IVORY:KNIGHT_STEEL,.50)
+      );
+      arcMesh.rotation.x=-Math.PI/2;
+      arcMesh.position.y=.32+i*.22;
+      g.add(arcMesh);
+    }
+    const center=new THREE.Mesh(new THREE.CircleGeometry(c.radius*scale*.38,34),knightMat(KNIGHT_STEEL,.12));
+    center.rotation.x=-Math.PI/2;
+    center.position.y=.04;
+    g.add(center);
+    g.position.set(pos.x,pos.y,pos.z);
+    knightBaseOpacity(g);
+    pushKnightFx(g,{life:.28,spin:13,grow:.24,from:.86});
+  }
+
+  if(typeof enemyProjectiles!=='undefined'){
+    for(let i=enemyProjectiles.length-1;i>=0;i--){
+      const p=enemyProjectiles[i];
+      if(!p||!p.mesh)continue;
+      if(Math.hypot(p.mesh.position.x-pos.x,p.mesh.position.z-pos.z)>radius)continue;
+      const px=p.mesh.position.x,py=p.mesh.position.y,pz=p.mesh.position.z;
+      scene.remove(p.mesh);disposeGroup(p.mesh);
+      if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}
+      enemyProjectiles.splice(i,1);
+      knightWhirlwindDeflectFx(px,py,pz,'ability');
+      spawnBurst(px,py,pz,7,FX_MAT_SPARK,2.9);
+    }
+  }
+
+  let hits=0;
+  for(const z of zombies){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    const dx=z.position.x-pos.x,dz=z.position.z-pos.z;
+    const dist=Math.hypot(dx,dz);
+    if(dist>radius)continue;
+    const cls=z.userData.archetype==='boss'?'boss':(z.userData.archetype==='brute'?'brute':'normal');
+    let dmg=c.damage*playerStats.power*damageScale;
+    if(cls==='boss')dmg*=c.bossMult;
+    else if(cls==='brute')dmg*=c.bruteMult;
+    applyBulletDamage(z,dmg);
+    if(z.userData.dead){hits++;continue;}
+    const stunScale=cls==='boss'?.18:(cls==='brute'?.55:1);
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,c.stun*stunScale);
+    const len=dist||1;
+    let force=c.knockback*(cls==='boss'?.14:(cls==='brute'?.45:1))*scale;
+    const prior=Math.hypot(z.userData.knockbackX||0,z.userData.knockbackZ||0);
+    force=Math.max(force,prior);
+    z.userData.knockbackX=(dx/len)*force;
+    z.userData.knockbackZ=(dz/len)*force;
+    hits++;
+  }
+  if(hits)triggerCombatShake(6,85);
+}
+function endRhinoCloudWhirlwind(){
+  const r=rhinoRuntime;
+  if(!(r.cloudWhirlTimer>0)&&r.cloudWhirlTimer!==Infinity)return;
+  r.cloudWhirlTimer=0;
+  r.cloudWhirlPulse=0;
+  if(player){
+    knightWhirlwindEndFx('ability');
+    spawnKnightGuardBurst(player.position,2.1*rhinoCloudWhirlwindCombatScale(),KNIGHT_STEEL);
+    player.userData.spinVisualTimer=0;
+    const fit=player.userData.greenRhinoFit;
+    if(fit&&player.userData.greenRhinoSpinBaseY!==undefined){
+      fit.rotation.y=player.userData.greenRhinoSpinBaseY;
+      fit.rotation.z=0;fit.rotation.x=0;
+      player.userData.greenRhinoSpinBaseY=undefined;
+      player.userData.greenRhinoSpinAngle=0;
+    }
+  }
+}
+function updateRhinoCloudWhirlwind(dt){
+  const r=rhinoRuntime;
+  if(!(r.cloudWhirlTimer>0))return;
+  if(Number.isFinite(r.cloudWhirlTimer))r.cloudWhirlTimer=Math.max(0,r.cloudWhirlTimer-dt);
+  r.cloudWhirlPulse-=dt;
+  if(r.cloudWhirlPulse<=0){
+    r.cloudWhirlPulse=KNIGHT_CFG.whirlwind.pulse;
+    rhinoCloudWhirlwindPulse();
+  }
+  player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,.14);
+  player.userData.spinVisualSpeed=KNIGHT_CFG.whirlwind.spinSpeed;
+  if(Number.isFinite(r.cloudWhirlTimer)&&r.cloudWhirlTimer<=0)endRhinoCloudWhirlwind();
+}
 
 function rhinoArenaCenter(out=new THREE.Vector3()){
   // Arena is centered at world origin in the current game. Keep this helper
@@ -24351,7 +24357,7 @@ function rhinoTitanActive(){
   return rhinoIsActive() && (rhinoRuntime.titanTimer||0)>0;
 }
 function rhinoTitanSecondaryBusy(){
-  return !!(rhinoRuntime.overdrive||rhinoRuntime.gamma||rhinoRuntime.freight);
+  return !!(rhinoRuntime.overdrive||rhinoRuntime.gamma||rhinoCloudWhirlwindActive());
 }
 function rhinoTitanScaledWeapon(w){
   if(!w||!rhinoTitanActive())return w;
@@ -24754,7 +24760,9 @@ function rhinoWorldBreakerCleanup(force=false){
     r.titanFx=null;
     rhinoTitanSyncScale(false);
   }
-  r.overdrive=r.gamma=r.freight=r.crashing=r.armageddon=r.echo=null;
+  if(r.cloudWhirlTimer>0||r.cloudWhirlTimer===Infinity)endRhinoCloudWhirlwind();
+  r.overdrive=r.gamma=r.crashing=r.armageddon=r.echo=null;
+  r.cloudWhirlTimer=0;r.cloudWhirlPulse=0;
   r.titanTimer=0;
   }
 /* Retired V23.01 Rhino Charge / Boomerang Cyclone / Ricochet Bladestorm code removed in V23.03.01. */
@@ -24771,10 +24779,10 @@ function doRhinoAttack(w){
     doRhinoBoomerangThrow(w);
   }else if(w.kind==='rhino_overdrive')triggerRhinoOverdrive(w);
   else if(w.kind==='rhino_gamma_leap')triggerRhinoGammaLeap(w);
-  else if(w.kind==='rhino_freight_train')triggerRhinoFreightTrain(w);
+  else if(w.kind==='rhino_cloud_whirlwind')triggerRhinoCloudWhirlwind();
 }
 function isRhinoWeaponKind(kind){
-  return kind==='rhino_boomerang'||kind==='rhino_overdrive'||kind==='rhino_gamma_leap'||kind==='rhino_freight_train';
+  return kind==='rhino_boomerang'||kind==='rhino_overdrive'||kind==='rhino_gamma_leap'||kind==='rhino_cloud_whirlwind';
 }
 
 function updateRhinoCombat(dt){
@@ -24782,7 +24790,7 @@ function updateRhinoCombat(dt){
   try{
     updateRhinoOverdrive(dt);
     updateRhinoGammaLeap(dt);
-    updateRhinoFreightTrain(dt);
+    updateRhinoCloudWhirlwind(dt);
     updateRhinoCrashingBolt(dt);
     updateRhinoTitanRampage(dt);
     updateRhinoArmageddon(dt);
@@ -32122,7 +32130,16 @@ function update(dt){
   if(player.userData.spinVisualTimer>0){
     player.userData.spinVisualTimer-=dt;
 
-    if(state.avatarType==='cloud' && player.userData.cloudFit){
+    if(state.avatarType==='rhino' && player.userData.greenRhinoFit){
+      const fit=player.userData.greenRhinoFit;
+      if(player.userData.greenRhinoSpinBaseY===undefined){
+        player.userData.greenRhinoSpinBaseY=fit.rotation.y;
+        player.userData.greenRhinoSpinAngle=0;
+      }
+      player.userData.greenRhinoSpinAngle=(player.userData.greenRhinoSpinAngle||0)+(player.userData.spinVisualSpeed||26)*dt;
+      fit.rotation.y=player.userData.greenRhinoSpinBaseY+player.userData.greenRhinoSpinAngle;
+      fit.rotation.z=0;fit.rotation.x=.035;
+    }else if(state.avatarType==='cloud' && player.userData.cloudFit){
       // Cloud's imported root has an authored quaternion with mixed axes.
       // Spinning that root through Euler Y/Z makes his head pitch upward.
       // Spin only the clean fit wrapper around Y and keep pitch/roll stable.
@@ -32145,7 +32162,14 @@ function update(dt){
       }
     }
   } else {
-    if(state.avatarType==='cloud' && player.userData.cloudFit &&
+    if(state.avatarType==='rhino' && player.userData.greenRhinoFit &&
+       player.userData.greenRhinoSpinBaseY!==undefined){
+      const fit=player.userData.greenRhinoFit;
+      fit.rotation.y=player.userData.greenRhinoSpinBaseY;
+      fit.rotation.z=0;fit.rotation.x=0;
+      player.userData.greenRhinoSpinBaseY=undefined;
+      player.userData.greenRhinoSpinAngle=0;
+    }else if(state.avatarType==='cloud' && player.userData.cloudFit &&
        player.userData.cloudSpinBaseY!==undefined){
       cloudResetCombatPoseState(true);
     }else if(player.userData.kayRoot && player.userData.spinBaseY!==undefined){
