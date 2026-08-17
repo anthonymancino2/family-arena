@@ -1,4 +1,4 @@
-<!-- V23.06.00 Velocity Weaver: replaces the Hooded Rogue and Chopper Shadow Stalker combat kit with a procedural speedster/arachnid kit: Sonic Piston, Arc Line Sweep, Quantum Slingshot, Phasing Resonance, Synaptic Snare, Infinite Speed Blitz, Tachyon Dome and Speedforce Cataclysm. Existing save IDs are preserved, enemy damage stays routed through applyBulletDamage(), projectile phasing is collision-real, Blitz hit-stop skips one game-logic frame per strike, and all movement/VFX are delta-time or rendered-frame driven. -->
+<!-- V23.06.06 Velocity Weaver Runtime Routing Fix: hard-routes the Velocity Weaver runtime to the concrete Hooded Rogue and Chopper avatar IDs, explicitly maps Chopper to the Hooded combat table, and protects the per-frame Velocity update from silent failures. It keeps established Rogue/Chopper internal move IDs for save/loadout compatibility and replaces the Hooded Rogue and Chopper Shadow Stalker combat kit with a procedural speedster/arachnid kit: Sonic Piston, Arc Line Sweep, Quantum Slingshot, Phasing Resonance, Synaptic Snare, Infinite Speed Blitz, Tachyon Dome and Speedforce Cataclysm. Existing save IDs are preserved, enemy damage stays routed through applyBulletDamage(), projectile phasing is collision-real, Blitz hit-stop skips one game-logic frame per strike, and all movement/VFX are delta-time or rendered-frame driven. -->
 <!-- V23.05.01 Shadow Stalker Rogue: replaces the Hooded Rogue combat loadout with two procedural Primaries (Phantom Flurry, Shadow Sweep), three zero-cooldown Secondaries (Shadowstep, Smoke Bomb, Viper's Fan), and three selectable Ultimates (Thousand Cuts, Dancing Steel, Twilight Execution). All motion, projectile travel, smoke expansion, mesh scaling/fading and camera jitter are delta-time/requestAnimationFrame driven; no skeletal animation is required by these moves. Existing enemy HP/boss protection routes through applyBulletDamage(). Other avatars are unchanged. -->
 <!-- V23.04.02 Direct Warrior Texture Binding: fixes Warrior bosses remaining black on iPhone Safari after V23.04.01. Root cause: the FBX material identifiers do not reliably match their external JPG filenames, and Viking's weapon material is even authored with the typo 'wiking_weapons_texture'. This build no longer depends on FBXLoader resolving texture paths. The seven already-optimized embedded JPGs are loaded directly as THREE textures and assigned after FBX parse by the exact authored material names: egyptian_red_B_texture / egyptianweapons_texture, roman_D_texture / roman_clothes_texture / roman_weapons_texture, and viking_C_texture / wiking_weapons_texture. Imported material base colors are forced to white so the diffuse maps cannot be multiplied into black silhouettes. URLModifier remains only as a fallback. Boss size, animations, stats and file-size optimization are unchanged. Syntax/size audit included. -->
 <!-- V23.04.01 Warrior Boss Texture Fix: fixes the uploaded Warrior bosses rendering as black silhouettes on iPhone Safari. The animated FBX files reference seven external JPG maps rather than embedding them internally. This build embeds only those seven required maps and feeds them to FBXLoader through a LoadingManager URL modifier. To preserve boss detail without bloating the HTML, primary body/clothing sheets are reduced from 2048px to 768px, smaller weapon sheets to 512px, and Viking's dense weapon sheet stays 768px; optimized JPEG quality 78 is used. No blue/green variants, static models, Maya project, renders, video or unrelated textures are included. Existing 2.5x Green Ranger boss scale, three-warrior rotation, animation splits, boss stats/HUD and anti-one-shot behavior remain unchanged. Syntax/size audit included. -->
@@ -1646,7 +1646,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.07.00 - Velocity Weaver Move Repair';
+const GAME_VERSION='23.06.05 - Velocity Weaver Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -2032,8 +2032,8 @@ const AVATAR_TYPE_LABELS = {
 };
 const HERO_ROSTER_INFO = {
   rogue:{title:'Tempest Archer',role:'RANGED • EASY',desc:'The speed-focused ranged avatar: fast movement, long-lived piercing arrows, and precise crowd control. Every fifth defeat triggers Tailwind for a short burst of movement and firing speed.'},
-  chopper:{title:'Chopper',role:'MELEE • HARD',desc:'A small, fast reindeer running the complete Velocity Weaver kit. Sonic Piston, Arc Line Sweep, Quantum Slingshot, Phasing Resonance and Synaptic Snare all behave exactly as they do on the Hooded Rogue; only the silhouette and his shorter reach change. His 18-bone rig carries no animation of its own, so every clip is retargeted from the KayKit skeleton.'},
-  hooded:{title:'Shadow Rogue',role:'MELEE • HARD',desc:'A speedster kit: infinite-speed jabs, kinetic sweeps, a tethered slingshot warp, phase-through vibration and an electric snare field.'},
+  chopper:{title:'Chopper',role:'MELEE • HARD',desc:'A small, fast reindeer running the complete Shadow Stalker Rogue kit. Phantom Flurry, Shadow Sweep, Shadowstep, Smoke Bomb and Viper\'s Fan all behave exactly as they do on the Hooded Rogue; only the silhouette changes. His 18-bone rig carries no animation of its own, so every clip is retargeted from the KayKit skeleton.'},
+  hooded:{title:'Shadow Rogue',role:'MELEE • HARD',desc:'Rapid close-range slashes, shadow clones, and evasive movement. Crossbow removed for a pure assassin silhouette.'},
   mage:{title:'Nine-Tailed Fox Mage',role:'RANGED • MEDIUM',desc:'Native-rigged fox using the complete Arcane Mage combat system, elemental magic, and Arcane Echo clones.'},
   knight:{title:'Knight of Dawn',role:'MELEE • DEFENDER',desc:'An armored royal defender. Sword-and-shield combos, Magical Armor, guarding and counterattacks. Strongest class for surviving while surrounded.'},
   barbarian:{title:'Aesir Barbarian',role:'SLOW • AREA BRUISER',desc:'A horned Norse berserker built around raw ground power. She is by far the SLOWEST avatar in the roster and cannot chase anything down - instead every single blow she lands throws a shockwave out of the impact point, so she is never fighting one enemy at a time. Two Primaries, three Secondaries, three selectable Ultimates, and a Berserker Kin clone special.'},
@@ -3611,15 +3611,15 @@ const CHARACTER_COMBAT = {
     defaultId:'phantom_flurry',
     baseMoveMult:1.35,
     weapons:{
-      phantom_flurry:{name:'Sonic Piston', price:0, slot:'primary', kind:'velocity_sonic_piston', cooldown:0.15, damage:1.0, auto:true,
+      phantom_flurry:{name:'Sonic Piston', price:0, slot:'primary', kind:'rogue_phantom_flurry', cooldown:0.04, damage:1.0, auto:true,
         desc:'Infinite-speed jab: stretch depth to 300%, lunge 0.5 units, flash white, fire a 3-unit yellow lightning strike, then snap back in 0.04s.'},
-      shadow_sweep:{name:'Arc Line Sweep', price:0, slot:'primary', kind:'velocity_arc_sweep', cooldown:0.24, damage:1.25, auto:true,
+      shadow_sweep:{name:'Arc Line Sweep', price:0, slot:'primary', kind:'rogue_shadow_sweep', cooldown:0.06, damage:1.25, auto:true,
         desc:'Twist 180° in exactly 0.06s while a cyan kinetic crescent expands outward and vacuum-drags enemies 0.5 units closer.'},
-      shadowstep:{name:'Quantum Slingshot', price:0, slot:'secondary', kind:'velocity_quantum_slingshot', cooldown:0,
+      shadowstep:{name:'Quantum Slingshot', price:0, slot:'secondary', kind:'rogue_shadowstep', cooldown:0,
         desc:'Tether to the nearest enemy within 8 units and lerp to 1 unit in front over 0.12s, elongating at speed before a one-frame inversion and radial blast.'},
-      smoke_bomb:{name:'Phasing Resonance', price:0, slot:'secondary', kind:'velocity_phasing_resonance', cooldown:0,
+      smoke_bomb:{name:'Phasing Resonance', price:0, slot:'secondary', kind:'rogue_smoke_bomb', cooldown:0,
         desc:'Vibrate X/Z by ±15% at 60Hz for 1.5s, fade to 30% opacity, and let incoming enemy projectiles pass through without registering a hit.'},
-      vipers_fan:{name:'Synaptic Snare', price:0, slot:'secondary', kind:'velocity_synaptic_snare', cooldown:0,
+      vipers_fan:{name:'Synaptic Snare', price:0, slot:'secondary', kind:'rogue_vipers_fan', cooldown:0,
         desc:'Create four electric nodes at radius 3 linked by cyan zap-lines. Enemies intersecting the square are frozen and flash cyan for 1 second.'}
     }
   },
@@ -3747,6 +3747,9 @@ function arcaneEchoesUnlocked(){
 }
 let previewRenderer=null, previewScene=null, previewCamera=null, previewRoot=null, previewMixer=null, previewRAF=0;
 function combatForAvatar(){
+  // Chopper intentionally shares the Velocity Weaver/Hooded Rogue combat table.
+  // Resolve it explicitly instead of relying on a later gameplay-class alias.
+  if(state && state.avatarType==='chopper') return CHARACTER_COMBAT.hooded;
   // Exact skin first, then the gameplay class. This is what lets the Green
   // Rhino Ranger carry its own weapon list while still running the whole
   // barbarian-class chassis (stats, cooldown scaling, HUD, ultimate slot).
@@ -13874,7 +13877,7 @@ function updateSecondaryButton(){
     btn.innerHTML='<span class="secondaryIcon">🔒</span><span class="secondaryLabel">SECONDARY</span>';
     return;
   }
-  const icon=w.kind==='velocity_quantum_slingshot'?'⚡':(w.kind==='velocity_phasing_resonance'?'〰️':(w.kind==='velocity_synaptic_snare'?'▦':(w.kind==='giant_fireball'?'☄️':(w.kind==='cloud_great_sword_slash'?'⚔️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='barbarian_whirlwind'?'🌀':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind==='rhino_cloud_whirlwind'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'))))))))));
+  const icon=(w.kind==='rogue_shadowstep'||w.kind==='velocity_quantum_slingshot')?'⚡':((w.kind==='rogue_smoke_bomb'||w.kind==='velocity_phasing_resonance')?'〰️':((w.kind==='rogue_vipers_fan'||w.kind==='velocity_synaptic_snare')?'▦':(w.kind==='giant_fireball'?'☄️':(w.kind==='cloud_great_sword_slash'?'⚔️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='barbarian_whirlwind'?'🌀':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind==='rhino_cloud_whirlwind'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'))))))))));
   if(whirlwindActive){
     const wTimer=(w.kind==='barbarian_whirlwind')
       ? barbarianRuntime.whirlTimer
@@ -16772,17 +16775,14 @@ function updateHoodedHud(){
         const kit=shadowStalkerMoveset;
         const label=equippedAbilityId==='hooded_thousand_cuts'?'SPEED BLITZ'
           :(equippedAbilityId==='hooded_dancing_steel'?'TACHYON DOME':'CATACLYSM');
-        const moveKey=equippedAbilityId==='hooded_thousand_cuts'?'infiniteSpeedBlitz'
-          :(equippedAbilityId==='hooded_dancing_steel'?'tachyonDome':'speedforceCataclysm');
         const active=!!(kit&&(
           (equippedAbilityId==='hooded_thousand_cuts'&&kit.blitz)||
           (equippedAbilityId==='hooded_dancing_steel'&&kit.dome)||
           (equippedAbilityId==='hooded_twilight_execution'&&kit.cataclysm)
         ));
-        const cd=kit&&kit.cooldownFor?kit.cooldownFor(moveKey):0;
-        abilityBtn.textContent=active?label+'!':(cd>0?label+' '+Math.ceil(cd):label);
+        abilityBtn.textContent=active?label+'!':label;
         abilityBtn.classList.toggle('active',active);
-        abilityBtn.classList.toggle('cooling',cd>0&&!active);
+        abilityBtn.classList.remove('cooling');
       }else if(isKnight||isBarbarian){
         const info=knightAbilityCooldownInfo();
         if(info){
@@ -30349,124 +30349,80 @@ function doBarbarianRoarSlashCombo(comboWeapon){
    THREE must already be available globally.
 */
 class VelocityWeaver {
-  constructor({scene,camera,renderer,player,getEnemies=()=>[],damageEnemy=null,enemyRadius=.62,reachScale=1,fxScale=1,damage={}}){
+  constructor({scene,camera,renderer,player,getEnemies=()=>[],damageEnemy=null,enemyRadius=.62,damage={}}){
     if(!scene||!camera||!renderer||!player)throw new Error('VelocityWeaver requires scene, camera, renderer, and player.');
     this.scene=scene;this.camera=camera;this.renderer=renderer;this.player=player;
     this.getEnemies=getEnemies;this.enemyRadius=enemyRadius;
-    // Chopper is roughly a third the Hooded Rogue's arm length, so his reach and
-    // FX are scaled here rather than by shipping a second copy of every move.
-    this.reachScale=Number(reachScale)||1;
-    this.fxScale=Number(fxScale)||1;
     this.damageEnemy=damageEnemy||((e,n)=>{if(e?.userData&&!e.userData.dead)e.userData.hp=(e.userData.hp||1)-n;});
     this.damage=Object.assign({sonicPiston:1.0,arcLineSweep:1.25,quantumSlingshot:1.5,synapticSnare:.9,infiniteSpeedBlitz:999999},damage);
     this.time=0;this.fx=[];this.ghosts=[];this.shockwaves=[];
     this.sonic=null;this.sweep=null;this.slingshot=null;this.phasing=null;this.snare=null;
     this.blitz=null;this.dome=null;this.cataclysm=null;
-    // Every move that displaces the body records the exact offset it applied so
-    // the next frame can subtract it again. Without this the kit fights the
-    // normal movement code: it kept snapping the player back to the position
-    // captured at cast time, which read as "the joystick stops working while
-    // attacking" and, because Primary auto-fires, meant near-permanent lockup.
-    this.cooldowns={sonicPiston:0,arcLineSweep:0,quantumSlingshot:0,phasingResonance:0,synapticSnare:0,infiniteSpeedBlitz:0,tachyonDome:0,speedforceCataclysm:0};
-    this.cooldownLengths={quantumSlingshot:.45,phasingResonance:4.0,synapticSnare:3.0,infiniteSpeedBlitz:8.0,tachyonDome:14.0,speedforceCataclysm:24.0};
     this._ambientSaved=null;this._catMaterials=null;this._baseScale=player.scale.clone();
-    this._scaleDirty=false;this._flashActive=false;
     this._lastGhostPos=player.position.clone();this._catFrame=0;
   }
-  // ---- shared transform bookkeeping -------------------------------------
-  _applyOffset(s,offset){if(s.off)this.player.position.sub(s.off);this.player.position.add(offset);s.off=offset.clone();}
-  _clearOffset(s){if(s&&s.off){this.player.position.sub(s.off);s.off=null;}}
-  _applyYaw(s,delta){if(s.yawOff)this.player.rotation.y-=s.yawOff;this.player.rotation.y+=delta;s.yawOff=delta;}
-  _clearYaw(s){if(s&&s.yawOff){this.player.rotation.y-=s.yawOff;s.yawOff=0;}}
-  _updateScale(){
-    const b=this._baseScale;let sx=1,sy=1,sz=1;
-    if(this.sonic)sz*=this.sonic.stretch||1;
-    if(this.slingshot)sz*=this.slingshot.stretch||1;
-    if(this.phasing){sx*=this.phasing.wx||1;sz*=this.phasing.wz||1;}
-    if(sx===1&&sy===1&&sz===1){
-      if(this._scaleDirty){this.player.scale.copy(b);this._scaleDirty=false;}
-      else this._baseScale.copy(this.player.scale); // re-baseline once the model settles
-      return;
-    }
-    this.player.scale.set(b.x*sx,b.y*sy,b.z*sz);this._scaleDirty=true;
-  }
-  _ready(name){return (this.cooldowns[name]||0)<=0;}
-  _startCooldown(name){this.cooldowns[name]=this.cooldownLengths[name]||0;}
-  cooldownFor(name){return Math.max(0,this.cooldowns[name]||0);}
   sonicPiston(){
     if(this.sonic)return false;
-    // 0.04s was under three frames at 60fps - the lunge, flash and snap-back were
-    // finishing before a single frame could show them. 0.15s still reads as an
-    // instant jab but is actually visible, and the strike now sweeps the full ray
-    // instead of stopping at the first body it touches.
-    const f=this._forward(this.player);
-    this.sonic={elapsed:0,duration:.15,forward:f,flashed:false,stretch:1,off:null};
+    const f=this._forward(this.player),basePos=this.player.position.clone(),baseScale=this.player.scale.clone();
+    this.sonic={elapsed:0,duration:.04,basePos,baseScale,forward:f,flashed:false,hit:false};
     return true;
   }
   arcLineSweep(){
     if(this.sweep)return false;
+    const startYaw=this.player.rotation.y;
     const g=new THREE.RingGeometry(.7,1.0,28,1,0,Math.PI);
     const m=new THREE.MeshBasicMaterial({color:0x44f7ff,wireframe:true,transparent:true,opacity:.72,side:THREE.DoubleSide,depthWrite:false});
     const cres=new THREE.Mesh(g,m);cres.rotation.x=-Math.PI/2;cres.position.copy(this.player.position);cres.position.y+=.12;cres.scale.setScalar(.2);this.scene.add(cres);
-    this.sweep={elapsed:0,duration:.24,cres,hit:new Set(),yawOff:0};return true;
+    this.sweep={elapsed:0,duration:.06,startYaw,cres,hit:new Set()};return true;
   }
   quantumSlingshot(){
-    if(this.slingshot||!this._ready('quantumSlingshot'))return false;
-    const target=this._nearestEnemy(8*this.reachScale);if(!target)return false;
-    this._startCooldown('quantumSlingshot');
+    if(this.slingshot)return false;
+    const target=this._nearestEnemy(8);if(!target)return false;
     const start=this.player.position.clone();const tf=this._forward(target);
     const end=target.position.clone().addScaledVector(tf,-1);end.y=start.y;
     const tether=this._line(start.clone().add(new THREE.Vector3(0,.7,0)),target.position.clone().add(new THREE.Vector3(0,.7,0)),0xffffff,1,.13);
-    this.slingshot={elapsed:0,duration:.16,start,end,target,tether,stretch:1};return true;
+    this.slingshot={elapsed:0,duration:.12,start,end,target,tether,baseScale:this.player.scale.clone()};return true;
   }
   phasingResonance(){
-    if(this.phasing||!this._ready('phasingResonance'))return false;
-    this._startCooldown('phasingResonance');
+    if(this.phasing)return false;
     const saved=[];this.player.traverse(o=>{if(o.isMesh&&o.material){const arr=Array.isArray(o.material)?o.material:[o.material];for(const m of arr)saved.push({m,transparent:m.transparent,opacity:m.opacity});}});
     for(const x of saved){x.m.transparent=true;x.m.opacity=.30;}
-    // 60Hz against a 60fps sampler aliases to a dead-flat scale. 13Hz is the
-    // fastest wobble that actually renders as a vibration on a 60Hz screen.
-    this.phasing={elapsed:0,duration:1.5,hz:13,saved,wx:1,wz:1};return true;
+    this.phasing={elapsed:0,duration:1.5,baseScale:this.player.scale.clone(),saved};return true;
   }
   synapticSnare(){
-    if(this.snare||!this._ready('synapticSnare'))return false;
-    this._startCooldown('synapticSnare');
-    const R=3*this.reachScale;
+    if(this.snare)return false;
     const center=this.player.position.clone(),nodes=[];const geom=new THREE.BoxGeometry(.22,.22,.22);const mat=new THREE.MeshBasicMaterial({color:0x37f6ff,wireframe:true});
-    [[R,0],[0,R],[-R,0],[0,-R]].forEach(([x,z])=>{const n=new THREE.Mesh(geom,mat);n.position.set(center.x+x,center.y+.35,center.z+z);this.scene.add(n);nodes.push(n);});
-    const lines=[];for(let i=0;i<4;i++)lines.push(this._line(nodes[i].position,nodes[(i+1)%4].position,0x37f6ff,.95,2.6));
-    // 1.0s was barely long enough to walk an enemy into the square. 2.5s makes
-    // it a real zoning tool, and the freeze now lasts as long as the field.
-    this.snare={elapsed:0,duration:2.5,nodes,lines,center,hit:new Set(),geom,mat};return true;
+    [[3,0],[0,3],[-3,0],[0,-3]].forEach(([x,z])=>{const n=new THREE.Mesh(geom,mat);n.position.set(center.x+x,center.y+.35,center.z+z);this.scene.add(n);nodes.push(n);});
+    const lines=[];for(let i=0;i<4;i++)lines.push(this._line(nodes[i].position,nodes[(i+1)%4].position,0x37f6ff,.95,1.05));
+    this.snare={elapsed:0,duration:1.0,nodes,lines,center,hit:new Set(),geom,mat};return true;
   }
+  // Legacy Shadow Stalker method aliases keep older integration hooks alive.
+  phantomFlurry(){return this.sonicPiston();}
+  shadowSweep(){return this.arcLineSweep();}
+  shadowstep(){return this.quantumSlingshot();}
+  smokeBomb(){return this.phasingResonance();}
+  vipersFan(){return this.synapticSnare();}
+  thousandCuts(){return this.infiniteSpeedBlitz();}
+  dancingSteelAttack(){return this.tachyonDome();}
+  twilightExecution(){return this.speedforceCataclysm();}
   infiniteSpeedBlitz(){
-    if(this.blitz||!this._ready('infiniteSpeedBlitz'))return false;
-    const targets=this._nearestEnemies(6,999);if(!targets.length)return false;
-    this._startCooldown('infiniteSpeedBlitz');
+    if(this.blitz)return false;const targets=this._nearestEnemies(6,999);if(!targets.length)return false;
     this.player.visible=false;this.blitz={elapsed:0,duration:1,targets,next:0,last:this.player.position.clone()};return true;
   }
   tachyonDome(){
-    if(this.dome||!this._ready('tachyonDome'))return false;
-    this._startCooldown('tachyonDome');
+    if(this.dome)return false;
     const geom=new THREE.SphereGeometry(1,12,8),mat=new THREE.MeshBasicMaterial({color:0x55eaff,wireframe:true,transparent:true,opacity:.28,depthWrite:false});
     const mesh=new THREE.Mesh(geom,mat);mesh.position.copy(this.player.position);mesh.scale.setScalar(.05);this.scene.add(mesh);
-    this.dome={elapsed:0,duration:4.4,expand:.4,radius:Math.max(18,(typeof arenaSize!=='undefined'&&arenaSize)||30),mesh,geom,mat,ghostTimer:0};return true;
+    this.dome={elapsed:0,duration:4.4,expand:.4,radius:Math.max(18,arenaSize||30),mesh,geom,mat,ghostTimer:0};return true;
   }
   speedforceCataclysm(){
-    if(this.cataclysm||!this._ready('speedforceCataclysm'))return false;
-    this._startCooldown('speedforceCataclysm');
+    if(this.cataclysm)return false;
     this._ambientSaved=[];this.scene.traverse(o=>{if(o.isAmbientLight){this._ambientSaved.push({o,intensity:o.intensity});o.intensity=0;}});
     this._catMaterials=[];this.player.traverse(o=>{if(o.isMesh&&o.material){this._catMaterials.push({o,material:o.material});o.material=new THREE.MeshBasicMaterial({color:0x20bfff,wireframe:true});}});
-    // 6s of a fully unlit arena is disorienting on a phone. 4s still lands.
-    this.cataclysm={elapsed:0,duration:4,ringFrame:0};this._catFrame=0;return true;
+    this.cataclysm={elapsed:0,duration:6,ringFrame:0};this._catFrame=0;return true;
   }
   update(dt){
-    this.time+=dt;
-    for(const k in this.cooldowns)if(this.cooldowns[k]>0)this.cooldowns[k]=Math.max(0,this.cooldowns[k]-dt);
-    this._updateSonic(dt);this._updateSweep(dt);this._updateSlingshot(dt);this._updatePhasing(dt);this._updateSnare(dt);this._updateBlitz(dt);this._updateDome(dt);this._updateCataclysm(dt);this._updateFx(dt);this._updateGhosts(dt);this._updateShockwaves(dt);
-    // One writer for scale, so two overlapping moves can no longer clobber each
-    // other's captured baseScale and leave the model permanently stretched.
-    this._updateScale();
+    this.time+=dt;this._updateSonic(dt);this._updateSweep(dt);this._updateSlingshot(dt);this._updatePhasing(dt);this._updateSnare(dt);this._updateBlitz(dt);this._updateDome(dt);this._updateCataclysm(dt);this._updateFx(dt);this._updateGhosts(dt);this._updateShockwaves(dt);
   }
   isPhasing(){return !!this.phasing;}
   movementMultiplier(){return (this.dome?3:1)*(this.cataclysm?3:1);}
@@ -30476,45 +30432,14 @@ class VelocityWeaver {
     if(this.dome&&enemy&&this._flatDistance(enemy.position,this.player.position)<=this.dome.radius)return .1;
     return 1;
   }
-  _updateSonic(dt){const s=this.sonic;if(!s)return;s.elapsed+=dt;const p=Math.min(1,s.elapsed/s.duration);const tri=p<.5?p*2:(1-p)*2;
-    s.stretch=1+2*tri;
-    // Lunge as a relative offset so joystick movement still drives the body.
-    this._applyOffset(s,new THREE.Vector3(s.forward.x,0,s.forward.z).multiplyScalar(.5*tri*this.reachScale));
-    if(p>=.42&&!s.flashed){s.flashed=true;this._flashPlayerWhite();
-      const reach=3*this.reachScale;
-      const a=this.player.position.clone().add(new THREE.Vector3(0,.7,0)),b=a.clone().addScaledVector(s.forward,reach);
-      this._line(a,b,0xffef32,1,.14);this._cameraJitter(.10,2);
-      // No break: the piston is a ray, so it damages everything it passes through.
-      for(const e of this._aliveEnemies())if(this._segmentHits(a,b,e,(.7+this.enemyRadius)*this.reachScale))this.damageEnemy(e,this.damage.sonicPiston);
-    }
-    if(p>=1){this._clearOffset(s);s.stretch=1;this.sonic=null;}}
-  _updateSweep(dt){const s=this.sweep;if(!s)return;s.elapsed+=dt;const p=Math.min(1,s.elapsed/s.duration);
-    // Spin as a yaw offset, not an absolute yaw, so aiming is not overwritten.
-    this._applyYaw(s,Math.PI*p);
-    s.cres.position.x=this.player.position.x;s.cres.position.z=this.player.position.z;s.cres.position.y=this.player.position.y+.12;
-    s.cres.scale.setScalar((.2+p*4.2)*this.fxScale);s.cres.material.opacity=.72*(1-p*.65);
-    const r=(.7+p*3.8)*this.reachScale+this.enemyRadius;
-    for(const e of this._aliveEnemies()){if(s.hit.has(e)||this._flatDistance(e.position,this.player.position)>r)continue;s.hit.add(e);this.damageEnemy(e,this.damage.arcLineSweep);const v=this.player.position.clone().sub(e.position);v.y=0;if(v.lengthSq()>1e-5)e.position.addScaledVector(v.normalize(),.5);}
-    if(p>=1){this._clearYaw(s);this.scene.remove(s.cres);s.cres.geometry.dispose();s.cres.material.dispose();this.sweep=null;}}
-  _updateSlingshot(dt){const s=this.slingshot;if(!s)return;s.elapsed+=dt;const p=Math.min(1,s.elapsed/s.duration),e=1-Math.pow(1-p,3);
-    // A slingshot is a warp, so it is allowed to own position outright - but it
-    // re-reads the target every frame so it lands on a moving enemy, not on the
-    // stale spot the enemy occupied when the button was pressed.
-    if(s.target&&!s.target.userData?.dead&&s.target.parent){
-      const tf=this._forward(s.target);
-      s.end.copy(s.target.position).addScaledVector(tf,-1*this.reachScale);s.end.y=s.start.y;
-    }
-    this.player.position.lerpVectors(s.start,s.end,e);
-    s.stretch=1+2.4*Math.sin(Math.PI*p);
-    if(p>=1){s.stretch=1;this._invertCanvasOneFrame();
-      const blast=3.2*this.reachScale;
-      for(const en of this._aliveEnemies()){const v=en.position.clone().sub(this.player.position);v.y=0;const d=v.length();if(d>0&&d<blast){en.position.addScaledVector(v.normalize(),Math.max(.4,1.4*(1-d/blast)));this.damageEnemy(en,this.damage.quantumSlingshot);}}
-      this._spawnShockwave(this.player.position);
-      this.slingshot=null;}}
-  _updatePhasing(dt){const s=this.phasing;if(!s)return;s.elapsed+=dt;const wave=Math.sin(s.elapsed*Math.PI*2*s.hz)*.15;
-    s.wx=1+wave;s.wz=1-wave;
-    if(s.elapsed>=s.duration){s.wx=1;s.wz=1;for(const x of s.saved){x.m.transparent=x.transparent;x.m.opacity=x.opacity;}this.phasing=null;}}
-  _updateSnare(dt){const s=this.snare;if(!s)return;s.elapsed+=dt;for(let i=0;i<4;i++){const a=s.nodes[i].position,b=s.nodes[(i+1)%4].position;for(const e of this._aliveEnemies()){if(this._segmentHits(a,b,e,.42)){e.userData.velocityWeaverFrozen=Math.max(e.userData.velocityWeaverFrozen||0,1);if(!s.hit.has(e)){s.hit.add(e);this.damageEnemy(e,this.damage.synapticSnare);this._flashEnemyCyan(e,1);}}}}for(const e of this._aliveEnemies())if(e.userData.velocityWeaverFrozen>0)e.userData.velocityWeaverFrozen=Math.max(0,e.userData.velocityWeaverFrozen-dt);if(s.elapsed>=s.duration){for(const e of this._aliveEnemies())e.userData.velocityWeaverFrozen=0;for(const n of s.nodes)this.scene.remove(n);for(const l of s.lines){if(l.object?.parent)this.scene.remove(l.object);}s.geom.dispose();s.mat.dispose();this.snare=null;}}
+  _updateSonic(dt){const s=this.sonic;if(!s)return;s.elapsed+=dt;const p=Math.min(1,s.elapsed/s.duration);const tri=p<.5?p*2:(1-p)*2;this.player.scale.copy(s.baseScale);this.player.scale.z=s.baseScale.z*(1+2*tri);this.player.position.copy(s.basePos).addScaledVector(s.forward,.5*tri);
+    if(p>=.48&&!s.flashed){s.flashed=true;this._flashPlayerWhite();const a=this.player.position.clone().add(new THREE.Vector3(0,.7,0)),b=a.clone().addScaledVector(s.forward,3);this._line(a,b,0xffef32,1,.08);this._cameraJitter(.10,1);for(const e of this._aliveEnemies())if(this._segmentHits(a,b,e,.7)){this.damageEnemy(e,this.damage.sonicPiston);break;}}
+    if(p>=1){this.player.scale.copy(s.baseScale);this.player.position.copy(s.basePos);this.sonic=null;}}
+  _updateSweep(dt){const s=this.sweep;if(!s)return;s.elapsed+=dt;const p=Math.min(1,s.elapsed/s.duration);this.player.rotation.y=s.startYaw+Math.PI*p;s.cres.position.x=this.player.position.x;s.cres.position.z=this.player.position.z;s.cres.scale.setScalar(.2+p*4.2);s.cres.material.opacity=.72*(1-p*.65);const r=.7+p*3.8;for(const e of this._aliveEnemies()){if(s.hit.has(e)||this._flatDistance(e.position,this.player.position)>r)continue;s.hit.add(e);this.damageEnemy(e,this.damage.arcLineSweep);const v=this.player.position.clone().sub(e.position);v.y=0;if(v.lengthSq()>1e-5)e.position.addScaledVector(v.normalize(),.5);}
+    if(p>=1){this.player.rotation.y=s.startYaw;this.scene.remove(s.cres);s.cres.geometry.dispose();s.cres.material.dispose();this.sweep=null;}}
+  _updateSlingshot(dt){const s=this.slingshot;if(!s)return;s.elapsed+=dt;const p=Math.min(1,s.elapsed/s.duration),e=1-Math.pow(1-p,3);this.player.position.lerpVectors(s.start,s.end,e);this.player.scale.copy(s.baseScale);this.player.scale.z=s.baseScale.z*(1+2.4*Math.sin(Math.PI*p));if(p>=1){this.player.scale.copy(s.baseScale);this._invertCanvasOneFrame();for(const en of this._aliveEnemies()){const v=en.position.clone().sub(this.player.position);v.y=0;const d=v.length();if(d>0&&d<3.2){en.position.addScaledVector(v.normalize(),Math.max(.4,1.4*(1-d/3.2)));this.damageEnemy(en,this.damage.quantumSlingshot);}}this.slingshot=null;}}
+  _updatePhasing(dt){const s=this.phasing;if(!s)return;s.elapsed+=dt;const wave=Math.sin(s.elapsed*Math.PI*2*60)*.15;this.player.scale.copy(s.baseScale);this.player.scale.x=s.baseScale.x*(1+wave);this.player.scale.z=s.baseScale.z*(1-wave);if(s.elapsed>=s.duration){this.player.scale.copy(s.baseScale);for(const x of s.saved){x.m.transparent=x.transparent;x.m.opacity=x.opacity;}this.phasing=null;}}
+  _updateSnare(dt){const s=this.snare;if(!s)return;s.elapsed+=dt;for(let i=0;i<4;i++){const a=s.nodes[i].position,b=s.nodes[(i+1)%4].position;for(const e of this._aliveEnemies()){if(this._segmentHits(a,b,e,.42)){e.userData.velocityWeaverFrozen=Math.max(e.userData.velocityWeaverFrozen||0,1);if(!s.hit.has(e)){s.hit.add(e);this.damageEnemy(e,this.damage.synapticSnare);this._flashEnemyCyan(e,1);}}}}for(const e of this._aliveEnemies())if(e.userData.velocityWeaverFrozen>0)e.userData.velocityWeaverFrozen=Math.max(0,e.userData.velocityWeaverFrozen-dt);if(s.elapsed>=s.duration){for(const n of s.nodes)this.scene.remove(n);for(const l of s.lines){if(l.object?.parent)this.scene.remove(l.object);}s.geom.dispose();s.mat.dispose();this.snare=null;}}
   _updateBlitz(dt){const s=this.blitz;if(!s)return;s.elapsed+=dt;const should=Math.min(s.targets.length,Math.floor((s.elapsed/s.duration)*s.targets.length+1e-6));while(s.next<should){const t=s.targets[s.next++];if(!t||t.userData?.dead)continue;const a=s.last.clone().add(new THREE.Vector3(0,.7,0)),b=t.position.clone().add(new THREE.Vector3(0,.7,0));this._jaggedLine(a,b,0xffef32,.16);this.damageEnemy(t,this.damage.infiniteSpeedBlitz);s.last=t.position.clone();velocityWeaverHitStopFrames=Math.max(velocityWeaverHitStopFrames,1);this._cameraJitter(.38,2);}if(s.elapsed>=s.duration){const t=s.targets[s.targets.length-1];if(t&&!t.userData?.dead)this.player.position.copy(t.position).add(new THREE.Vector3(.8,0,.2));this.player.visible=true;this.blitz=null;}}
   _updateDome(dt){const s=this.dome;if(!s)return;s.elapsed+=dt;s.mesh.position.copy(this.player.position);const p=Math.min(1,s.elapsed/s.expand);s.mesh.scale.setScalar(.05+(s.radius)*p);s.mesh.material.opacity=.28*(1-Math.max(0,(s.elapsed-4)/.4));s.ghostTimer-=dt;if(s.elapsed>s.expand&&s.ghostTimer<=0){s.ghostTimer=.06;this._spawnGhost();}if(s.elapsed>=s.duration){this.scene.remove(s.mesh);s.geom.dispose();s.mat.dispose();this.dome=null;}}
   _updateCataclysm(dt){const s=this.cataclysm;if(!s)return;s.elapsed+=dt;this._catFrame++;if(this._catFrame%5===0)this._spawnShockwave(this.player.position);this.camera.position.y+=Math.sin(this.time*90)*.025;if(s.elapsed>=s.duration)this._endCataclysm();}
@@ -30526,7 +30451,7 @@ class VelocityWeaver {
   _updateFx(dt){for(let i=this.fx.length-1;i>=0;i--){const f=this.fx[i];f.age+=dt;if(f.kind==='line'){f.mat.opacity=f.opacity*Math.max(0,1-f.age/f.life);}if(f.age>=f.life){if(f.object?.parent)this.scene.remove(f.object);f.geom?.dispose?.();f.mat?.dispose?.();this.fx.splice(i,1);}}}
   _line(a,b,color,opacity=1,life=.1){const geom=new THREE.BufferGeometry().setFromPoints([a,b]);const mat=new THREE.LineBasicMaterial({color,transparent:true,opacity,depthWrite:false});const object=new THREE.Line(geom,mat);this.scene.add(object);const f={kind:'line',object,geom,mat,age:0,life,opacity};this.fx.push(f);return f;}
   _jaggedLine(a,b,color,life){const pts=[];const n=7;for(let i=0;i<=n;i++){const p=a.clone().lerp(b,i/n);if(i&&i<n){p.x+=(Math.random()-.5)*.45;p.y+=(Math.random()-.5)*.25;p.z+=(Math.random()-.5)*.45;}pts.push(p);}const geom=new THREE.BufferGeometry().setFromPoints(pts),mat=new THREE.LineBasicMaterial({color,transparent:true,opacity:1,depthWrite:false});const object=new THREE.Line(geom,mat);this.scene.add(object);this.fx.push({kind:'line',object,geom,mat,age:0,life,opacity:1});}
-  _flashPlayerWhite(){if(this.cataclysm||this._flashActive)return;this._flashActive=true;const saved=[];this.player.traverse(o=>{if(o.isMesh&&o.material){saved.push({o,m:o.material});o.material=new THREE.MeshBasicMaterial({color:0xffffff});}});requestAnimationFrame(()=>{for(const x of saved){x.o.material?.dispose?.();x.o.material=x.m;}this._flashActive=false;});}
+  _flashPlayerWhite(){const saved=[];this.player.traverse(o=>{if(o.isMesh&&o.material){saved.push({o,m:o.material});o.material=new THREE.MeshBasicMaterial({color:0xffffff});}});requestAnimationFrame(()=>{for(const x of saved){x.o.material?.dispose?.();x.o.material=x.m;}});}
   _flashEnemyCyan(enemy,life){const saved=[];enemy.traverse(o=>{if(o.isMesh&&o.material){saved.push({o,m:o.material});o.material=new THREE.MeshBasicMaterial({color:0x3ffcff});}});setTimeout(()=>{for(const x of saved)if(x.o){x.o.material?.dispose?.();x.o.material=x.m;}},life*1000);}
   _invertCanvasOneFrame(){const c=this.renderer.domElement,prev=c.style.filter;c.style.filter='invert(1) contrast(1.6)';requestAnimationFrame(()=>{c.style.filter=prev;});}
   _cameraJitter(amp,frames){const base=this.camera.position.clone();let left=frames;const tick=()=>{if(left--<=0){this.camera.position.copy(base);return;}this.camera.position.copy(base).add(new THREE.Vector3((Math.random()-.5)*amp,(Math.random()-.5)*amp,(Math.random()-.5)*amp));requestAnimationFrame(tick);};tick();}
@@ -30537,13 +30462,7 @@ class VelocityWeaver {
   _flatDistance(a,b){return Math.hypot(a.x-b.x,a.z-b.z);}
   _segmentHits(a,b,e,r){const p=e.position,abx=b.x-a.x,abz=b.z-a.z,apx=p.x-a.x,apz=p.z-a.z,d=abx*abx+abz*abz||1,t=Math.max(0,Math.min(1,(apx*abx+apz*abz)/d)),cx=a.x+abx*t,cz=a.z+abz*t;return (p.x-cx)**2+(p.z-cz)**2<=r*r;}
   _disposeClone(root){root.traverse(o=>{if(o.isMesh&&o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose?.());else o.material.dispose?.();}});}
-  dispose(){this.player.visible=true;
-    this._clearOffset(this.sonic);this._clearYaw(this.sweep);
-    if(this.phasing)for(const x of this.phasing.saved){x.m.transparent=x.transparent;x.m.opacity=x.opacity;}
-    this.sonic=null;this.sweep=null;this.slingshot=null;this.phasing=null;
-    this.player.scale.copy(this._baseScale);this._scaleDirty=false;
-    for(const e of (this.getEnemies()||[]))if(e?.userData)e.userData.velocityWeaverFrozen=0;
-    this._endCataclysm();for(const f of this.fx){if(f.object?.parent)this.scene.remove(f.object);f.geom?.dispose?.();f.mat?.dispose?.();}for(const x of this.ghosts){if(x.g.parent)this.scene.remove(x.g);this._disposeClone(x.g);}for(const x of this.shockwaves){if(x.mesh.parent)this.scene.remove(x.mesh);x.g.dispose();x.m.dispose();}if(this.sweep?.cres?.parent){this.scene.remove(this.sweep.cres);this.sweep.cres.geometry.dispose();this.sweep.cres.material.dispose();}if(this.dome?.mesh?.parent){this.scene.remove(this.dome.mesh);this.dome.geom.dispose();this.dome.mat.dispose();}if(this.snare){for(const n of this.snare.nodes)if(n.parent)this.scene.remove(n);this.snare.geom.dispose();this.snare.mat.dispose();}this.fx=[];this.ghosts=[];this.shockwaves=[];}
+  dispose(){this.player.visible=true;if(this.sonic)this.player.scale.copy(this.sonic.baseScale);if(this.slingshot)this.player.scale.copy(this.slingshot.baseScale);if(this.phasing){this.player.scale.copy(this.phasing.baseScale);for(const x of this.phasing.saved){x.m.transparent=x.transparent;x.m.opacity=x.opacity;}}this._endCataclysm();for(const f of this.fx){if(f.object?.parent)this.scene.remove(f.object);f.geom?.dispose?.();f.mat?.dispose?.();}for(const x of this.ghosts){if(x.g.parent)this.scene.remove(x.g);this._disposeClone(x.g);}for(const x of this.shockwaves){if(x.mesh.parent)this.scene.remove(x.mesh);x.g.dispose();x.m.dispose();}if(this.sweep?.cres?.parent){this.scene.remove(this.sweep.cres);this.sweep.cres.geometry.dispose();this.sweep.cres.material.dispose();}if(this.dome?.mesh?.parent){this.scene.remove(this.dome.mesh);this.dome.geom.dispose();this.dome.mat.dispose();}if(this.snare){for(const n of this.snare.nodes)if(n.parent)this.scene.remove(n);this.snare.geom.dispose();this.snare.mat.dispose();}this.fx=[];this.ghosts=[];this.shockwaves=[];}
 }
 window.VelocityWeaver=VelocityWeaver;
 window.RogueMoveset=VelocityWeaver;
@@ -30551,10 +30470,17 @@ window.RogueMoveset=VelocityWeaver;
 
 let shadowStalkerMoveset = null;
 let velocityWeaverHitStopFrames=0;
-function velocityWeaverMovementMultiplier(){return (hoodedIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.movementMultiplier():1;}
-function velocityWeaverAttackSpeedMultiplier(){return (hoodedIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.attackSpeedMultiplier():1;}
-function velocityWeaverEnemyTimeScale(z){return (hoodedIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.enemyTimeScale(z):1;}
-function velocityWeaverPhasingActive(){return !!(hoodedIsActive()&&shadowStalkerMoveset&&shadowStalkerMoveset.isPhasing());}
+let velocityWeaverRuntimeErrorShown=false;
+// Do not depend on the legacy Shadow Stalker class predicate here. Velocity Weaver
+// belongs to these two concrete roster entries only, so runtime routing stays valid
+// even if gameplayAvatarType()/legacy class aliases change elsewhere in the file.
+function velocityWeaverIsActive(){
+  return !!(state && (state.avatarType==='hooded' || state.avatarType==='chopper'));
+}
+function velocityWeaverMovementMultiplier(){return (velocityWeaverIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.movementMultiplier():1;}
+function velocityWeaverAttackSpeedMultiplier(){return (velocityWeaverIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.attackSpeedMultiplier():1;}
+function velocityWeaverEnemyTimeScale(z){return (velocityWeaverIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.enemyTimeScale(z):1;}
+function velocityWeaverPhasingActive(){return !!(velocityWeaverIsActive()&&shadowStalkerMoveset&&shadowStalkerMoveset.isPhasing());}
 function disposeShadowStalkerMoveset(){
   if(shadowStalkerMoveset){
     try{shadowStalkerMoveset.dispose();}catch(err){console.warn('Shadow Stalker dispose recovered:',err);}
@@ -30562,7 +30488,7 @@ function disposeShadowStalkerMoveset(){
   shadowStalkerMoveset=null;
 }
 function ensureShadowStalkerMoveset(){
-  if(!hoodedIsActive()||!player||!scene||!camera||!renderer)return null;
+  if(!velocityWeaverIsActive()||!player||!scene||!camera||!renderer)return null;
   if(shadowStalkerMoveset && shadowStalkerMoveset.player!==player) disposeShadowStalkerMoveset();
   if(!shadowStalkerMoveset){
     shadowStalkerMoveset=new VelocityWeaver({
@@ -30571,15 +30497,6 @@ function ensureShadowStalkerMoveset(){
       damageEnemy:(enemy,amount)=>{
         if(!enemy||!enemy.userData||enemy.userData.dead)return;
         applyBulletDamage(enemy,Math.max(0,Number(amount)||0)*playerStats.power);
-        // The VITALITY counter and its every-25-hits heart heal used to be fed by
-        // doMeleeAttack(). The Velocity Weaver primaries never route through that,
-        // so the counter sat at 0/25 forever. Credit hits from the kit instead.
-        hoodedMeleeHits++;
-        while(hoodedMeleeHits>=25){
-          hoodedMeleeHits-=25;
-          if(hearts<maxHearts){hearts++;renderHearts();spawnShadowSmoke(player.position.x,player.position.y+1,player.position.z,18);}
-        }
-        updateHoodedHud();
       },
       enemyRadius: chopperIsActive()?CHOPPER_TUNING.enemyRadius:0.55,
       reachScale: chopperIsActive()?CHOPPER_TUNING.reach:1,
@@ -30591,30 +30508,39 @@ function ensureShadowStalkerMoveset(){
   return shadowStalkerMoveset;
 }
 function updateShadowStalkerMoveset(dt){
-  if(!hoodedIsActive()){
+  if(!velocityWeaverIsActive()){
     if(shadowStalkerMoveset)disposeShadowStalkerMoveset();
+    velocityWeaverRuntimeErrorShown=false;
     return;
   }
-  const kit=ensureShadowStalkerMoveset();
-  if(kit)kit.update(dt);
+  try{
+    const kit=ensureShadowStalkerMoveset();
+    if(kit)kit.update(dt);
+  }catch(err){
+    console.error('Velocity Weaver update recovered:',err);
+    if(!velocityWeaverRuntimeErrorShown){
+      velocityWeaverRuntimeErrorShown=true;
+      try{toast('Velocity Weaver runtime recovered: '+String(err&&err.message||err).slice(0,80));}catch(_e){}
+    }
+  }
 }
 function triggerShadowStalkerPrimary(w){
   const kit=ensureShadowStalkerMoveset();
   if(!kit||!w)return false;
-  if(w.kind==='velocity_sonic_piston')return kit.sonicPiston();
-  if(w.kind==='velocity_arc_sweep')return kit.arcLineSweep();
+  if(w.kind==='rogue_phantom_flurry'||w.kind==='velocity_sonic_piston')return kit.sonicPiston();
+  if(w.kind==='rogue_shadow_sweep'||w.kind==='velocity_arc_sweep')return kit.arcLineSweep();
   return false;
 }
 function triggerShadowStalkerSecondary(w){
   const kit=ensureShadowStalkerMoveset();
   if(!kit||!w)return false;
-  if(w.kind==='velocity_quantum_slingshot')return kit.quantumSlingshot();
-  if(w.kind==='velocity_phasing_resonance')return kit.phasingResonance();
-  if(w.kind==='velocity_synaptic_snare')return kit.synapticSnare();
+  if(w.kind==='rogue_shadowstep'||w.kind==='velocity_quantum_slingshot')return kit.quantumSlingshot();
+  if(w.kind==='rogue_smoke_bomb'||w.kind==='velocity_phasing_resonance')return kit.phasingResonance();
+  if(w.kind==='rogue_vipers_fan'||w.kind==='velocity_synaptic_snare')return kit.synapticSnare();
   return false;
 }
 function triggerHoodedEquippedAbility(){
-  if(!hoodedIsActive()||!gameRunning)return false;
+  if(!velocityWeaverIsActive()||!gameRunning)return false;
   const kit=ensureShadowStalkerMoveset();
   if(!kit)return false;
   if(equippedAbilityId==='hooded_thousand_cuts')return kit.infiniteSpeedBlitz();
@@ -30625,7 +30551,7 @@ function triggerHoodedEquippedAbility(){
 
 function performWeaponAttack(w, countsAsPrimary=true){
   if(!w) return;
-  if(w.kind==='velocity_sonic_piston'||w.kind==='velocity_arc_sweep'){
+  if(w.kind==='rogue_phantom_flurry'||w.kind==='rogue_shadow_sweep'||w.kind==='velocity_sonic_piston'||w.kind==='velocity_arc_sweep'){
     triggerShadowStalkerPrimary(w);
   } else if(isWolverineWeaponKind(w.kind)){
     doWolverineAttack(w);
@@ -31229,14 +31155,12 @@ function doSecondaryShoot(){
   const w=secondaryWeaponForAvatar();
   if(!w)return;
   if(state.avatarType==='cloud'&&w.kind!=='cloud_great_sword_slash') resetCloudCrossbreakerChain();
-  if(w.kind==='velocity_quantum_slingshot'||w.kind==='velocity_phasing_resonance'||w.kind==='velocity_synaptic_snare'){
-    // Shadow Stalker Secondaries are gated by the move's own cooldown inside the
-    // kit rather than by the shared secondaryAttackCooldown, so a failed cast
-    // (on cooldown, or no target in range) costs nothing and gives feedback.
+  if(w.kind==='rogue_shadowstep'||w.kind==='rogue_smoke_bomb'||w.kind==='rogue_vipers_fan'||w.kind==='velocity_quantum_slingshot'||w.kind==='velocity_phasing_resonance'||w.kind==='velocity_synaptic_snare'){
+    // Requested Shadow Stalker rule: Secondary moves have NO post-use cooldown.
+    // The move itself is the only gate; shared secondaryAttackCooldown stays zero.
     player.userData.secondaryAttackCooldown=0;
-    const fired=triggerShadowStalkerSecondary(w);
-    if(fired) markSecondaryUsed();
-    else navigator.vibrate&&navigator.vibrate(10);
+    markSecondaryUsed();
+    triggerShadowStalkerSecondary(w);
     return;
   }
   // Chain-Lightning Javelin launches without a target or charge, but uses a fixed
