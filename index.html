@@ -1,3 +1,4 @@
+<!-- V23.07.05 Chopper Scale + Gameplay Boot Fix: Chopper preview/gameplay fit now matches the Nine-Tailed Fox exact 1.30-unit world height. Adds a guarded Chopper survival boot fallback so a legacy initialization error cannot leave only the HUD visible with an empty dark arena. Pirate class separation, no-warp/no-distortion rule, native body animation and head protection remain intact. -->
 <!-- V23.07.04 Pirate Chopper Class Separation: Chopper is now a completely independent pirate combat class. Removes the chopper->hooded class mapping, legacy hooded ability IDs, velocity weapon kinds and all Chopper dispatch through Shadow Stalker/Velocity Weaver. Adds dedicated pirate runtime for Cutlass Cleave, Flintlock Volley, Boarding Leap, Captain's Guard, Powder Keg, Broadside Barrage, Cannonstorm Ring, Pirate King's Maelstrom and Black Flag signature. Mesh scale/warp/fade remain forbidden and head lock remains enforced. Visible build label synchronized. -->
 <!-- RETIRED V23.07.03 Pirate Chopper Runtime Repair: removes remaining Velocity Weaver labels/presentation from Chopper, restores the full Mesh2Motion animation source, locks the head chain against inherited torso rotation without scaling/warping, strips root-motion drift and locomotion pelvis roll, makes Boarding Leap fire even with no nearby target, and gives Chopper pirate-specific ability/signature HUD labels. -->
 <!-- V23.06.01 Pirate Chopper rebuild: head/neck and all animation scale tracks are stripped at runtime; Jog/Run_Anime drive locomotion; rejected Chopper combat clips are no longer routed. Pirate kit is Cutlass Cleave, Flintlock Volley, Boarding Leap, Captain's Guard, Powder Keg, Broadside Barrage, Cannonstorm Ring and Pirate King's Maelstrom. Chopper mesh is never warped, stretched, scaled, faded or distorted by move visuals. -->
@@ -1678,7 +1679,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.07.04 - Pirate Chopper Class Separation';
+const GAME_VERSION='23.07.05 - Chopper Scale + Gameplay Boot Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -2908,7 +2909,7 @@ async function updateAvatarPreview(characterId){
     }else{
       const box=new THREEAsset.Box3().setFromObject(root);
       const size=box.getSize(new THREEAsset.Vector3());
-      const previewReference=1.48;
+      const previewReference=characterId==='chopper'?1.30:1.48;
       const gameplayScale=AVATAR_SCALE[characterId]||1;
       const relativeScale=(previewReference/Math.max(.001,size.y))*gameplayScale;
       const fullBodyMaxHeight=2.12;
@@ -12371,6 +12372,7 @@ function buildGreenRhinoPlayer(options={}){
 
     wrapper.add(fit);
     wrapper.userData.kayRoot = root;
+    if(characterId==='chopper')wrapper.userData.chopperTargetWorldHeight=1.30;
     wrapper.userData.greenRhinoFit = fit;
     wrapper.userData.greenRhinoFitBaseScale = fit.scale.clone();
     wrapper.userData.greenRhinoFitBasePosition = fit.position.clone();
@@ -12916,7 +12918,8 @@ function buildKayKitPlayer(characterId, options={}){
     }else{
       const rawBox=new THREEAsset.Box3().setFromObject(root);
       const rawSize=rawBox.getSize(new THREEAsset.Vector3());
-      root.scale.setScalar(1.48/Math.max(.001,rawSize.y));
+      const importedTargetHeight=characterId==='chopper'?1.30:1.48;
+      root.scale.setScalar(importedTargetHeight/Math.max(.001,rawSize.y));
       root.updateMatrixWorld(true);
       const placedBox=new THREEAsset.Box3().setFromObject(root);
       root.position.y-=placedBox.min.y;
@@ -34199,6 +34202,13 @@ function startSurvival(){
   resetCharacterLoadout();
   resetAbilityLoadout();
   applyPendingPreGameLoadout();
+  if(state.avatarType==='chopper'){
+    const cc=CHARACTER_COMBAT.chopper;
+    if(!ownedWeapons.chopper_cutlass)ownedWeapons.chopper_cutlass=true;
+    if(!currentWeaponId){currentWeaponId='chopper_boarding_leap';ownedWeapons.chopper_boarding_leap=true;}
+    if(!equippedAbilityId){equippedAbilityId='chopper_broadside';ownedAbilities.chopper_broadside=true;}
+    currentPrimaryWeaponId=(currentPrimaryWeaponId&&cc.weapons[currentPrimaryWeaponId])?currentPrimaryWeaponId:null;
+  }
   if(state.avatarType==='cloud'){
     updateWeaponHud();
     updatePassiveHud();
@@ -34215,18 +34225,41 @@ function startSurvival(){
   if(freeMode) toggleFreeMode(); // always start a fresh run in normal play
   dashActive = false; dashTimer = 0; dashCooldownTimer = 0; dashStartedAt = 0;
   if(player){ scene.remove(player); disposeGroup(player); }
-  spawnPlayer();
+  // Chopper V23.07.05 boot guard: the previous build could enter the game
+  // screen but stop before arena/round initialization, leaving only HUD chrome.
+  // Keep the normal shared boot path, but isolate each presentation step so a
+  // legacy hero-specific helper can never prevent the pirate class from starting.
+  try{ spawnPlayer(); }catch(err){ console.error('Player spawn recovered:',err); }
   if(state.avatarType==='mage'){
     foxMageStabilityClock=0;
     arcaneEchoSpawnGeneration++;
   }
-  renderHearts();
-  updateRunTokensHud();
-  updateWeaponHud();
+  try{ renderHearts(); }catch(err){ console.error('Hearts HUD recovered:',err); }
+  try{ updateRunTokensHud(); }catch(err){ console.error('Token HUD recovered:',err); }
+  try{ updateWeaponHud(); }catch(err){ console.error('Weapon HUD recovered:',err); }
   runStartTime = performance.now();
   roundTimerFrozenElapsed = null;
   roundCompletionStartedAt = 0;
-  startRound();
+  try{
+    startRound();
+  }catch(err){
+    console.error('Round boot recovered:',err);
+    // Minimal deterministic fallback. This intentionally uses only shared arena
+    // systems and does not route Chopper through Rogue/Hooded code.
+    try{ clearZombies(); }catch(_e){}
+    try{ applyTheme(round); }catch(_e){}
+    roundKillTarget=killTargetForRound(round);
+    roundKillsDone=0;
+    zombiesRemainingToSpawn=roundKillTarget;
+    bossSpawnPending=bossRoundFor(round);
+    try{ fillEnemySlotsFromQueue(); }catch(e2){ console.error('Enemy fallback recovered:',e2); }
+    try{ spawnPowerUps(); }catch(_e){}
+    roundStartTime=performance.now();
+    heartsLostThisRound=0;secondaryUsedThisRound=false;ultimateUsedThisRound=false;
+    try{ updateRoundTimerHud(); }catch(_e){}
+    try{ updateEnemyCountHud(); }catch(_e){}
+    try{ updateEnemyRadar(); }catch(_e){}
+  }
   if(catchUpGrant){
     // Announced after startRound()'s own banner so both are readable.
     setTimeout(()=>toast('Catch-up loadout: \uD83D\uDCAA+'+catchUpGrant.power
