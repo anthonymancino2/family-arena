@@ -1,4 +1,4 @@
-<!-- V23.06.05 Velocity Weaver Compatibility Fix: restores the established Rogue/Chopper internal weapon kinds while keeping the Velocity Weaver behaviors. Fixes Primary/Secondary dispatch compatibility across existing input, HUD, loadout and combat code.  replaces the Hooded Rogue and Chopper Shadow Stalker combat kit with a procedural speedster/arachnid kit: Sonic Piston, Arc Line Sweep, Quantum Slingshot, Phasing Resonance, Synaptic Snare, Infinite Speed Blitz, Tachyon Dome and Speedforce Cataclysm. Existing save IDs are preserved, enemy damage stays routed through applyBulletDamage(), projectile phasing is collision-real, Blitz hit-stop skips one game-logic frame per strike, and all movement/VFX are delta-time or rendered-frame driven. -->
+<!-- V23.06.06 Velocity Weaver Runtime Routing Fix: hard-routes the Velocity Weaver runtime to the concrete Hooded Rogue and Chopper avatar IDs, explicitly maps Chopper to the Hooded combat table, and protects the per-frame Velocity update from silent failures. It keeps established Rogue/Chopper internal move IDs for save/loadout compatibility and replaces the Hooded Rogue and Chopper Shadow Stalker combat kit with a procedural speedster/arachnid kit: Sonic Piston, Arc Line Sweep, Quantum Slingshot, Phasing Resonance, Synaptic Snare, Infinite Speed Blitz, Tachyon Dome and Speedforce Cataclysm. Existing save IDs are preserved, enemy damage stays routed through applyBulletDamage(), projectile phasing is collision-real, Blitz hit-stop skips one game-logic frame per strike, and all movement/VFX are delta-time or rendered-frame driven. -->
 <!-- V23.05.01 Shadow Stalker Rogue: replaces the Hooded Rogue combat loadout with two procedural Primaries (Phantom Flurry, Shadow Sweep), three zero-cooldown Secondaries (Shadowstep, Smoke Bomb, Viper's Fan), and three selectable Ultimates (Thousand Cuts, Dancing Steel, Twilight Execution). All motion, projectile travel, smoke expansion, mesh scaling/fading and camera jitter are delta-time/requestAnimationFrame driven; no skeletal animation is required by these moves. Existing enemy HP/boss protection routes through applyBulletDamage(). Other avatars are unchanged. -->
 <!-- V23.04.02 Direct Warrior Texture Binding: fixes Warrior bosses remaining black on iPhone Safari after V23.04.01. Root cause: the FBX material identifiers do not reliably match their external JPG filenames, and Viking's weapon material is even authored with the typo 'wiking_weapons_texture'. This build no longer depends on FBXLoader resolving texture paths. The seven already-optimized embedded JPGs are loaded directly as THREE textures and assigned after FBX parse by the exact authored material names: egyptian_red_B_texture / egyptianweapons_texture, roman_D_texture / roman_clothes_texture / roman_weapons_texture, and viking_C_texture / wiking_weapons_texture. Imported material base colors are forced to white so the diffuse maps cannot be multiplied into black silhouettes. URLModifier remains only as a fallback. Boss size, animations, stats and file-size optimization are unchanged. Syntax/size audit included. -->
 <!-- V23.04.01 Warrior Boss Texture Fix: fixes the uploaded Warrior bosses rendering as black silhouettes on iPhone Safari. The animated FBX files reference seven external JPG maps rather than embedding them internally. This build embeds only those seven required maps and feeds them to FBXLoader through a LoadingManager URL modifier. To preserve boss detail without bloating the HTML, primary body/clothing sheets are reduced from 2048px to 768px, smaller weapon sheets to 512px, and Viking's dense weapon sheet stays 768px; optimized JPEG quality 78 is used. No blue/green variants, static models, Maya project, renders, video or unrelated textures are included. Existing 2.5x Green Ranger boss scale, three-warrior rotation, animation splits, boss stats/HUD and anti-one-shot behavior remain unchanged. Syntax/size audit included. -->
@@ -3747,6 +3747,9 @@ function arcaneEchoesUnlocked(){
 }
 let previewRenderer=null, previewScene=null, previewCamera=null, previewRoot=null, previewMixer=null, previewRAF=0;
 function combatForAvatar(){
+  // Chopper intentionally shares the Velocity Weaver/Hooded Rogue combat table.
+  // Resolve it explicitly instead of relying on a later gameplay-class alias.
+  if(state && state.avatarType==='chopper') return CHARACTER_COMBAT.hooded;
   // Exact skin first, then the gameplay class. This is what lets the Green
   // Rhino Ranger carry its own weapon list while still running the whole
   // barbarian-class chassis (stats, cooldown scaling, HUD, ultimate slot).
@@ -30467,10 +30470,17 @@ window.RogueMoveset=VelocityWeaver;
 
 let shadowStalkerMoveset = null;
 let velocityWeaverHitStopFrames=0;
-function velocityWeaverMovementMultiplier(){return (hoodedIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.movementMultiplier():1;}
-function velocityWeaverAttackSpeedMultiplier(){return (hoodedIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.attackSpeedMultiplier():1;}
-function velocityWeaverEnemyTimeScale(z){return (hoodedIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.enemyTimeScale(z):1;}
-function velocityWeaverPhasingActive(){return !!(hoodedIsActive()&&shadowStalkerMoveset&&shadowStalkerMoveset.isPhasing());}
+let velocityWeaverRuntimeErrorShown=false;
+// Do not depend on the legacy Shadow Stalker class predicate here. Velocity Weaver
+// belongs to these two concrete roster entries only, so runtime routing stays valid
+// even if gameplayAvatarType()/legacy class aliases change elsewhere in the file.
+function velocityWeaverIsActive(){
+  return !!(state && (state.avatarType==='hooded' || state.avatarType==='chopper'));
+}
+function velocityWeaverMovementMultiplier(){return (velocityWeaverIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.movementMultiplier():1;}
+function velocityWeaverAttackSpeedMultiplier(){return (velocityWeaverIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.attackSpeedMultiplier():1;}
+function velocityWeaverEnemyTimeScale(z){return (velocityWeaverIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.enemyTimeScale(z):1;}
+function velocityWeaverPhasingActive(){return !!(velocityWeaverIsActive()&&shadowStalkerMoveset&&shadowStalkerMoveset.isPhasing());}
 function disposeShadowStalkerMoveset(){
   if(shadowStalkerMoveset){
     try{shadowStalkerMoveset.dispose();}catch(err){console.warn('Shadow Stalker dispose recovered:',err);}
@@ -30478,7 +30488,7 @@ function disposeShadowStalkerMoveset(){
   shadowStalkerMoveset=null;
 }
 function ensureShadowStalkerMoveset(){
-  if(!hoodedIsActive()||!player||!scene||!camera||!renderer)return null;
+  if(!velocityWeaverIsActive()||!player||!scene||!camera||!renderer)return null;
   if(shadowStalkerMoveset && shadowStalkerMoveset.player!==player) disposeShadowStalkerMoveset();
   if(!shadowStalkerMoveset){
     shadowStalkerMoveset=new VelocityWeaver({
@@ -30498,12 +30508,21 @@ function ensureShadowStalkerMoveset(){
   return shadowStalkerMoveset;
 }
 function updateShadowStalkerMoveset(dt){
-  if(!hoodedIsActive()){
+  if(!velocityWeaverIsActive()){
     if(shadowStalkerMoveset)disposeShadowStalkerMoveset();
+    velocityWeaverRuntimeErrorShown=false;
     return;
   }
-  const kit=ensureShadowStalkerMoveset();
-  if(kit)kit.update(dt);
+  try{
+    const kit=ensureShadowStalkerMoveset();
+    if(kit)kit.update(dt);
+  }catch(err){
+    console.error('Velocity Weaver update recovered:',err);
+    if(!velocityWeaverRuntimeErrorShown){
+      velocityWeaverRuntimeErrorShown=true;
+      try{toast('Velocity Weaver runtime recovered: '+String(err&&err.message||err).slice(0,80));}catch(_e){}
+    }
+  }
 }
 function triggerShadowStalkerPrimary(w){
   const kit=ensureShadowStalkerMoveset();
@@ -30515,13 +30534,13 @@ function triggerShadowStalkerPrimary(w){
 function triggerShadowStalkerSecondary(w){
   const kit=ensureShadowStalkerMoveset();
   if(!kit||!w)return false;
-  if(w.kind==='rogue_shadowstep'||(w.kind==='rogue_shadowstep'||w.kind==='velocity_quantum_slingshot'))return kit.quantumSlingshot();
-  if(w.kind==='rogue_smoke_bomb'||(w.kind==='rogue_smoke_bomb'||w.kind==='velocity_phasing_resonance'))return kit.phasingResonance();
-  if(w.kind==='rogue_vipers_fan'||(w.kind==='rogue_vipers_fan'||w.kind==='velocity_synaptic_snare'))return kit.synapticSnare();
+  if(w.kind==='rogue_shadowstep'||w.kind==='velocity_quantum_slingshot')return kit.quantumSlingshot();
+  if(w.kind==='rogue_smoke_bomb'||w.kind==='velocity_phasing_resonance')return kit.phasingResonance();
+  if(w.kind==='rogue_vipers_fan'||w.kind==='velocity_synaptic_snare')return kit.synapticSnare();
   return false;
 }
 function triggerHoodedEquippedAbility(){
-  if(!hoodedIsActive()||!gameRunning)return false;
+  if(!velocityWeaverIsActive()||!gameRunning)return false;
   const kit=ensureShadowStalkerMoveset();
   if(!kit)return false;
   if(equippedAbilityId==='hooded_thousand_cuts')return kit.infiniteSpeedBlitz();
@@ -31136,7 +31155,7 @@ function doSecondaryShoot(){
   const w=secondaryWeaponForAvatar();
   if(!w)return;
   if(state.avatarType==='cloud'&&w.kind!=='cloud_great_sword_slash') resetCloudCrossbreakerChain();
-  if(w.kind==='rogue_shadowstep'||w.kind==='rogue_smoke_bomb'||w.kind==='rogue_vipers_fan'||(w.kind==='rogue_shadowstep'||w.kind==='velocity_quantum_slingshot')||(w.kind==='rogue_smoke_bomb'||w.kind==='velocity_phasing_resonance')||(w.kind==='rogue_vipers_fan'||w.kind==='velocity_synaptic_snare')){
+  if(w.kind==='rogue_shadowstep'||w.kind==='rogue_smoke_bomb'||w.kind==='rogue_vipers_fan'||w.kind==='velocity_quantum_slingshot'||w.kind==='velocity_phasing_resonance'||w.kind==='velocity_synaptic_snare'){
     // Requested Shadow Stalker rule: Secondary moves have NO post-use cooldown.
     // The move itself is the only gate; shared secondaryAttackCooldown stays zero.
     player.userData.secondaryAttackCooldown=0;
