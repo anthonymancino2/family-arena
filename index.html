@@ -1,3 +1,4 @@
+<!-- V23.12.00 Chopper Pirate Combat Revision: removes move-name pop-up banners; replaces the Pirate default Primary with one black forward cannonball using the game's standard non-Archer forward auto-aim cone; moves Anchor Drop to Secondary, targets the nearest enemy within half the arena radius and renders the anchor at 3x size; removes Bulwark Guard; rebuilds Boarding Dash to carry touched enemies to the endpoint, kill normal enemies there, stun Brutes/bosses on first Boarding hit and kill them on the second, with shockwaves at both dash endpoints; Powder Kegs render at 10x size and their blast is lethal; restores Chopper support in the Ability/Ultimate HUD so his selected ultimate button appears. Save-compatible weapon and ability IDs are preserved/migrated. -->
 <!-- V23.11.00 Chopper Pirate Kit: forks a genuinely standalone ChopperPirateKit class. Chopper no longer instantiates the Velocity Weaver engine at all - his own class owns his cooldowns, combo state, damage, enemy slow and per-frame update, and every trigger routes to it before the rogue kit is consulted. Fixes Boarding Dash damaging the player: it warped him ONTO the target with zero i-frames, so enemy contact collision hurt him. It now stops 2 units short and grants 0.75s of real invulnerability. Bulwark Guard grants 2s of genuine i-frames and physically shoves enemies out of reach. Large visual upgrade: real dynamic PointLight flashes, thick TubeGeometry blade trails, ground telegraph rings before every AoE, tumbling debris, rising light pillars, full-screen colour washes and a move-name banner so it is always obvious which move fired. -->
 <!-- V23.10.00 Chopper Own Class: Chopper is no longer a cosmetic skin over the Shadow Stalker Rogue. gameplayAvatarType('chopper') now returns 'chopper', so no rogue or archer system can reach him: no purple shadow afterimage trail, no shadow smoke, no soul orbs, no Hooded-Rogue shadow clones flanking him, and no Eclipse ultimate. He gets his own signature instead - BROADSIDE, with its own POWDER meter and its own charge counters that the rogue can never read or reset. Second primary replaced: the Keelhaul Spin whirlpool is gone, replaced by Anchor Drop, a gold ship anchor that falls and cracks the deck. Slash arcs now sweep vertically through the air in front of him at chibi scale instead of lying flat on the ground at radius 1.5, which is what rendered as a large white puddle. -->
 <!-- V23.09.00 Chopper Storybook Pirate: removes ALL avatar deformation. _updateScale() previously stretched the player along Z for the lunge and wobbled X/Z for the guard; because the primary auto-fires every ~0.22s that stretch was effectively permanent and smeared the whole model sideways. Chopper is now locked to uniform scale, stays fully opaque (no 30% ghost) and is never touched by any move. Boarding Dash no longer silently refuses to fire when no enemy is in range - it always performs a committed leap. Adds a procedural storybook-pirate FX layer (canvas-generated sprites, zero new payload): layered white/gold/rose crescent slashes with a brighter every-third-hit finisher, sea-green whirlpool for Keelhaul Spin, foam wake and splash rings for Boarding Dash, an iridescent bubble shield for Bulwark Guard, real little gold-banded barrels with pulsing fuses for Powder Keg Toss, a muzzle bloom and rolling calm for Doldrums Cannon, and rising foam columns for Kraken Rising. Gold coins, twinkles and hearts spray on impact. -->
@@ -3665,22 +3666,19 @@ const CHARACTER_COMBAT = {
     }
   },
   chopper: {
-    // Same IDs/kinds as the Hooded Rogue class preserve every existing save.
-    // Names, flavour and animation routing are Chopper-only: combatForAvatar()
-    // resolves the exact skin before falling back to the class.
+    // Save IDs stay compatible, but the Pirate now has one default cannon Primary
+    // and three Secondaries: Boarding Dash, Anchor Drop and Powder Keg Toss.
     defaultId:'phantom_flurry',
     baseMoveMult:1.22,
     weapons:{
-      phantom_flurry:{name:'Cutlass Combo', price:0, slot:'primary', kind:'velocity_sonic_piston', cooldown:0.22, damage:1.35, auto:true,
-        desc:'A rolling three-hit cutlass chain — overhead chop, horizontal slash, then a committed lunging stab. Each landed hit flashes a bright steel arc and shoves the target back a step.'},
-      shadow_sweep:{name:'Anchor Drop', price:0, slot:'primary', kind:'velocity_arc_sweep', cooldown:0.48, damage:1.70, auto:true,
-        desc:'Haul a gold ship anchor overhead and bring it down hard in front of you. The impact cracks the deck in a gold ring and showers coins over everything caught underneath.'},
+      phantom_flurry:{name:'Cannon Shot', price:0, slot:'primary', kind:'velocity_sonic_piston', cooldown:0.38, damage:1.35, auto:true,
+        desc:'Fire one heavy black cannonball forward. It uses the same standard forward auto-aim cone as the other default non-Archer ranged attacks and snaps to a valid enemy in front.'},
       shadowstep:{name:'Boarding Dash', price:0, slot:'secondary', kind:'velocity_quantum_slingshot', cooldown:0,
-        desc:'Kick off the deck and rocket at the nearest enemy on the real dodge-forward roll, breaking through the approach lane and bursting outward on arrival.'},
-      smoke_bomb:{name:'Bulwark Guard', price:0, slot:'secondary', kind:'velocity_phasing_resonance', cooldown:0,
-        desc:'Raise the guard stance and become projectile-proof for 1.5 seconds. A steady shield glimmer marks exactly how long the parry window holds.'},
+        desc:'Dash toward the nearest target, pulling enemies into the rush and carrying them to the endpoint. Normal enemies are executed there; Brutes and bosses are stunned on the first Boarding hit and executed on the second.'},
+      shadow_sweep:{name:'Anchor Drop', price:0, slot:'secondary', kind:'velocity_arc_sweep', cooldown:0,
+        desc:'Drop a giant anchor directly onto the closest enemy within half the playable-map radius. The anchor itself is three times larger than before.'},
       vipers_fan:{name:'Powder Keg Toss', price:0, slot:'secondary', kind:'velocity_synaptic_snare', cooldown:0,
-        desc:'Use the genuine throw animation to lob four powder kegs around the deck. Crackling fuse lines snare anything crossing them before the charges blow.'}
+        desc:'Throw four enormous powder kegs around the Pirate. Each barrel is ten times larger than before and its detonation instantly defeats anything caught in the blast.'}
     }
   },
   rogue: {
@@ -14256,6 +14254,12 @@ const HERO_ABILITIES = { rhino:[RHINO_CRASHING_BOLT,RHINO_SHATTERED_DOMAIN,RHINO
   barbarian:[BARBARIAN_PRIMAL_RAGE, BARBARIAN_WORLD_BREAKER, BARBARIAN_RAGNAROK_WAVE] };
 const REMOVED_WEAPON_IDS=['radiant_cleave','blade_cyclone','holy_wave','shield_bash','banner_spear','knight_banner_spear','primal_wave'];
 function sanitizeRemovedAbilitySelection(){
+  // V23.12.00 Pirate loadout migration: Anchor moved from Primary to Secondary
+  // and the old Bulwark Guard slot now resolves to Anchor instead.
+  if(state&&state.avatarType==='chopper'){
+    if(currentPrimaryWeaponId==='shadow_sweep') currentPrimaryWeaponId=null;
+    if(currentWeaponId==='smoke_bomb') currentWeaponId='shadow_sweep';
+  }
   // V23.05.01 Shadow Stalker migration: old Hooded Rogue weapons no longer exist.
   if(['hooded_blade','ninja_uzi','spin','clone_stars','clone_spin'].includes(currentPrimaryWeaponId)) currentPrimaryWeaponId=null;
   if(['hooded_blade','ninja_uzi','spin','clone_stars','clone_spin'].includes(currentWeaponId)) currentWeaponId='shadowstep';
@@ -16899,7 +16903,7 @@ function updateHoodedHud(){
   }
   const abilityBtn=document.getElementById('abilityBtn');
   if(abilityBtn){
-    const supportsAbility = isHooded || isMage || isArcher || isKnight || isBarbarian;
+    const supportsAbility = isHooded || isChopper || isMage || isArcher || isKnight || isBarbarian;
     const equipped = supportsAbility && equippedAbilityId && ownedAbilities[equippedAbilityId];
     const laserMode = equippedAbilityId==='arcane_laser';
     abilityBtn.classList.toggle('hidden', !equipped);
@@ -16927,18 +16931,19 @@ function updateHoodedHud(){
               : (superMeteorCooldownTimer>0 ? `METEOR ${Math.ceil(superMeteorCooldownTimer)}` : 'SUPER METEOR'));
         abilityBtn.classList.toggle('active',!!activeSuperMeteor||superMeteorSequenceActive);
         abilityBtn.classList.toggle('cooling',superMeteorCooldownTimer>0&&!superMeteorSequenceActive);
-      }else if(isHooded){
-        const kit=shadowStalkerMoveset;
-        const label=equippedAbilityId==='hooded_thousand_cuts'?'SPEED BLITZ'
-          :(equippedAbilityId==='hooded_dancing_steel'?'TACHYON DOME':'CATACLYSM');
+      }else if(isHooded||isChopper){
+        const kit=isChopper?chopperKit:shadowStalkerMoveset;
+        const label=isChopper
+          ? (equippedAbilityId==='hooded_thousand_cuts'?'CUTLASS STORM':(equippedAbilityId==='hooded_dancing_steel'?'DOLDRUMS CANNON':'KRAKEN RISING'))
+          : (equippedAbilityId==='hooded_thousand_cuts'?'SPEED BLITZ':(equippedAbilityId==='hooded_dancing_steel'?'TACHYON DOME':'CATACLYSM'));
         const moveKey=equippedAbilityId==='hooded_thousand_cuts'?'infiniteSpeedBlitz'
           :(equippedAbilityId==='hooded_dancing_steel'?'tachyonDome':'speedforceCataclysm');
-        const active=!!(kit&&(
-          (equippedAbilityId==='hooded_thousand_cuts'&&kit.blitz)||
-          (equippedAbilityId==='hooded_dancing_steel'&&kit.dome)||
-          (equippedAbilityId==='hooded_twilight_execution'&&kit.cataclysm)
-        ));
-        const cd=kit&&kit.cooldownFor?kit.cooldownFor(moveKey):0;
+        const active=!!(kit&&(isChopper
+          ? ((equippedAbilityId==='hooded_thousand_cuts'&&kit.storm)||(equippedAbilityId==='hooded_dancing_steel'&&kit.cannon)||(equippedAbilityId==='hooded_twilight_execution'&&kit.kraken))
+          : ((equippedAbilityId==='hooded_thousand_cuts'&&kit.blitz)||(equippedAbilityId==='hooded_dancing_steel'&&kit.dome)||(equippedAbilityId==='hooded_twilight_execution'&&kit.cataclysm))));
+        const cd=isChopper
+          ? (kit&&kit.cooldownForAbility?kit.cooldownForAbility(equippedAbilityId):0)
+          : (kit&&kit.cooldownFor?kit.cooldownFor(moveKey):0);
         abilityBtn.textContent=active?label+'!':(cd>0?label+' '+Math.ceil(cd):label);
         abilityBtn.classList.toggle('active',active);
         abilityBtn.classList.toggle('cooling',cd>0&&!active);
@@ -16964,7 +16969,7 @@ function updateHoodedHud(){
       }
       if(!laserMode){
         abilityBtn.style.removeProperty('--charge');
-        if(equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='supernova_piercer'&&equippedAbilityId!=='super_meteor'&&!isHooded&&!isKnight&&!isBarbarian){
+        if(equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='supernova_piercer'&&equippedAbilityId!=='super_meteor'&&!isHooded&&!isChopper&&!isKnight&&!isBarbarian){
           abilityBtn.classList.remove('empty','active','cooling');
         }
       }
@@ -30929,28 +30934,9 @@ const chopperFX = (function(){
     setTimeout(()=>{flashEl.style.transition='opacity '+(ms||260)+'ms ease-out';
       flashEl.style.opacity='0';},70);
   }
-  // Move-name banner. The single biggest fix for "I can't tell what's firing".
-  function banner(text,css){
-    if(!bannerEl){
-      bannerEl=document.createElement('div');
-      bannerEl.style.cssText='position:fixed;left:50%;top:34%;transform:translate(-50%,-50%) scale(.7);'+
-        'pointer-events:none;z-index:61;font:800 30px/1.05 system-ui,-apple-system,sans-serif;'+
-        'letter-spacing:.055em;text-align:center;opacity:0;text-shadow:0 3px 0 rgba(0,0,0,.45),0 0 22px currentColor;'+
-        'transition:opacity .12s ease-out,transform .22s cubic-bezier(.2,1.7,.4,1);white-space:nowrap;';
-      document.body.appendChild(bannerEl);
-    }
-    bannerEl.textContent=text;
-    bannerEl.style.color=css||'#ffd76a';
-    bannerEl.style.transition='opacity .1s ease-out,transform .2s cubic-bezier(.2,1.7,.4,1)';
-    bannerEl.style.opacity='1';
-    bannerEl.style.transform='translate(-50%,-50%) scale(1.06)';
-    clearTimeout(bannerEl._t);
-    bannerEl._t=setTimeout(()=>{
-      bannerEl.style.transition='opacity .34s ease-in,transform .34s ease-in';
-      bannerEl.style.opacity='0';
-      bannerEl.style.transform='translate(-50%,-58%) scale(.92)';
-    },560);
-  }
+  // Pirate move-name overlay intentionally disabled. Combat feedback comes from
+  // the animation, VFX, impact and HUD controls rather than center-screen text.
+  function banner(){ return; }
 
   return {
     ready:()=>ready,
@@ -31009,6 +30995,7 @@ const chopperFX = (function(){
       const arm=new THREE.Mesh(new THREE.TorusGeometry(.36,.065,8,18,Math.PI),gm);
       arm.rotation.y=Math.PI/2;arm.position.y=-.42;
       anchor.add(shank,stock,rt,arm);
+      anchor.scale.setScalar(3);
       anchor.position.copy(at);anchor.position.y+=4.2;anchor.rotation.y=Math.random()*3;
       group.add(anchor);
       push(anchor,{dur:.22,from:1,to:1,fadeIn:.01,vel:new THREE.Vector3(0,-19,0)});
@@ -31024,8 +31011,10 @@ const chopperFX = (function(){
     },
     boardingDash(start,end){
       if(!ensure())return;
-      ring(start,{color:PAL.aqua,dur:.45,from:.4,to:3.4});
-      ring(end,{color:PAL.cream,dur:.55,from:.3,to:4.0});
+      ring(start,{color:PAL.aqua,dur:.52,from:.35,to:5.4,peak:.92});
+      ring(start,{color:PAL.white,dur:.38,from:.25,to:3.3,peak:.82});
+      ring(end,{color:PAL.cream,dur:.62,from:.3,to:6.0,peak:1});
+      ring(end,{color:PAL.aqua,dur:.46,from:.25,to:4.1,peak:.88});
       flash(end.clone().setY(end.y+.8),PAL.aqua,4,.32);
       const d=end.clone().sub(start);
       for(let i=0;i<=14;i++){
@@ -31067,6 +31056,7 @@ const chopperFX = (function(){
       b1.rotation.x=Math.PI/2;b1.position.y=.09;
       const b2=b1.clone();b2.position.y=-.09;
       keg.add(body,b1,b2);
+      keg.scale.setScalar(10);
       keg.position.copy(pos);keg.position.y+=.2;keg.rotation.y=Math.random()*3;
       group.add(keg);
       const fuse=sprite(tex.glow,PAL.ember,.4);fuse.material.opacity=1;
@@ -31174,11 +31164,10 @@ let chopperKit = null;
 class ChopperPirateKit {
   constructor(){
     this.player=player;
-    this.cool={anchor:0,dash:0,guard:0,kegs:0,storm:0,cannon:0,kraken:0};
-    this.len ={anchor:0.50,dash:1.10,guard:6.0,kegs:4.0,storm:9.0,cannon:14.0,kraken:24.0};
-    this.combo=0; this.comboResetIn=0;
-    this.swing=null;this.anchor=null;this.dash=null;this.guard=null;
-    this.kegs=null;this.storm=null;this.cannon=null;this.kraken=null;
+    this.cool={primary:0,anchor:0,dash:0,kegs:0,storm:0,cannon:0,kraken:0};
+    this.len ={primary:0.38,anchor:0.50,dash:1.10,kegs:4.0,storm:9.0,cannon:14.0,kraken:24.0};
+    this.anchor=null;this.dash=null;this.kegs=null;this.storm=null;this.cannon=null;this.kraken=null;
+    this.cannonballs=[];
     this.baseScale=player.scale.clone();
   }
   // ---- helpers ----
@@ -31193,6 +31182,16 @@ class ChopperPirateKit {
       if(d<bd){bd=d;best=e;}
     }
     return best;
+  }
+  _isLarge(e){
+    const t=e&&e.userData&&e.userData.archetype;
+    return t==='brute'||t==='boss'||!!(e&&e.userData&&e.userData.isRoundBoss);
+  }
+  _kill(e){
+    if(!e||!e.userData||e.userData.dead)return false;
+    e.userData.hp=0;
+    killZombie(e);
+    return true;
   }
   _hurt(e,amount){
     if(!e||!e.userData||e.userData.dead)return;
@@ -31213,45 +31212,59 @@ class ChopperPirateKit {
     }
     return hits;
   }
-  _cone(origin,yaw,range,arc,dmg){
+  _killRadial(center,radius){
     let hits=0;
-    for(const e of this._enemies()){
-      const dx=e.position.x-origin.x,dz=e.position.z-origin.z;
-      if(dx*dx+dz*dz>range*range)continue;
-      const a=Math.atan2(dx,dz),diff=Math.abs(((a-yaw+Math.PI*3)%(Math.PI*2))-Math.PI);
-      if(diff<=arc/2){this._hurt(e,dmg);hits++;}
+    for(const e of [...this._enemies()]){
+      const dx=e.position.x-center.x,dz=e.position.z-center.z;
+      if(dx*dx+dz*dz<=radius*radius){ if(this._kill(e))hits++; }
     }
     return hits;
   }
+  cooldownForAbility(id){
+    if(id==='hooded_thousand_cuts')return this.cool.storm||0;
+    if(id==='hooded_dancing_steel')return this.cool.cannon||0;
+    if(id==='hooded_twilight_execution')return this.cool.kraken||0;
+    return 0;
+  }
 
-  // ---- PRIMARY 1: Cutlass Combo ----
-  cutlass(){
-    if(this.swing)return false;
-    const step=this.combo%3; this.combo++; this.comboResetIn=1.1;
-    const yaw=this.player.rotation.y;
-    const fin=step===2;
-    const dmg=CHOPPER_TUNING.damage.sonicPiston*(fin?1.7:1);
-    const hits=this._cone(this.player.position,yaw,fin?3.2:2.6,Math.PI*(fin?1.1:.8),dmg);
-    chopperFX.cutlass(step,hits);
-    if(step===0)chopperFX.banner('CUTLASS COMBO','#ffd76a');
-    if(fin)chopperFX.banner('FINISHER!','#ff9ec7');
-    triggerCombatShake(hits?(fin?13:7):3,hits?(fin?190:120):70);
-    this.swing={t:0,d:fin?.26:.18};
+  // ---- PRIMARY: Cannon Shot ----
+  cannonShot(){
+    if(this.cool.primary>0)return false;
+    this.cool.primary=this.len.primary;
+    const target=findAutoAimTarget(18); // standard default forward cone (dot >= .77)
+    let dir=this._fwd();
+    if(target){
+      dir=target.position.clone().sub(this.player.position);dir.y=0;
+      if(dir.lengthSq()>.0001)dir.normalize(); else dir=this._fwd();
+      this.player.rotation.y=Math.atan2(dir.x,dir.z);
+    }
+    const pos=this.player.position.clone().addScaledVector(dir,.85);pos.y+=.78;
+    const mesh=new THREE.Mesh(
+      new THREE.SphereGeometry(.24,14,10),
+      new THREE.MeshLambertMaterial({color:0x070707,emissive:0x000000,flatShading:true})
+    );
+    mesh.position.copy(pos);scene.add(mesh);
+    const glow=new THREE.PointLight(0xffb347,1.8,3.2,2);glow.position.copy(pos);scene.add(glow);
+    this.cannonballs.push({mesh,glow,dir:dir.clone(),life:0,maxLife:1.25,speed:15.5,hit:new Set()});
+    spawnBurst(pos.x,pos.y,pos.z,7,FX_MAT_SPARK,2.6);
+    triggerCombatShake(4,85);
     return true;
   }
 
-  // ---- PRIMARY 2: Anchor Drop ----
+  // ---- SECONDARY: Anchor Drop ----
   anchorDrop(){
     if(this.anchor||this.cool.anchor>0)return false;
+    const maxRange=Math.max(1,(typeof arenaSize==='number'?arenaSize:30)*.5);
+    const tgt=this._nearest(maxRange);
+    if(!tgt)return false;
     this.cool.anchor=this.len.anchor;
-    const at=this.player.position.clone().addScaledVector(this._fwd(),1.15);
+    const at=tgt.position.clone();at.y=this.player.position.y;
     chopperFX.anchorTelegraph(at);
-    chopperFX.banner('ANCHOR DROP','#ffb347');
     this.anchor={t:0,d:.22,at,done:false};
     return true;
   }
 
-  // ---- SECONDARY 1: Boarding Dash ----
+  // ---- SECONDARY: Boarding Dash ----
   boardingDash(){
     if(this.dash||this.cool.dash>0)return false;
     this.cool.dash=this.len.dash;
@@ -31259,203 +31272,163 @@ class ChopperPirateKit {
     const tgt=this._nearest(9);
     let dir,dist;
     if(tgt){
-      dir=tgt.position.clone().sub(start);dir.y=0;dir.normalize();
-      // Stop SHORT of the target. Landing on top of an enemy is what made
-      // this move damage the player through contact collision.
-      dist=Math.max(1.4,start.distanceTo(tgt.position)-2.0);
-    }else{ dir=this._fwd(); dist=5.4; }
+      dir=tgt.position.clone().sub(start);dir.y=0;if(dir.lengthSq()>.0001)dir.normalize();else dir=this._fwd();
+      dist=Math.max(2.2,Math.min(8.2,start.distanceTo(tgt.position)+1.4));
+    }else{dir=this._fwd();dist=5.4;}
     const end=start.clone().addScaledVector(dir,dist);end.y=start.y;
-    // Real invulnerability frames: the dash is a commitment, not a liability.
     invincibleTimer=Math.max(invincibleTimer||0,.75);
     chopperFX.boardingDash(start,end);
-    chopperFX.banner('BOARDING DASH','#7fe6ff');
     triggerCombatShake(8,140);
-    this.dash={t:0,d:.20,start,end,hit:new Set()};
+    this.dash={t:0,d:.24,start,end,hit:new Set(),carried:[]};
     return true;
   }
 
-  // ---- SECONDARY 2: Bulwark Guard ----
-  bulwarkGuard(){
-    if(this.guard||this.cool.guard>0)return false;
-    this.cool.guard=this.len.guard;
-    invincibleTimer=Math.max(invincibleTimer||0,2.0);
-    chopperFX.guardOpen(2.0);
-    chopperFX.banner('BULWARK GUARD','#7fe6ff');
-    // Shove everything out of arm's reach so the guard reads as a repel.
-    const p=this.player.position;
-    for(const e of this._enemies()){
-      const dx=e.position.x-p.x,dz=e.position.z-p.z,d=Math.hypot(dx,dz);
-      if(d<3.0&&d>.001){
-        e.position.x+=dx/d*(3.0-d)*.9;
-        e.position.z+=dz/d*(3.0-d)*.9;
-      }
-    }
-    this.guard={t:0,d:2.0};
-    return true;
-  }
-
-  // ---- SECONDARY 3: Powder Keg Toss ----
+  // ---- SECONDARY: Powder Keg Toss ----
   powderKegs(){
     if(this.kegs||this.cool.kegs>0)return false;
     this.cool.kegs=this.len.kegs;
-    const c=this.player.position.clone(),R=2.9,list=[];
+    const c=this.player.position.clone(),R=3.8,list=[];
     [[R,0],[0,R],[-R,0],[0,-R]].forEach(([x,z])=>{
       const at=new THREE.Vector3(c.x+x,c.y,c.z+z);
       const k=chopperFX.kegPlace(at);
       if(k)list.push({keg:k,at});
     });
-    chopperFX.banner('POWDER KEGS','#ff8a3d');
     this.kegs={t:0,d:1.7,list};
     return true;
   }
 
-  // ---- ABILITY: Cutlass Storm ----
+  // ---- ABILITIES / ULTIMATES ----
   cutlassStorm(){
     if(this.storm||this.cool.storm>0)return false;
-    const targets=this._enemies().slice(0,6);
-    if(!targets.length)return false;
-    this.cool.storm=this.len.storm;
-    invincibleTimer=Math.max(invincibleTimer||0,1.4);
-    chopperFX.banner('CUTLASS STORM','#ffd76a');
+    const targets=this._enemies().slice(0,6);if(!targets.length)return false;
+    this.cool.storm=this.len.storm;invincibleTimer=Math.max(invincibleTimer||0,1.4);
     chopperFX.screenFlash('rgba(255,215,106,.4)',.35,300);
-    this.storm={t:0,d:1.1,targets,next:0,last:this.player.position.clone()};
-    return true;
+    this.storm={t:0,d:1.1,targets,next:0,last:this.player.position.clone()};return true;
   }
-
-  // ---- ABILITY: Doldrums Cannon ----
   doldrumsCannon(){
     if(this.cannon||this.cool.cannon>0)return false;
-    this.cool.cannon=this.len.cannon;
-    chopperFX.cannon();
-    chopperFX.banner('DOLDRUMS CANNON','#7fe6ff');
-    triggerCombatShake(15,260);
-    this._cone(this.player.position,this.player.rotation.y,11,Math.PI*.7,2.4);
-    this.cannon={t:0,d:5.0};
-    return true;
+    this.cool.cannon=this.len.cannon;chopperFX.cannon();triggerCombatShake(15,260);
+    const yaw=this.player.rotation.y;
+    for(const e of this._enemies()){
+      const dx=e.position.x-this.player.position.x,dz=e.position.z-this.player.position.z;
+      const dist=Math.hypot(dx,dz);if(dist>11)continue;
+      const a=Math.atan2(dx,dz),diff=Math.abs(((a-yaw+Math.PI*3)%(Math.PI*2))-Math.PI);
+      if(diff<=Math.PI*.35)this._hurt(e,2.4);
+    }
+    this.cannon={t:0,d:5.0};return true;
   }
-
-  // ---- ABILITY: Kraken Rising ----
   krakenRising(){
     if(this.kraken||this.cool.kraken>0)return false;
-    this.cool.kraken=this.len.kraken;
-    chopperFX.banner('KRAKEN RISING','#3fb6d8');
-    chopperFX.screenFlash('rgba(63,182,216,.6)',.5,420);
-    triggerCombatShake(18,320);
-    this.baseScale=this.player.scale.clone();
-    this.kraken={t:0,d:6.0,frame:0};
-    return true;
+    this.cool.kraken=this.len.kraken;chopperFX.screenFlash('rgba(63,182,216,.6)',.5,420);
+    triggerCombatShake(18,320);this.baseScale=this.player.scale.clone();this.kraken={t:0,d:6.0,frame:0};return true;
   }
-
-  // ---- SIGNATURE: Broadside ----
-  broadside(){
-    chopperFX.broadside();
-    chopperFX.banner('BROADSIDE!','#ffd76a');
-    triggerCombatShake(20,340);
-    this._radial(this.player.position,9,4.5);
-    return true;
-  }
+  broadside(){chopperFX.broadside();triggerCombatShake(20,340);this._radial(this.player.position,9,4.5);return true;}
 
   // ---- per-frame ----
   update(dt){
     if(!this.player||!this.player.parent)return;
-    for(const k in this.cool) if(this.cool[k]>0) this.cool[k]=Math.max(0,this.cool[k]-dt);
-    if(this.comboResetIn>0){this.comboResetIn-=dt;if(this.comboResetIn<=0)this.combo=0;}
+    for(const k in this.cool)if(this.cool[k]>0)this.cool[k]=Math.max(0,this.cool[k]-dt);
 
-    if(this.swing){this.swing.t+=dt;if(this.swing.t>=this.swing.d)this.swing=null;}
+    for(let i=this.cannonballs.length-1;i>=0;i--){
+      const b=this.cannonballs[i];b.life+=dt;
+      const prev=b.mesh.position.clone();
+      b.mesh.position.addScaledVector(b.dir,b.speed*dt);b.glow.position.copy(b.mesh.position);
+      b.mesh.rotation.x+=dt*8;b.mesh.rotation.z+=dt*5;
+      let remove=b.life>=b.maxLife||bulletBlockedAt(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z);
+      for(const z of this._enemies()){
+        if(remove||b.hit.has(z))continue;
+        const dx=z.position.x-b.mesh.position.x,dz=z.position.z-b.mesh.position.z;
+        if(dx*dx+dz*dz<=.65*.65){
+          b.hit.add(z);this._hurt(z,CHOPPER_TUNING.damage.sonicPiston);chopperFX.stormHit(z.position.clone(),1);remove=true;
+        }
+      }
+      if(remove){scene.remove(b.mesh);scene.remove(b.glow);b.mesh.geometry.dispose();b.mesh.material.dispose();this.cannonballs.splice(i,1);}
+    }
 
     if(this.anchor){
       const a=this.anchor;a.t+=dt;
-      if(!a.done&&a.t>=a.d){
-        a.done=true;
-        chopperFX.anchorImpact(a.at);
-        const hits=this._radial(a.at,2.9,CHOPPER_TUNING.damage.arcLineSweep*1.5);
-        triggerCombatShake(hits?18:12,280);
-      }
+      if(!a.done&&a.t>=a.d){a.done=true;chopperFX.anchorImpact(a.at);const hits=this._radial(a.at,2.9,CHOPPER_TUNING.damage.arcLineSweep*1.5);triggerCombatShake(hits?18:12,280);}
       if(a.t>=a.d+.4)this.anchor=null;
     }
 
     if(this.dash){
-      const s=this.dash;s.t+=dt;
-      const p=Math.min(1,s.t/s.d),e=1-Math.pow(1-p,3);
+      const s=this.dash;s.t+=dt;const p=Math.min(1,s.t/s.d),e=1-Math.pow(1-p,3);
       this.player.position.lerpVectors(s.start,s.end,e);
       for(const z of this._enemies()){
         if(s.hit.has(z))continue;
         const dx=z.position.x-this.player.position.x,dz=z.position.z-this.player.position.z;
-        if(dx*dx+dz*dz<=2.56){
-          s.hit.add(z);
-          this._hurt(z,CHOPPER_TUNING.damage.quantumSlingshot);
-          chopperFX.stormHit(z.position.clone(),s.hit.size);
-          triggerCombatShake(9,150);
+        if(dx*dx+dz*dz<=2.9){
+          s.hit.add(z);s.carried.push(z);z.userData.boardingCarry=true;
+          chopperFX.stormHit(z.position.clone(),s.hit.size);triggerCombatShake(8,120);
         }
       }
-      if(p>=1)this.dash=null;
+      // Pull every touched survivor into the Pirate's wake and physically carry it.
+      const side=new THREE.Vector3(-Math.cos(this.player.rotation.y),0,Math.sin(this.player.rotation.y));
+      const f=this._fwd();
+      for(let i=0;i<s.carried.length;i++){
+        const z=s.carried[i];if(!z||!z.parent||z.userData.dead)continue;
+        const lane=(i-(s.carried.length-1)/2)*.42;
+        z.position.copy(this.player.position).addScaledVector(f,-.72).addScaledVector(side,lane);
+        z.position.y=this.player.position.y;
+      }
+      if(p>=1){
+        for(const z of s.carried){
+          if(!z||!z.userData||z.userData.dead)continue;
+          z.userData.boardingCarry=false;
+          z.position.x=s.end.x+(Math.random()-.5)*1.0;z.position.z=s.end.z+(Math.random()-.5)*1.0;
+          if(this._isLarge(z)){
+            z.userData.chopperBoardingHits=(z.userData.chopperBoardingHits||0)+1;
+            if(z.userData.chopperBoardingHits>=2)this._kill(z);
+            else{
+              z.userData.hitStun=Math.max(z.userData.hitStun||0,3.0);
+              z.userData.knockbackX=0;z.userData.knockbackZ=0;
+            }
+          }else this._kill(z);
+        }
+        // Endpoint impact is gameplay-relevant as well as visual: catch enemies
+        // clustered right at the landing point even if they missed the travel hitbox.
+        for(const z of [...this._enemies()]){
+          if(s.hit.has(z))continue;
+          const dx=z.position.x-s.end.x,dz=z.position.z-s.end.z;if(dx*dx+dz*dz>2.7*2.7)continue;
+          if(this._isLarge(z)){
+            z.userData.chopperBoardingHits=(z.userData.chopperBoardingHits||0)+1;
+            if(z.userData.chopperBoardingHits>=2)this._kill(z);else z.userData.hitStun=Math.max(z.userData.hitStun||0,3.0);
+          }else this._kill(z);
+        }
+        triggerCombatShake(15,240);this.dash=null;
+      }
     }
 
-    if(this.guard){this.guard.t+=dt;if(this.guard.t>=this.guard.d)this.guard=null;}
-
     if(this.kegs){
-      const s=this.kegs;s.t+=dt;
-      for(const k of s.list)chopperFX.kegTick(k.keg,s.t,s.d);
+      const s=this.kegs;s.t+=dt;for(const k of s.list)chopperFX.kegTick(k.keg,s.t,s.d);
       if(s.t>=s.d){
-        for(const k of s.list){
-          chopperFX.kegBlow(k.keg);
-          this._radial(k.at,2.4,CHOPPER_TUNING.damage.synapticSnare*2.2);
-        }
-        triggerCombatShake(16,300);
-        chopperFX.screenFlash('rgba(255,138,61,.5)',.42,300);
-        this.kegs=null;
+        for(const k of s.list){chopperFX.kegBlow(k.keg);this._killRadial(k.at,2.4);}
+        triggerCombatShake(18,320);chopperFX.screenFlash('rgba(255,138,61,.5)',.42,300);this.kegs=null;
       }
     }
 
     if(this.storm){
-      const s=this.storm;s.t+=dt;
-      const should=Math.min(s.targets.length,Math.floor((s.t/s.d)*s.targets.length+1e-6));
-      while(s.next<should){
-        const t=s.targets[s.next++];
-        if(!t||!t.parent||t.userData?.dead)continue;
-        chopperFX.stormHit(t.position.clone(),s.next);
-        this._hurt(t,999999);
-        triggerCombatShake(12,200);
-      }
-      if(s.t>=s.d){
-        const last=s.targets[s.targets.length-1];
-        if(last&&last.parent)this.player.position.set(last.position.x+.9,this.player.position.y,last.position.z+.3);
-        this.storm=null;
-      }
+      const s=this.storm;s.t+=dt;const should=Math.min(s.targets.length,Math.floor((s.t/s.d)*s.targets.length+1e-6));
+      while(s.next<should){const t=s.targets[s.next++];if(!t||!t.parent||t.userData?.dead)continue;chopperFX.stormHit(t.position.clone(),s.next);this._hurt(t,999999);triggerCombatShake(12,200);}
+      if(s.t>=s.d){const last=s.targets[s.targets.length-1];if(last&&last.parent)this.player.position.set(last.position.x+.9,this.player.position.y,last.position.z+.3);this.storm=null;}
     }
-
-    if(this.cannon){
-      const s=this.cannon;s.t+=dt;
-      for(const e of this._enemies())e.userData.chopperBecalmed=.12;
-      if(s.t>=s.d)this.cannon=null;
-    }
-    for(const e of this._enemies())
-      if(e.userData.chopperBecalmed>0)e.userData.chopperBecalmed=Math.max(0,e.userData.chopperBecalmed-dt*0);
-
+    if(this.cannon){const s=this.cannon;s.t+=dt;for(const e of this._enemies())e.userData.chopperBecalmed=.12;if(s.t>=s.d)this.cannon=null;}
+    for(const e of this._enemies())if(e.userData.chopperBecalmed>0)e.userData.chopperBecalmed=Math.max(0,e.userData.chopperBecalmed-dt*0);
     if(this.kraken){
-      const s=this.kraken;s.t+=dt;s.frame++;
-      const grow=1+1.6*Math.min(1,s.t/.4)*(s.t>s.d-.5?Math.max(0,(s.d-s.t)/.5):1);
+      const s=this.kraken;s.t+=dt;s.frame++;const grow=1+1.6*Math.min(1,s.t/.4)*(s.t>s.d-.5?Math.max(0,(s.d-s.t)/.5):1);
       this.player.scale.set(this.baseScale.x*grow,this.baseScale.y*grow,this.baseScale.z*grow);
-      if(s.frame%16===0){
-        chopperFX.krakenPulse(this.player.position.clone(),s.frame);
-        this._radial(this.player.position,6.0,1.1);
-        triggerCombatShake(10,160);
-      }
+      if(s.frame%16===0){chopperFX.krakenPulse(this.player.position.clone(),s.frame);this._radial(this.player.position,6.0,1.1);triggerCombatShake(10,160);}
       if(s.t>=s.d){this.player.scale.copy(this.baseScale);this.kraken=null;}
     }
-
     chopperFX.update(dt);
   }
-
-  enemyTimeScale(e){
-    if(this.cannon&&e&&e.userData&&e.userData.chopperBecalmed>0)return .1;
-    return 1;
-  }
-  isGuarding(){return !!this.guard;}
+  enemyTimeScale(e){if(this.cannon&&e&&e.userData&&e.userData.chopperBecalmed>0)return .1;return 1;}
+  isGuarding(){return false;}
   dispose(){
     if(this.kraken&&this.player)this.player.scale.copy(this.baseScale);
     if(this.kegs)for(const k of this.kegs.list)chopperFX.kegBlow(k.keg);
-    chopperFX.dispose();
+    for(const b of this.cannonballs){if(b.mesh){scene.remove(b.mesh);b.mesh.geometry.dispose();b.mesh.material.dispose();}if(b.glow)scene.remove(b.glow);}
+    this.cannonballs=[];chopperFX.dispose();
   }
 }
 function ensureChopperKit(){
@@ -31477,13 +31450,8 @@ function updateChopperKit(dt){
 function triggerChopperPrimary(w){
   const k=ensureChopperKit(); if(!k||!w)return false;
   if(w.kind==='velocity_sonic_piston'){
-    const fired=k.cutlass();
-    if(fired)velocityWeaverPlayClip('sonicPiston');
-    return fired;
-  }
-  if(w.kind==='velocity_arc_sweep'){
-    const fired=k.anchorDrop();
-    if(fired)velocityWeaverPlayClip('arcLineSweep');
+    const fired=k.cannonShot();
+    if(fired)velocityWeaverPlayClip('tachyonDome');
     return fired;
   }
   return false;
@@ -31491,7 +31459,7 @@ function triggerChopperPrimary(w){
 function triggerChopperSecondary(w){
   const k=ensureChopperKit(); if(!k||!w)return false;
   if(w.kind==='velocity_quantum_slingshot'){const f=k.boardingDash();if(f)velocityWeaverPlayClip('quantumSlingshot');return f;}
-  if(w.kind==='velocity_phasing_resonance'){const f=k.bulwarkGuard();if(f)velocityWeaverPlayClip('phasingResonance');return f;}
+  if(w.kind==='velocity_arc_sweep'){const f=k.anchorDrop();if(f)velocityWeaverPlayClip('arcLineSweep');return f;}
   if(w.kind==='velocity_synaptic_snare'){const f=k.powderKegs();if(f)velocityWeaverPlayClip('synapticSnare');return f;}
   return false;
 }
@@ -32277,7 +32245,7 @@ function doSecondaryShoot(){
   const w=secondaryWeaponForAvatar();
   if(!w)return;
   if(state.avatarType==='cloud'&&w.kind!=='cloud_great_sword_slash') resetCloudCrossbreakerChain();
-  if(w.kind==='velocity_quantum_slingshot'||w.kind==='velocity_phasing_resonance'||w.kind==='velocity_synaptic_snare'){
+  if(w.kind==='velocity_quantum_slingshot'||w.kind==='velocity_arc_sweep'||w.kind==='velocity_synaptic_snare'){
     // Shadow Stalker Secondaries are gated by the move's own cooldown inside the
     // kit rather than by the shared secondaryAttackCooldown, so a failed cast
     // (on cooldown, or no target in range) costs nothing and gives feedback.
