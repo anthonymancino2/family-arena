@@ -1654,6 +1654,7 @@ only as an emergency visual fallback if the native fox asset fails.
 window.__VWLOG=[];
 function vwBanner(msg){
   window.__VWLOG.push(msg);
+  if(!window.__VW_SHOW_BANNER) return;   // set window.__VW_SHOW_BANNER=true to re-enable
   let el=document.getElementById('vwBanner');
   if(!el){
     el=document.createElement('div');
@@ -1673,7 +1674,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.07.01 - DIAGNOSTIC BUILD';
+const GAME_VERSION='23.07.02 - Velocity Weaver Animation Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -30578,6 +30579,56 @@ window.RogueMoveset=VelocityWeaver;
 
 let shadowStalkerMoveset = null;
 let velocityWeaverHitStopFrames=0;
+
+// ---------------------------------------------------------------------
+// VELOCITY WEAVER ANIMATION BRIDGE
+// Root cause of "the moves do nothing": the kit was authored as a pure
+// procedural/VFX moveset and never called playKayClip once, so every move
+// ran its damage and FX while the rig sat in bind pose. Every other class
+// routes through a clip helper (knightPlayClip, doBarbarianAttack, the Fox
+// cast clips); this is the equivalent for the Shadow Stalker class.
+//
+// Chopper and the Hooded Rogue both carry the standard 15-clip KayKit set
+// (verified against the embedded Chopper GLB: Idle, Running_A,
+// 1H_Melee_Attack_Chop, 1H_Melee_Attack_Slice_Horizontal,
+// 1H_Melee_Attack_Stab, 2H_Melee_Attack_Spin, Dodge_Forward, Block, Hit_A,
+// Throw, Jump_*), so one map serves both skins.
+const VELOCITY_WEAVER_CLIPS = {
+  sonicPiston:        {clip:'1H_Melee_Attack_Stab',             lock:0.13},
+  arcLineSweep:       {clip:'2H_Melee_Attack_Spin',             lock:0.22},
+  quantumSlingshot:   {clip:'Dodge_Forward',                    lock:0.16},
+  phasingResonance:   {clip:'Block',                            lock:0.30},
+  synapticSnare:      {clip:'Throw',                            lock:0.34},
+  infiniteSpeedBlitz: {clip:'1H_Melee_Attack_Slice_Horizontal', lock:0.30},
+  tachyonDome:        {clip:'2H_Melee_Attack_Spin',             lock:0.40},
+  speedforceCataclysm:{clip:'1H_Melee_Attack_Chop',             lock:0.45}
+};
+function velocityWeaverPlayClip(moveName){
+  const entry=VELOCITY_WEAVER_CLIPS[moveName];
+  if(!entry||!player||!player.userData||!player.userData.playKayClip)return;
+  const clips=player.userData.kayClips||{};
+  // Fall back through the melee set so a skin missing one clip still animates
+  // rather than silently dropping back to bind pose.
+  const name=clips[entry.clip]?entry.clip
+    :(clips['1H_Melee_Attack_Chop']?'1H_Melee_Attack_Chop'
+    :(clips['1H_Melee_Attack_Slice_Horizontal']?'1H_Melee_Attack_Slice_Horizontal':null));
+  if(!name)return;
+  try{
+    // force=true so a running lock cannot swallow the strike; oneShot=true so
+    // the clip plays through and hands control back to the locomotion driver.
+    player.userData.playKayClip(name,true,true,entry.lock);
+  }catch(err){ console.warn('Velocity Weaver clip recovered:',err); }
+}
+// Bind-pose watchdog: if nothing is driving the skeleton, re-kick Idle so the
+// character can never be left standing in a T-pose.
+function velocityWeaverIdleWatchdog(){
+  if(!player||!player.userData||!player.userData.playKayClip)return;
+  const u=player.userData;
+  if((u.kayActionLock||0)>0)return;
+  if(u.kayCurrentAction&&u.kayCurrentAction.isRunning&&u.kayCurrentAction.isRunning())return;
+  if(u.kayCurrentName)return;
+  try{ u.playKayClip('Idle',true,false,0); }catch(_e){}
+}
 function velocityWeaverMovementMultiplier(){return (hoodedIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.movementMultiplier():1;}
 function velocityWeaverAttackSpeedMultiplier(){return (hoodedIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.attackSpeedMultiplier():1;}
 function velocityWeaverEnemyTimeScale(z){return (hoodedIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.enemyTimeScale(z):1;}
@@ -30633,14 +30684,24 @@ function updateShadowStalkerMoveset(dt){
     return;
   }
   const kit=ensureShadowStalkerMoveset();
-  if(kit)kit.update(dt);
+  if(!kit)return;
+  velocityWeaverIdleWatchdog();
+  try{ kit.update(dt); }
+  catch(err){ console.error('Velocity Weaver update recovered:',err); }
 }
 function triggerShadowStalkerPrimary(w){
   const kit=ensureShadowStalkerMoveset();
   if(!w){ vwOnce('PRIMARY: no weapon object'); return false; }
   if(!kit){ vwOnce('PRIMARY pressed but kit is null (reason above)'); return false; }
-  if(w.kind==='velocity_sonic_piston')return kit.sonicPiston();
-  if(w.kind==='velocity_arc_sweep')return kit.arcLineSweep();
+  // The kit returns false when a move is already running or on cooldown, so
+  // gating the clip on the return value keeps the rig in sync with the move
+  // instead of restarting the animation on every rejected input frame.
+  if(w.kind==='velocity_sonic_piston'){
+    const fired=kit.sonicPiston(); if(fired)velocityWeaverPlayClip('sonicPiston'); return fired;
+  }
+  if(w.kind==='velocity_arc_sweep'){
+    const fired=kit.arcLineSweep(); if(fired)velocityWeaverPlayClip('arcLineSweep'); return fired;
+  }
   vwOnce('PRIMARY: unhandled kind "'+w.kind+'" id='+currentPrimaryWeaponId);
   return false;
 }
@@ -30648,9 +30709,10 @@ function triggerShadowStalkerSecondary(w){
   const kit=ensureShadowStalkerMoveset();
   if(!w){ vwOnce('SECONDARY: no weapon object'); return false; }
   if(!kit){ vwOnce('SECONDARY pressed but kit is null (reason above)'); return false; }
-  if(w.kind==='velocity_quantum_slingshot')return kit.quantumSlingshot();
-  if(w.kind==='velocity_phasing_resonance')return kit.phasingResonance();
-  if(w.kind==='velocity_synaptic_snare')return kit.synapticSnare();
+  const run=(move)=>{ const fired=kit[move](); if(fired)velocityWeaverPlayClip(move); return fired; };
+  if(w.kind==='velocity_quantum_slingshot')return run('quantumSlingshot');
+  if(w.kind==='velocity_phasing_resonance')return run('phasingResonance');
+  if(w.kind==='velocity_synaptic_snare')return run('synapticSnare');
   return false;
 }
 function triggerHoodedEquippedAbility(){
@@ -30659,9 +30721,10 @@ function triggerHoodedEquippedAbility(){
   const kit=ensureShadowStalkerMoveset();
   if(!kit){ vwOnce('ABILITY pressed but kit is null (reason above)'); return false; }
   if(!equippedAbilityId){ vwOnce('ABILITY: equippedAbilityId is null/empty'); return false; }
-  if(equippedAbilityId==='hooded_thousand_cuts')return kit.infiniteSpeedBlitz();
-  if(equippedAbilityId==='hooded_dancing_steel')return kit.tachyonDome();
-  if(equippedAbilityId==='hooded_twilight_execution')return kit.speedforceCataclysm();
+  const run=(move)=>{ const fired=kit[move](); if(fired)velocityWeaverPlayClip(move); return fired; };
+  if(equippedAbilityId==='hooded_thousand_cuts')return run('infiniteSpeedBlitz');
+  if(equippedAbilityId==='hooded_dancing_steel')return run('tachyonDome');
+  if(equippedAbilityId==='hooded_twilight_execution')return run('speedforceCataclysm');
   return false;
 }
 
