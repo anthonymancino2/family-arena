@@ -1,3 +1,4 @@
+<!-- V23.06.00 Velocity Weaver: replaces the Hooded Rogue and Chopper Shadow Stalker combat kit with a procedural speedster/arachnid kit: Sonic Piston, Arc Line Sweep, Quantum Slingshot, Phasing Resonance, Synaptic Snare, Infinite Speed Blitz, Tachyon Dome and Speedforce Cataclysm. Existing save IDs are preserved, enemy damage stays routed through applyBulletDamage(), projectile phasing is collision-real, Blitz hit-stop skips one game-logic frame per strike, and all movement/VFX are delta-time or rendered-frame driven. -->
 <!-- V23.05.01 Shadow Stalker Rogue: replaces the Hooded Rogue combat loadout with two procedural Primaries (Phantom Flurry, Shadow Sweep), three zero-cooldown Secondaries (Shadowstep, Smoke Bomb, Viper's Fan), and three selectable Ultimates (Thousand Cuts, Dancing Steel, Twilight Execution). All motion, projectile travel, smoke expansion, mesh scaling/fading and camera jitter are delta-time/requestAnimationFrame driven; no skeletal animation is required by these moves. Existing enemy HP/boss protection routes through applyBulletDamage(). Other avatars are unchanged. -->
 <!-- V23.04.02 Direct Warrior Texture Binding: fixes Warrior bosses remaining black on iPhone Safari after V23.04.01. Root cause: the FBX material identifiers do not reliably match their external JPG filenames, and Viking's weapon material is even authored with the typo 'wiking_weapons_texture'. This build no longer depends on FBXLoader resolving texture paths. The seven already-optimized embedded JPGs are loaded directly as THREE textures and assigned after FBX parse by the exact authored material names: egyptian_red_B_texture / egyptianweapons_texture, roman_D_texture / roman_clothes_texture / roman_weapons_texture, and viking_C_texture / wiking_weapons_texture. Imported material base colors are forced to white so the diffuse maps cannot be multiplied into black silhouettes. URLModifier remains only as a fallback. Boss size, animations, stats and file-size optimization are unchanged. Syntax/size audit included. -->
 <!-- V23.04.01 Warrior Boss Texture Fix: fixes the uploaded Warrior bosses rendering as black silhouettes on iPhone Safari. The animated FBX files reference seven external JPG maps rather than embedding them internally. This build embeds only those seven required maps and feeds them to FBXLoader through a LoadingManager URL modifier. To preserve boss detail without bloating the HTML, primary body/clothing sheets are reduced from 2048px to 768px, smaller weapon sheets to 512px, and Viking's dense weapon sheet stays 768px; optimized JPEG quality 78 is used. No blue/green variants, static models, Maya project, renders, video or unrelated textures are included. Existing 2.5x Green Ranger boss scale, three-warrior rotation, animation splits, boss stats/HUD and anti-one-shot behavior remain unchanged. Syntax/size audit included. -->
@@ -2082,8 +2083,8 @@ function chopperIsActive(){ return state.avatarType==='chopper'; }
 // the FX were sized against a taller silhouette. reach/fx compensate for the
 // body; move/attack/damage are the speed-class identity.
 const CHOPPER_TUNING = {
-  move:1.30, attack:1.35, reach:1.35, fx:1.45, enemyRadius:0.85,
-  damage:{phantomFlurry:1.35, shadowSweep:1.85, vipersFan:1.55, thousandCuts:999999}
+  move:1.0, attack:1.0, reach:1.0, fx:1.0, enemyRadius:0.85,
+  damage:{sonicPiston:1.35, arcLineSweep:1.70, quantumSlingshot:1.45, synapticSnare:1.0, infiniteSpeedBlitz:999999}
 };
 function chopperMoveMultiplier(){ return chopperIsActive()?CHOPPER_TUNING.move:1; }
 function gameplayAvatarType(type=state.avatarType){
@@ -3434,7 +3435,7 @@ function updateEnemyProjectiles(baseDt){
     if(p.trailTimer<=0){ p.trailTimer=0.035; spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,1,FX_MAT_ENEMY_SHOT,0.35); }
     const targets=livingPlayers();
     let hitTarget=null,hitDist=Infinity;
-    for(const t of targets){let d=Math.hypot(t.position.x-p.mesh.position.x,(t.position.y+.55)-p.mesh.position.y,t.position.z-p.mesh.position.z);if(t===player)d-=knightGuardianGiantHitRadius();if(d<hitDist){hitDist=d;hitTarget=t;}}
+    for(const t of targets){if(t===player&&velocityWeaverPhasingActive())continue;let d=Math.hypot(t.position.x-p.mesh.position.x,(t.position.y+.55)-p.mesh.position.y,t.position.z-p.mesh.position.z);if(t===player)d-=knightGuardianGiantHitRadius();if(d<hitDist){hitDist=d;hitTarget=t;}}
     if(hitTarget&&hitDist<.55){
       spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,12,FX_MAT_ENEMY_SHOT,3.4);
       if(hitTarget.userData&&hitTarget.userData.isArcaneEcho){
@@ -3610,16 +3611,16 @@ const CHARACTER_COMBAT = {
     defaultId:'phantom_flurry',
     baseMoveMult:1.35,
     weapons:{
-      phantom_flurry:{name:'Phantom Flurry', price:0, slot:'primary', kind:'rogue_phantom_flurry', cooldown:0.05, damage:1.0, auto:true,
-        desc:'Dual piston dagger strikes alternate every 0.05s. Each blade physically stretches forward, flashes white at peak extension and leaves a short wire-speed trail.'},
-      shadow_sweep:{name:'Shadow Sweep', price:0, slot:'primary', kind:'rogue_shadow_sweep', cooldown:0.08, damage:1.35, auto:true,
-        desc:'A procedural 180° body-and-dagger twist over 0.08s that throws an expanding purple crescent through nearby enemies.'},
-      shadowstep:{name:'Shadowstep', price:0, slot:'secondary', kind:'rogue_shadowstep', cooldown:0,
-        desc:'ZERO COOLDOWN. Warp exactly 1 unit behind the nearest enemy within 6 units, blacking the canvas for one frame and leaving five shrinking purple squares behind.'},
-      smoke_bomb:{name:'Smoke Bomb', price:0, slot:'secondary', kind:'rogue_smoke_bomb', cooldown:0,
-        desc:'ZERO COOLDOWN. Vanish inside 15 expanding dark smoke spheres for 2 seconds. Enemies intersecting the smoke are physically forced into randomized confused movement.'},
-      vipers_fan:{name:"Viper's Fan", price:0, slot:'secondary', kind:'rogue_vipers_fan', cooldown:0,
-        desc:'ZERO COOLDOWN. Throw three spinning daggers at -15°, 0° and +15°. Hits burst into green pixels and turn the struck enemy neon green for 1 second.'}
+      phantom_flurry:{name:'Sonic Piston', price:0, slot:'primary', kind:'velocity_sonic_piston', cooldown:0.04, damage:1.0, auto:true,
+        desc:'Infinite-speed jab: stretch depth to 300%, lunge 0.5 units, flash white, fire a 3-unit yellow lightning strike, then snap back in 0.04s.'},
+      shadow_sweep:{name:'Arc Line Sweep', price:0, slot:'primary', kind:'velocity_arc_sweep', cooldown:0.06, damage:1.25, auto:true,
+        desc:'Twist 180° in exactly 0.06s while a cyan kinetic crescent expands outward and vacuum-drags enemies 0.5 units closer.'},
+      shadowstep:{name:'Quantum Slingshot', price:0, slot:'secondary', kind:'velocity_quantum_slingshot', cooldown:0,
+        desc:'Tether to the nearest enemy within 8 units and lerp to 1 unit in front over 0.12s, elongating at speed before a one-frame inversion and radial blast.'},
+      smoke_bomb:{name:'Phasing Resonance', price:0, slot:'secondary', kind:'velocity_phasing_resonance', cooldown:0,
+        desc:'Vibrate X/Z by ±15% at 60Hz for 1.5s, fade to 30% opacity, and let incoming enemy projectiles pass through without registering a hit.'},
+      vipers_fan:{name:'Synaptic Snare', price:0, slot:'secondary', kind:'velocity_synaptic_snare', cooldown:0,
+        desc:'Create four electric nodes at radius 3 linked by cyan zap-lines. Enemies intersecting the square are frozen and flash cyan for 1 second.'}
     }
   },
   rogue: {
@@ -13873,7 +13874,7 @@ function updateSecondaryButton(){
     btn.innerHTML='<span class="secondaryIcon">🔒</span><span class="secondaryLabel">SECONDARY</span>';
     return;
   }
-  const icon=w.kind==='rogue_shadowstep'?'💨':(w.kind==='rogue_smoke_bomb'?'☁️':(w.kind==='rogue_vipers_fan'?'🗡️':(w.kind==='giant_fireball'?'☄️':(w.kind==='cloud_great_sword_slash'?'⚔️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='barbarian_whirlwind'?'🌀':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind==='rhino_cloud_whirlwind'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'))))))))));
+  const icon=w.kind==='velocity_quantum_slingshot'?'⚡':(w.kind==='velocity_phasing_resonance'?'〰️':(w.kind==='velocity_synaptic_snare'?'▦':(w.kind==='giant_fireball'?'☄️':(w.kind==='cloud_great_sword_slash'?'⚔️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='barbarian_whirlwind'?'🌀':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind==='rhino_cloud_whirlwind'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'))))))))));
   if(whirlwindActive){
     const wTimer=(w.kind==='barbarian_whirlwind')
       ? barbarianRuntime.whirlTimer
@@ -14069,12 +14070,12 @@ function renderShopList(){
 // Mage abilities use one mutually-exclusive loadout slot. The shared HUD
 // button remains in the approved position directly left of FIRE. Buying
 // an ability equips it immediately; owned abilities can be swapped here.
-const HOODED_THOUSAND_CUTS = {id:'hooded_thousand_cuts', name:'Thousand Cuts', price:0, avatar:'hooded', unlockLevel:1,
-  desc:'Vanish for 1 second and draw a rapid succession of neon cuts directly through up to five nearby enemies. Every cut creates a two-frame camera jitter; reappear beside the final target.'};
-const HOODED_DANCING_STEEL = {id:'hooded_dancing_steel', name:'Dancing Steel', price:0, avatar:'hooded', unlockLevel:1,
-  desc:'Detach both daggers into a two-second widening sine/cosine spiral. They grow to 200% size, orbit out to 5 units and drag continuous ribbon trails before snapping back.'};
-const HOODED_TWILIGHT_EXECUTION = {id:'hooded_twilight_execution', name:'Twilight Execution', price:0, avatar:'hooded', unlockLevel:1,
-  desc:'Enter the Shadow Realm for 5 seconds: ambient light drops to 10%, the Rogue becomes neon pink/cyan wireframe, and every Primary bypasses terrain by warping directly to the target face with a four-frame rumble.'};
+const HOODED_THOUSAND_CUTS = {id:'hooded_thousand_cuts', name:'Infinite Speed Blitz', price:0, avatar:'hooded', unlockLevel:1,
+  desc:'Vanish and chain jagged yellow lightning through up to six enemies over 1 second. Every strike forces one rendered-frame hit-stop and violent camera shake; reappear at the final target.'};
+const HOODED_DANCING_STEEL = {id:'hooded_dancing_steel', name:'Tachyon Dome', price:0, avatar:'hooded', unlockLevel:1,
+  desc:'Expand a giant cyan wireframe time dome over 0.4s. For 4 seconds enemies inside run at 10% speed while your movement and attack speed are tripled and five fading ghosts trail behind you.'};
+const HOODED_TWILIGHT_EXECUTION = {id:'hooded_twilight_execution', name:'Speedforce Cataclysm', price:0, avatar:'hooded', unlockLevel:1,
+  desc:'Kill ambient light for 6 seconds, turn the avatar into blazing neon-blue wireframe, move at 3x speed, and stamp an expanding floor shockwave every five frames.'};
 
 const WOLVERINE_BERSERKER_FRENZY = {id:'wolverine_frenzy', name:'Berserker Frenzy', price:880, avatar:'wolverine', unlockLevel:14,
   desc:'Enter a blood frenzy. Every enemy on the map is marked, and you blink between them in a chain of claw strikes, executing non-boss targets on contact and tearing repeated capped damage off bosses. Ends with an adamantium cross-slash that scars the whole arena.'};
@@ -16617,6 +16618,7 @@ function attackCooldownFor(w){
   if(wolverineIsActive()) factor /= wolverineAttackSpeedMult();
   if(barbarianIsActive()) factor /= barbarianAttackSpeedMult();
   if(chopperIsActive()) factor *= CHOPPER_TUNING.attack;
+  if(hoodedIsActive()) factor *= velocityWeaverAttackSpeedMultiplier();
   if(w.fireRateCap) factor = Math.min(w.fireRateCap, factor);
   const computed=w.cooldown / factor;
   if(knightIsActive() && isKnightWeaponKind(w.kind)){
@@ -16768,12 +16770,12 @@ function updateHoodedHud(){
         abilityBtn.classList.toggle('cooling',superMeteorCooldownTimer>0&&!superMeteorSequenceActive);
       }else if(isHooded){
         const kit=shadowStalkerMoveset;
-        const label=equippedAbilityId==='hooded_thousand_cuts'?'THOUSAND CUTS'
-          :(equippedAbilityId==='hooded_dancing_steel'?'DANCING STEEL':'TWILIGHT');
+        const label=equippedAbilityId==='hooded_thousand_cuts'?'SPEED BLITZ'
+          :(equippedAbilityId==='hooded_dancing_steel'?'TACHYON DOME':'CATACLYSM');
         const active=!!(kit&&(
-          (equippedAbilityId==='hooded_thousand_cuts'&&kit.thousandCuts)||
-          (equippedAbilityId==='hooded_dancing_steel'&&kit.dancingSteel)||
-          (equippedAbilityId==='hooded_twilight_execution'&&kit.twilight)
+          (equippedAbilityId==='hooded_thousand_cuts'&&kit.blitz)||
+          (equippedAbilityId==='hooded_dancing_steel'&&kit.dome)||
+          (equippedAbilityId==='hooded_twilight_execution'&&kit.cataclysm)
         ));
         abilityBtn.textContent=active?label+'!':label;
         abilityBtn.classList.toggle('active',active);
@@ -30343,1232 +30345,123 @@ function doBarbarianRoarSlashCombo(comboWeapon){
    No skeletal animation clips are required. All movement/VFX are delta-time math.
    THREE must already be available globally.
 */
-class RogueMoveset {
-  constructor({
-    scene,
-    camera,
-    renderer,
-    player,
-    daggerL = null,
-    daggerR = null,
-    getEnemies = () => [],
-    damageEnemy = null,
-    enemyRadius = 0.55,
-    reachScale = 1,
-    fxScale = 1,
-    damage = {}
-  }) {
-    if (!scene || !camera || !renderer || !player) {
-      throw new Error("RogueMoveset requires scene, camera, renderer, and player.");
-    }
-
-    this.scene = scene;
-    this.camera = camera;
-    this.renderer = renderer;
-    this.player = player;
-    this.getEnemies = getEnemies;
-    this.enemyRadius = enemyRadius;
-    this.reachScale = reachScale;
-    this.fxScale = fxScale;
-
-    // If integrated into an existing game, pass its canonical damage function.
-    // The fallback is still functional for standalone meshes with userData.hp.
-    this.damageEnemy = damageEnemy || ((enemy, amount) => {
-      if (!enemy || enemy.userData?.dead) return;
-      const hp = Number(enemy.userData?.hp);
-      if (Number.isFinite(hp)) {
-        enemy.userData.hp = hp - amount;
-        if (enemy.userData.hp <= 0) {
-          enemy.userData.dead = true;
-          enemy.visible = false;
-        }
-      }
-    });
-
-    this.damage = Object.assign({
-      phantomFlurry: 1.0,
-      shadowSweep: 1.35,
-      vipersFan: 1.15,
-      thousandCuts: 9999
-    }, damage);
-
-    this._ownedGeometry = [];
-    this._ownedMaterial = [];
-
-    this.daggers = [
-      daggerL || this._makeHeldDagger(-0.30),
-      daggerR || this._makeHeldDagger(+0.30)
-    ];
-
-    this.daggerBase = this.daggers.map(d => ({
-      parent: d.parent,
-      position: d.position.clone(),
-      quaternion: d.quaternion.clone(),
-      scale: d.scale.clone(),
-      material: d.material
-    }));
-
-    this._whiteFlashMaterial = this._trackMaterial(new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: false
-    }));
-
-    this._purpleMaterial = this._trackMaterial(new THREE.MeshBasicMaterial({
-      color: 0x8f35ff,
-      transparent: true,
-      opacity: 0.72,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    }));
-
-    this._neonLineMaterial = this._trackMaterial(new THREE.LineBasicMaterial({
-      color: 0x9d4dff,
-      transparent: true,
-      opacity: 1,
-      depthWrite: false
-    }));
-
-    this._greenMaterial = this._trackMaterial(new THREE.MeshBasicMaterial({
-      color: 0x39ff14
-    }));
-
-    this.time = 0;
-    this.flurrySide = 0;
-
-    this.flurry = null;
-    this.sweep = null;
-    this.smoke = null;
-    this.thousandCuts = null;
-    this.dancingSteel = null;
-    this.twilight = null;
-
-    this.projectiles = [];
-    this.fx = [];
-    this.particles = [];
-
-    this.jitter = null;
+class VelocityWeaver {
+  constructor({scene,camera,renderer,player,getEnemies=()=>[],damageEnemy=null,enemyRadius=.62,damage={}}){
+    if(!scene||!camera||!renderer||!player)throw new Error('VelocityWeaver requires scene, camera, renderer, and player.');
+    this.scene=scene;this.camera=camera;this.renderer=renderer;this.player=player;
+    this.getEnemies=getEnemies;this.enemyRadius=enemyRadius;
+    this.damageEnemy=damageEnemy||((e,n)=>{if(e?.userData&&!e.userData.dead)e.userData.hp=(e.userData.hp||1)-n;});
+    this.damage=Object.assign({sonicPiston:1.0,arcLineSweep:1.25,quantumSlingshot:1.5,synapticSnare:.9,infiniteSpeedBlitz:999999},damage);
+    this.time=0;this.fx=[];this.ghosts=[];this.shockwaves=[];
+    this.sonic=null;this.sweep=null;this.slingshot=null;this.phasing=null;this.snare=null;
+    this.blitz=null;this.dome=null;this.cataclysm=null;
+    this._ambientSaved=null;this._catMaterials=null;this._baseScale=player.scale.clone();
+    this._lastGhostPos=player.position.clone();this._catFrame=0;
   }
-
-  // ---------------------------------------------------------------------------
-  // PUBLIC TRIGGERS
-  // ---------------------------------------------------------------------------
-
-  phantomFlurry() {
-    if (this.flurry) return false;
-    this._twilightPrimaryWarp();
-
-    const index = this.flurrySide;
-    this.flurrySide = 1 - this.flurrySide;
-    const dagger = this.daggers[index];
-
-    this.flurry = {
-      dagger,
-      index,
-      elapsed: 0,
-      duration: 0.05,
-      baseScale: this.daggerBase[index].scale.clone(),
-      baseMaterial: dagger.material,
-      flashed: false,
-      hit: false
-    };
+  sonicPiston(){
+    if(this.sonic)return false;
+    const f=this._forward(this.player),basePos=this.player.position.clone(),baseScale=this.player.scale.clone();
+    this.sonic={elapsed:0,duration:.04,basePos,baseScale,forward:f,flashed:false,hit:false};
     return true;
   }
-
-  shadowSweep() {
-    if (this.sweep) return false;
-    this._twilightPrimaryWarp();
-
-    const startYaw = this.player.rotation.y;
-    const daggerYaw = this.daggers.map(d => d.rotation.y);
-
-    const crescent = this._makeCrescentMesh(0.55, 0.76, 24);
-    const f = this._forward(this.player);
-    crescent.position.copy(this.player.position)
-      .addScaledVector(f, 0.8)
-      .add(new THREE.Vector3(0, 0.75, 0));
-    crescent.rotation.x = -Math.PI / 2;
-    crescent.rotation.z = -this._facingYaw(this.player);
-    crescent.scale.setScalar(0.15);
-    this.scene.add(crescent);
-
-    this.sweep = {
-      elapsed: 0,
-      duration: 0.08,
-      startYaw,
-      daggerYaw,
-      crescent,
-      hitSet: new Set()
-    };
-    return true;
+  arcLineSweep(){
+    if(this.sweep)return false;
+    const startYaw=this.player.rotation.y;
+    const g=new THREE.RingGeometry(.7,1.0,28,1,0,Math.PI);
+    const m=new THREE.MeshBasicMaterial({color:0x44f7ff,wireframe:true,transparent:true,opacity:.72,side:THREE.DoubleSide,depthWrite:false});
+    const cres=new THREE.Mesh(g,m);cres.rotation.x=-Math.PI/2;cres.position.copy(this.player.position);cres.position.y+=.12;cres.scale.setScalar(.2);this.scene.add(cres);
+    this.sweep={elapsed:0,duration:.06,startYaw,cres,hit:new Set()};return true;
   }
-
-  // SECONDARY — ZERO COOLDOWN.
-  shadowstep() {
-    const target = this._nearestEnemy(6);
-    if (!target) return false;
-
-    const origin = this.player.position.clone();
-    const enemyForward = this._forward(target);
-
-    // Exactly 1 unit behind enemy facing.
-    const destination = target.position.clone().addScaledVector(enemyForward, -1);
-    destination.y = this.player.position.y;
-
-    this._blackCanvasOneFrame();
-
-    // No collision resolver on purpose: this is the requested warp.
-    this.player.position.copy(destination);
-    this.player.rotation.y = this._facingYaw(target);
-    this.player.userData.facing = this.player.rotation.y;
-
-    for (let i = 0; i < 5; i++) {
-      const square = new THREE.Mesh(
-        this._trackGeometry(new THREE.BoxGeometry(0.11, 0.11, 0.11)),
-        this._purpleMaterial.clone()
-      );
-      square.material.opacity = 0.85;
-      square.material.transparent = true;
-      square.position.set(
-        origin.x + (Math.random() - 0.5) * 0.18,
-        origin.y + 0.18 + i * 0.26,
-        origin.z + (Math.random() - 0.5) * 0.18
-      );
-      this.scene.add(square);
-      this.particles.push({
-        mesh: square,
-        age: 0,
-        life: 0.30,
-        startScale: 1,
-        velocity: new THREE.Vector3(
-          (Math.random() - 0.5) * 0.25,
-          0.25 + Math.random() * 0.25,
-          (Math.random() - 0.5) * 0.25
-        ),
-        disposeMaterial: true
-      });
-    }
-
-    return true;
+  quantumSlingshot(){
+    if(this.slingshot)return false;
+    const target=this._nearestEnemy(8);if(!target)return false;
+    const start=this.player.position.clone();const tf=this._forward(target);
+    const end=target.position.clone().addScaledVector(tf,-1);end.y=start.y;
+    const tether=this._line(start.clone().add(new THREE.Vector3(0,.7,0)),target.position.clone().add(new THREE.Vector3(0,.7,0)),0xffffff,1,.13);
+    this.slingshot={elapsed:0,duration:.12,start,end,target,tether,baseScale:this.player.scale.clone()};return true;
   }
-
-  // SECONDARY — ZERO COOLDOWN.
-  smokeBomb() {
-    // No post-use cooldown, but the current 2-second cloud must finish before
-    // another cloud starts. This prevents a held button from spawning 15 new
-    // sphere meshes every rendered frame on mobile.
-    if (this.smoke) return false;
-
-    const originalScale = this.player.scale.clone();
-    this.player.scale.setScalar(0);
-
-    const spheres = [];
-    const geom = this._trackGeometry(new THREE.SphereGeometry(0.18, 6, 4));
-
-    for (let i = 0; i < 15; i++) {
-      const mat = new THREE.MeshBasicMaterial({
-        color: i % 3 === 0 ? 0x1d1d24 : 0x303039,
-        transparent: true,
-        opacity: 0.70,
-        depthWrite: false
-      });
-      const mesh = new THREE.Mesh(geom, mat);
-
-      const a = Math.random() * Math.PI * 2;
-      const radial = 1.0 + Math.random() * 2.2;
-      const vy = 0.35 + Math.random() * 1.4;
-
-      mesh.position.copy(this.player.position);
-      mesh.position.y += 0.35 + Math.random() * 0.45;
-      this.scene.add(mesh);
-
-      spheres.push({
-        mesh,
-        velocity: new THREE.Vector3(
-          Math.cos(a) * radial,
-          vy,
-          Math.sin(a) * radial
-        ),
-        spin: (Math.random() - 0.5) * 7
-      });
-    }
-
-    this.smoke = {
-      elapsed: 0,
-      duration: 2.0,
-      originalScale,
-      spheres,
-      confused: new Map()
-    };
-
-    return true;
+  phasingResonance(){
+    if(this.phasing)return false;
+    const saved=[];this.player.traverse(o=>{if(o.isMesh&&o.material){const arr=Array.isArray(o.material)?o.material:[o.material];for(const m of arr)saved.push({m,transparent:m.transparent,opacity:m.opacity});}});
+    for(const x of saved){x.m.transparent=true;x.m.opacity=.30;}
+    this.phasing={elapsed:0,duration:1.5,baseScale:this.player.scale.clone(),saved};return true;
   }
-
-  // SECONDARY — ZERO COOLDOWN.
-  vipersFan() {
-    const origin = this.player.position.clone();
-    origin.y += 0.72;
-
-    const baseYaw = this._facingYaw(this.player);
-    const angles = [-15, 0, 15].map(d => d * Math.PI / 180);
-
-    for (const offset of angles) {
-      const yaw = baseYaw + offset;
-      const mesh = this._makeProjectileDagger();
-
-      mesh.position.copy(origin);
-      mesh.rotation.y = yaw;
-      this.scene.add(mesh);
-
-      const direction = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-
-      this.projectiles.push({
-        type: "viper",
-        mesh,
-        direction,
-        speed: 14,
-        age: 0,
-        life: 1.35,
-        spinSpeed: 36,
-        hit: new Set()
-      });
-    }
-    return true;
+  synapticSnare(){
+    if(this.snare)return false;
+    const center=this.player.position.clone(),nodes=[];const geom=new THREE.BoxGeometry(.22,.22,.22);const mat=new THREE.MeshBasicMaterial({color:0x37f6ff,wireframe:true});
+    [[3,0],[0,3],[-3,0],[0,-3]].forEach(([x,z])=>{const n=new THREE.Mesh(geom,mat);n.position.set(center.x+x,center.y+.35,center.z+z);this.scene.add(n);nodes.push(n);});
+    const lines=[];for(let i=0;i<4;i++)lines.push(this._line(nodes[i].position,nodes[(i+1)%4].position,0x37f6ff,.95,1.05));
+    this.snare={elapsed:0,duration:1.0,nodes,lines,center,hit:new Set(),geom,mat};return true;
   }
-
-  thousandCuts() {
-    if (this.thousandCuts) return false;
-
-    const targets = this._nearestEnemies(5, 12);
-    if (!targets.length) return false;
-
-    this.player.visible = false;
-
-    const cuts = Math.max(10, targets.length * 3);
-    this.thousandCuts = {
-      elapsed: 0,
-      duration: 1.0,
-      targets,
-      cuts,
-      nextCut: 0,
-      damaged: new Set(),
-      lastTarget: targets[targets.length - 1]
-    };
-    return true;
+  infiniteSpeedBlitz(){
+    if(this.blitz)return false;const targets=this._nearestEnemies(6,999);if(!targets.length)return false;
+    this.player.visible=false;this.blitz={elapsed:0,duration:1,targets,next:0,last:this.player.position.clone()};return true;
   }
-
-  dancingSteelAttack() {
-    if (this.dancingSteel) return false;
-
-    const entries = this.daggers.map((dagger, i) => {
-      const worldPos = new THREE.Vector3();
-      const worldQuat = new THREE.Quaternion();
-      const worldScale = new THREE.Vector3();
-      dagger.updateMatrixWorld(true);
-      dagger.matrixWorld.decompose(worldPos, worldQuat, worldScale);
-
-      this.scene.attach(dagger);
-      dagger.position.copy(worldPos);
-      dagger.quaternion.copy(worldQuat);
-      dagger.scale.copy(worldScale);
-
-      const trailGeom = new THREE.BufferGeometry();
-      const maxPts = 26;
-      const positions = new Float32Array(maxPts * 3);
-      trailGeom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-      trailGeom.setDrawRange(0, 0);
-
-      const trailMat = new THREE.LineBasicMaterial({
-        color: i === 0 ? 0xff4dc4 : 0x45eaff,
-        transparent: true,
-        opacity: 0.78,
-        depthWrite: false
-      });
-      const trail = new THREE.Line(trailGeom, trailMat);
-      this.scene.add(trail);
-
-      return {
-        dagger,
-        index: i,
-        baseScale: worldScale.clone(),
-        phase: i * Math.PI,
-        trail,
-        trailPoints: [],
-        trailGeom,
-        trailMat
-      };
-    });
-
-    this.dancingSteel = {
-      elapsed: 0,
-      duration: 2.0,
-      entries
-    };
-    return true;
+  tachyonDome(){
+    if(this.dome)return false;
+    const geom=new THREE.SphereGeometry(1,12,8),mat=new THREE.MeshBasicMaterial({color:0x55eaff,wireframe:true,transparent:true,opacity:.28,depthWrite:false});
+    const mesh=new THREE.Mesh(geom,mat);mesh.position.copy(this.player.position);mesh.scale.setScalar(.05);this.scene.add(mesh);
+    this.dome={elapsed:0,duration:4.4,expand:.4,radius:Math.max(18,arenaSize||30),mesh,geom,mat,ghostTimer:0};return true;
   }
-
-  twilightExecution() {
-    if (this.twilight) this._endTwilight();
-
-    const ambient = [];
-    this.scene.traverse(obj => {
-      if (obj && obj.isAmbientLight) {
-        ambient.push({ light: obj, intensity: obj.intensity });
-        obj.intensity *= 0.10;
-      }
-    });
-
-    const materials = [];
-    let meshIndex = 0;
-    this.player.traverse(obj => {
-      if (!obj.isMesh) return;
-
-      materials.push({ mesh: obj, material: obj.material });
-
-      const temp = new THREE.MeshBasicMaterial({
-        color: (meshIndex++ % 2) ? 0x36f7ff : 0xff3fd1,
-        wireframe: true,
-        transparent: true,
-        opacity: 1
-      });
-      obj.material = temp;
-    });
-
-    this.twilight = {
-      elapsed: 0,
-      duration: 5.0,
-      ambient,
-      materials
-    };
-
-    return true;
+  speedforceCataclysm(){
+    if(this.cataclysm)return false;
+    this._ambientSaved=[];this.scene.traverse(o=>{if(o.isAmbientLight){this._ambientSaved.push({o,intensity:o.intensity});o.intensity=0;}});
+    this._catMaterials=[];this.player.traverse(o=>{if(o.isMesh&&o.material){this._catMaterials.push({o,material:o.material});o.material=new THREE.MeshBasicMaterial({color:0x20bfff,wireframe:true});}});
+    this.cataclysm={elapsed:0,duration:6,ringFrame:0};this._catFrame=0;return true;
   }
-
-  // ---------------------------------------------------------------------------
-  // MAIN DELTA-TIME UPDATE
-  // Call once per frame, preferably AFTER base player/enemy/camera movement
-  // and BEFORE renderer.render(scene, camera).
-  // ---------------------------------------------------------------------------
-
-  update(dt) {
-    if (!Number.isFinite(dt) || dt <= 0) return;
-    dt = Math.min(dt, 0.05);
-    this.time += dt;
-
-    this._updatePhantomFlurry(dt);
-    this._updateShadowSweep(dt);
-    this._updateParticles(dt);
-    this._updateSmokeBomb(dt);
-    this._updateProjectiles(dt);
-    this._updateThousandCuts(dt);
-    this._updateDancingSteel(dt);
-    this._updateTwilight(dt);
-    this._updateFx(dt);
-    this._updateCameraJitter();
+  update(dt){
+    this.time+=dt;this._updateSonic(dt);this._updateSweep(dt);this._updateSlingshot(dt);this._updatePhasing(dt);this._updateSnare(dt);this._updateBlitz(dt);this._updateDome(dt);this._updateCataclysm(dt);this._updateFx(dt);this._updateGhosts(dt);this._updateShockwaves(dt);
   }
-
-  // ---------------------------------------------------------------------------
-  // PRIMARY 1: PHANTOM FLURRY — exact 0.05 s procedural piston
-  // ---------------------------------------------------------------------------
-
-  _updatePhantomFlurry(dt) {
-    const s = this.flurry;
-    if (!s) return;
-
-    s.elapsed += dt;
-    const p = Math.min(1, s.elapsed / s.duration);
-
-    // Triangle piston:
-    // p 0.0 -> 0.5 : extension 0 -> 1
-    // p 0.5 -> 1.0 : extension 1 -> 0
-    const extension = 1 - Math.abs(2 * p - 1);
-
-    // Scale Z from near-zero to exactly 3x base, then snap back.
-    // Keep a tiny non-zero floor to avoid singular matrix behavior.
-    const targetLength = 3.0;
-    const baseDaggerLength = 0.82;
-    const zScale = Math.max(0.001, (targetLength / baseDaggerLength) * extension);
-    s.dagger.scale.set(
-      s.baseScale.x,
-      s.baseScale.y,
-      s.baseScale.z * zScale
-    );
-
-    if (extension >= 0.94 && !s.flashed) {
-      s.flashed = true;
-      s.dagger.material = this._whiteFlashMaterial;
-      this._spawnStrikeWire(s.dagger);
-
-      if (!s.hit) {
-        s.hit = true;
-        const tip = this._daggerWorldTip(s.dagger, 1.45 * this.reachScale);
-        const enemy = this._nearestEnemyToPoint(tip, 1.05 * this.reachScale);
-        if (enemy) this.damageEnemy(enemy, this.damage.phantomFlurry);
-      }
-    }
-
-    if (p >= 1) {
-      s.dagger.scale.copy(s.baseScale);
-      s.dagger.material = s.baseMaterial;
-      this.flurry = null;
-    }
+  isPhasing(){return !!this.phasing;}
+  movementMultiplier(){return (this.dome?3:1)*(this.cataclysm?3:1);}
+  attackSpeedMultiplier(){return this.dome?3:1;}
+  enemyTimeScale(enemy){
+    if(this.snare&&enemy?.userData?.velocityWeaverFrozen>0)return 0;
+    if(this.dome&&enemy&&this._flatDistance(enemy.position,this.player.position)<=this.dome.radius)return .1;
+    return 1;
   }
-
-  _spawnStrikeWire(dagger) {
-    const tip = this._daggerWorldTip(dagger, 1.6);
-    const back = this._daggerWorldTip(dagger, -0.25);
-
-    const geom = new THREE.BufferGeometry().setFromPoints([back, tip]);
-    const mat = new THREE.LineBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.95,
-      depthWrite: false
-    });
-    const line = new THREE.Line(geom, mat);
-    this.scene.add(line);
-
-    this.fx.push({
-      kind: "fadeLine",
-      object: line,
-      age: 0,
-      life: 0.09,
-      geom,
-      mat
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // PRIMARY 2: SHADOW SWEEP
-  // ---------------------------------------------------------------------------
-
-  _updateShadowSweep(dt) {
-    const s = this.sweep;
-    if (!s) return;
-
-    s.elapsed += dt;
-    const p = Math.min(1, s.elapsed / s.duration);
-
-    // Cubic smoothstep keeps the 180° turn sharp without a discontinuity.
-    const e = p * p * (3 - 2 * p);
-    const yawDelta = Math.PI * e;
-
-    this.player.rotation.y = s.startYaw + yawDelta;
-    this.player.userData.facing = this.player.rotation.y;
-
-    for (let i = 0; i < this.daggers.length; i++) {
-      this.daggers[i].rotation.y = s.daggerYaw[i] + yawDelta;
-    }
-
-    const crescentScale = (0.15 + (2.5 / 0.76) * e) * this.fxScale;
-    s.crescent.scale.setScalar(crescentScale);
-    s.crescent.material.opacity = 0.72 * (1 - p);
-
-    const center = this.player.position.clone()
-      .addScaledVector(this._forward(this.player), 1.25 * this.reachScale);
-    for (const enemy of this._aliveEnemies()) {
-      if (s.hitSet.has(enemy)) continue;
-      const d = this._flatDistance(center, enemy.position);
-      if (d <= 2.5 * this.reachScale) {
-        s.hitSet.add(enemy);
-        this.damageEnemy(enemy, this.damage.shadowSweep);
-      }
-    }
-
-    if (p >= 1) {
-      this.scene.remove(s.crescent);
-      s.crescent.geometry.dispose();
-      s.crescent.material.dispose();
-      this.sweep = null;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // SECONDARY 1: SHADOWSTEP
-  // Implemented synchronously in shadowstep(); this helper is the 1-frame blackout.
-  // ---------------------------------------------------------------------------
-
-  _blackCanvasOneFrame() {
-    const canvas = this.renderer.domElement;
-    if (!canvas) return;
-
-    const oldFilter = canvas.style.filter;
-    const oldBackground = canvas.style.backgroundColor;
-
-    canvas.style.filter = "brightness(0)";
-    canvas.style.backgroundColor = "#000";
-
-    requestAnimationFrame(() => {
-      canvas.style.filter = oldFilter;
-      canvas.style.backgroundColor = oldBackground;
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // SECONDARY 2: SMOKE BOMB
-  // ---------------------------------------------------------------------------
-
-  _updateSmokeBomb(dt) {
-    const s = this.smoke;
-    if (!s) return;
-
-    s.elapsed += dt;
-    const p = Math.min(1, s.elapsed / s.duration);
-
-    for (const ball of s.spheres) {
-      ball.mesh.position.addScaledVector(ball.velocity, dt);
-      ball.velocity.y -= 0.45 * dt;
-      ball.mesh.rotation.x += ball.spin * dt;
-      ball.mesh.rotation.z -= ball.spin * 0.7 * dt;
-
-      const expansion = 1 + 5.2 * p;
-      ball.mesh.scale.setScalar(expansion);
-      ball.mesh.material.opacity = 0.70 * (1 - 0.88 * p);
-    }
-
-    // Real intersection test against the 15 expanding smoke spheres.
-    for (const enemy of this._aliveEnemies()) {
-      let inside = false;
-
-      for (const ball of s.spheres) {
-        const sphereRadius = 0.18 * ball.mesh.scale.x;
-        if (enemy.position.distanceTo(ball.mesh.position) <= sphereRadius + this.enemyRadius) {
-          inside = true;
-          break;
-        }
-      }
-
-      if (!inside) continue;
-
-      let c = s.confused.get(enemy);
-      if (!c) {
-        c = {
-          direction: new THREE.Vector3(1, 0, 0),
-          changeIn: 0
-        };
-        s.confused.set(enemy, c);
-      }
-
-      c.changeIn -= dt;
-      if (c.changeIn <= 0) {
-        const a = Math.random() * Math.PI * 2;
-        c.direction.set(Math.cos(a), 0, Math.sin(a));
-        c.changeIn = 0.08 + Math.random() * 0.18;
-      }
-
-      // Physical confused displacement, not a metadata-only "blind" flag.
-      const confusedSpeed = 1.1 + Math.random() * 1.7;
-      enemy.position.addScaledVector(c.direction, confusedSpeed * dt);
-      enemy.rotation.y = Math.atan2(c.direction.x, c.direction.z);
-    }
-
-    if (p >= 1) this._endSmokeBomb();
-  }
-
-  _endSmokeBomb() {
-    if (!this.smoke) return;
-
-    this.player.scale.copy(this.smoke.originalScale);
-    for (const ball of this.smoke.spheres) {
-      this.scene.remove(ball.mesh);
-      ball.mesh.material.dispose();
-    }
-    this.smoke = null;
-  }
-
-  // ---------------------------------------------------------------------------
-  // SECONDARY 3: VIPER'S FAN
-  // ---------------------------------------------------------------------------
-
-  _updateProjectiles(dt) {
-    for (let i = this.projectiles.length - 1; i >= 0; i--) {
-      const p = this.projectiles[i];
-      p.age += dt;
-
-      if (p.type === "viper") {
-        const previous = p.mesh.position.clone();
-        p.mesh.position.addScaledVector(p.direction, p.speed * dt);
-        p.mesh.rotation.y += p.spinSpeed * dt;
-
-        for (const enemy of this._aliveEnemies()) {
-          if (p.hit.has(enemy)) continue;
-          if (this._segmentHitsEnemy(previous, p.mesh.position, enemy, 0.30 + this.enemyRadius)) {
-            p.hit.add(enemy);
-            this.damageEnemy(enemy, this.damage.vipersFan);
-            this._greenPixelExplosion(enemy.position);
-            this._poisonFlash(enemy, 1.0);
-
-            // One blade stops on first enemy contact.
-            p.age = p.life;
-            break;
-          }
-        }
-      }
-
-      if (p.age >= p.life) {
-        this.scene.remove(p.mesh);
-        p.mesh.geometry.dispose();
-        p.mesh.material.dispose();
-        this.projectiles.splice(i, 1);
-      }
-    }
-  }
-
-  _greenPixelExplosion(position) {
-    const geom = this._trackGeometry(new THREE.BoxGeometry(0.07, 0.07, 0.07));
-
-    for (let i = 0; i < 7; i++) {
-      const mat = new THREE.MeshBasicMaterial({ color: 0x39ff14 });
-      const m = new THREE.Mesh(geom, mat);
-      m.position.copy(position);
-      m.position.y += 0.65;
-      this.scene.add(m);
-
-      const a = Math.random() * Math.PI * 2;
-      this.particles.push({
-        mesh: m,
-        age: 0,
-        life: 0.24,
-        startScale: 1,
-        velocity: new THREE.Vector3(
-          Math.cos(a) * (1.5 + Math.random()),
-          0.8 + Math.random() * 1.6,
-          Math.sin(a) * (1.5 + Math.random())
-        ),
-        disposeMaterial: true
-      });
-    }
-  }
-
-  _poisonFlash(enemy, seconds) {
-    if (!enemy || !enemy.isObject3D) return;
-
-    const saved = [];
-    enemy.traverse(obj => {
-      if (!obj.isMesh || !obj.material) return;
-      saved.push({ obj, material: obj.material });
-      obj.material = this._greenMaterial;
-    });
-
-    this.fx.push({
-      kind: "restoreMaterials",
-      object: enemy,
-      age: 0,
-      life: seconds,
-      saved
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // ULTIMATE 1: THOUSAND CUTS — full 1-second procedural sequence
-  // ---------------------------------------------------------------------------
-
-  _updateThousandCuts(dt) {
-    const s = this.thousandCuts;
-    if (!s) return;
-
-    s.elapsed += dt;
-    const p = Math.min(1, s.elapsed / s.duration);
-
-    // Number of line events that should have happened by this exact time.
-    const shouldHaveFired = Math.min(s.cuts, Math.floor(p * s.cuts + 1e-6));
-
-    while (s.nextCut < shouldHaveFired) {
-      const cutIndex = s.nextCut++;
-      const target = s.targets[cutIndex % s.targets.length];
-      if (!target || target.userData?.dead) continue;
-
-      const angle = (cutIndex * 2.399963229728653) % (Math.PI * 2); // golden-angle spread
-      const dir = new THREE.Vector3(Math.cos(angle), 0.18 * Math.sin(cutIndex * 1.7), Math.sin(angle))
-        .normalize();
-
-      const halfLen = 1.8 + (cutIndex % 3) * 0.25;
-      const center = target.position.clone();
-      center.y += 0.78;
-
-      const a = center.clone().addScaledVector(dir, -halfLen);
-      const b = center.clone().addScaledVector(dir, +halfLen);
-
-      this._spawnNeonCutLine(a, b, cutIndex);
-
-      if (!s.damaged.has(target)) {
-        s.damaged.add(target);
-        this.damageEnemy(target, this.damage.thousandCuts);
-      }
-
-      // Exactly two rendered-frame jitters for each cut line.
-      this._startCameraJitter(2, 0.12);
-    }
-
-    if (p >= 1) {
-      const finalTarget = s.lastTarget;
-      if (finalTarget && !finalTarget.userData?.dead && finalTarget.parent) {
-        const side = new THREE.Vector3(1, 0, 0)
-          .applyAxisAngle(new THREE.Vector3(0, 1, 0), this._facingYaw(finalTarget));
-        this.player.position.copy(finalTarget.position).addScaledVector(side, 0.9);
-        this.player.position.y = finalTarget.position.y;
-      } else {
-        const last = s.targets[s.targets.length - 1];
-        if (last) this.player.position.copy(last.position).add(new THREE.Vector3(0.9, 0, 0));
-      }
-
-      this.player.visible = true;
-      this.thousandCuts = null;
-    }
-  }
-
-  _spawnNeonCutLine(a, b, index) {
-    const geom = new THREE.BufferGeometry().setFromPoints([a, b]);
-    const mat = new THREE.LineBasicMaterial({
-      color: index % 2 ? 0x3cf7ff : 0xff3bd5,
-      transparent: true,
-      opacity: 1,
-      depthWrite: false
-    });
-
-    const line = new THREE.Line(geom, mat);
-    this.scene.add(line);
-
-    this.fx.push({
-      kind: "fadeLine",
-      object: line,
-      age: 0,
-      life: 0.13,
-      geom,
-      mat
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // ULTIMATE 2: DANCING STEEL
-  // ---------------------------------------------------------------------------
-
-  _updateDancingSteel(dt) {
-    const s = this.dancingSteel;
-    if (!s) return;
-
-    s.elapsed += dt;
-    const p = Math.min(1, s.elapsed / s.duration);
-    const eased = p * p * (3 - 2 * p);
-
-    // Radius grows mathematically from 0 -> 5 over 2 seconds.
-    const radius = 5 * eased;
-    const angularSpeed = 17; // rad/s
-    const size = 1 + eased;  // reaches 200% of original size.
-
-    for (const e of s.entries) {
-      const a = s.elapsed * angularSpeed + e.phase;
-
-      e.dagger.position.set(
-        this.player.position.x + Math.cos(a) * radius,
-        this.player.position.y + 0.75 + Math.sin(a * 2.0) * 0.20,
-        this.player.position.z + Math.sin(a) * radius
-      );
-      e.dagger.rotation.y += 34 * dt;
-      e.dagger.rotation.x += 20 * dt;
-      e.dagger.scale.copy(e.baseScale).multiplyScalar(size);
-
-      e.trailPoints.push(e.dagger.position.clone());
-      if (e.trailPoints.length > 26) e.trailPoints.shift();
-
-      const arr = e.trailGeom.attributes.position.array;
-      for (let i = 0; i < e.trailPoints.length; i++) {
-        const pt = e.trailPoints[i];
-        arr[i * 3] = pt.x;
-        arr[i * 3 + 1] = pt.y;
-        arr[i * 3 + 2] = pt.z;
-      }
-      e.trailGeom.attributes.position.needsUpdate = true;
-      e.trailGeom.setDrawRange(0, e.trailPoints.length);
-
-      for (const enemy of this._aliveEnemies()) {
-        if (this._flatDistance(e.dagger.position, enemy.position) < 0.48 + this.enemyRadius) {
-          // Throttled per-enemy orbit hits.
-          const now = this.time;
-          const key = e.index ? "_rogueSteelHitB" : "_rogueSteelHitA";
-          if (!enemy.userData[key] || now - enemy.userData[key] > 0.18) {
-            enemy.userData[key] = now;
-            this.damageEnemy(enemy, 0.55);
-          }
-        }
-      }
-    }
-
-    if (p >= 1) this._endDancingSteel();
-  }
-
-  _endDancingSteel() {
-    const s = this.dancingSteel;
-    if (!s) return;
-
-    for (const e of s.entries) {
-      const base = this.daggerBase[e.index];
-      base.parent.attach(e.dagger);
-      e.dagger.position.copy(base.position);
-      e.dagger.quaternion.copy(base.quaternion);
-      e.dagger.scale.copy(base.scale);
-
-      this.scene.remove(e.trail);
-      e.trailGeom.dispose();
-      e.trailMat.dispose();
-    }
-
-    this.dancingSteel = null;
-  }
-
-  // ---------------------------------------------------------------------------
-  // ULTIMATE 3: TWILIGHT EXECUTION
-  // ---------------------------------------------------------------------------
-
-  _updateTwilight(dt) {
-    if (!this.twilight) return;
-
-    this.twilight.elapsed += dt;
-
-    // Small pulse so the wireframe is alive without any animation clip.
-    const pulse = 0.86 + Math.sin(this.twilight.elapsed * 16) * 0.14;
-    for (const entry of this.twilight.materials) {
-      if (entry.mesh.material && entry.mesh.material.isMeshBasicMaterial) {
-        entry.mesh.material.opacity = pulse;
-      }
-    }
-
-    if (this.twilight.elapsed >= this.twilight.duration) this._endTwilight();
-  }
-
-  _twilightPrimaryWarp() {
-    if (!this.twilight) return false;
-
-    const target = this._nearestEnemy(20);
-    if (!target) return false;
-
-    // Teleport to enemy's face/front. No terrain collision query by design.
-    const front = this._forward(target);
-    this.player.position.copy(target.position).addScaledVector(front, 0.78);
-    this.player.position.y = target.position.y;
-
-    const toTarget = target.position.clone().sub(this.player.position);
-    this.player.rotation.y = Math.atan2(toTarget.x, toTarget.z);
-    this.player.userData.facing = this.player.rotation.y;
-
-    // Requested violent four rendered-frame rumble.
-    this._startCameraJitter(4, 0.27);
-    return true;
-  }
-
-  _endTwilight() {
-    if (!this.twilight) return;
-
-    for (const a of this.twilight.ambient) {
-      if (a.light) a.light.intensity = a.intensity;
-    }
-
-    for (const m of this.twilight.materials) {
-      if (!m.mesh) continue;
-      const temp = m.mesh.material;
-      m.mesh.material = m.material;
-      if (temp && temp !== m.material && temp.dispose) temp.dispose();
-    }
-
-    this.twilight = null;
-  }
-
-  // ---------------------------------------------------------------------------
-  // PARTICLES / FX
-  // ---------------------------------------------------------------------------
-
-  _updateParticles(dt) {
-    for (let i = this.particles.length - 1; i >= 0; i--) {
-      const p = this.particles[i];
-      p.age += dt;
-      const t = Math.min(1, p.age / p.life);
-
-      p.mesh.position.addScaledVector(p.velocity, dt);
-      p.velocity.y -= 1.6 * dt;
-
-      const scale = p.startScale * (1 - t);
-      p.mesh.scale.setScalar(Math.max(0.001, scale));
-
-      if (p.mesh.material?.transparent) p.mesh.material.opacity = 1 - t;
-
-      if (t >= 1) {
-        this.scene.remove(p.mesh);
-        if (p.disposeMaterial && p.mesh.material?.dispose) p.mesh.material.dispose();
-        this.particles.splice(i, 1);
-      }
-    }
-  }
-
-  _updateFx(dt) {
-    for (let i = this.fx.length - 1; i >= 0; i--) {
-      const f = this.fx[i];
-      f.age += dt;
-      const p = Math.min(1, f.age / f.life);
-
-      if (f.kind === "fadeLine") {
-        f.mat.opacity = 1 - p;
-      } else if (f.kind === "restoreMaterials") {
-        // Nothing per-frame.
-      }
-
-      if (p >= 1) {
-        if (f.kind === "fadeLine") {
-          this.scene.remove(f.object);
-          f.geom.dispose();
-          f.mat.dispose();
-        } else if (f.kind === "restoreMaterials") {
-          for (const saved of f.saved) {
-            if (saved.obj) saved.obj.material = saved.material;
-          }
-        }
-        this.fx.splice(i, 1);
-      }
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // CAMERA JITTER
-  // ---------------------------------------------------------------------------
-
-  _startCameraJitter(frames, strength) {
-    // If an existing shake is stronger/longer, preserve the stronger request.
-    if (!this.jitter) {
-      this.jitter = {
-        frames,
-        strength,
-        base: this.camera.position.clone()
-      };
-    } else {
-      this.jitter.frames = Math.max(this.jitter.frames, frames);
-      this.jitter.strength = Math.max(this.jitter.strength, strength);
-      this.jitter.base.copy(this.camera.position);
-    }
-  }
-
-  _updateCameraJitter() {
-    if (!this.jitter) return;
-
-    const j = this.jitter;
-
-    if (j.frames <= 0) {
-      this.camera.position.copy(j.base);
-      this.jitter = null;
-      return;
-    }
-
-    const x = (Math.random() * 2 - 1) * j.strength;
-    const y = (Math.random() * 2 - 1) * j.strength * 0.55;
-    const z = (Math.random() * 2 - 1) * j.strength;
-
-    this.camera.position.copy(j.base).add(new THREE.Vector3(x, y, z));
-    j.frames--;
-  }
-
-  // ---------------------------------------------------------------------------
-  // GEOMETRY / MATH HELPERS
-  // ---------------------------------------------------------------------------
-
-  _makeHeldDagger(x) {
-    const geom = this._trackGeometry(new THREE.BoxGeometry(0.11, 0.07, 0.82));
-    const mat = this._trackMaterial(new THREE.MeshBasicMaterial({ color: 0xaeb8c6 }));
-    const dagger = new THREE.Mesh(geom, mat);
-
-    dagger.position.set(x, 0.72, 0.58);
-    dagger.userData.rogueMovesetDagger = true;
-    dagger.rotation.x = 0;
-    dagger.rotation.y = 0;
-    this.player.add(dagger);
-    return dagger;
-  }
-
-  _makeProjectileDagger() {
-    const geom = new THREE.BoxGeometry(0.12, 0.06, 0.70);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xcdd7e7 });
-    return new THREE.Mesh(geom, mat);
-  }
-
-  _makeCrescentMesh(innerRadius, outerRadius, segments) {
-    const positions = [];
-    const start = -Math.PI / 2;
-    const end = Math.PI / 2;
-
-    for (let i = 0; i < segments; i++) {
-      const a0 = start + (end - start) * (i / segments);
-      const a1 = start + (end - start) * ((i + 1) / segments);
-
-      const i0 = [Math.cos(a0) * innerRadius, Math.sin(a0) * innerRadius, 0];
-      const o0 = [Math.cos(a0) * outerRadius, Math.sin(a0) * outerRadius, 0];
-      const i1 = [Math.cos(a1) * innerRadius, Math.sin(a1) * innerRadius, 0];
-      const o1 = [Math.cos(a1) * outerRadius, Math.sin(a1) * outerRadius, 0];
-
-      positions.push(...i0, ...o0, ...o1);
-      positions.push(...i0, ...o1, ...i1);
-    }
-
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    geom.computeVertexNormals();
-
-    const mat = this._purpleMaterial.clone();
-    const mesh = new THREE.Mesh(geom, mat);
-    return mesh;
-  }
-
-  _daggerWorldTip(dagger, localZ) {
-    return dagger.localToWorld(new THREE.Vector3(0, 0, localZ));
-  }
-
-  _forward(object) {
-    const yaw = this._facingYaw(object);
-    return new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)).normalize();
-  }
-
-  _facingYaw(object) {
-    if (object?.userData && Number.isFinite(object.userData.facing)) {
-      return object.userData.facing;
-    }
-    return Number.isFinite(object?.rotation?.y) ? object.rotation.y : 0;
-  }
-
-  _aliveEnemies() {
-    const list = this.getEnemies() || [];
-    return list.filter(e =>
-      e &&
-      e.isObject3D &&
-      e.visible !== false &&
-      !e.userData?.dead &&
-      e.parent
-    );
-  }
-
-  _nearestEnemy(radius) {
-    let best = null;
-    let bestD2 = radius * radius;
-
-    for (const enemy of this._aliveEnemies()) {
-      const dx = enemy.position.x - this.player.position.x;
-      const dz = enemy.position.z - this.player.position.z;
-      const d2 = dx * dx + dz * dz;
-
-      if (d2 <= bestD2) {
-        bestD2 = d2;
-        best = enemy;
-      }
-    }
-    return best;
-  }
-
-  _nearestEnemies(limit, radius) {
-    const r2 = radius * radius;
-
-    return this._aliveEnemies()
-      .map(enemy => {
-        const dx = enemy.position.x - this.player.position.x;
-        const dz = enemy.position.z - this.player.position.z;
-        return { enemy, d2: dx * dx + dz * dz };
-      })
-      .filter(x => x.d2 <= r2)
-      .sort((a, b) => a.d2 - b.d2)
-      .slice(0, limit)
-      .map(x => x.enemy);
-  }
-
-  _nearestEnemyToPoint(point, radius) {
-    let best = null;
-    let bestD2 = radius * radius;
-
-    for (const enemy of this._aliveEnemies()) {
-      const dx = enemy.position.x - point.x;
-      const dy = (enemy.position.y + 0.6) - point.y;
-      const dz = enemy.position.z - point.z;
-      const d2 = dx * dx + dy * dy + dz * dz;
-
-      if (d2 <= bestD2) {
-        bestD2 = d2;
-        best = enemy;
-      }
-    }
-    return best;
-  }
-
-  _flatDistance(a, b) {
-    const dx = a.x - b.x;
-    const dz = a.z - b.z;
-    return Math.sqrt(dx * dx + dz * dz);
-  }
-
-  _segmentHitsEnemy(a, b, enemy, radius) {
-    const p = enemy.position;
-    const abx = b.x - a.x;
-    const abz = b.z - a.z;
-    const apx = p.x - a.x;
-    const apz = p.z - a.z;
-
-    const denom = abx * abx + abz * abz || 1;
-    const t = Math.max(0, Math.min(1, (apx * abx + apz * abz) / denom));
-    const cx = a.x + abx * t;
-    const cz = a.z + abz * t;
-
-    const dx = p.x - cx;
-    const dz = p.z - cz;
-    return dx * dx + dz * dz <= radius * radius;
-  }
-
-  _trackGeometry(g) {
-    this._ownedGeometry.push(g);
-    return g;
-  }
-
-  _trackMaterial(m) {
-    this._ownedMaterial.push(m);
-    return m;
-  }
-
-  dispose() {
-    this._endSmokeBomb();
-    this._endDancingSteel();
-    this._endTwilight();
-
-    for (const p of this.projectiles) {
-      this.scene.remove(p.mesh);
-      p.mesh.geometry?.dispose?.();
-      p.mesh.material?.dispose?.();
-    }
-    this.projectiles.length = 0;
-
-    for (const p of this.particles) {
-      this.scene.remove(p.mesh);
-      if (p.disposeMaterial) p.mesh.material?.dispose?.();
-    }
-    this.particles.length = 0;
-
-    for (const f of this.fx) {
-      if (f.kind === "fadeLine") {
-        this.scene.remove(f.object);
-        f.geom?.dispose?.();
-        f.mat?.dispose?.();
-      } else if (f.kind === "restoreMaterials") {
-        for (const saved of f.saved || []) {
-          if (saved.obj) saved.obj.material = saved.material;
-        }
-      }
-    }
-    this.fx.length = 0;
-
-    for (const d of this.daggers) {
-      if (d?.userData?.rogueMovesetDagger && d.parent) d.parent.remove(d);
-    }
-
-    for (const g of this._ownedGeometry) g?.dispose?.();
-    for (const m of this._ownedMaterial) m?.dispose?.();
-    this._ownedGeometry.length = 0;
-    this._ownedMaterial.length = 0;
-  }
+  _updateSonic(dt){const s=this.sonic;if(!s)return;s.elapsed+=dt;const p=Math.min(1,s.elapsed/s.duration);const tri=p<.5?p*2:(1-p)*2;this.player.scale.copy(s.baseScale);this.player.scale.z=s.baseScale.z*(1+2*tri);this.player.position.copy(s.basePos).addScaledVector(s.forward,.5*tri);
+    if(p>=.48&&!s.flashed){s.flashed=true;this._flashPlayerWhite();const a=this.player.position.clone().add(new THREE.Vector3(0,.7,0)),b=a.clone().addScaledVector(s.forward,3);this._line(a,b,0xffef32,1,.08);this._cameraJitter(.10,1);for(const e of this._aliveEnemies())if(this._segmentHits(a,b,e,.7)){this.damageEnemy(e,this.damage.sonicPiston);break;}}
+    if(p>=1){this.player.scale.copy(s.baseScale);this.player.position.copy(s.basePos);this.sonic=null;}}
+  _updateSweep(dt){const s=this.sweep;if(!s)return;s.elapsed+=dt;const p=Math.min(1,s.elapsed/s.duration);this.player.rotation.y=s.startYaw+Math.PI*p;s.cres.position.x=this.player.position.x;s.cres.position.z=this.player.position.z;s.cres.scale.setScalar(.2+p*4.2);s.cres.material.opacity=.72*(1-p*.65);const r=.7+p*3.8;for(const e of this._aliveEnemies()){if(s.hit.has(e)||this._flatDistance(e.position,this.player.position)>r)continue;s.hit.add(e);this.damageEnemy(e,this.damage.arcLineSweep);const v=this.player.position.clone().sub(e.position);v.y=0;if(v.lengthSq()>1e-5)e.position.addScaledVector(v.normalize(),.5);}
+    if(p>=1){this.player.rotation.y=s.startYaw;this.scene.remove(s.cres);s.cres.geometry.dispose();s.cres.material.dispose();this.sweep=null;}}
+  _updateSlingshot(dt){const s=this.slingshot;if(!s)return;s.elapsed+=dt;const p=Math.min(1,s.elapsed/s.duration),e=1-Math.pow(1-p,3);this.player.position.lerpVectors(s.start,s.end,e);this.player.scale.copy(s.baseScale);this.player.scale.z=s.baseScale.z*(1+2.4*Math.sin(Math.PI*p));if(p>=1){this.player.scale.copy(s.baseScale);this._invertCanvasOneFrame();for(const en of this._aliveEnemies()){const v=en.position.clone().sub(this.player.position);v.y=0;const d=v.length();if(d>0&&d<3.2){en.position.addScaledVector(v.normalize(),Math.max(.4,1.4*(1-d/3.2)));this.damageEnemy(en,this.damage.quantumSlingshot);}}this.slingshot=null;}}
+  _updatePhasing(dt){const s=this.phasing;if(!s)return;s.elapsed+=dt;const wave=Math.sin(s.elapsed*Math.PI*2*60)*.15;this.player.scale.copy(s.baseScale);this.player.scale.x=s.baseScale.x*(1+wave);this.player.scale.z=s.baseScale.z*(1-wave);if(s.elapsed>=s.duration){this.player.scale.copy(s.baseScale);for(const x of s.saved){x.m.transparent=x.transparent;x.m.opacity=x.opacity;}this.phasing=null;}}
+  _updateSnare(dt){const s=this.snare;if(!s)return;s.elapsed+=dt;for(let i=0;i<4;i++){const a=s.nodes[i].position,b=s.nodes[(i+1)%4].position;for(const e of this._aliveEnemies()){if(this._segmentHits(a,b,e,.42)){e.userData.velocityWeaverFrozen=Math.max(e.userData.velocityWeaverFrozen||0,1);if(!s.hit.has(e)){s.hit.add(e);this.damageEnemy(e,this.damage.synapticSnare);this._flashEnemyCyan(e,1);}}}}for(const e of this._aliveEnemies())if(e.userData.velocityWeaverFrozen>0)e.userData.velocityWeaverFrozen=Math.max(0,e.userData.velocityWeaverFrozen-dt);if(s.elapsed>=s.duration){for(const n of s.nodes)this.scene.remove(n);for(const l of s.lines){if(l.object?.parent)this.scene.remove(l.object);}s.geom.dispose();s.mat.dispose();this.snare=null;}}
+  _updateBlitz(dt){const s=this.blitz;if(!s)return;s.elapsed+=dt;const should=Math.min(s.targets.length,Math.floor((s.elapsed/s.duration)*s.targets.length+1e-6));while(s.next<should){const t=s.targets[s.next++];if(!t||t.userData?.dead)continue;const a=s.last.clone().add(new THREE.Vector3(0,.7,0)),b=t.position.clone().add(new THREE.Vector3(0,.7,0));this._jaggedLine(a,b,0xffef32,.16);this.damageEnemy(t,this.damage.infiniteSpeedBlitz);s.last=t.position.clone();velocityWeaverHitStopFrames=Math.max(velocityWeaverHitStopFrames,1);this._cameraJitter(.38,2);}if(s.elapsed>=s.duration){const t=s.targets[s.targets.length-1];if(t&&!t.userData?.dead)this.player.position.copy(t.position).add(new THREE.Vector3(.8,0,.2));this.player.visible=true;this.blitz=null;}}
+  _updateDome(dt){const s=this.dome;if(!s)return;s.elapsed+=dt;s.mesh.position.copy(this.player.position);const p=Math.min(1,s.elapsed/s.expand);s.mesh.scale.setScalar(.05+(s.radius)*p);s.mesh.material.opacity=.28*(1-Math.max(0,(s.elapsed-4)/.4));s.ghostTimer-=dt;if(s.elapsed>s.expand&&s.ghostTimer<=0){s.ghostTimer=.06;this._spawnGhost();}if(s.elapsed>=s.duration){this.scene.remove(s.mesh);s.geom.dispose();s.mat.dispose();this.dome=null;}}
+  _updateCataclysm(dt){const s=this.cataclysm;if(!s)return;s.elapsed+=dt;this._catFrame++;if(this._catFrame%5===0)this._spawnShockwave(this.player.position);this.camera.position.y+=Math.sin(this.time*90)*.025;if(s.elapsed>=s.duration)this._endCataclysm();}
+  _endCataclysm(){if(!this.cataclysm)return;for(const x of this._ambientSaved||[])x.o.intensity=x.intensity;for(const x of this._catMaterials||[]){if(x.o.material!==x.material)x.o.material?.dispose?.();x.o.material=x.material;}this._ambientSaved=null;this._catMaterials=null;this.cataclysm=null;}
+  _spawnGhost(){const g=this.player.clone(true);g.traverse(o=>{if(o.isMesh){o.material=new THREE.MeshBasicMaterial({color:0x74eaff,transparent:true,opacity:.20,wireframe:true,depthWrite:false});}});g.position.copy(this.player.position);g.rotation.copy(this.player.rotation);this.scene.add(g);this.ghosts.push({g,age:0,life:.32});while(this.ghosts.length>5){const old=this.ghosts.shift();this.scene.remove(old.g);this._disposeClone(old.g);}}
+  _updateGhosts(dt){for(let i=this.ghosts.length-1;i>=0;i--){const x=this.ghosts[i];x.age+=dt;const f=Math.max(0,1-x.age/x.life);x.g.traverse(o=>{if(o.isMesh&&o.material)o.material.opacity=.20*f;});if(x.age>=x.life){this.scene.remove(x.g);this._disposeClone(x.g);this.ghosts.splice(i,1);}}}
+  _spawnShockwave(pos){const g=new THREE.RingGeometry(.35,.48,20);const m=new THREE.MeshBasicMaterial({color:0x4be7ff,transparent:true,opacity:.75,side:THREE.DoubleSide,depthWrite:false});const mesh=new THREE.Mesh(g,m);mesh.position.set(pos.x,.04,pos.z);mesh.rotation.x=-Math.PI/2;this.scene.add(mesh);this.shockwaves.push({mesh,g,m,age:0,life:.55});}
+  _updateShockwaves(dt){for(let i=this.shockwaves.length-1;i>=0;i--){const x=this.shockwaves[i];x.age+=dt;const p=x.age/x.life;x.mesh.scale.setScalar(1+p*10);x.m.opacity=.75*(1-p);if(x.age>=x.life){this.scene.remove(x.mesh);x.g.dispose();x.m.dispose();this.shockwaves.splice(i,1);}}}
+  _updateFx(dt){for(let i=this.fx.length-1;i>=0;i--){const f=this.fx[i];f.age+=dt;if(f.kind==='line'){f.mat.opacity=f.opacity*Math.max(0,1-f.age/f.life);}if(f.age>=f.life){if(f.object?.parent)this.scene.remove(f.object);f.geom?.dispose?.();f.mat?.dispose?.();this.fx.splice(i,1);}}}
+  _line(a,b,color,opacity=1,life=.1){const geom=new THREE.BufferGeometry().setFromPoints([a,b]);const mat=new THREE.LineBasicMaterial({color,transparent:true,opacity,depthWrite:false});const object=new THREE.Line(geom,mat);this.scene.add(object);const f={kind:'line',object,geom,mat,age:0,life,opacity};this.fx.push(f);return f;}
+  _jaggedLine(a,b,color,life){const pts=[];const n=7;for(let i=0;i<=n;i++){const p=a.clone().lerp(b,i/n);if(i&&i<n){p.x+=(Math.random()-.5)*.45;p.y+=(Math.random()-.5)*.25;p.z+=(Math.random()-.5)*.45;}pts.push(p);}const geom=new THREE.BufferGeometry().setFromPoints(pts),mat=new THREE.LineBasicMaterial({color,transparent:true,opacity:1,depthWrite:false});const object=new THREE.Line(geom,mat);this.scene.add(object);this.fx.push({kind:'line',object,geom,mat,age:0,life,opacity:1});}
+  _flashPlayerWhite(){const saved=[];this.player.traverse(o=>{if(o.isMesh&&o.material){saved.push({o,m:o.material});o.material=new THREE.MeshBasicMaterial({color:0xffffff});}});requestAnimationFrame(()=>{for(const x of saved){x.o.material?.dispose?.();x.o.material=x.m;}});}
+  _flashEnemyCyan(enemy,life){const saved=[];enemy.traverse(o=>{if(o.isMesh&&o.material){saved.push({o,m:o.material});o.material=new THREE.MeshBasicMaterial({color:0x3ffcff});}});setTimeout(()=>{for(const x of saved)if(x.o){x.o.material?.dispose?.();x.o.material=x.m;}},life*1000);}
+  _invertCanvasOneFrame(){const c=this.renderer.domElement,prev=c.style.filter;c.style.filter='invert(1) contrast(1.6)';requestAnimationFrame(()=>{c.style.filter=prev;});}
+  _cameraJitter(amp,frames){const base=this.camera.position.clone();let left=frames;const tick=()=>{if(left--<=0){this.camera.position.copy(base);return;}this.camera.position.copy(base).add(new THREE.Vector3((Math.random()-.5)*amp,(Math.random()-.5)*amp,(Math.random()-.5)*amp));requestAnimationFrame(tick);};tick();}
+  _aliveEnemies(){return (this.getEnemies()||[]).filter(e=>e&&e.isObject3D&&e.visible!==false&&!e.userData?.dead&&e.parent);}
+  _nearestEnemy(radius){let best=null,d2=radius*radius;for(const e of this._aliveEnemies()){const dx=e.position.x-this.player.position.x,dz=e.position.z-this.player.position.z,q=dx*dx+dz*dz;if(q<=d2){d2=q;best=e;}}return best;}
+  _nearestEnemies(limit,radius){const r2=radius*radius;return this._aliveEnemies().map(e=>({e,d:(e.position.x-this.player.position.x)**2+(e.position.z-this.player.position.z)**2})).filter(x=>x.d<=r2).sort((a,b)=>a.d-b.d).slice(0,limit).map(x=>x.e);}
+  _forward(o){const y=o.rotation?.y||o.userData?.facing||0;return new THREE.Vector3(Math.sin(y),0,Math.cos(y));}
+  _flatDistance(a,b){return Math.hypot(a.x-b.x,a.z-b.z);}
+  _segmentHits(a,b,e,r){const p=e.position,abx=b.x-a.x,abz=b.z-a.z,apx=p.x-a.x,apz=p.z-a.z,d=abx*abx+abz*abz||1,t=Math.max(0,Math.min(1,(apx*abx+apz*abz)/d)),cx=a.x+abx*t,cz=a.z+abz*t;return (p.x-cx)**2+(p.z-cz)**2<=r*r;}
+  _disposeClone(root){root.traverse(o=>{if(o.isMesh&&o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose?.());else o.material.dispose?.();}});}
+  dispose(){this.player.visible=true;if(this.sonic)this.player.scale.copy(this.sonic.baseScale);if(this.slingshot)this.player.scale.copy(this.slingshot.baseScale);if(this.phasing){this.player.scale.copy(this.phasing.baseScale);for(const x of this.phasing.saved){x.m.transparent=x.transparent;x.m.opacity=x.opacity;}}this._endCataclysm();for(const f of this.fx){if(f.object?.parent)this.scene.remove(f.object);f.geom?.dispose?.();f.mat?.dispose?.();}for(const x of this.ghosts){if(x.g.parent)this.scene.remove(x.g);this._disposeClone(x.g);}for(const x of this.shockwaves){if(x.mesh.parent)this.scene.remove(x.mesh);x.g.dispose();x.m.dispose();}if(this.sweep?.cres?.parent){this.scene.remove(this.sweep.cres);this.sweep.cres.geometry.dispose();this.sweep.cres.material.dispose();}if(this.dome?.mesh?.parent){this.scene.remove(this.dome.mesh);this.dome.geom.dispose();this.dome.mat.dispose();}if(this.snare){for(const n of this.snare.nodes)if(n.parent)this.scene.remove(n);this.snare.geom.dispose();this.snare.mat.dispose();}this.fx=[];this.ghosts=[];this.shockwaves=[];}
 }
-
-window.RogueMoveset = RogueMoveset;
+window.VelocityWeaver=VelocityWeaver;
+window.RogueMoveset=VelocityWeaver;
 
 
 let shadowStalkerMoveset = null;
+let velocityWeaverHitStopFrames=0;
+function velocityWeaverMovementMultiplier(){return (hoodedIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.movementMultiplier():1;}
+function velocityWeaverAttackSpeedMultiplier(){return (hoodedIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.attackSpeedMultiplier():1;}
+function velocityWeaverEnemyTimeScale(z){return (hoodedIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.enemyTimeScale(z):1;}
+function velocityWeaverPhasingActive(){return !!(hoodedIsActive()&&shadowStalkerMoveset&&shadowStalkerMoveset.isPhasing());}
 function disposeShadowStalkerMoveset(){
   if(shadowStalkerMoveset){
     try{shadowStalkerMoveset.dispose();}catch(err){console.warn('Shadow Stalker dispose recovered:',err);}
@@ -31579,7 +30472,7 @@ function ensureShadowStalkerMoveset(){
   if(!hoodedIsActive()||!player||!scene||!camera||!renderer)return null;
   if(shadowStalkerMoveset && shadowStalkerMoveset.player!==player) disposeShadowStalkerMoveset();
   if(!shadowStalkerMoveset){
-    shadowStalkerMoveset=new RogueMoveset({
+    shadowStalkerMoveset=new VelocityWeaver({
       scene,camera,renderer,player,
       getEnemies:()=>zombies,
       damageEnemy:(enemy,amount)=>{
@@ -31590,7 +30483,7 @@ function ensureShadowStalkerMoveset(){
       reachScale: chopperIsActive()?CHOPPER_TUNING.reach:1,
       fxScale: chopperIsActive()?CHOPPER_TUNING.fx:1,
       damage: chopperIsActive()?CHOPPER_TUNING.damage
-            :{phantomFlurry:1.0,shadowSweep:1.35,vipersFan:1.15,thousandCuts:999999}
+            :{sonicPiston:1.0,arcLineSweep:1.25,quantumSlingshot:1.5,synapticSnare:.9,infiniteSpeedBlitz:999999}
     });
   }
   return shadowStalkerMoveset;
@@ -31606,31 +30499,31 @@ function updateShadowStalkerMoveset(dt){
 function triggerShadowStalkerPrimary(w){
   const kit=ensureShadowStalkerMoveset();
   if(!kit||!w)return false;
-  if(w.kind==='rogue_phantom_flurry')return kit.phantomFlurry();
-  if(w.kind==='rogue_shadow_sweep')return kit.shadowSweep();
+  if(w.kind==='velocity_sonic_piston')return kit.sonicPiston();
+  if(w.kind==='velocity_arc_sweep')return kit.arcLineSweep();
   return false;
 }
 function triggerShadowStalkerSecondary(w){
   const kit=ensureShadowStalkerMoveset();
   if(!kit||!w)return false;
-  if(w.kind==='rogue_shadowstep')return kit.shadowstep();
-  if(w.kind==='rogue_smoke_bomb')return kit.smokeBomb();
-  if(w.kind==='rogue_vipers_fan')return kit.vipersFan();
+  if(w.kind==='velocity_quantum_slingshot')return kit.quantumSlingshot();
+  if(w.kind==='velocity_phasing_resonance')return kit.phasingResonance();
+  if(w.kind==='velocity_synaptic_snare')return kit.synapticSnare();
   return false;
 }
 function triggerHoodedEquippedAbility(){
   if(!hoodedIsActive()||!gameRunning)return false;
   const kit=ensureShadowStalkerMoveset();
   if(!kit)return false;
-  if(equippedAbilityId==='hooded_thousand_cuts')return kit.thousandCuts();
-  if(equippedAbilityId==='hooded_dancing_steel')return kit.dancingSteelAttack();
-  if(equippedAbilityId==='hooded_twilight_execution')return kit.twilightExecution();
+  if(equippedAbilityId==='hooded_thousand_cuts')return kit.infiniteSpeedBlitz();
+  if(equippedAbilityId==='hooded_dancing_steel')return kit.tachyonDome();
+  if(equippedAbilityId==='hooded_twilight_execution')return kit.speedforceCataclysm();
   return false;
 }
 
 function performWeaponAttack(w, countsAsPrimary=true){
   if(!w) return;
-  if(w.kind==='rogue_phantom_flurry'||w.kind==='rogue_shadow_sweep'){
+  if(w.kind==='velocity_sonic_piston'||w.kind==='velocity_arc_sweep'){
     triggerShadowStalkerPrimary(w);
   } else if(isWolverineWeaponKind(w.kind)){
     doWolverineAttack(w);
@@ -32234,7 +31127,7 @@ function doSecondaryShoot(){
   const w=secondaryWeaponForAvatar();
   if(!w)return;
   if(state.avatarType==='cloud'&&w.kind!=='cloud_great_sword_slash') resetCloudCrossbreakerChain();
-  if(w.kind==='rogue_shadowstep'||w.kind==='rogue_smoke_bomb'||w.kind==='rogue_vipers_fan'){
+  if(w.kind==='velocity_quantum_slingshot'||w.kind==='velocity_phasing_resonance'||w.kind==='velocity_synaptic_snare'){
     // Requested Shadow Stalker rule: Secondary moves have NO post-use cooldown.
     // The move itself is the only gate; shared secondaryAttackCooldown stays zero.
     player.userData.secondaryAttackCooldown=0;
@@ -34039,7 +32932,7 @@ function update(dt){
     const passiveMoveMult=(hoodedIsActive() && passiveState.shadowstepTimer>0)?(passiveForAvatar().killMoveMult||1):((archerIsActive() && (passiveState.archerTailwindTimer||0)>0)?(passiveForAvatar().tailwindMoveMult||1):((mageGameplayActive() && passiveState.mageSpeedBoostTimer>0)?MAGE_SPEED_BOOST_MULT:1));
     const speed=(player&&player.userData&&player.userData.supernovaRooted)
       ? 0
-      : PLAYER_SPEED * characterMoveMult * passiveMoveMult * knightMoveMultiplier() * barbarianMoveMultiplier() * chopperMoveMultiplier() * (1 + (speedStat-1)*0.15);
+      : PLAYER_SPEED * characterMoveMult * passiveMoveMult * knightMoveMultiplier() * barbarianMoveMultiplier() * chopperMoveMultiplier() * velocityWeaverMovementMultiplier() * (1 + (speedStat-1)*0.15);
     const nx = player.position.x + (mx/len)*speed*dt;
     const nz = player.position.z + (mz/len)*speed*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
@@ -34283,7 +33176,7 @@ function update(dt){
   // Zombies chase + contact damage — frozen in place while free roaming.
   if(!freeMode){
     zombies.forEach(z=>{
-      const enemyDt=dt*knightRoyalOnslaughtEnemyTimeScale(z);
+      const enemyDt=dt*knightRoyalOnslaughtEnemyTimeScale(z)*velocityWeaverEnemyTimeScale(z);
       if(z.userData.kayMixer) z.userData.kayMixer.update(enemyDt);
       z.userData.kayActionLock=Math.max(0,(z.userData.kayActionLock||0)-enemyDt);
       if(z.userData.dead || z.userData.spawnPending) return;
@@ -34755,6 +33648,7 @@ function animate(){
     if(!renderer || !scene || !camera || !clock) return;
     const dt = Math.min(clock.getDelta(), 0.05);
     if(gameRunning){
+      if(velocityWeaverHitStopFrames>0){ velocityWeaverHitStopFrames--; renderer.render(scene,camera); return; }
       // A single bad visual must never be able to stop the render loop again.
       // Before this guard, one thrown effect skipped renderer.render() on every
       // following frame, which reads to the player as a hard freeze.
