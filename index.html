@@ -1,4 +1,4 @@
-<!-- V23.06.00 Velocity Weaver: replaces the Hooded Rogue and Chopper Shadow Stalker combat kit with a procedural speedster/arachnid kit: Sonic Piston, Arc Line Sweep, Quantum Slingshot, Phasing Resonance, Synaptic Snare, Infinite Speed Blitz, Tachyon Dome and Speedforce Cataclysm. Existing save IDs are preserved, enemy damage stays routed through applyBulletDamage(), projectile phasing is collision-real, Blitz hit-stop skips one game-logic frame per strike, and all movement/VFX are delta-time or rendered-frame driven. -->
+<!-- V23.06.05 Velocity Weaver Compatibility Fix: restores the established Rogue/Chopper internal weapon kinds while keeping the Velocity Weaver behaviors. Fixes Primary/Secondary dispatch compatibility across existing input, HUD, loadout and combat code.  replaces the Hooded Rogue and Chopper Shadow Stalker combat kit with a procedural speedster/arachnid kit: Sonic Piston, Arc Line Sweep, Quantum Slingshot, Phasing Resonance, Synaptic Snare, Infinite Speed Blitz, Tachyon Dome and Speedforce Cataclysm. Existing save IDs are preserved, enemy damage stays routed through applyBulletDamage(), projectile phasing is collision-real, Blitz hit-stop skips one game-logic frame per strike, and all movement/VFX are delta-time or rendered-frame driven. -->
 <!-- V23.05.01 Shadow Stalker Rogue: replaces the Hooded Rogue combat loadout with two procedural Primaries (Phantom Flurry, Shadow Sweep), three zero-cooldown Secondaries (Shadowstep, Smoke Bomb, Viper's Fan), and three selectable Ultimates (Thousand Cuts, Dancing Steel, Twilight Execution). All motion, projectile travel, smoke expansion, mesh scaling/fading and camera jitter are delta-time/requestAnimationFrame driven; no skeletal animation is required by these moves. Existing enemy HP/boss protection routes through applyBulletDamage(). Other avatars are unchanged. -->
 <!-- V23.04.02 Direct Warrior Texture Binding: fixes Warrior bosses remaining black on iPhone Safari after V23.04.01. Root cause: the FBX material identifiers do not reliably match their external JPG filenames, and Viking's weapon material is even authored with the typo 'wiking_weapons_texture'. This build no longer depends on FBXLoader resolving texture paths. The seven already-optimized embedded JPGs are loaded directly as THREE textures and assigned after FBX parse by the exact authored material names: egyptian_red_B_texture / egyptianweapons_texture, roman_D_texture / roman_clothes_texture / roman_weapons_texture, and viking_C_texture / wiking_weapons_texture. Imported material base colors are forced to white so the diffuse maps cannot be multiplied into black silhouettes. URLModifier remains only as a fallback. Boss size, animations, stats and file-size optimization are unchanged. Syntax/size audit included. -->
 <!-- V23.04.01 Warrior Boss Texture Fix: fixes the uploaded Warrior bosses rendering as black silhouettes on iPhone Safari. The animated FBX files reference seven external JPG maps rather than embedding them internally. This build embeds only those seven required maps and feeds them to FBXLoader through a LoadingManager URL modifier. To preserve boss detail without bloating the HTML, primary body/clothing sheets are reduced from 2048px to 768px, smaller weapon sheets to 512px, and Viking's dense weapon sheet stays 768px; optimized JPEG quality 78 is used. No blue/green variants, static models, Maya project, renders, video or unrelated textures are included. Existing 2.5x Green Ranger boss scale, three-warrior rotation, animation splits, boss stats/HUD and anti-one-shot behavior remain unchanged. Syntax/size audit included. -->
@@ -1646,7 +1646,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <script>
 (function(){
 
-const GAME_VERSION='23.06.04 - Chopper Speed Tuning';
+const GAME_VERSION='23.06.05 - Velocity Weaver Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3611,15 +3611,15 @@ const CHARACTER_COMBAT = {
     defaultId:'phantom_flurry',
     baseMoveMult:1.35,
     weapons:{
-      phantom_flurry:{name:'Sonic Piston', price:0, slot:'primary', kind:'velocity_sonic_piston', cooldown:0.04, damage:1.0, auto:true,
+      phantom_flurry:{name:'Sonic Piston', price:0, slot:'primary', kind:'rogue_phantom_flurry', cooldown:0.04, damage:1.0, auto:true,
         desc:'Infinite-speed jab: stretch depth to 300%, lunge 0.5 units, flash white, fire a 3-unit yellow lightning strike, then snap back in 0.04s.'},
-      shadow_sweep:{name:'Arc Line Sweep', price:0, slot:'primary', kind:'velocity_arc_sweep', cooldown:0.06, damage:1.25, auto:true,
+      shadow_sweep:{name:'Arc Line Sweep', price:0, slot:'primary', kind:'rogue_shadow_sweep', cooldown:0.06, damage:1.25, auto:true,
         desc:'Twist 180° in exactly 0.06s while a cyan kinetic crescent expands outward and vacuum-drags enemies 0.5 units closer.'},
-      shadowstep:{name:'Quantum Slingshot', price:0, slot:'secondary', kind:'velocity_quantum_slingshot', cooldown:0,
+      shadowstep:{name:'Quantum Slingshot', price:0, slot:'secondary', kind:'rogue_shadowstep', cooldown:0,
         desc:'Tether to the nearest enemy within 8 units and lerp to 1 unit in front over 0.12s, elongating at speed before a one-frame inversion and radial blast.'},
-      smoke_bomb:{name:'Phasing Resonance', price:0, slot:'secondary', kind:'velocity_phasing_resonance', cooldown:0,
+      smoke_bomb:{name:'Phasing Resonance', price:0, slot:'secondary', kind:'rogue_smoke_bomb', cooldown:0,
         desc:'Vibrate X/Z by ±15% at 60Hz for 1.5s, fade to 30% opacity, and let incoming enemy projectiles pass through without registering a hit.'},
-      vipers_fan:{name:'Synaptic Snare', price:0, slot:'secondary', kind:'velocity_synaptic_snare', cooldown:0,
+      vipers_fan:{name:'Synaptic Snare', price:0, slot:'secondary', kind:'rogue_vipers_fan', cooldown:0,
         desc:'Create four electric nodes at radius 3 linked by cyan zap-lines. Enemies intersecting the square are frozen and flash cyan for 1 second.'}
     }
   },
@@ -13874,7 +13874,7 @@ function updateSecondaryButton(){
     btn.innerHTML='<span class="secondaryIcon">🔒</span><span class="secondaryLabel">SECONDARY</span>';
     return;
   }
-  const icon=w.kind==='velocity_quantum_slingshot'?'⚡':(w.kind==='velocity_phasing_resonance'?'〰️':(w.kind==='velocity_synaptic_snare'?'▦':(w.kind==='giant_fireball'?'☄️':(w.kind==='cloud_great_sword_slash'?'⚔️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='barbarian_whirlwind'?'🌀':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind==='rhino_cloud_whirlwind'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'))))))))));
+  const icon=(w.kind==='rogue_shadowstep'||w.kind==='velocity_quantum_slingshot')?'⚡':((w.kind==='rogue_smoke_bomb'||w.kind==='velocity_phasing_resonance')?'〰️':((w.kind==='rogue_vipers_fan'||w.kind==='velocity_synaptic_snare')?'▦':(w.kind==='giant_fireball'?'☄️':(w.kind==='cloud_great_sword_slash'?'⚔️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='barbarian_whirlwind'?'🌀':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind==='rhino_cloud_whirlwind'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'))))))))));
   if(whirlwindActive){
     const wTimer=(w.kind==='barbarian_whirlwind')
       ? barbarianRuntime.whirlTimer
@@ -30393,6 +30393,15 @@ class VelocityWeaver {
     const lines=[];for(let i=0;i<4;i++)lines.push(this._line(nodes[i].position,nodes[(i+1)%4].position,0x37f6ff,.95,1.05));
     this.snare={elapsed:0,duration:1.0,nodes,lines,center,hit:new Set(),geom,mat};return true;
   }
+  // Legacy Shadow Stalker method aliases keep older integration hooks alive.
+  phantomFlurry(){return this.sonicPiston();}
+  shadowSweep(){return this.arcLineSweep();}
+  shadowstep(){return this.quantumSlingshot();}
+  smokeBomb(){return this.phasingResonance();}
+  vipersFan(){return this.synapticSnare();}
+  thousandCuts(){return this.infiniteSpeedBlitz();}
+  dancingSteelAttack(){return this.tachyonDome();}
+  twilightExecution(){return this.speedforceCataclysm();}
   infiniteSpeedBlitz(){
     if(this.blitz)return false;const targets=this._nearestEnemies(6,999);if(!targets.length)return false;
     this.player.visible=false;this.blitz={elapsed:0,duration:1,targets,next:0,last:this.player.position.clone()};return true;
@@ -30499,16 +30508,16 @@ function updateShadowStalkerMoveset(dt){
 function triggerShadowStalkerPrimary(w){
   const kit=ensureShadowStalkerMoveset();
   if(!kit||!w)return false;
-  if(w.kind==='velocity_sonic_piston')return kit.sonicPiston();
-  if(w.kind==='velocity_arc_sweep')return kit.arcLineSweep();
+  if(w.kind==='rogue_phantom_flurry'||w.kind==='velocity_sonic_piston')return kit.sonicPiston();
+  if(w.kind==='rogue_shadow_sweep'||w.kind==='velocity_arc_sweep')return kit.arcLineSweep();
   return false;
 }
 function triggerShadowStalkerSecondary(w){
   const kit=ensureShadowStalkerMoveset();
   if(!kit||!w)return false;
-  if(w.kind==='velocity_quantum_slingshot')return kit.quantumSlingshot();
-  if(w.kind==='velocity_phasing_resonance')return kit.phasingResonance();
-  if(w.kind==='velocity_synaptic_snare')return kit.synapticSnare();
+  if(w.kind==='rogue_shadowstep'||(w.kind==='rogue_shadowstep'||w.kind==='velocity_quantum_slingshot'))return kit.quantumSlingshot();
+  if(w.kind==='rogue_smoke_bomb'||(w.kind==='rogue_smoke_bomb'||w.kind==='velocity_phasing_resonance'))return kit.phasingResonance();
+  if(w.kind==='rogue_vipers_fan'||(w.kind==='rogue_vipers_fan'||w.kind==='velocity_synaptic_snare'))return kit.synapticSnare();
   return false;
 }
 function triggerHoodedEquippedAbility(){
@@ -30523,7 +30532,7 @@ function triggerHoodedEquippedAbility(){
 
 function performWeaponAttack(w, countsAsPrimary=true){
   if(!w) return;
-  if(w.kind==='velocity_sonic_piston'||w.kind==='velocity_arc_sweep'){
+  if(w.kind==='rogue_phantom_flurry'||w.kind==='rogue_shadow_sweep'||w.kind==='velocity_sonic_piston'||w.kind==='velocity_arc_sweep'){
     triggerShadowStalkerPrimary(w);
   } else if(isWolverineWeaponKind(w.kind)){
     doWolverineAttack(w);
@@ -31127,7 +31136,7 @@ function doSecondaryShoot(){
   const w=secondaryWeaponForAvatar();
   if(!w)return;
   if(state.avatarType==='cloud'&&w.kind!=='cloud_great_sword_slash') resetCloudCrossbreakerChain();
-  if(w.kind==='velocity_quantum_slingshot'||w.kind==='velocity_phasing_resonance'||w.kind==='velocity_synaptic_snare'){
+  if(w.kind==='rogue_shadowstep'||w.kind==='rogue_smoke_bomb'||w.kind==='rogue_vipers_fan'||(w.kind==='rogue_shadowstep'||w.kind==='velocity_quantum_slingshot')||(w.kind==='rogue_smoke_bomb'||w.kind==='velocity_phasing_resonance')||(w.kind==='rogue_vipers_fan'||w.kind==='velocity_synaptic_snare')){
     // Requested Shadow Stalker rule: Secondary moves have NO post-use cooldown.
     // The move itself is the only gate; shared secondaryAttackCooldown stays zero.
     player.userData.secondaryAttackCooldown=0;
