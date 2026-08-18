@@ -1,3 +1,4 @@
+<!-- V23.12.08 Anchor Visual Repair: fixes Anchor Drop over-scaling, makes Broadside clones solid/readable, and rebuilds Anchor Rain visibility with solid low-poly holographic anchors that reliably descend on-screen.
 <!-- V23.12.07 Visible Anchor + Triple Tide: Anchor Rain holograms are made strongly visible on bright maps with high-opacity giant primitive silhouettes, lower spawn height and readable descent timing. Broadside hologram clones are much less transparent while remaining ultra-light and invincible. Anchor Drop now scales from close-range single-anchor coverage at early rounds to half-map coverage, five simultaneous anchors and zero cooldown at Round 30. Tidal Cataclysm is rebuilt as three slow arena-crossing waves spawned across ten seconds: normals die on first contact, large non-boss enemies are slowed for 10 seconds and die on second wave contact, bosses take 3% max HP per wave. -->
 <!-- V23.12.06 Pirate Mobile Scaling + Tidal Repair: Broadside Chopper clones are rebuilt as ultra-light holographic Chopper silhouettes instead of full skinned Mesh2Motion rigs, eliminating per-clone skeleton/mixer/texture cost while keeping Knight-style AI, aggro, movement, invincibility and 10% damage. Enemy melee now explicitly recognizes Chopper clones as invincible targets instead of falling through to playerTakeHit(). Cannon Shot fire cooldown scales linearly to 0 by Round 20; Anchor Drop is 3x larger than V23.12.05, its fall speed accelerates by round and its cooldown reaches 0 at Round 20; Powder Keg cooldown is 1s at Round 1 and scales to 0 at Round 30. Anchor Rain now uses enormous low-detail holographic anchors for 10 seconds. Tidal Cataclysm is rebuilt as a visible arena-wide solid water wall and its stale Doldrums HUD/active-state routing is corrected. -->
 <!-- V23.12.05 Pirate Anchor Routing Fix: fixes Chopper Secondary dispatch so Boarding Dash, Anchor Drop, and Powder Keg Toss route into the standalone ChopperPirateKit instead of falling through to generic shootFromPosition(), which caused the rapid yellow/white projectile stream seen when Anchor was equipped. Anchor Drop is now guaranteed to perform only its tracked giant falling-anchor attack. No balance or requested V23.12.04 Pirate behavior changed. -->
@@ -1685,7 +1686,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.12.07 - Visible Anchor + Triple Tide';
+const GAME_VERSION='23.12.08 - Anchor Visual Repair';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -15107,9 +15108,11 @@ function createChopperBroadsideHoloClone(index){
   // This low-poly hologram preserves a recognizable Chopper silhouette while the
   // clone AI/damage/aggro rules remain identical.
   const wrap=new THREE.Group();
-  const sea=index%2?0x63e7ff:0x73ffd9;
-  const mat=new THREE.MeshBasicMaterial({color:sea,transparent:true,opacity:.82,depthWrite:false});
-  const pale=new THREE.MeshBasicMaterial({color:0xeaffff,transparent:true,opacity:.72,depthWrite:false});
+  const sea=index%2?0x19cfe6:0x19bfa8;
+  // Solid low-poly crew: no transparency on bright maps. This keeps the cheap clone
+  // geometry while making every crew member readable at a glance.
+  const mat=new THREE.MeshBasicMaterial({color:sea,transparent:false,depthWrite:true});
+  const pale=new THREE.MeshBasicMaterial({color:0xd9fbff,transparent:false,depthWrite:true});
   const body=new THREE.Mesh(new THREE.SphereGeometry(.48,7,5),mat);body.scale.set(1,.92,.82);body.position.y=.55;wrap.add(body);
   const head=new THREE.Mesh(new THREE.SphereGeometry(.40,7,5),mat);head.position.y=1.18;wrap.add(head);
   const brim=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.075,8),pale);brim.position.y=1.48;wrap.add(brim);
@@ -31231,14 +31234,14 @@ const chopperFX = (function(){
       if(!ensure())return null;
       opts=opts||{};
       const rain=!!opts.rain;
-      // V23.12.07: Secondary anchors are 3x larger again (9 -> 27).
-      // Anchor Rain favors a giant readable holographic silhouette over detail.
-      const scale=rain?18.0:27.0, dur=Number(opts.dur)||(rain?.92:.28), height=rain?9.5:8.2;
-      telegraph(at,rain?5.2:3.2,dur,rain?PAL.aqua:PAL.ember);
+      // V23.12.08: undo the accidental 27x compounding. Secondary returns to the
+      // intended 9x visual scale; Rain uses a separate large-but-screen-readable 7x silhouette.
+      const scale=rain?7.0:9.0, dur=Number(opts.dur)||(rain?1.35:.28), height=rain?7.2:6.4;
+      telegraph(at,rain?4.3:2.6,dur,rain?PAL.aqua:PAL.ember);
       const anchor=new THREE.Group();
       const gm=rain
-        ? new THREE.MeshBasicMaterial({color:0x71e9ff,transparent:true,opacity:.84,depthWrite:false,side:THREE.DoubleSide,blending:THREE.NormalBlending})
-        : new THREE.MeshLambertMaterial({color:0xe8b13c,flatShading:true,transparent:true,opacity:.96});
+        ? new THREE.MeshBasicMaterial({color:0x24d8ff,transparent:false,depthWrite:true,side:THREE.DoubleSide})
+        : new THREE.MeshLambertMaterial({color:0xe8b13c,flatShading:true,transparent:false});
       // Only four primitive pieces. No textures and no dynamic lights.
       const shank=new THREE.Mesh(new THREE.CylinderGeometry(.085,.105,1.35,6),gm);
       const stock=new THREE.Mesh(new THREE.BoxGeometry(.95,.10,.10),gm);stock.position.y=.42;
@@ -31247,7 +31250,7 @@ const chopperFX = (function(){
       anchor.add(shank,stock,ringTop,arm);anchor.scale.setScalar(scale);
       anchor.position.copy(at);anchor.position.y+=height;anchor.rotation.y=Math.random()*Math.PI*2;anchor.rotation.z=(Math.random()-.5)*.08;
       group.add(anchor);
-      push(anchor,{dur,from:scale,to:scale,fadeIn:.015,peak:rain?.94:1,vel:new THREE.Vector3(0,-height/dur,0),rot:new THREE.Vector3(0,rain?.75:2.0,0),onEnd:()=>{anchor.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});}});
+      push(anchor,{dur,from:scale,to:scale,fadeIn:0,peak:1,vel:new THREE.Vector3(0,-height/dur,0),rot:new THREE.Vector3(0,rain?.42:2.0,0),onEnd:()=>{anchor.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});}});
       return anchor;
     },
     anchorImpact(at){
@@ -31484,7 +31487,7 @@ const chopperFX = (function(){
 
 
 // =====================================================================
-// CHOPPER PIRATE KIT (V23.12.07) — standalone.
+// CHOPPER PIRATE KIT (V23.12.08) — standalone.
 // Chopper's own move engine. Shares no state, no timing, no code path
 // and no presentation with the Shadow Stalker / Velocity Weaver class.
 // =====================================================================
@@ -31699,8 +31702,8 @@ class ChopperPirateKit {
   cutlassStorm(){
     if(this.storm||this.cool.storm>0||this._titanActive())return false;
     this.cool.storm=this.len.storm;invincibleTimer=Math.max(invincibleTimer||0,.8);
-    chopperFX.anchorRainStart(this.player.position.clone());
-    this.storm={t:0,d:10.0,next:0,interval:.42,drops:[],idx:0};return true;
+    chopperFX.anchorRainStart(this.player.position.clone());chopperFX.screenFlash('rgba(36,216,255,.55)',.42,260);
+    this.storm={t:0,d:10.0,next:0,interval:.55,drops:[],idx:0};return true;
   }
   doldrumsCannon(){
     if(this.tidal||this.cool.cannon>0||this._titanActive())return false;
@@ -31837,12 +31840,18 @@ class ChopperPirateKit {
     if(this.storm){
       const s=this.storm;s.t+=dt;s.next-=dt;
       while(s.next<=0&&s.t<s.d){
-        s.next+=s.interval;s.idx++;
-        const alive=this._enemies();let at;
-        if(alive.length&&Math.random()<.78){const t=alive[Math.floor(Math.random()*alive.length)];at=t.position.clone();}
-        else{const a=Math.random()*Math.PI*2,r=Math.sqrt(Math.random())*Math.max(8,(typeof arenaSize==='number'?arenaSize:30)*.86);at=new THREE.Vector3(Math.cos(a)*r,this.player.position.y,Math.sin(a)*r);}
-        at.y=this.player.position.y;chopperFX.anchorTelegraph(at,{rain:true,dur:.92});
-        s.drops.push({at,t:.92,idx:s.idx});
+        s.next+=s.interval;
+        const alive=this._enemies();
+        // Two anchors per rain beat. One is biased to a living enemy and one stays
+        // in the player's visible combat neighborhood so the Ultimate can never
+        // look like nothing is happening when most enemies are off-camera.
+        for(let k=0;k<2;k++){
+          s.idx++;let at=null;
+          if(k===0&&alive.length){const t=alive[Math.floor(Math.random()*alive.length)];at=t.position.clone();}
+          if(!at){const a=Math.random()*Math.PI*2,r=3.5+Math.random()*8.5;at=new THREE.Vector3(this.player.position.x+Math.cos(a)*r,this.player.position.y,this.player.position.z+Math.sin(a)*r);}
+          at.y=this.player.position.y;chopperFX.anchorTelegraph(at,{rain:true,dur:1.35});
+          s.drops.push({at,t:1.35,idx:s.idx});
+        }
       }
       for(let i=s.drops.length-1;i>=0;i--){const d=s.drops[i];d.t-=dt;if(d.t>0)continue;
         chopperFX.anchorRainImpact(d.at,d.idx);triggerCombatShake(d.idx%4===0?12:7,d.idx%4===0?170:90);
