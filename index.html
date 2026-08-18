@@ -1,3 +1,4 @@
+<!-- V23.13.03 Aesir Front Pose + Natural Axe Hold: keeps exported-model 3 as the active Aesir rig, but fixes the unnatural axe presentation by using the rig's current bind/rest pose as the WeaponReady idle/preview stance instead of sampling a late recovery frame from an attack clip. The avatar preview is rotated to a clean front-facing hero angle and no missing Idle clip fallback is used. Gameplay idle/recovery returns to the same natural hand-on-axe pose, while the Thor-inspired lightning VFX and native Mesh2Motion combat routing remain intact. -->
 <!-- V23.13.02 Aesir Model-3 Native Grip Fix: replaces Aesir with the newly uploaded exported-model 3.glb (34 authored Mesh2Motion clips). Keeps the Stormforged Thor-inspired lightning presentation, removes references to clips absent from the new rig, and routes idle/combat/recovery only through native weapon-bearing takes. The axe remains part of the single skinned mesh: no fake duplicate weapon, runtime re-parenting, squash/stretch, per-axis deformation, donor retargeting, or procedural bone twisting is used. -->
 <!-- V23.13.01 Aesir Stormforged Grip + Native: fixes the avatar-select metadata to report the new Mesh2Motion 34-clip rig, replaces the generic caster idle with a weapon-ready pose sampled directly from the native Sword_Regular_A_Rec animation, and restricts Aesir combat routing to weapon-safe Sword/Ground-Pound/Power-Up/Jog clips so the embedded axe stays in the cleanest authored hand relationship possible. No squash/stretch, per-axis model scaling, donor retargeting, or procedural whole-body warping is used. -->
 <!-- V23.13.00 Aesir Stormforged: replaces the old Aesir GLB with the newly uploaded Mesh2Motion rig carrying 34 authored clips. Removes the old CC0 donor/custom-bone pose dependency from the live Aesir path and routes Barbarian combat to native clips only, so attacks never warp, squash, stretch or procedurally twist the avatar. Rebuilds Aesir presentation around a mobile-efficient Thor-inspired lightning identity: electric axe crescents, sky bolts, rune rings, thunder columns and lightning shock fronts, with especially large spectacle on Earthbreaker, World Breaker and Primal Axe Wave. Existing Barbarian gameplay balance is preserved unless the visual system already drove the same hit. -->
@@ -1691,7 +1692,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.13.02 - Aesir Model-3 Grip Fix';
+const GAME_VERSION='23.13.03 - Aesir Front Pose + Natural Axe Hold';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -2779,10 +2780,14 @@ async function updateAvatarPreview(characterId){
       previewRoot=fit;
       previewScene.add(fit);
 
-      // The preview shows Aesir's real Idle so the card is never a still frame.
+      // Use Aesir's natural bind/rest pose for the preview so the axe is held cleanly
+      // and the card no longer falls back to an unrelated non-idle animation.
+      fit.rotation.y=Math.PI;
       previewMixer=new THREEAsset.AnimationMixer(root);
-      const idle=gltf.animations.find(c=>c.name==='Idle')||gltf.animations[0];
-      if(idle)previewMixer.clipAction(idle).play();
+      const previewPose=buildStaticPoseClipFromCurrent(root,THREEAsset,'Aesir_WeaponReady');
+      if(previewPose){
+        previewMixer.clipAction(previewPose).play();
+      }
 
       if(status)status.textContent='Aesir Stormforged · 34 native clips';
       return;
@@ -11273,6 +11278,26 @@ function prepareAesirMaterials(root,THREEAsset){
   });
 }
 
+function buildStaticPoseClipFromCurrent(root,THREEAsset,name='Aesir_WeaponReady'){
+  const tracks=[];
+  root.updateMatrixWorld(true);
+  root.traverse(o=>{
+    if(!o||!o.name) return;
+    const key=o.name;
+    if(o.position && (o.isBone || /root|pelvis|spine|clavicle|upperarm|lowerarm|hand|thigh|calf|foot|ball|neck|head/i.test(o.name))){
+      tracks.push(new THREEAsset.VectorKeyframeTrack(key+'.position',[0,1],[o.position.x,o.position.y,o.position.z,o.position.x,o.position.y,o.position.z]));
+    }
+    if(o.quaternion && (o.isBone || /root|pelvis|spine|clavicle|upperarm|lowerarm|hand|thigh|calf|foot|ball|neck|head/i.test(o.name))){
+      tracks.push(new THREEAsset.QuaternionKeyframeTrack(key+'.quaternion',[0,1],[o.quaternion.x,o.quaternion.y,o.quaternion.z,o.quaternion.w,o.quaternion.x,o.quaternion.y,o.quaternion.z,o.quaternion.w]));
+    }
+    if(o.scale && !o.isBone){
+      tracks.push(new THREEAsset.VectorKeyframeTrack(key+'.scale',[0,1],[o.scale.x,o.scale.y,o.scale.z,o.scale.x,o.scale.y,o.scale.z]));
+    }
+  });
+  return tracks.length?new THREEAsset.AnimationClip(name,1,tracks):null;
+}
+
+
 // The combat code speaks KayKit/Wolverine clip names. Rather than touch every
 // call site, resolve whatever it asks for onto one of Aesir's ten takes.
 // Returns [clipName, timeScale, loop].
@@ -11377,26 +11402,12 @@ function buildAesirBarbarianPlayer(options={}){
     // V23.13.01 — weapon-ready idle comes FROM the authored Mesh2Motion rig.
     // The exported axe is part of the single skinned mesh, not a detachable prop node,
     // so the safest grip repair is to keep the skeleton in a native weapon-bearing pose
-    // rather than parenting/rotating a fake axe or deforming the avatar. Sample the late
-    // recovery frame from Sword_Regular_A_Rec and turn it into a static looping pose.
-    const readySource=clips.Sword_Regular_A_Rec||clips.Sword_Regular_A||clips.Sword_Attack;
-    if(readySource){
-      const sampleT=Math.max(0,readySource.duration*.96);
-      const poseTracks=[];
-      for(const tr of readySource.tracks){
-        try{
-          const stride=tr.getValueSize();
-          const value=new Float32Array(stride);
-          tr.createInterpolant(value).evaluate(sampleT);
-          const vals=Array.from(value);
-          const doubled=vals.concat(vals);
-          const poseTrack=new tr.constructor(tr.name,[0,1],doubled);
-          poseTracks.push(poseTrack);
-        }catch(e){}
-      }
-      if(poseTracks.length){
-        clips.Aesir_WeaponReady=new THREEAsset.AnimationClip('Aesir_WeaponReady',1,poseTracks);
-      }
+    // Use the rig's own current bind/rest pose as the neutral weapon-ready stance.
+    // This keeps the axe in its clean natural hand relationship for preview, idle and
+    // post-attack recovery instead of freezing a late frame from an unrelated attack clip.
+    {
+      const staticPose=buildStaticPoseClipFromCurrent(root,THREEAsset,'Aesir_WeaponReady');
+      if(staticPose)clips.Aesir_WeaponReady=staticPose;
     }
     wrapper.userData.kayMixer=mixer;
     wrapper.userData.kayClips=clips;
