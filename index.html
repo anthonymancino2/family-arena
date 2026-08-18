@@ -1,4 +1,5 @@
-<!-- V23.12.09 Pirate Anchor/Tide/Kraken Tune: Anchor Drop visual size is reduced 50% from V23.12.08. Anchor Rain now uses the same gold low-poly Anchor Drop visual construction while keeping a larger Ultimate-only scale. Tidal Cataclysm keeps the approved slow wave travel speed but now generates exactly five waves and ends only after the fifth wave fully crosses the arena. Broadside clone summons are explicitly allowed during Kraken Rising while all other Kraken special locks remain intact. -->
+<!-- V23.12.10 Boarding Echo Blast: Boarding Dash now summons one lightweight, clearly visible Chopper echo at the dash endpoint. The echo waits exactly 0.5 seconds, then detonates with an 8.8-unit shockwave (four normal Chopper body-heights), instantly eliminating normal enemies inside the blast while dealing extra boss-safe/large-enemy damage. Existing Boarding Dash carry, first-hit stun / second-hit kill rules and endpoint shockwaves are preserved. -->
+<!-- V23.12.10 Pirate Anchor/Tide/Kraken Tune: Anchor Drop visual size is reduced 50% from V23.12.08. Anchor Rain now uses the same gold low-poly Anchor Drop visual construction while keeping a larger Ultimate-only scale. Tidal Cataclysm keeps the approved slow wave travel speed but now generates exactly five waves and ends only after the fifth wave fully crosses the arena. Broadside clone summons are explicitly allowed during Kraken Rising while all other Kraken special locks remain intact. -->
 <!-- V23.12.08 Anchor Visual Repair: fixes Anchor Drop over-scaling, makes Broadside clones solid/readable, and rebuilds Anchor Rain visibility with solid low-poly holographic anchors that reliably descend on-screen.
 <!-- V23.12.07 Visible Anchor + Triple Tide: Anchor Rain holograms are made strongly visible on bright maps with high-opacity giant primitive silhouettes, lower spawn height and readable descent timing. Broadside hologram clones are much less transparent while remaining ultra-light and invincible. Anchor Drop now scales from close-range single-anchor coverage at early rounds to half-map coverage, five simultaneous anchors and zero cooldown at Round 30. Tidal Cataclysm is rebuilt as five slow arena-crossing waves spawned across ten seconds: normals die on first contact, large non-boss enemies are slowed for 10 seconds and die on second wave contact, bosses take 3% max HP per wave. -->
 <!-- V23.12.06 Pirate Mobile Scaling + Tidal Repair: Broadside Chopper clones are rebuilt as ultra-light holographic Chopper silhouettes instead of full skinned Mesh2Motion rigs, eliminating per-clone skeleton/mixer/texture cost while keeping Knight-style AI, aggro, movement, invincibility and 10% damage. Enemy melee now explicitly recognizes Chopper clones as invincible targets instead of falling through to playerTakeHit(). Cannon Shot fire cooldown scales linearly to 0 by Round 20; Anchor Drop is 3x larger than V23.12.05, its fall speed accelerates by round and its cooldown reaches 0 at Round 20; Powder Keg cooldown is 1s at Round 1 and scales to 0 at Round 30. Anchor Rain now uses enormous low-detail holographic anchors for 10 seconds. Tidal Cataclysm is rebuilt as a visible arena-wide solid water wall and its stale Doldrums HUD/active-state routing is corrected. -->
@@ -29453,7 +29454,7 @@ function updateArcaneLaser(dt){
 // the game, but shares no state, no visuals and no code path with the rogue's
 // Shadow Eclipse.
 function triggerChopperBroadside(){
-  // V23.12.09: Broadside crew are explicitly allowed during Kraken Rising.
+  // V23.12.10: Broadside crew are explicitly allowed during Kraken Rising.
   if(!gameRunning||!chopperClassIsActive())return false;
   if(player&&player.userData&&player.userData.playKayClip){
     try{ player.userData.playKayClip('2H_Melee_Attack_Spin',true,true,.5); }catch(_e){}
@@ -31235,7 +31236,7 @@ const chopperFX = (function(){
       if(!ensure())return null;
       opts=opts||{};
       const rain=!!opts.rain;
-      // V23.12.09: Secondary is 50% smaller than V23.12.08 (9x -> 4.5x).
+      // V23.12.10: Secondary is 50% smaller than V23.12.08 (9x -> 4.5x).
       // Anchor Rain deliberately reuses this exact gold low-poly anchor construction,
       // but keeps its own larger Ultimate scale so the rain still reads as gigantic.
       const scale=rain?7.0:4.5, dur=Number(opts.dur)||(rain?1.35:.28), height=rain?7.2:6.4;
@@ -31274,6 +31275,15 @@ const chopperFX = (function(){
       }
       for(let i=0;i<3;i++)spark(end.clone().setY(end.y+.55),{map:tex.star,color:PAL.cream,from:.3,dur:.36,
         vel:new THREE.Vector3((Math.random()-.5)*1.8,1.2+Math.random(),(Math.random()-.5)*1.8),grav:-3});
+    },
+    boardingCloneBurst(at,radius){
+      if(!ensure()||!at)return;
+      // One large readable ring pair is cheaper and clearer than particle spam.
+      ring(at,{color:PAL.cream,dur:.58,from:.45,to:radius,peak:.98});
+      ring(at,{color:PAL.aqua,dur:.72,from:.30,to:radius*.82,y:.16,peak:.82});
+      spark(at.clone().setY(at.y+.85),{map:tex.star,color:PAL.white,from:1.6,to:4.8,dur:.34,fadeIn:.015});
+      spark(at.clone().setY(at.y+.60),{map:tex.glow,color:PAL.gold,from:1.1,to:3.8,dur:.44,fadeIn:.015});
+      screenFlash('rgba(255,241,191,.38)',.24,185);
     },
     guardOpen(dur){
       if(!ensure()||!player)return;
@@ -31499,6 +31509,7 @@ class ChopperPirateKit {
     this.len ={cannonShot:0.38,anchor:0.50,dash:1.10,kegs:1.0,storm:18.0,cannon:16.0,kraken:15.0};
     this.combo=0;this.comboResetIn=0;this.swing=null;
     this.anchor=null;this.dash=null;this.kegs=[];this.kegCastLock=0;this.cannonCastLock=0;this.storm=null;this.cannon=null;this.kraken=null;this.tidal=null;
+    this.dashEchoes=[];
     this.cannonballs=[];
     this.baseScale=player.scale.clone();
   }
@@ -31592,6 +31603,43 @@ class ChopperPirateKit {
       if(dx*dx+dz*dz<=radius*radius){ if(this._kill(e))hits++; }
     }
     return hits;
+  }
+  _spawnBoardingEcho(at){
+    if(!at||!scene)return;
+    const echo=createChopperBroadsideHoloClone(0);
+    echo.position.copy(at);echo.position.y=this.player.position.y;
+    echo.scale.setScalar(1.08);
+    // Distinguish this sacrificial dash echo from the aqua Broadside crew.
+    echo.traverse(o=>{
+      if(o.material){
+        if(Array.isArray(o.material)){for(const m of o.material){if(m&&m.color)m.color.setHex(0xffd76a);}}
+        else if(o.material.color)o.material.color.setHex(0xffd76a);
+      }
+    });
+    echo.userData.isBoardingEcho=true;echo.userData.invincible=true;
+    scene.add(echo);
+    this.dashEchoes.push({mesh:echo,t:0,d:.5,at:at.clone()});
+    chopperFX.screenFlash('rgba(255,215,106,.18)',.12,90);
+  }
+  _explodeBoardingEcho(echo){
+    if(!echo)return;
+    const at=echo.at.clone();
+    // Four normal Chopper body-heights. Normal fitted Chopper height is ~2.2 world units.
+    const radius=8.8;
+    chopperFX.boardingCloneBurst(at,radius);
+    triggerCombatShake(17,260);
+    for(const z of [...this._enemies()]){
+      const dx=z.position.x-at.x,dz=z.position.z-at.z;if(dx*dx+dz*dz>radius*radius)continue;
+      if(!this._isLarge(z)){this._kill(z);continue;}
+      if(this._isBoss(z)){
+        const maxHp=Math.max(1,Number(z.userData.maxHp)||Number(z.userData.hp)||1);
+        applyBulletDamage(z,maxHp*.04);
+      }else{
+        // Additional instant blast damage without bypassing the existing two-dash kill rule.
+        this._hurt(z,2.2);
+      }
+    }
+    if(echo.mesh&&echo.mesh.parent){echo.mesh.parent.remove(echo.mesh);disposeGroup(echo.mesh);}
   }
   cooldownForAbility(id){
     if(id==='hooded_thousand_cuts')return this.cool.storm||0;
@@ -31712,7 +31760,7 @@ class ChopperPirateKit {
     const radius=Math.max(18,typeof arenaSize==='number'?arenaSize:30),halfWidth=radius*1.20;
     const center=new THREE.Vector3(0,this.player.position.y,0);
     const start=center.clone().addScaledVector(dir,-radius*1.35),end=center.clone().addScaledVector(dir,radius*1.35);
-    // V23.12.09: exactly five waves. Keep the approved slow 8-second arena-crossing
+    // V23.12.10: exactly five waves. Keep the approved slow 8-second arena-crossing
     // speed; new waves launch every 2 seconds and the Ultimate ends only after wave #5 exits.
     this.tidal={t:0,spawnEvery:2.0,nextSpawn:0,spawned:0,totalWaves:5,waveDuration:8.0,start,end,dir,yaw,halfWidth,waves:[],contacts:new Map()};
     chopperFX.screenFlash('rgba(16,126,166,.58)',.36,280);triggerCombatShake(12,220);
@@ -31735,6 +31783,15 @@ class ChopperPirateKit {
     this.cannonCastLock=Math.max(0,(this.cannonCastLock||0)-dt);this.kegCastLock=Math.max(0,(this.kegCastLock||0)-dt);
     if(this.comboResetIn>0){this.comboResetIn=Math.max(0,this.comboResetIn-dt);if(this.comboResetIn===0)this.combo=0;}
     if(this.swing){this.swing.t+=dt;if(this.swing.t>=this.swing.d)this.swing=null;}
+
+    for(let i=this.dashEchoes.length-1;i>=0;i--){
+      const e=this.dashEchoes[i];e.t+=dt;
+      if(e.mesh&&e.mesh.parent){
+        const pulse=1.08+Math.sin(Math.min(1,e.t/e.d)*Math.PI*5)*.08;e.mesh.scale.setScalar(pulse);
+        e.mesh.rotation.y+=dt*2.2;
+      }
+      if(e.t>=e.d){this._explodeBoardingEcho(e);this.dashEchoes.splice(i,1);}
+    }
 
     for(let i=this.cannonballs.length-1;i>=0;i--){
       const b=this.cannonballs[i];b.life+=dt;
@@ -31827,6 +31884,7 @@ class ChopperPirateKit {
             if(z.userData.chopperBoardingHits>=2)this._kill(z);else z.userData.hitStun=Math.max(z.userData.hitStun||0,3.0);
           }else this._kill(z);
         }
+        this._spawnBoardingEcho(s.end);
         triggerCombatShake(15,240);this.dash=null;
       }
     }
@@ -31912,6 +31970,8 @@ class ChopperPirateKit {
   dispose(){
     if(this.kraken&&this.player)this.player.scale.copy(this.kraken.base||this.baseScale);if(this.tidal&&this.tidal.waves){for(const w of this.tidal.waves){if(w&&w.wave)chopperFX.tidalFinish(w.wave,this.tidal.end||this.player.position);}}
     if(this.kegs&&this.kegs.length)for(const batch of this.kegs)for(const k of batch.list)chopperFX.kegBlow(k.keg);
+    for(const e of this.dashEchoes||[]){if(e.mesh&&e.mesh.parent){e.mesh.parent.remove(e.mesh);disposeGroup(e.mesh);}}
+    this.dashEchoes=[];
     for(const b of this.cannonballs){if(b.mesh){scene.remove(b.mesh);b.mesh.geometry.dispose();b.mesh.material.dispose();}}
     this.cannonballs=[];chopperFX.dispose();
   }
