@@ -1,3 +1,4 @@
+<!-- V23.25.00 Aesir Secondary Scaling + Global No-Cooldown Test: lowers both Aesir idle arms by removing the single-arm support override and preserving the authored Rest_Pose; enables development zero-cooldown behavior for selectable moves across all avatars; scales Bifrost Singularity from one outward core to six evenly spaced cores at Round 30; integrates the 10-second Aegis Shield-Wall into Bifrost and Lightning Tether with its own 10s-to-2s round-scaled re-arm timer; upgrades Lightning Tether into a stronger round-scaled chain-drain reaching ten hits at Round 30; and replaces standalone Aegis with an Aesir Whirlwind that matches the Knight Defensive Whirlwind rules, damage, pulse, knockback, deflection, duration scaling, and movement penalty. -->
 <!-- V23.24.00 Aesir HUD Debug Cleanup: removes the on-screen ARMS tuning/debug control from normal gameplay by disabling the Aesir arm tuner. No arm pose values, animation corrections, axe behavior, primaries, secondaries, or global zero-cooldown Ultimate testing are changed. -->
 <!-- V23.23.00 Aesir Idle Arm Regression Fix: preserves the already-corrected non-axe/free arm exactly as authored in Rest_Pose by removing the V23.20 forced-down world-space override. Only the single axe-side support arm is adjusted during true idle, and that support pose is deliberately lower/softer so the hand reads as supporting the floating axe instead of reaching overhead. Divine Secondaries, approved Primaries, Celestial flight orientation, and global zero-cooldown Ultimate testing remain unchanged. -->
 <!-- V23.22.00 Aesir Divine Secondaries: replaces Aesir's three retired Secondary identities with Bifrost Singularity, Aegis Shield-Wall, and Lightning Tether. Singularity launches a lightweight spatial core that pulls enemies inward before imploding; Aegis creates a front-facing hex wall that absorbs incoming hits and converts enemy shots into reflected projectiles; Lightning Tether locks the floating axe to the nearest enemy for continuous shock damage and health-drain healing. Existing approved Primaries, single-axe idle pose, Celestial flight orientation, and global zero-cooldown Ultimate testing remain intact. -->
@@ -1699,7 +1700,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.24.00 - Aesir HUD Debug Cleanup';
+const GAME_VERSION='23.25.00 - Aesir Secondary Scaling Test';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3787,12 +3788,12 @@ const CHARACTER_COMBAT = {
         desc:'Instantly burst forward through a jagged lane of electricity. The real movement follows collision-safe line segments while pooled lightning ribbons mark the path and shock every enemy crossed.'},
       feral_onslaught:{name:'Celestial Hammer-Pulse', price:400, slot:'primary', kind:'aesir_celestial_hammer_pulse', cooldown:0.92, damage:1.85, radius:4.6, range:16, auto:true,
         desc:'Command the independent floating axe to crash down on the nearest target. If no enemy is close enough, the axe fires straight forward to maximum reach and slams there. The impact releases concentrated thunder-clap rings that damage, stagger, and knock surrounding enemies away.'},
-      earthbreaker:{name:'Bifrost Singularity', price:220, slot:'secondary', kind:'aesir_bifrost_singularity', cooldown:3.2, damage:3.0, radius:7.0, range:11,
-        desc:'Launch a compact swirling Bifrost anomaly toward the nearest enemy or straight ahead. It anchors in space, drags nearby enemies toward its center with continuous vector pull, then collapses into a violent implosion.'},
-      war_cyclone:{name:'Aegis Shield-Wall', price:400, slot:'secondary', kind:'aesir_aegis_shield_wall', cooldown:4.0, damage:1.45, radius:3.0, duration:3.5,
-        desc:'Project a golden hexagonal divine wall in front of Aesir. While active it absorbs incoming damage and intercepts enemy projectiles; intercepted shots are redirected back toward living enemies as real reflected projectiles.'},
-      savage_roar:{name:'Lightning Tether', price:460, slot:'secondary', kind:'aesir_lightning_tether', cooldown:2.6, damage:0.22, radius:13, duration:4.0, auto:false,
-        desc:'Lock a glowing divine chain from the independent floating axe onto the nearest enemy. The tether continuously shocks the target and converts a portion of successful drain pulses into healing for Aesir.'}
+      earthbreaker:{name:'Bifrost Singularity', price:220, slot:'secondary', kind:'aesir_bifrost_singularity', cooldown:0, damage:3.0, radius:6.6, range:11, auto:true,
+        desc:'Fire round-scaled Bifrost singularity cores evenly outward from Aesir. The count grows from 1 to 6 by Round 30; each core travels, pulls nearby enemies into its own center, then implodes. Also attempts to deploy the integrated Aegis Shield-Wall when its independent shield timer is ready.'},
+      war_cyclone:{name:'Aesir Whirlwind', price:400, slot:'secondary', kind:'barbarian_whirlwind', cooldown:0, damage:0, radius:3.25, auto:true,
+        desc:'Aesir spins like the Knight Defensive Whirlwind with the same radius, damage pulses, outward knockback, stagger, weak-projectile deflection, movement penalty and round-scaled active duration. Development testing removes the move cooldown.'},
+      savage_roar:{name:'Lightning Tether', price:460, slot:'secondary', kind:'aesir_lightning_tether', cooldown:0, damage:1.65, radius:15, duration:4.0, auto:true,
+        desc:'The floating axe launches a heavy divine chain-drain sequence. Chain-hit count scales with round until it reaches 10 hits at Round 30, preferring fresh enemies before re-hitting survivors. Also attempts to deploy the integrated Aegis Shield-Wall when its independent shield timer is ready.'}
     }
   },
   mage: {
@@ -3820,12 +3821,14 @@ let arcaneEchoSpawnGeneration = 0;
 const ARCANE_ECHO_COUNT = 5;
 const ARCANE_ECHO_INITIAL_CHARGE = 25;
 function arcaneEchoesCooldownForLevel(level=avatarLevel()){
+  if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)return 0;
   return Math.max(1.5, 15 - (Math.max(1,level)-1)*(10/19));
 }
 // Global development unlock switch for combat testing. This is game-wide and is
 // intentionally independent of the completed Fox Mage integration.
 const UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING = true;
 const TEST_NO_ULTIMATE_COOLDOWNS = true;
+const TEST_NO_MOVE_COOLDOWNS = true; // development: selectable Primaries/Secondaries/Ultimates re-arm immediately
 function arcaneEchoesUnlocked(){
   return mageGameplayActive() && (UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING || avatarLevel()>=10);
 }
@@ -11506,45 +11509,15 @@ function aesirApplyArmPose(){
   // can set player.userData.aesirAxeCount >= 2 and both arms are then allowed up.
   const trueIdle=(player.userData.kayCurrentName==='Rest_Pose' && !(player.userData.kayActionLock>0));
   const axeCount=Math.max(1,Number(player.userData.aesirAxeCount)||1);
-  let supportLeft=true;
-  if(trueIdle && axeCount<2 && aesirAxe && aesirAxe.group){
-    aesirAxe.group.updateMatrixWorld(true);
-    aesirAxe.group.getWorldPosition(_aesP3);
-    R.hL.updateMatrixWorld(true); R.hR.updateMatrixWorld(true);
-    R.hL.getWorldPosition(_aesQ1); R.hR.getWorldPosition(_aesQ2);
-    supportLeft=_aesQ1.distanceToSquared(_aesP3)<=_aesQ2.distanceToSquared(_aesP3);
-  }
+  // V23.25: one-up / one-down proved too extreme in live testing. During true
+  // standing idle with the normal single axe, do not post-process either arm.
+  // Both arms stay in the lower authored Rest_Pose that was already corrected.
+  if(trueIdle && axeCount<2)return;
 
   const soften=(player.userData.kayActionLock||0)>0?C.attackScale:1;
   for(let i=0;i<2;i++){
     const isLeft=(i===0), sign=i?-1:1;
     const up=i?R.uR:R.uL, fo=i?R.fR:R.fL, ha=i?R.hR:R.hL;
-
-    if(trueIdle && axeCount<2){
-      if(isLeft!==supportLeft){
-        // V23.23: DO NOT TOUCH THE ALREADY-FIXED FREE ARM.
-        // Rest_Pose already contains the authored/baked correction that took
-        // multiple passes to get right. Skipping this arm entirely preserves
-        // that exact mixer result instead of forcing it down/out again.
-        continue;
-      }
-
-      // Single-axe support arm only. Keep it visibly raised toward the floating
-      // axe, but below shoulder-overhead height. This is intentionally a small
-      // correction layered on Rest_Pose rather than the full combat arm-out push.
-      _aesOut.copy(_aesLat).multiplyScalar(sign*0.82);
-      _aesOut.y=0.18;
-      _aesOut.z+=0.10;
-      _aesOut.normalize();
-      aesirAimArmWorld(up,fo,_aesOut,0.46);
-
-      _aesOut.copy(_aesLat).multiplyScalar(sign*0.48);
-      _aesOut.y=0.26;
-      _aesOut.z+=0.18;
-      _aesOut.normalize();
-      aesirAimArmWorld(fo,ha,_aesOut,0.34);
-      continue;
-    }
 
     up.updateMatrixWorld(true);
     up.getWorldPosition(_aesP1); fo.getWorldPosition(_aesP2);
@@ -15271,10 +15244,7 @@ function setupControls(){
     secondaryPressed=false;
     secondaryInputHeld=false;
     secondaryPointerId=null;
-    const releasedSecondary=secondaryWeaponForAvatar();
-    if(releasedSecondary&&releasedSecondary.kind==='barbarian_whirlwind'&&(barbarianRuntime.whirlTimer||0)>0){
-      barbarianEndWhirlwind();
-    }
+    // Aesir Whirlwind follows Knight rules: release does not cancel the active spin.
   };
   const beginSecondaryFire=e=>{
     if(e){e.preventDefault();e.stopPropagation();}
@@ -15921,8 +15891,8 @@ let barbarianKinEpoch = 0;
    trustworthy: if an enemy is inside the visible cyclone, it can be hit.
    ========================================================================== */
 const BARB_WHIRL = {
-  radius:5.4, damage:0.42, pulse:0.20, knockback:6.2, stun:0.22,
-  moveMult:0.62, spinSpeed:22, startSpin:5.5, rampTime:1.05
+  radius:3.25, damage:0.72, pulse:0.22, knockback:3.4, stun:0.20,
+  moveMult:0.55, spinSpeed:22, startSpin:5.5, rampTime:0.55, bruteMult:0.8, bossMult:0.4
 };
 function barbarianClearWhirlVisual(){
   const r=barbarianRuntime, g=r&&r.whirlFx;
@@ -15955,8 +15925,8 @@ function barbarianBuildWhirlVisual(){
     g.add(m);return m;
   };
   // Three readable steel/energy bands. The outer band is exactly BARB_WHIRL.radius.
-  addRing('cycloneInnerRing',2.25,.10,.28,0xff7a20,.56);
-  addRing('cycloneMidRing',3.75,.12,.64,0xffd08a,.64);
+  addRing('cycloneInnerRing',BARB_WHIRL.radius*.42,.10,.28,0x72dcff,.56);
+  addRing('cycloneMidRing',BARB_WHIRL.radius*.72,.12,.64,0xb9ecff,.64);
   addRing('cycloneOuterRing',BARB_WHIRL.radius-.16,.16,.92,0xfff3d0,.78);
 
   // Eight broad axe wakes occupy the ring without covering Aesir in the centre.
@@ -15967,29 +15937,29 @@ function barbarianBuildWhirlVisual(){
     const holder=new THREE.Group();holder.rotation.y=a;
     const wake=new THREE.Mesh(
       new THREE.PlaneGeometry(1.25,.46),
-      new THREE.MeshBasicMaterial({color:i%2?0xff8a24:0xfff0c8,transparent:true,opacity:.72,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
+      new THREE.MeshBasicMaterial({color:i%2?0x72dcff:0xeaffff,transparent:true,opacity:.72,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
     );
-    wake.position.set(0,.86,4.55);wake.rotation.x=-.18;
+    wake.position.set(0,.86,BARB_WHIRL.radius*.82);wake.rotation.x=-.18;
     holder.add(wake);
     const edge=new THREE.Mesh(
       new THREE.BoxGeometry(.11,.22,1.05),
-      new THREE.MeshBasicMaterial({color:0xfff8e8,transparent:true,opacity:.88,depthWrite:false,blending:THREE.AdditiveBlending})
+      new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.88,depthWrite:false,blending:THREE.AdditiveBlending})
     );
-    edge.position.set(.48,.88,4.48);edge.rotation.y=.18;
+    edge.position.set(.36,.88,BARB_WHIRL.radius*.80);edge.rotation.y=.18;
     holder.add(edge);blades.add(holder);
   }
 
   // Low dust/pressure skirt makes the radius readable against the floor.
   const skirt=new THREE.Mesh(
-    new THREE.RingGeometry(3.15,BARB_WHIRL.radius,64),
-    new THREE.MeshBasicMaterial({color:0xff6a20,transparent:true,opacity:.15,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
+    new THREE.RingGeometry(BARB_WHIRL.radius*.58,BARB_WHIRL.radius,64),
+    new THREE.MeshBasicMaterial({color:0x72dcff,transparent:true,opacity:.15,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
   );
   skirt.name='cycloneGroundSkirt';skirt.rotation.x=-Math.PI/2;skirt.position.y=.035;g.add(skirt);
   scene.add(g);barbarianRuntime.whirlFx=g;return g;
 }
 function barbarianWhirlCooldownForRound(){
-  const r=Math.max(1,Number(round)||1);
-  return Math.max(0,1-((Math.min(r,30)-1)/29));
+  if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)return 0;
+  return knightDefensiveWhirlwindCooldownForRound();
 }
 function barbarianWhirlActive(){
   return barbarianIsActive() && (barbarianRuntime.whirlTimer||0)>0;
@@ -15999,8 +15969,8 @@ function triggerBarbarianWhirlwind(){
   if(!gameRunning||!barbarianIsActive()||!player)return false;
   const r=barbarianRuntime;
   if((r.whirlCooldown||0)>0||(r.whirlTimer||0)>0)return false;
-  // Hold owns the lifetime. Cooldown begins only when the player releases.
-  r.whirlTimer=Infinity;
+  // Same active-duration rules as Knight Defensive Whirlwind.
+  r.whirlTimer=knightDefensiveWhirlwindDurationForRound();
   r.whirlPulse=0;
   r.whirlElapsed=0;
   r.whirlDust=0;
@@ -16020,7 +15990,7 @@ function triggerBarbarianWhirlwind(){
   }
   triggerCombatShake(10,220);
   if(navigator.vibrate)navigator.vibrate([30,18,46]);
-  toast('WAR AXE CYCLONE');
+  toast('AESIR WHIRLWIND');
   return true;
 }
 function barbarianMjolnirEcho(){
@@ -16036,50 +16006,31 @@ function barbarianMjolnirEcho(){
 }
 function barbarianWhirlPulse(){
   if(!player)return;
-  const c=BARB_WHIRL;
-  const pos={x:player.position.x,y:player.position.y,z:player.position.z};
-  // Thick counter-rotating axe arcs plus a full-radius pressure beat.
+  const c=BARB_WHIRL,pos={x:player.position.x,y:player.position.y,z:player.position.z};
   const spin=(performance.now()*0.0046)%(Math.PI*2);
-  // The orange War Axe Cyclone arcs are the old identity. Skip them whenever the
-  // storm spirit is the one performing; Green Rhino has no spirit, so it keeps
-  // its original look untouched.
-  if(!aesirAxe){
-    for(let i=0;i<4;i++){
-      spawnAxeSwingTrail(pos,spin+i*(Math.PI*.5),i%2?1:-1,1.72,i%2?0xff8a28:0xfff0c8);
-    }
+  for(let i=0;i<4;i++)spawnAxeSwingTrail(pos,spin+i*(Math.PI*.5),i%2?1:-1,1.12,i%2?0xdff7ff:0x72dcff);
+  knightShockRing(pos,c.radius*.58,0x72dcff,.16);knightShockRing(pos,c.radius,0xeaffff,.25);
+  // Same weak-projectile deflection rule as Knight Defensive Whirlwind.
+  for(let i=enemyProjectiles.length-1;i>=0;i--){
+    const p=enemyProjectiles[i];if(!p||!p.mesh)continue;
+    if(Math.hypot(p.mesh.position.x-pos.x,p.mesh.position.z-pos.z)>c.radius)continue;
+    const px=p.mesh.position.x,py=p.mesh.position.y,pz=p.mesh.position.z;
+    scene.remove(p.mesh);disposeGroup(p.mesh);if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}enemyProjectiles.splice(i,1);
+    knightWhirlwindDeflectFx(px,py,pz,'ability');spawnBurst(px,py,pz,7,FX_MAT_SPARK,2.9);
   }
-  knightShockRing(pos,c.radius*.52,0xff5a18,.15);
-  knightShockRing(pos,c.radius*.78,0xffd49a,.20);
-  knightShockRing(pos,c.radius,0xfff4da,.27);
-  if(knightFxBudget(1))spawnBurst(pos.x,pos.y+.18,pos.z,isMobile?3:6,FX_MAT_SPARK,c.radius*.90);
-  // Gameplay reach = visible outer ring reach.
-  for(const z of zombies){
-    if(!z||!z.userData||z.userData.dead)continue;
-    if(Math.hypot(z.position.x-pos.x,z.position.z-pos.z)>c.radius)continue;
-    const maxHp=Math.max(.001,z.userData.maxHp||z.userData.hp||1);
-    const rageDamageMult=barbarianUltimateActive>0?1.5:1;
-    const pulseDamage=Math.min(c.damage*playerStats.power*rageDamageMult,maxHp*.35);
-    applyBulletDamage(z,pulseDamage);
-  }
-  barbarianKnockbackRing(pos,c.radius,c.knockback,c.stun);
+  const hits=knightRadial(pos,c.radius,c.damage,{knock:c.knockback,stun:c.stun,bruteMult:c.bruteMult,bossMult:c.bossMult});
+  if(hits)triggerCombatShake(6,85);
 }
 function barbarianEndWhirlwind(){
   const r=barbarianRuntime;
-  if(!((r.whirlTimer||0)>0))return;
+  if(!r.whirlFx&&!((r.whirlTimer||0)>0))return;
   r.whirlTimer=0;r.whirlPulse=0;
   r.whirlCooldown=Math.max(r.whirlCooldown||0,barbarianWhirlCooldownForRound());
   barbarianClearWhirlVisual();
   if(!player)return;
-  // Final committed sweep before the stored rotation is thrown outward.
+  // Same Knight-style ending guard burst; no extra damage packet beyond normal pulses.
   const y=player.rotation.y;
-  knightShockRing(player.position,BARB_WHIRL.radius*.72,0xffd49a,.24);
-  for(const z of zombies){
-    if(!z||!z.userData||z.userData.dead)continue;
-    if(Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)>BARB_WHIRL.radius)continue;
-    const maxHp=Math.max(.001,z.userData.maxHp||z.userData.hp||1);
-    const rageDamageMult=barbarianUltimateActive>0?1.5:1;
-    applyBulletDamage(z,Math.min(.72*playerStats.power*rageDamageMult,maxHp*.45));
-  }
+  knightShockRing(player.position,BARB_WHIRL.radius*.72,0xdff7ff,.24);
   // V23.15.00: storm-coloured, and the orange axe-swing trails are gone - the
   // spirit's own arcs read the hit now.
   barbarianShockwave(player.position,y,
@@ -16092,14 +16043,12 @@ function barbarianUpdateWhirlwind(dt){
   if((r.domeCooldown||0)>0)r.domeCooldown=Math.max(0,r.domeCooldown-dt);
   if((r.mjolCooldown||0)>0)r.mjolCooldown=Math.max(0,r.mjolCooldown-dt);
   if(!((r.whirlTimer||0)>0))return;
-  // Pointer/touch release is authoritative; this also catches blur/visibility loss.
-  if(!secondaryInputHeld){barbarianEndWhirlwind();return;}
+  r.whirlTimer=Math.max(0,(r.whirlTimer||0)-dt);
+  if(r.whirlTimer<=0){barbarianEndWhirlwind();return;}
   r.whirlElapsed=(r.whirlElapsed||0)+dt;
   r.whirlPulse-=dt;
   r.whirlDust=(r.whirlDust||0)-dt;
   if(r.whirlPulse<=0){ r.whirlPulse=BARB_WHIRL.pulse; barbarianWhirlPulse(); }
-  // V23.15.00: keep the spirit orbiting for as long as the secondary is held
-  if(aesirAxe)barbarianMjolnirEcho();
   if(r.whirlDust<=0){
     r.whirlDust=.16;
     if(knightFxBudget(1))spawnBurst(player.position.x,player.position.y+.05,player.position.z,isMobile?2:4,FX_MAT_SPARK,2.0);
@@ -16724,6 +16673,7 @@ function findClipByWords(parts, fallback='1H_Melee_Attack_Chop'){
   return found || fallback;
 }
 function attackCooldownFor(w){
+  if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)return 0;
   if(chopperClassIsActive()&&w&&w.name==='Cannon Shot'){const r=Math.max(1,Number(round)||1);return r>=20?0:.38*((20-r)/19);}
   // Green Ranger tactical Secondaries intentionally have NO post-move cooldown.
   if(rhinoIsActive() && (w.kind==='rhino_overdrive'||w.kind==='rhino_gamma_leap'||w.kind==='rhino_cloud_whirlwind')) return 0;
@@ -19256,11 +19206,9 @@ function triggerKnightWhirlwind(){
   }
 }
 function knightDefensiveWhirlwindCooldownForRound(){
+  if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)return 0;
   const r=Math.max(1,Number(round)||1);
-  if(r<=10) return 8;
-  if(r<=15) return 3;
-  if(r<=20) return 1.5;
-  return 0;
+  if(r<=10)return 8;if(r<=15)return 3;if(r<=20)return 1.5;return 0;
 }
 function knightDefensiveWhirlwindDurationForRound(){
   const r=Math.max(1,Number(round)||1);
@@ -25800,185 +25748,128 @@ function aesirCelestialHammerPulse(w){
 }
 
 /* ============================================================================
-   V23.22.00 AESIR DIVINE SECONDARIES
-   One small persistent runtime owns all three moves so nothing relies on large
-   particle counts or timer storms. Geometry is created only while a move is
-   active and disposed immediately when that move ends.
+   V23.25.00 AESIR DIVINE SECONDARIES — SCALING TEST PASS
+   Bifrost and Tether share an independently timed Aegis shield. The selectable
+   moves themselves obey the global development no-cooldown rule; Aegis keeps
+   its own requested re-arm timer so shield cadence can be tested accurately.
    ========================================================================== */
-let aesirSecondaryRuntime={singularity:null,shield:null,tether:null,reflected:[]};
-function aesirDisposeObject(o){
-  if(!o)return;
-  try{if(o.parent)o.parent.remove(o);disposeGroup(o);}catch(_err){}
-}
+let aesirSecondaryRuntime={singularity:null,shield:null,shieldCooldown:0,tether:null,reflected:[]};
+function aesirDisposeObject(o){if(!o)return;try{if(o.parent)o.parent.remove(o);disposeGroup(o);}catch(_err){}}
 function aesirResetSecondaries(){
   const r=aesirSecondaryRuntime;
-  if(r.singularity&&r.singularity.group)aesirDisposeObject(r.singularity.group);
+  if(r.singularity&&r.singularity.cores)for(const c of r.singularity.cores)if(c.group)aesirDisposeObject(c.group);
   if(r.shield&&r.shield.group)aesirDisposeObject(r.shield.group);
   if(r.tether&&r.tether.line)aesirDisposeObject(r.tether.line);
-  for(const p of r.reflected||[]){if(p&&p.mesh)aesirDisposeObject(p.mesh);}
-  aesirSecondaryRuntime={singularity:null,shield:null,tether:null,reflected:[]};
+  for(const p of r.reflected||[])if(p&&p.mesh)aesirDisposeObject(p.mesh);
+  aesirSecondaryRuntime={singularity:null,shield:null,shieldCooldown:0,tether:null,reflected:[]};
+}
+function aesirRoundScaledCount(maxCount){
+  const r=Math.max(1,Math.min(30,Number(round)||1));
+  return 1+Math.floor((r-1)*(maxCount-1)/29);
+}
+function aesirShieldCooldownForRound(){
+  const r=Math.max(1,Math.min(30,Number(round)||1));
+  return 10-((r-1)/29)*8; // Round 1 = 10s, Round 30 = 2s
 }
 function aesirMakeSingularityFx(pos){
   const g=new THREE.Group();g.position.copy(pos);
-  const core=new THREE.Mesh(new THREE.SphereGeometry(.48,isMobile?10:14,isMobile?8:12),new THREE.MeshBasicMaterial({color:0xdff8ff,transparent:true,opacity:.90,depthWrite:false,blending:THREE.AdditiveBlending}));g.add(core);
-  const shell=new THREE.Mesh(new THREE.SphereGeometry(.92,isMobile?10:14,isMobile?8:12),new THREE.MeshBasicMaterial({color:0x705cff,wireframe:true,transparent:true,opacity:.45,depthWrite:false,blending:THREE.AdditiveBlending}));g.add(shell);
-  for(let i=0;i<2;i++){
-    const t=new THREE.Mesh(new THREE.TorusGeometry(1.05+i*.34,.06,6,isMobile?24:36),new THREE.MeshBasicMaterial({color:i?0xffd56a:0x6eeaff,transparent:true,opacity:.70,depthWrite:false,blending:THREE.AdditiveBlending}));
-    t.rotation.x=Math.PI/2+i*.65;t.rotation.y=i*.8;g.add(t);
-  }
+  const core=new THREE.Mesh(new THREE.SphereGeometry(.42,isMobile?8:12,isMobile?6:10),new THREE.MeshBasicMaterial({color:0xdff8ff,transparent:true,opacity:.90,depthWrite:false,blending:THREE.AdditiveBlending}));g.add(core);
+  const shell=new THREE.Mesh(new THREE.SphereGeometry(.82,isMobile?8:12,isMobile?6:10),new THREE.MeshBasicMaterial({color:0x705cff,wireframe:true,transparent:true,opacity:.44,depthWrite:false,blending:THREE.AdditiveBlending}));g.add(shell);
+  const t=new THREE.Mesh(new THREE.TorusGeometry(.98,.055,6,isMobile?20:28),new THREE.MeshBasicMaterial({color:0x6eeaff,transparent:true,opacity:.68,depthWrite:false,blending:THREE.AdditiveBlending}));t.rotation.x=Math.PI/2;g.add(t);
   scene.add(g);return g;
-}
-function triggerAesirBifrostSingularity(w){
-  if(!gameRunning||!barbarianIsActive()||!player)return false;
-  if(aesirSecondaryRuntime.singularity)return false;
-  const target=findNearestEnemy(w.range||11);
-  if(target)faceEnemyTarget(target);
-  const yaw=player.rotation.y, reach=Math.min(w.range||11,11);
-  const end=target?target.position.clone():new THREE.Vector3(player.position.x+Math.sin(yaw)*reach,player.position.y,player.position.z+Math.cos(yaw)*reach);
-  end.y=player.position.y+.85;
-  const start=player.position.clone();start.y+=1.25;
-  const g=aesirMakeSingularityFx(start);
-  aesirSecondaryRuntime.singularity={group:g,t:0,travel:.34,hold:1.55,end,origin:start.clone(),radius:w.radius||7,damage:w.damage||3.0,imploded:false};
-  if(aesirAxe)aesirAxe.provoke('orbit',{d:0,r:0,s:0,k:0});
-  if(player.userData.playKayClip)player.userData.playKayClip('power up',true,true,.24);
-  knightShockRing(player.position,1.6,0x8eefff,.24);triggerCombatShake(4,90);
-  return true;
 }
 function aesirBuildShieldFx(){
   const g=new THREE.Group();g.name='aesirAegisShieldWall';
   const mat=new THREE.MeshBasicMaterial({color:0xffd86a,transparent:true,opacity:.34,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
   const edgeMat=new THREE.MeshBasicMaterial({color:0xfff2b2,wireframe:true,transparent:true,opacity:.78,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
   const centers=[[0,0],[1.18,0],[-1.18,0],[.59,1.02],[-.59,1.02],[.59,-1.02],[-.59,-1.02]];
-  for(const [x,y] of centers){
-    const h=new THREE.Mesh(new THREE.CircleGeometry(.73,6),mat.clone());h.position.set(x,y,0);g.add(h);
-    const e=new THREE.Mesh(new THREE.CircleGeometry(.76,6),edgeMat.clone());e.position.set(x,y,.012);g.add(e);
-  }
+  for(const [x,y] of centers){const h=new THREE.Mesh(new THREE.CircleGeometry(.73,6),mat.clone());h.position.set(x,y,0);g.add(h);const e=new THREE.Mesh(new THREE.CircleGeometry(.76,6),edgeMat.clone());e.position.set(x,y,.012);g.add(e);}
   scene.add(g);return g;
 }
-function triggerAesirAegisShieldWall(w){
-  if(!gameRunning||!barbarianIsActive()||!player)return false;
-  if(aesirSecondaryRuntime.shield)return false;
-  const g=aesirBuildShieldFx();
-  aesirSecondaryRuntime.shield={group:g,t:0,duration:w.duration||3.5,damage:w.damage||1.45,pulse:0};
-  if(player.userData.playKayClip)player.userData.playKayClip('guard',true,true,.25);
+function aesirTryIntegratedAegis(){
+  const r=aesirSecondaryRuntime;
+  if(!gameRunning||!barbarianIsActive()||!player||r.shield||(r.shieldCooldown||0)>0)return false;
+  const g=aesirBuildShieldFx();r.shield={group:g,t:0,duration:10,damage:1.45};
   knightShockRing(player.position,2.0,0xffd86a,.28);spawnBurst(player.position.x,player.position.y+1.0,player.position.z,isMobile?7:12,FX_MAT_SPARK,2.5);
   return true;
 }
-function aesirShieldAbsorbHit(){
-  const s=aesirSecondaryRuntime&&aesirSecondaryRuntime.shield;
-  if(!s||!player||s.t>=s.duration)return false;
-  // Melee damage has no attacker argument in the legacy hit API, so use the
-  // nearest threatening enemy to preserve the wall's FRONT-facing rule.
-  const attacker=findNearestEnemy(4.8);
-  if(attacker){
-    const dx=attacker.position.x-player.position.x,dz=attacker.position.z-player.position.z;
-    const len=Math.hypot(dx,dz)||1,fx=Math.sin(player.rotation.y),fz=Math.cos(player.rotation.y);
-    if((dx/len)*fx+(dz/len)*fz<-.08)return false;
+function triggerAesirBifrostSingularity(w){
+  if(!gameRunning||!barbarianIsActive()||!player)return false;
+  aesirTryIntegratedAegis();
+  if(aesirSecondaryRuntime.singularity)return false;
+  const count=aesirRoundScaledCount(6),yaw0=player.rotation.y,reach=Math.min(w.range||11,11),start=player.position.clone();start.y+=1.20;
+  const cores=[];
+  for(let i=0;i<count;i++){
+    const a=yaw0+i*(Math.PI*2/count),end=new THREE.Vector3(player.position.x+Math.sin(a)*reach,player.position.y+.85,player.position.z+Math.cos(a)*reach);
+    cores.push({group:aesirMakeSingularityFx(start),t:0,travel:.38,hold:1.45,end,origin:start.clone(),radius:w.radius||6.6,damage:w.damage||3.0,imploded:false});
   }
-  knightShockRing(player.position,1.45,0xfff0a6,.18);
-  spawnBurst(player.position.x,player.position.y+1.0,player.position.z,isMobile?4:7,FX_MAT_SPARK,2.0);
-  if(navigator.vibrate)navigator.vibrate(8);
-  return true;
+  aesirSecondaryRuntime.singularity={cores};
+  if(aesirAxe)aesirAxe.provoke('orbit',{d:0,r:0,s:0,k:0});
+  if(player.userData.playKayClip)player.userData.playKayClip('power up',true,true,.24);
+  knightShockRing(player.position,1.6,0x8eefff,.24);triggerCombatShake(5,100);return true;
+}
+function aesirShieldAbsorbHit(){
+  const s=aesirSecondaryRuntime&&aesirSecondaryRuntime.shield;if(!s||!player||s.t>=s.duration)return false;
+  const attacker=findNearestEnemy(4.8);if(attacker){const dx=attacker.position.x-player.position.x,dz=attacker.position.z-player.position.z,len=Math.hypot(dx,dz)||1,fx=Math.sin(player.rotation.y),fz=Math.cos(player.rotation.y);if((dx/len)*fx+(dz/len)*fz<-.08)return false;}
+  knightShockRing(player.position,1.45,0xfff0a6,.18);spawnBurst(player.position.x,player.position.y+1.0,player.position.z,isMobile?4:7,FX_MAT_SPARK,2.0);if(navigator.vibrate)navigator.vibrate(8);return true;
 }
 function aesirReflectEnemyProjectile(p){
-  if(!p||!p.mesh)return;
-  const z=findNearestEnemy(18);
-  if(!z){aesirDisposeObject(p.mesh);if(p.tail)aesirDisposeObject(p.tail);return;}
-  if(p.tail)aesirDisposeObject(p.tail);
-  const mesh=p.mesh;
-  const dir=z.position.clone().add(new THREE.Vector3(0,.65,0)).sub(mesh.position).normalize();
-  aesirSecondaryRuntime.reflected.push({mesh,target:z,dir,speed:13,life:1.8,damage:(aesirSecondaryRuntime.shield?.damage||1.45)});
-  aesirLightningArc(mesh.position.clone(),z.position.clone().add(new THREE.Vector3(0,.65,0)),0xffe58a,.12);
+  if(!p||!p.mesh)return;const z=findNearestEnemy(18);if(!z){aesirDisposeObject(p.mesh);if(p.tail)aesirDisposeObject(p.tail);return;}
+  if(p.tail)aesirDisposeObject(p.tail);const mesh=p.mesh,dir=z.position.clone().add(new THREE.Vector3(0,.65,0)).sub(mesh.position).normalize();
+  aesirSecondaryRuntime.reflected.push({mesh,target:z,dir,speed:13,life:1.8,damage:(aesirSecondaryRuntime.shield?.damage||1.45)});aesirLightningArc(mesh.position.clone(),z.position.clone().add(new THREE.Vector3(0,.65,0)),0xffe58a,.12);
+}
+function aesirChooseTetherTarget(from,visited,maxRange){
+  let best=null,bd=maxRange*maxRange;
+  for(const z of zombies){if(!z||!z.userData||z.userData.dead||z.userData.spawnPending||visited.has(z))continue;const dx=z.position.x-from.x,dz=z.position.z-from.z,d=dx*dx+dz*dz;if(d<bd){bd=d;best=z;}}
+  if(best)return best;
+  // If there are fewer living enemies than the hit budget, allow repeat hits.
+  bd=maxRange*maxRange;for(const z of zombies){if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;const dx=z.position.x-from.x,dz=z.position.z-from.z,d=dx*dx+dz*dz;if(d<bd){bd=d;best=z;}}return best;
 }
 function triggerAesirLightningTether(w){
   if(!gameRunning||!barbarianIsActive()||!player)return false;
-  const target=findNearestEnemy(w.radius||13);if(!target)return false;
-  if(aesirSecondaryRuntime.tether&&aesirSecondaryRuntime.tether.line)aesirDisposeObject(aesirSecondaryRuntime.tether.line);
-  faceEnemyTarget(target);
-  const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);
-  const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xffe27a,transparent:true,opacity:.92,depthWrite:false,blending:THREE.AdditiveBlending}));scene.add(line);
-  aesirSecondaryRuntime.tether={target,line,t:0,duration:w.duration||4,pulse:0,damage:w.damage||.22,heal:0,maxRange:w.radius||13};
-  if(aesirAxe)aesirAxe.provoke('chain',{d:0,r:0,s:0,k:0});
-  if(player.userData.playKayClip)player.userData.playKayClip('power up',true,true,.24);
-  spawnBurst(target.position.x,target.position.y+.7,target.position.z,isMobile?8:14,FX_MAT_SPARK,2.8);
-  return true;
+  aesirTryIntegratedAegis();
+  if(aesirSecondaryRuntime.tether)return false;
+  const target=findNearestEnemy(w.radius||15);if(!target)return false;faceEnemyTarget(target);
+  const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xffe27a,transparent:true,opacity:.94,depthWrite:false,blending:THREE.AdditiveBlending}));scene.add(line);
+  aesirSecondaryRuntime.tether={target,line,t:0,pulse:0,damage:w.damage||1.65,heal:0,maxRange:w.radius||15,hitBudget:aesirRoundScaledCount(10),hits:0,visited:new Set()};
+  if(aesirAxe)aesirAxe.provoke('chain',{d:0,r:0,s:0,k:0});if(player.userData.playKayClip)player.userData.playKayClip('power up',true,true,.24);spawnBurst(target.position.x,target.position.y+.7,target.position.z,isMobile?8:14,FX_MAT_SPARK,2.8);return true;
 }
 function updateAesirDivineSecondaries(dt){
   const r=aesirSecondaryRuntime;
-  // Bifrost Singularity: fly -> pull -> implode.
-  const s=r.singularity;
-  if(s){
-    s.t+=dt;
-    const travelK=Math.min(1,s.t/s.travel),e=travelK*travelK*(3-2*travelK);
-    if(s.t<=s.travel)s.group.position.lerpVectors(s.origin,s.end,e);else s.group.position.copy(s.end);
-    s.group.rotation.y+=dt*7.5;s.group.rotation.x+=dt*2.2;
-    const pulse=1+Math.sin(s.t*15)*.08;s.group.scale.setScalar(pulse);
-    if(s.t>s.travel && s.t<s.travel+s.hold){
-      const c=s.group.position;
-      for(const z of zombies){
-        if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-        const dx=c.x-z.position.x,dz=c.z-z.position.z,dist=Math.hypot(dx,dz);
-        if(dist<=.35||dist>s.radius)continue;
-        const boss=z.userData.archetype==='boss',pull=(boss?2.0:7.2)*dt;
-        const step=Math.min(dist-.30,pull*(.45+1-dist/s.radius));
-        z.position.x+=(dx/dist)*step;z.position.z+=(dz/dist)*step;
-        z.userData.hitStun=Math.max(z.userData.hitStun||0,.08);
-      }
-      if(Math.random()<dt*9){knightShockRing(c,1.1+Math.random()*2.5,0x7fe9ff,.16);}
+  if((r.shieldCooldown||0)>0)r.shieldCooldown=Math.max(0,r.shieldCooldown-dt);
+  const pack=r.singularity;
+  if(pack){
+    let alive=0;
+    for(const s of pack.cores){
+      if(!s.group)continue;
+      s.t+=dt;const travelK=Math.min(1,s.t/s.travel),e=travelK*travelK*(3-2*travelK);if(s.t<=s.travel)s.group.position.lerpVectors(s.origin,s.end,e);else s.group.position.copy(s.end);s.group.rotation.y+=dt*7.5;s.group.rotation.x+=dt*2.2;const pulse=1+Math.sin(s.t*15)*.08;s.group.scale.setScalar(pulse);
+      if(s.t>s.travel&&s.t<s.travel+s.hold){const c=s.group.position;for(const z of zombies){if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;const dx=c.x-z.position.x,dz=c.z-z.position.z,dist=Math.hypot(dx,dz);if(dist<=.35||dist>s.radius)continue;const boss=z.userData.archetype==='boss',pull=(boss?1.8:6.8)*dt,step=Math.min(dist-.30,pull*(.45+1-dist/s.radius));z.position.x+=(dx/dist)*step;z.position.z+=(dz/dist)*step;z.userData.hitStun=Math.max(z.userData.hitStun||0,.08);}}
+      if(!s.imploded&&s.t>=s.travel+s.hold){s.imploded=true;const c=s.group.position.clone();knightShockRing(c,s.radius,0xffffff,.45);knightShockRing(c,s.radius*.55,0x8d75ff,.34);spawnBurst(c.x,c.y,c.z,isMobile?10:18,FX_MAT_SPARK,4.3);for(const z of zombies){if(!z||!z.userData||z.userData.dead)continue;if(Math.hypot(z.position.x-c.x,z.position.z-c.z)<=s.radius)applyBulletDamage(z,s.damage*playerStats.power);}triggerCombatShake(10,160);}
+      if(s.t>=s.travel+s.hold+.28){if(s.group){aesirDisposeObject(s.group);s.group=null;}}else alive++;
     }
-    if(!s.imploded&&s.t>=s.travel+s.hold){
-      s.imploded=true;const c=s.group.position.clone();
-      knightShockRing(c,s.radius,0xffffff,.48);knightShockRing(c,s.radius*.58,0x8d75ff,.38);aesirSkyBolt(c,1.15,0xdff8ff);
-      spawnBurst(c.x,c.y,c.z,isMobile?18:30,FX_MAT_SPARK,5.0);
-      for(const z of zombies){if(!z||!z.userData||z.userData.dead)continue;if(Math.hypot(z.position.x-c.x,z.position.z-c.z)<=s.radius)applyBulletDamage(z,s.damage*playerStats.power);}
-      triggerCombatShake(15,210);if(navigator.vibrate)navigator.vibrate([24,10,40]);
-    }
-    if(s.t>=s.travel+s.hold+.28){aesirDisposeObject(s.group);r.singularity=null;}
+    if(!alive)r.singularity=null;
   }
-  // Aegis: follows Aesir's facing and reflects only projectiles crossing the front wall.
-  const sh=r.shield;
-  if(sh&&player){
-    sh.t+=dt;const yaw=player.rotation.y,fx=Math.sin(yaw),fz=Math.cos(yaw);
-    sh.group.position.set(player.position.x+fx*2.25,player.position.y+1.55,player.position.z+fz*2.25);sh.group.rotation.y=yaw;
-    const fade=Math.max(0,Math.min(1,(sh.duration-sh.t)/.35));sh.group.traverse(o=>{if(o.material)o.material.opacity=Math.min(o.material.opacity,Math.max(.05,fade)*(.80));});
-    for(let i=enemyProjectiles.length-1;i>=0;i--){
-      const p=enemyProjectiles[i];if(!p||!p.mesh)continue;
-      const dx=p.mesh.position.x-player.position.x,dz=p.mesh.position.z-player.position.z;
-      const front=dx*fx+dz*fz,lateral=Math.abs(dx*fz-dz*fx),dy=Math.abs(p.mesh.position.y-(player.position.y+1.25));
-      if(front<.55||front>3.25||lateral>2.75||dy>2.35)continue;
-      enemyProjectiles.splice(i,1);aesirReflectEnemyProjectile(p);knightShockRing(p.mesh.position,1.0,0xffe68a,.16);
-    }
-    if(sh.t>=sh.duration){aesirDisposeObject(sh.group);r.shield=null;}
+  const sh=r.shield;if(sh&&player){
+    sh.t+=dt;const yaw=player.rotation.y,fx=Math.sin(yaw),fz=Math.cos(yaw);sh.group.position.set(player.position.x+fx*2.25,player.position.y+1.55,player.position.z+fz*2.25);sh.group.rotation.y=yaw;
+    for(let i=enemyProjectiles.length-1;i>=0;i--){const p=enemyProjectiles[i];if(!p||!p.mesh)continue;const dx=p.mesh.position.x-player.position.x,dz=p.mesh.position.z-player.position.z,front=dx*fx+dz*fz,lateral=Math.abs(dx*fz-dz*fx),dy=Math.abs(p.mesh.position.y-(player.position.y+1.25));if(front<.55||front>3.25||lateral>2.75||dy>2.35)continue;enemyProjectiles.splice(i,1);aesirReflectEnemyProjectile(p);knightShockRing(p.mesh.position,1.0,0xffe68a,.16);}
+    if(sh.t>=sh.duration){aesirDisposeObject(sh.group);r.shield=null;r.shieldCooldown=aesirShieldCooldownForRound();}
   }
-  // Reflected Aegis shots become real return projectiles.
-  for(let i=r.reflected.length-1;i>=0;i--){
-    const p=r.reflected[i];p.life-=dt;
-    if(!p.target||p.target.userData.dead||!p.target.parent){p.target=findNearestEnemy(18);}
-    if(p.target){const aim=p.target.position.clone().add(new THREE.Vector3(0,.65,0)).sub(p.mesh.position);const d=aim.length();if(d<.55){applyBulletDamage(p.target,p.damage*playerStats.power);spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,isMobile?6:10,FX_MAT_SPARK,2.5);aesirDisposeObject(p.mesh);r.reflected.splice(i,1);continue;}p.dir.lerp(aim.normalize(),Math.min(1,dt*8)).normalize();p.mesh.position.addScaledVector(p.dir,p.speed*dt);}
-    if(p.life<=0){aesirDisposeObject(p.mesh);r.reflected.splice(i,1);}
-  }
-  // Lightning Tether: floating-axe endpoint, continuous drain, discrete-heart healing.
-  const t=r.tether;
-  if(t){
-    t.t+=dt;
-    if(!t.target||t.target.userData.dead||!t.target.parent||!player||Math.hypot(t.target.position.x-player.position.x,t.target.position.z-player.position.z)>t.maxRange*1.35){aesirDisposeObject(t.line);r.tether=null;}
-    else{
-      const a=(aesirAxe&&aesirAxe.group)?aesirAxe.group.position:player.position.clone().add(new THREE.Vector3(0,1.4,0));
-      const b=t.target.position.clone().add(new THREE.Vector3(0,.72,0));
-      const arr=t.line.geometry.attributes.position.array;arr[0]=a.x;arr[1]=a.y;arr[2]=a.z;arr[3]=b.x;arr[4]=b.y;arr[5]=b.z;t.line.geometry.attributes.position.needsUpdate=true;
-      t.line.material.opacity=.72+.25*Math.sin(t.t*24);t.pulse-=dt;
+  for(let i=r.reflected.length-1;i>=0;i--){const p=r.reflected[i];p.life-=dt;if(!p.target||p.target.userData.dead||!p.target.parent)p.target=findNearestEnemy(18);if(p.target){const aim=p.target.position.clone().add(new THREE.Vector3(0,.65,0)).sub(p.mesh.position),d=aim.length();if(d<.55){applyBulletDamage(p.target,p.damage*playerStats.power);spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,isMobile?6:10,FX_MAT_SPARK,2.5);aesirDisposeObject(p.mesh);r.reflected.splice(i,1);continue;}p.dir.lerp(aim.normalize(),Math.min(1,dt*8)).normalize();p.mesh.position.addScaledVector(p.dir,p.speed*dt);}if(p.life<=0){aesirDisposeObject(p.mesh);r.reflected.splice(i,1);}}
+  const t=r.tether;if(t){
+    t.t+=dt;if(!t.target||t.target.userData.dead||!t.target.parent)t.target=aesirChooseTetherTarget(player.position,t.visited,t.maxRange);
+    if(!t.target||!player){aesirDisposeObject(t.line);r.tether=null;}else{
+      const a=(aesirAxe&&aesirAxe.group)?aesirAxe.group.position:player.position.clone().add(new THREE.Vector3(0,1.4,0)),b=t.target.position.clone().add(new THREE.Vector3(0,.72,0));const arr=t.line.geometry.attributes.position.array;arr[0]=a.x;arr[1]=a.y;arr[2]=a.z;arr[3]=b.x;arr[4]=b.y;arr[5]=b.z;t.line.geometry.attributes.position.needsUpdate=true;t.line.material.opacity=.75+.22*Math.sin(t.t*26);t.pulse-=dt;
       if(t.pulse<=0){
-        t.pulse=.22;applyBulletDamage(t.target,t.damage*playerStats.power);t.target.userData.hitStun=Math.max(t.target.userData.hitStun||0,.16);
-        t.heal+=t.damage*.38;
+        t.pulse=.26;applyBulletDamage(t.target,t.damage*playerStats.power);t.target.userData.hitStun=Math.max(t.target.userData.hitStun||0,.22);t.heal+=.34;t.hits++;t.visited.add(t.target);aesirLightningArc(a,b,0xffe889,.13);spawnBurst(b.x,b.y,b.z,isMobile?5:8,FX_MAT_SPARK,2.0);
         if(t.heal>=1&&hearts<maxHearts){t.heal-=1;hearts=Math.min(maxHearts,hearts+1);renderHearts();spawnBurst(player.position.x,player.position.y+1.0,player.position.z,isMobile?5:9,FX_MAT_SPARK,2.2);}
-        if(Math.random()<.55)aesirLightningArc(a,b,0xffe889,.12);
+        if(t.hits>=t.hitBudget){aesirDisposeObject(t.line);r.tether=null;}
+        else if(r.tether){t.target=aesirChooseTetherTarget(b,t.visited,t.maxRange);if(t.target)faceEnemyTarget(t.target);}
       }
-      if(t.t>=t.duration){aesirDisposeObject(t.line);r.tether=null;}
     }
   }
 }
 function aesirBifrostSingularity(w){return triggerAesirBifrostSingularity(w);}
-function aesirAegisShieldWall(w){return triggerAesirAegisShieldWall(w);}
+function aesirAegisShieldWall(w){return false;} // standalone Aegis retired; shield is integrated into Bifrost/Tether
 function aesirLightningTether(w){return triggerAesirLightningTether(w);}
 
 function doBarbarianAttack(w){
@@ -26834,6 +26725,7 @@ let archerMirrorCycleDuration=15;
 let archerMirrorInitialChargePending=true;
 
 function archerMirrorCooldownForLevel(level=avatarLevel()){
+  if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)return 0;
   return Math.max(1.5,15-(Math.max(1,level)-1)*(10/19));
 }
 function archerMirrorUnlocked(){
@@ -30790,7 +30682,7 @@ class VelocityWeaver {
     this.player.scale.set(b.x*sx,b.y*sy,b.z*sz);this._scaleDirty=true;
   }
   _ready(name){return (this.cooldowns[name]||0)<=0;}
-  _startCooldown(name){this.cooldowns[name]=this.cooldownLengths[name]||0;}
+  _startCooldown(name){this.cooldowns[name]=(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)?0:(this.cooldownLengths[name]||0);}
   cooldownFor(name){return Math.max(0,this.cooldowns[name]||0);}
   sonicPiston(){
     if(this.sonic)return false;
@@ -31535,6 +31427,7 @@ class ChopperPirateKit {
   movementMultiplier(){return this._titanActive()?.85:1;}
   attackSpeedMultiplier(){return 1;}
   _roundCooldown(base,zeroRound){
+    if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)return 0;
     const r=Math.max(1,Number(round)||1);
     if(r>=zeroRound)return 0;
     return Math.max(0,base*((zeroRound-r)/(zeroRound-1)));
@@ -32379,7 +32272,7 @@ function triggerCloudSkybreakerSlash(w){
   }
 
   const now=performance.now();
-  cloudSkybreakerNextReadyAt=now+Math.max(150,(w.cooldown||0.5)*1000);
+  cloudSkybreakerNextReadyAt=(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)?0:(now+Math.max(150,(w.cooldown||0.5)*1000));
 
   const target=findNearestEnemy(50);
   if(target){
@@ -32807,7 +32700,7 @@ function doSecondaryShoot(){
   // one-second cooldown so repeated casts remain powerful without becoming spammy.
   if(w.kind==='chain_lightning_javelin'){
     if((player.userData.secondaryAttackCooldown||0)>0)return;
-    player.userData.secondaryAttackCooldown=1.0;
+    player.userData.secondaryAttackCooldown=(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)?0:1.0;
     markSecondaryUsed();
     triggerChainLightningJavelin(w);
     return;
@@ -33237,6 +33130,7 @@ const MIRROR_VOLLEY_MAX_PLACEMENTS=3;
 const mirrorVolleySlots=Array.from({length:MIRROR_VOLLEY_MAX_PLACEMENTS},(_,index)=>({index,placementId:null,cooldown:0}));
 let mirrorVolleyCastSequence=0;
 function mirrorVolleyCooldownForLevel(level=avatarLevel()){
+  if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)return 0;
   const lv=Math.max(1,level);
   if(lv>=40)return 0;
   if(lv>=20)return Math.max(0,1-(lv-20)/20);
@@ -34745,6 +34639,19 @@ function update(dt){
   if(primaryInputHeld && gameRunning) doShoot();
   if((player.userData.secondaryAttackCooldown||0)>0){
     player.userData.secondaryAttackCooldown=Math.max(0,player.userData.secondaryAttackCooldown-dt);
+  }
+  if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS){
+    player.userData.attackCooldown=0;player.userData.secondaryAttackCooldown=0;
+    if(typeof knightRuntime!=='undefined'&&knightRuntime){
+      knightRuntime.whirlwindCooldown=0;knightRuntime.shatterCooldown=0;knightRuntime.chargeCooldown=0;
+      knightRuntime.aegisCooldown=0;knightRuntime.shieldTossCooldown=0;knightRuntime.ultCooldown=0;
+    }
+    if(typeof barbarianRuntime!=='undefined'&&barbarianRuntime){barbarianRuntime.whirlCooldown=0;barbarianRuntime.domeCooldown=0;barbarianRuntime.mjolCooldown=0;}
+    if(typeof rhinoRuntime!=='undefined'&&rhinoRuntime){rhinoRuntime.overdriveCooldown=0;rhinoRuntime.gammaCooldown=0;rhinoRuntime.crashingCooldown=0;rhinoRuntime.titanCooldown=0;rhinoRuntime.armageddonCooldown=0;}
+    if(typeof shadowStalkerMoveset!=='undefined'&&shadowStalkerMoveset&&shadowStalkerMoveset.cooldowns){for(const k in shadowStalkerMoveset.cooldowns)shadowStalkerMoveset.cooldowns[k]=0;}
+    if(typeof chopperKit!=='undefined'&&chopperKit&&chopperKit.cool){for(const k in chopperKit.cool)chopperKit.cool[k]=0;}
+    if(typeof archerMirrorCooldownTimer!=='undefined')archerMirrorCooldownTimer=0;
+    if(typeof mirrorVolleySlots!=='undefined')for(const s of mirrorVolleySlots)s.cooldown=0;
   }
   // Tap casts once in beginSecondaryFire(); while the control remains held,
   // retry here and let each move's own cooldown/slot rules decide readiness.
