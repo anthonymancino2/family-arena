@@ -1,3 +1,4 @@
+<!-- V23.20.00 Aesir Single-Axe Idle Arm Pose: when Aesir is truly idle with one floating axe, only the arm nearest the axe remains raised while the opposite arm relaxes downward. The existing post-mixer arm correction is now axe-aware during Rest_Pose so it cannot re-raise both arms. If a future move explicitly reports two or more active axes, both arms are allowed to use the raised support treatment. Celestial Forward-Fire and global zero-cooldown Ultimate testing remain unchanged. -->
 <!-- V23.19.00 Celestial Forward-Fire Fallback: Celestial Hammer-Pulse no longer bobs vertically over Aesir when no enemy is inside acquisition range. With a target, the independent axe still attacks that enemy. Without a target, it now launches horizontally straight down Aesir's facing lane, spins forward to a fixed reach, then drives into the ground there and emits the same thunder-clap damage/knockback pulse. Global zero-cooldown Ultimate testing remains enabled for every avatar. -->
 <!-- V23.18.00 Aesir Fresh Primaries + Global Ultimate Test Mode: replaces Aesir's legacy Primary identities with Storm-Step Blitz and Celestial Hammer-Pulse. Storm-Step uses a jagged collision-resolved dash, pooled lightning ribbons and swept path shock damage; Celestial Hammer-Pulse commands the independent floating axe spirit to remote-slam the nearest target and emit concentrated thunder-clap knockback waves. All avatar Ultimate cooldowns are disabled for development testing; active-duration locks remain so transformations/sequences cannot overlap themselves. -->
 <!-- V23.13.03 Aesir Front Pose + Natural Axe Hold: keeps exported-model 3 as the active Aesir rig, but fixes the unnatural axe presentation by using the rig's current bind/rest pose as the WeaponReady idle/preview stance instead of sampling a late recovery frame from an attack clip. The avatar preview is rotated to a clean front-facing hero angle and no missing Idle clip fallback is used. Gameplay idle/recovery returns to the same natural hand-on-axe pose, while the Thor-inspired lightning VFX and native Mesh2Motion combat routing remain intact. -->
@@ -1694,7 +1695,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.19.00 - Aesir Celestial Forward-Fire';
+const GAME_VERSION='23.20.00 - Aesir Single-Axe Idle Pose';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -11462,6 +11463,27 @@ function aesirPushArm(bone,child,amt){
   bone.updateMatrixWorld(true);
 }
 
+// Rotate a limb toward a specific WORLD-space direction. Used only for the
+// relaxed non-axe arm during true idle; attacks and locomotion stay authored.
+function aesirAimArmWorld(bone,child,worldDir,blend){
+  if(!(blend>0.0001)||!bone||!child||!bone.parent)return;
+  bone.getWorldPosition(_aesQ1); child.getWorldPosition(_aesQ2);
+  _aesQ2.sub(_aesQ1);
+  if(_aesQ2.lengthSq()<1e-8)return;
+  _aesQ2.normalize();
+  _aesP3.copy(worldDir);
+  if(_aesP3.lengthSq()<1e-8)return;
+  _aesP3.normalize();
+  _aesQa.setFromUnitVectors(_aesQ2,_aesP3);
+  bone.parent.getWorldQuaternion(_aesQb);
+  _aesQc.copy(_aesQb).conjugate().multiply(_aesQa).multiply(_aesQb);
+  _aesQb.copy(bone.quaternion);
+  _aesQ1.set(0,0,0); // no-op scratch reset; quaternion blend below is allocation-free
+  _aesQa.copy(_aesQc).multiply(_aesQb);
+  bone.quaternion.slerp(_aesQa,Math.max(0,Math.min(1,blend)));
+  bone.updateMatrixWorld(true);
+}
+
 function aesirApplyArmPose(){
   const C=AESIR_ARM_POSE;
   aesirArmTunerSync();
@@ -11473,10 +11495,38 @@ function aesirApplyArmPose(){
   if(_aesLat.lengthSq()<1e-8)return;
   _aesLat.normalize();                                   // her own left, in world space
   _aesChest.addVectors(_aesP1,_aesP2).multiplyScalar(0.5);
+
+  // V23.20: during the actual standing Rest_Pose, one visible axe means one
+  // raised/support arm. The arm closest to the floating axe is the support arm;
+  // the opposite arm is deliberately relaxed downward. A future multi-axe move
+  // can set player.userData.aesirAxeCount >= 2 and both arms are then allowed up.
+  const trueIdle=(player.userData.kayCurrentName==='Rest_Pose' && !(player.userData.kayActionLock>0));
+  const axeCount=Math.max(1,Number(player.userData.aesirAxeCount)||1);
+  let supportLeft=true;
+  if(trueIdle && axeCount<2 && aesirAxe && aesirAxe.group){
+    aesirAxe.group.updateMatrixWorld(true);
+    aesirAxe.group.getWorldPosition(_aesP3);
+    R.hL.updateMatrixWorld(true); R.hR.updateMatrixWorld(true);
+    R.hL.getWorldPosition(_aesQ1); R.hR.getWorldPosition(_aesQ2);
+    supportLeft=_aesQ1.distanceToSquared(_aesP3)<=_aesQ2.distanceToSquared(_aesP3);
+  }
+
   const soften=(player.userData.kayActionLock||0)>0?C.attackScale:1;
   for(let i=0;i<2;i++){
-    const sign=i?-1:1;
+    const isLeft=(i===0), sign=i?-1:1;
     const up=i?R.uR:R.uL, fo=i?R.fR:R.fL, ha=i?R.hR:R.hL;
+
+    if(trueIdle && axeCount<2 && isLeft!==supportLeft){
+      // Relaxed free arm: mostly down, with a small outward cant so it clears
+      // the coat instead of clipping through the torso. The forearm hangs a bit
+      // straighter than the upper arm for a natural one-arm-raised silhouette.
+      _aesOut.copy(_aesLat).multiplyScalar(sign*0.28); _aesOut.y=-1.0; _aesOut.normalize();
+      aesirAimArmWorld(up,fo,_aesOut,0.78);
+      _aesOut.copy(_aesLat).multiplyScalar(sign*0.12); _aesOut.y=-1.0; _aesOut.z+=0.08; _aesOut.normalize();
+      aesirAimArmWorld(fo,ha,_aesOut,0.68);
+      continue;
+    }
+
     up.updateMatrixWorld(true);
     up.getWorldPosition(_aesP1); fo.getWorldPosition(_aesP2);
     const armLen=_aesP1.distanceTo(_aesP2); if(armLen<1e-5)continue;
