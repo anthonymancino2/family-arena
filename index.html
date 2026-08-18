@@ -1,4 +1,5 @@
-<!-- V23.12.01 Pirate Efficient Spectacle + Two Primaries: restores Cutlass Combo as Primary 1 and adds the black Cannon Shot as Primary 2; Anchor Drop remains a Secondary in the retired Guard save slot, still targets the nearest enemy within half-map distance and stays 3x size. Boarding Dash carry/execute/stun rules and 10x lethal Powder Kegs are preserved. Pirate-only VFX are aggressively optimized for iPhone: repeated TubeGeometry slash trails and per-hit/per-projectile PointLights are removed from the hot path, dash particle counts are cut, impact debris/treasure/pillars are reduced, and cannonballs use lightweight emissive geometry instead of dynamic lights. Ultimate HUD support and move-name banner removal remain. -->
+<!-- V23.12.03 Chopper Broadside Clone Armada: Broadside is rebuilt to mirror the Knight Knights-of-the-Round clone special mechanically: persistent invincible clones, 2/5/10 round scaling, 8/15/30s durations, Knight-matched cooldown curve, first-priority enemy aggro, 2/3 player movement speed, formation/return behavior and 10% player-scaled damage. The summoned bodies use Chopper's own Mesh2Motion rig/animations with translucent sea-ghost pirate clone visuals and capped cosmetic FX for iPhone performance. The old cannon-barrage Broadside damage burst is removed. -->
+<!-- V23.12.02 Pirate Wow-Efficient Repair: restores life to Cutlass Combo with layered canvas slash crescents, impact sweeps and a stronger third-hit finisher without returning to TubeGeometry or per-hit PointLights. Cannon Shot is a separate second Primary. Anchor Drop now has its own Chopper-only Secondary ID instead of recycling old Primary/Guard IDs, preventing cross-slot save contamination; it still targets the nearest enemy within half-map distance and remains 3x size. Powder Kegs are 40% smaller than V23.12.01 (6x instead of 10x) while remaining lethal. All three Pirate ultimates receive larger-form, low-object-count spectacle effects for iPhone performance. -->
 <!-- V23.11.00 Chopper Pirate Kit: forks a genuinely standalone ChopperPirateKit class. Chopper no longer instantiates the Velocity Weaver engine at all - his own class owns his cooldowns, combo state, damage, enemy slow and per-frame update, and every trigger routes to it before the rogue kit is consulted. Fixes Boarding Dash damaging the player: it warped him ONTO the target with zero i-frames, so enemy contact collision hurt him. It now stops 2 units short and grants 0.75s of real invulnerability. Bulwark Guard grants 2s of genuine i-frames and physically shoves enemies out of reach. Large visual upgrade: real dynamic PointLight flashes, thick TubeGeometry blade trails, ground telegraph rings before every AoE, tumbling debris, rising light pillars, full-screen colour washes and a move-name banner so it is always obvious which move fired. -->
 <!-- V23.10.00 Chopper Own Class: Chopper is no longer a cosmetic skin over the Shadow Stalker Rogue. gameplayAvatarType('chopper') now returns 'chopper', so no rogue or archer system can reach him: no purple shadow afterimage trail, no shadow smoke, no soul orbs, no Hooded-Rogue shadow clones flanking him, and no Eclipse ultimate. He gets his own signature instead - BROADSIDE, with its own POWDER meter and its own charge counters that the rogue can never read or reset. Second primary replaced: the Keelhaul Spin whirlpool is gone, replaced by Anchor Drop, a gold ship anchor that falls and cracks the deck. Slash arcs now sweep vertically through the air in front of him at chibi scale instead of lying flat on the ground at radius 1.5, which is what rendered as a large white puddle. -->
 <!-- V23.09.00 Chopper Storybook Pirate: removes ALL avatar deformation. _updateScale() previously stretched the player along Z for the lunge and wobbled X/Z for the guard; because the primary auto-fires every ~0.22s that stretch was effectively permanent and smeared the whole model sideways. Chopper is now locked to uniform scale, stays fully opaque (no 30% ghost) and is never touched by any move. Boarding Dash no longer silently refuses to fire when no enemy is in range - it always performs a committed leap. Adds a procedural storybook-pirate FX layer (canvas-generated sprites, zero new payload): layered white/gold/rose crescent slashes with a brighter every-third-hit finisher, sea-green whirlpool for Keelhaul Spin, foam wake and splash rings for Boarding Dash, an iridescent bubble shield for Bulwark Guard, real little gold-banded barrels with pulsing fuses for Powder Keg Toss, a muzzle bloom and rolling calm for Doldrums Cannon, and rising foam columns for Kraken Rising. Gold coins, twinkles and hearts spray on impact. -->
@@ -1680,7 +1681,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.12.01 - Pirate Efficient Spectacle';
+const GAME_VERSION='23.12.03 - Broadside Clone Armada';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3673,14 +3674,14 @@ const CHARACTER_COMBAT = {
     weapons:{
       phantom_flurry:{name:'Cutlass Combo', price:0, slot:'primary', kind:'velocity_sonic_piston', cooldown:0.22, damage:1.35, auto:true,
         desc:'A rolling three-hit cutlass chain — overhead chop, horizontal slash, then a committed lunging stab. Each landed hit flashes a lightweight steel arc and shoves the target back a step.'},
-      shadow_sweep:{name:'Cannon Shot', price:0, slot:'primary', kind:'velocity_arc_sweep', cooldown:0.38, damage:1.35, auto:true,
+      chopper_cannon_shot:{name:'Cannon Shot', price:0, slot:'primary', kind:'velocity_arc_sweep', cooldown:0.38, damage:1.35, auto:true,
         desc:'Fire one heavy black cannonball forward. It uses the same standard forward auto-aim cone as the other default non-Archer ranged attacks and snaps to a valid enemy in front.'},
       shadowstep:{name:'Boarding Dash', price:0, slot:'secondary', kind:'velocity_quantum_slingshot', cooldown:0,
         desc:'Dash toward the nearest target, pulling enemies into the rush and carrying them to the endpoint. Normal enemies are executed there; Brutes and bosses are stunned on the first Boarding hit and executed on the second.'},
-      smoke_bomb:{name:'Anchor Drop', price:0, slot:'secondary', kind:'velocity_phasing_resonance', cooldown:0,
+      chopper_anchor_drop:{name:'Anchor Drop', price:0, slot:'secondary', kind:'velocity_phasing_resonance', cooldown:0,
         desc:'Drop a giant anchor directly onto the closest enemy within half the playable-map radius. The anchor itself is three times larger than before.'},
       vipers_fan:{name:'Powder Keg Toss', price:0, slot:'secondary', kind:'velocity_synaptic_snare', cooldown:0,
-        desc:'Throw four enormous powder kegs around the Pirate. Each barrel is ten times larger than before and its detonation instantly defeats anything caught in the blast.'}
+        desc:'Throw four giant powder kegs around the Pirate. They are 40% smaller than the prior oversized build (6x original size) and still instantly defeat anything caught in the blast.'}
     }
   },
   rogue: {
@@ -13249,6 +13250,8 @@ function spawnPlayer(){
 // ---- Zombies ----
 function livingPlayers(){
   // Knight/Ranger clone signatures have first aggro priority and are invincible.
+  const chopperClones=chopperBroadsideClones.filter(e=>e&&e.parent&&e.userData&&!e.userData.dead);
+  if(chopperClones.length)return chopperClones;
   const rangerClones=rhinoRoyalClones.filter(e=>e&&e.parent&&e.userData&&!e.userData.dead);
   if(rangerClones.length)return rangerClones;
   const knightClones=knightRoyalClones.filter(e=>e&&e.parent&&e.userData&&!e.userData.dead);
@@ -14256,10 +14259,16 @@ const HERO_ABILITIES = { rhino:[RHINO_CRASHING_BOLT,RHINO_SHATTERED_DOMAIN,RHINO
   barbarian:[BARBARIAN_PRIMAL_RAGE, BARBARIAN_WORLD_BREAKER, BARBARIAN_RAGNAROK_WAVE] };
 const REMOVED_WEAPON_IDS=['radiant_cleave','blade_cyclone','holy_wave','shield_bash','banner_spear','knight_banner_spear','primal_wave'];
 function sanitizeRemovedAbilitySelection(){
-  // V23.12.01 Pirate migration: Cutlass remains Primary 1, Cannon occupies the old
-  // Anchor primary ID, and Anchor now occupies the retired Bulwark Guard secondary ID.
+  // V23.12.02 Pirate migration: Cannon and Anchor now own dedicated Chopper IDs.
+  // Old shadow_sweep meant Anchor in V23.11, so an old Anchor-primary save becomes
+  // default Cutlass Primary + Anchor Secondary instead of silently becoming Cannon.
+  // Old smoke_bomb was Bulwark Guard; Guard is retired, so it migrates to Anchor.
   if(state&&state.avatarType==='chopper'){
-    if(currentWeaponId==='shadow_sweep') currentWeaponId='smoke_bomb';
+    if(currentPrimaryWeaponId==='shadow_sweep'){
+      currentPrimaryWeaponId=null;
+      currentWeaponId='chopper_anchor_drop';
+    }
+    if(currentWeaponId==='shadow_sweep'||currentWeaponId==='smoke_bomb') currentWeaponId='chopper_anchor_drop';
   }
   // V23.05.01 Shadow Stalker migration: old Hooded Rogue weapons no longer exist.
   if(['hooded_blade','ninja_uzi','spin','clone_stars','clone_spin'].includes(currentPrimaryWeaponId)) currentPrimaryWeaponId=null;
@@ -14973,6 +14982,181 @@ let hoodedUltimateCharge = 0;
 // Eclipse charge so the two classes can never read or reset each other.
 let chopperBroadsideCharge = 0;
 let chopperMeleeHits = 0;
+// V23.12.03 — Broadside now uses the Knight clone-special rules with Chopper visuals.
+let chopperBroadsideClones=[];
+let chopperBroadsideCooldown=0;
+let chopperBroadsideCycleDuration=0;
+let chopperBroadsideSummonEpoch=0;
+function chopperBroadsideCloneConfig(){
+  const r=Math.max(1,Number(round)||1);
+  if(r<10)return {count:0,duration:0,cooldown:0};
+  if(r<=15)return {count:2,duration:8,cooldown:10};
+  if(r<=20)return {count:5,duration:15,cooldown:5};
+  return {count:10,duration:30,cooldown:.8};
+}
+function chopperBroadsideFormationSlot(index,count,rotation=0){
+  count=Math.max(1,count||1);
+  const twoRings=count>=8;
+  let ringIndex=0,ringCount=count,radius=3.15;
+  if(twoRings){
+    const inner=Math.ceil(count*.4);
+    if(index<inner){ringIndex=index;ringCount=inner;radius=2.75;}
+    else{ringIndex=index-inner;ringCount=count-inner;radius=4.35;}
+  }else if(count>=5)radius=3.65;
+  else if(count<=2)radius=2.7;
+  const phase=twoRings&&index>=Math.ceil(count*.4)?Math.PI/Math.max(1,ringCount):0;
+  const a=rotation+phase+(ringIndex/Math.max(1,ringCount))*Math.PI*2;
+  return {x:Math.cos(a)*radius,z:Math.sin(a)*radius,a};
+}
+function chopperBroadsideOptionalFx(index,importance=1){
+  const count=Math.max(1,chopperBroadsideClones.length||chopperBroadsideCloneConfig().count||1);
+  if(count<=5)return true;
+  const stride=importance>=2?2:3;
+  return ((index||0)+Math.floor(performance.now()/220))%stride===0;
+}
+function tintChopperBroadsideClone(root,index){
+  root.traverse(o=>{
+    if(!o.isMesh||!o.material)return;
+    const mats=(Array.isArray(o.material)?o.material:[o.material]).map(m=>{
+      const c=m.clone();
+      c.transparent=true;c.opacity=.58;c.depthWrite=false;
+      if(c.color)c.color.lerp(new THREE.Color(index%2?0x59d9ff:0x8fffe2),.28);
+      if(c.emissive)c.emissive.setHex(index%2?0x07334f:0x063c35);
+      return c;
+    });
+    o.material=Array.isArray(o.material)?mats:mats[0];
+  });
+}
+function decorateChopperBroadsideClone(wrap,index){
+  const sea=index%2?0x59d9ff:0x79ffd9;
+  const mat=new THREE.MeshBasicMaterial({color:sea,transparent:true,opacity:.28,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.34,.62,24),mat.clone());
+  ring.rotation.x=-Math.PI/2;ring.position.y=.035;wrap.add(ring);
+  const flare=new THREE.Mesh(new THREE.RingGeometry(.16,.38,20),mat.clone());
+  flare.rotation.x=-Math.PI/2;flare.position.y=.06;wrap.add(flare);
+  wrap.userData.pirateAura=ring;wrap.userData.pirateFlare=flare;
+}
+function chopperClonePlayClip(c,names){
+  if(!c||!c.userData||!c.userData.kayMixer||!c.userData.kayClips)return;
+  const clips=Object.values(c.userData.kayClips);let clip=null;
+  for(const name of names||[]){clip=clips.find(x=>String(x.name||'')===name);if(clip)break;}
+  if(!clip)clip=clips.find(x=>/attack|melee|shoot|throw/i.test(String(x.name||'')));
+  if(!clip)return;
+  try{c.userData.kayMixer.stopAllAction();const a=c.userData.kayMixer.clipAction(clip);a.reset();a.setLoop(THREE.LoopOnce,1);a.clampWhenFinished=true;a.fadeIn(.04);a.play();}catch(_e){}
+}
+function chopperCloneDamageBase(){
+  const primary=weaponForAvatar();
+  return Math.max(1,Number(primary&&primary.damage)||1.35)*playerStats.power*.10;
+}
+function chopperCloneAttack(c,target){
+  if(!c||!target||target.userData.dead)return;
+  const base=chopperCloneDamageBase();
+  const step=(c.userData.attackStep||0)%3;c.userData.attackStep=step+1;
+  const dx=target.position.x-c.position.x,dz=target.position.z-c.position.z,dist=Math.hypot(dx,dz)||1;
+  c.rotation.y=Math.atan2(dx,dz);
+  if(step===2){
+    chopperClonePlayClip(c,['1H_Ranged_Shoot','Throw']);
+    applyBulletDamage(target,base*.95);
+    if(chopperBroadsideOptionalFx(c.userData.cloneIndex||0,2)){
+      chopperFX.stormHit(target.position.clone(),3);
+    }
+    c.userData.attackCooldown=.82;
+  }else{
+    chopperClonePlayClip(c,[step?'1H_Melee_Attack_Slice_Horizontal':'1H_Melee_Attack_Chop','1H_Melee_Attack_Stab']);
+    applyBulletDamage(target,step?base*1.15:base);
+    if(!target.userData.dead&&step){target.userData.knockbackX=(dx/dist)*1.4;target.userData.knockbackZ=(dz/dist)*1.4;}
+    if(chopperBroadsideOptionalFx(c.userData.cloneIndex||0,2))chopperFX.stormHit(target.position.clone(),step+1);
+    c.userData.attackCooldown=step?.64:.56;
+  }
+}
+function removeChopperBroadsideClone(c){
+  if(!c)return;
+  for(const z of zombies){if(z&&z.userData&&z.userData.targetPlayer===c){z.userData.targetPlayer=null;z.userData.targetRefresh=0;}}
+  if(c.parent)c.parent.remove(c);disposeGroup(c);
+  chopperBroadsideClones=chopperBroadsideClones.filter(x=>x!==c);
+}
+function clearChopperBroadsideClones(){
+  chopperBroadsideSummonEpoch++;
+  for(const c of [...chopperBroadsideClones])removeChopperBroadsideClone(c);
+  chopperBroadsideClones=[];
+}
+function chopperBroadsideArrivalFx(pos,index){
+  if(!pos||!chopperBroadsideOptionalFx(index,1))return;
+  const g=new THREE.Group();
+  const color=index%2?0x59d9ff:0x79ffd9;
+  const mat=new THREE.MeshBasicMaterial({color,transparent:true,opacity:.25,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const col=new THREE.Mesh(new THREE.CylinderGeometry(.18,.60,3.8,12,1,true),mat);col.position.y=1.9;g.add(col);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.42,1.05,28),mat.clone());ring.rotation.x=-Math.PI/2;ring.position.y=.05;g.add(ring);
+  g.position.copy(pos);scene.add(g);
+  const start=performance.now();
+  (function fadeCloneArrival(now){
+    if(!g.parent)return;
+    const t=Math.min(1,(now-start)/400),sc=.65+t*1.25;g.scale.setScalar(sc);
+    g.traverse(o=>{if(o.material)o.material.opacity=Math.max(0,.25*(1-t));});
+    if(t<1)requestAnimationFrame(fadeCloneArrival);else{scene.remove(g);g.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});}
+  })(start);
+}
+function triggerChopperBroadsideClones(){
+  if(!gameRunning||!chopperClassIsActive()||chopperBroadsideCooldown>0)return false;
+  const cfg=chopperBroadsideCloneConfig();if(cfg.count<=0)return false;
+  clearChopperBroadsideClones();
+  const epoch=chopperBroadsideSummonEpoch;
+  chopperBroadsideCooldown=cfg.cooldown;chopperBroadsideCycleDuration=cfg.cooldown;
+  chopperFX.screenFlash('rgba(52,220,220,.30)',.25,190);
+  triggerCombatShake(12,190);
+  getChopperAssetPromise().then(({gltf,THREEAsset,cloneSkinned})=>{
+    for(let i=0;i<cfg.count;i++)setTimeout(()=>{
+      if(epoch!==chopperBroadsideSummonEpoch||!player||!chopperClassIsActive()||!gameRunning)return;
+      const wrap=new THREE.Group(),root=cloneSkinned(gltf.scene);
+      root.rotation.y=AVATAR_MODEL_YAW.chopper||0;tuneChopperVisuals(root,THREEAsset,renderer);
+      const box=new THREEAsset.Box3().setFromObject(root),size=box.getSize(new THREEAsset.Vector3());
+      root.scale.setScalar(1.48/Math.max(.001,size.y));root.updateMatrixWorld(true);
+      const box2=new THREEAsset.Box3().setFromObject(root);root.position.y-=box2.min.y;
+      tintChopperBroadsideClone(root,i);wrap.add(root);decorateChopperBroadsideClone(wrap,i);
+      const slot=chopperBroadsideFormationSlot(i,cfg.count,-Math.PI/2);
+      wrap.position.set(player.position.x+slot.x,player.position.y,player.position.z+slot.z);
+      Object.assign(wrap.userData,{isChopperBroadsideClone:true,invincible:true,hp:Infinity,maxHp:Infinity,dead:false,cloneIndex:i,life:cfg.duration,
+        attackCooldown:.18+i*.06,attackStep:i%3,farTimer:0,returning:false,kayMixer:new THREEAsset.AnimationMixer(root),kayClips:{}});
+      for(const clip of gltf.animations)wrap.userData.kayClips[clip.name]=clip;
+      scene.add(wrap);chopperBroadsideClones.push(wrap);chopperBroadsideArrivalFx(wrap.position,i);
+    },i*105);
+  });
+  if(navigator.vibrate)navigator.vibrate([28,18,52]);
+  updateHoodedHud();
+  return true;
+}
+function chopperBroadsideMoveSpeed(){
+  const speedStat=(playerStats&&Number.isFinite(playerStats.speed))?playerStats.speed:1;
+  const characterMoveMult=(combatForAvatar().baseMoveMult||1);
+  const playerMoveSpeed=PLAYER_SPEED*characterMoveMult*chopperMoveMultiplier()*(1+(speedStat-1)*.15);
+  return Math.max(0,playerMoveSpeed*(2/3));
+}
+function updateChopperBroadsideClones(dt){
+  if(chopperBroadsideCooldown>0)chopperBroadsideCooldown=Math.max(0,chopperBroadsideCooldown-dt);
+  if(!player)return;
+  const now=performance.now()*.001;
+  for(const c of [...chopperBroadsideClones]){
+    if(!c||!c.parent)continue;
+    c.userData.life-=dt;
+    if(c.userData.life<=0){chopperBroadsideArrivalFx(c.position,c.userData.cloneIndex||0);removeChopperBroadsideClone(c);continue;}
+    if(c.userData.kayMixer)c.userData.kayMixer.update(dt);
+    if(c.userData.pirateAura)c.userData.pirateAura.rotation.z=now*((c.userData.cloneIndex||0)%2?-0.8:0.8);
+    if(c.userData.pirateFlare)c.userData.pirateFlare.scale.setScalar(1+Math.sin(now*4+(c.userData.cloneIndex||0))*.12);
+    c.userData.attackCooldown=Math.max(0,(c.userData.attackCooldown||0)-dt);
+    const playerDist=Math.hypot(c.position.x-player.position.x,c.position.z-player.position.z);
+    if(playerDist>11)c.userData.farTimer=(c.userData.farTimer||0)+dt;else{c.userData.farTimer=0;c.userData.returning=false;}
+    if(c.userData.farTimer>=10)c.userData.returning=true;
+    let target=null,best=12*12;
+    if(!c.userData.returning){for(const z of zombies){if(!z||z.userData.dead||z.userData.spawnPending||!z.visible)continue;const d=c.position.distanceToSquared(z.position);if(d<best){best=d;target=z;}}}
+    let desired=null;
+    if(c.userData.returning){const slot=chopperBroadsideFormationSlot(c.userData.cloneIndex||0,Math.max(1,chopperBroadsideClones.length),now*.18);desired=new THREE.Vector3(player.position.x+slot.x,player.position.y,player.position.z+slot.z);if(playerDist<5.2){c.userData.returning=false;c.userData.farTimer=0;}}
+    else if(target){const toward=target.position.clone().sub(c.position);toward.y=0;const d=toward.length();if(d>1.8){toward.normalize();desired=c.position.clone().addScaledVector(toward,Math.min(3,d-1.45));desired.y=player.position.y;}}
+    else{const slot=chopperBroadsideFormationSlot(c.userData.cloneIndex||0,Math.max(1,chopperBroadsideClones.length),now*.14);desired=new THREE.Vector3(player.position.x+slot.x,player.position.y,player.position.z+slot.z);}
+    if(desired){const dist=c.position.distanceTo(desired);if(dist>18)c.position.copy(desired);else{const dx=desired.x-c.position.x,dz=desired.z-c.position.z,planar=Math.hypot(dx,dz),travel=Math.min(planar,chopperBroadsideMoveSpeed()*dt);const nx=planar>1e-5?c.position.x+(dx/planar)*travel:c.position.x,nz=planar>1e-5?c.position.z+(dz/planar)*travel:c.position.z;const r=resolveCollision(nx,nz,c.position.y);c.position.x=r.x;c.position.z=r.z;c.position.y=player.position.y;}}
+    if(target&&target.parent&&!target.userData.dead){c.rotation.y=Math.atan2(target.position.x-c.position.x,target.position.z-c.position.z);if(c.position.distanceToSquared(target.position)<=3.1*3.1&&c.userData.attackCooldown<=0)chopperCloneAttack(c,target);}else c.rotation.y=player.rotation.y;
+  }
+  if(chopperClassIsActive()&&(chopperBroadsideCooldown>0||chopperBroadsideClones.length))updateHoodedHud();
+}
 let knightUltimateCharge = 0, knightUltimateActive = 0, knightUltimatePulse = 0, knightComboStep = 0;
 let barbarianUltimateCharge = 0, barbarianUltimateActive = 0, barbarianUltimatePulse = 0, barbarianComboStep = 0, barbarianFlurryStep = 0;
 // Aesir Berserker Overhaul: dedicated runtime for the three selectable
@@ -16824,8 +17008,9 @@ function updateHoodedHud(){
   const isHooded=hoodedIsActive(), isChopper=chopperClassIsActive(), isArcher=archerIsActive(), isMage=mageGameplayActive(), isKnight=knightIsActive(), isBarbarian=barbarianIsActive();
   const mageEchoReady=isMage&&arcaneEchoesUnlocked();
   const knightCloneSpecialReady=isKnight&&Math.max(1,Number(round)||1)>=10;
+  const chopperCloneSpecialReady=isChopper&&Math.max(1,Number(round)||1)>=10;
   const rhinoCloneSpecialReady=rhinoIsActive()&&Math.max(1,Number(round)||1)>=10;
-  const hasSignature=isHooded||isChopper||isArcher||knightCloneSpecialReady||rhinoCloneSpecialReady||(isBarbarian&&!rhinoIsActive())||mageEchoReady;
+  const hasSignature=isHooded||chopperCloneSpecialReady||isArcher||knightCloneSpecialReady||rhinoCloneSpecialReady||(isBarbarian&&!rhinoIsActive())||mageEchoReady;
   btn.classList.toggle('hidden',!hasSignature); meter.classList.toggle('on',hasSignature);
   if(hasSignature){
     let pct=0;
@@ -16835,6 +17020,10 @@ function updateHoodedHud(){
     }else if(isArcher){
       const total=Math.max(.001,archerMirrorCycleDuration||archerMirrorCooldownForLevel());
       pct=archerMirrorCooldownTimer<=0?100:Math.max(0,Math.min(100,(1-archerMirrorCooldownTimer/total)*100));
+    }else if(chopperCloneSpecialReady){
+      const cfg=chopperBroadsideCloneConfig();
+      const total=Math.max(.001,cfg.cooldown||1);
+      pct=chopperBroadsideCooldown<=0?100:Math.max(0,Math.min(100,(1-chopperBroadsideCooldown/total)*100));
     }else if(rhinoCloneSpecialReady){
       const cfg=rhinoRoyalCloneConfig();
       const total=Math.max(.001,cfg.cooldown||1);
@@ -16853,7 +17042,13 @@ function updateHoodedHud(){
     }
     btn.style.setProperty('--charge',pct+'%'); btn.classList.toggle('ready',pct>=100);
     if(mageEchoReady){btn.textContent=pct>=100?'ECHOES!':'ECHOES';meter.textContent=pct>=100?'ARCANE ECHOES READY':'ECHOES '+arcaneEchoesCooldownTimer.toFixed(1)+'s';}
-    else if(isChopper){btn.textContent=pct>=100?'BROADSIDE!':'BROADSIDE';meter.textContent='POWDER '+chopperMeleeHits+'/25';}
+    else if(chopperCloneSpecialReady){
+      btn.textContent=pct>=100?'BROADSIDE!':'BROADSIDE';
+      const cfg=chopperBroadsideCloneConfig();
+      const active=chopperBroadsideClones.length;
+      const life=active?Math.max(0,...chopperBroadsideClones.map(c=>Number(c.userData.life)||0)):0;
+      meter.textContent=active?`CREW ${active}/${cfg.count} · ${life.toFixed(1)}s`:(pct>=100?'BROADSIDE CREW READY':`CREW ${chopperBroadsideCooldown.toFixed(1)}s`);
+    }
     else if(isHooded){btn.textContent=pct>=100?'ECLIPSE!':'ECLIPSE';meter.textContent='VITALITY '+hoodedMeleeHits+'/25';}
     else if(isArcher){
       btn.textContent=pct>=100?'CLONES!':'CLONES';
@@ -29236,14 +29431,11 @@ function updateArcaneLaser(dt){
 // the game, but shares no state, no visuals and no code path with the rogue's
 // Shadow Eclipse.
 function triggerChopperBroadside(){
-  if(!gameRunning||!chopperClassIsActive())return;
-  if(chopperBroadsideCharge<100)return;
-  chopperBroadsideCharge=0; chopperMeleeHits=0; updateHoodedHud();
+  if(!gameRunning||!chopperClassIsActive())return false;
   if(player&&player.userData&&player.userData.playKayClip){
-    try{ player.userData.playKayClip('1H_Ranged_Shoot',true,true,.5); }catch(_e){}
+    try{ player.userData.playKayClip('2H_Melee_Attack_Spin',true,true,.5); }catch(_e){}
   }
-  const kit=ensureChopperKit();
-  if(kit)kit.broadside();
+  return triggerChopperBroadsideClones();
 }
 function triggerShadowEclipse(){
   if(!gameRunning||!hoodedIsActive()||hoodedUltimateActive>0)return;
@@ -30804,7 +30996,17 @@ const chopperFX = (function(){
       g.addColorStop(.85,'rgba(206,142,36,1)');g.addColorStop(.93,'rgba(255,246,214,1)');
       g.addColorStop(1,'rgba(255,246,214,0)');
       x.fillStyle=g;x.beginPath();x.arc(c,c,c*.94,0,7);x.fill();});
-    tex={glow,star,heart,ring,coin};
+    // One reusable crescent texture gives the Primary a large, readable sword trail
+    // without allocating TubeGeometry or dynamic lights on every auto attack.
+    const slash=cvs(192,(x,s)=>{const c=s/2;x.translate(c,c);x.rotate(-.28);
+      x.lineCap='round';
+      const grad=x.createLinearGradient(-c,0,c,0);
+      grad.addColorStop(0,'rgba(255,255,255,0)');grad.addColorStop(.28,'rgba(255,255,255,.7)');
+      grad.addColorStop(.62,'rgba(255,255,255,1)');grad.addColorStop(1,'rgba(255,255,255,0)');
+      x.strokeStyle=grad;x.lineWidth=18;x.beginPath();x.arc(-8,18,66,-1.15,.65);x.stroke();
+      x.globalAlpha=.62;x.lineWidth=8;x.beginPath();x.arc(-8,18,80,-1.10,.60);x.stroke();
+    });
+    tex={glow,star,heart,ring,coin,slash};
   }
   function ensure(){
     if(ready)return true;
@@ -30836,6 +31038,16 @@ const chopperFX = (function(){
     mesh.position.y+=(o.y==null?.07:o.y);group.add(mesh);
     return push(mesh,{dur:o.dur||.55,from:o.from||.5,to:o.to||4.5,
       fadeIn:.04,peak:o.peak==null?1:o.peak});
+  }
+  function slashArc(pos,yaw,o){o=o||{};
+    const m=new THREE.MeshBasicMaterial({map:tex.slash,color:o.color||PAL.cream,
+      transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide,
+      blending:THREE.AdditiveBlending});
+    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1.9,1.35),m);
+    mesh.position.copy(pos);mesh.position.y+=(o.y==null?.78:o.y);
+    mesh.rotation.y=yaw;mesh.rotation.z=o.roll||0;group.add(mesh);
+    return push(mesh,{dur:o.dur||.22,from:o.from||.8,to:o.to||1.35,
+      fadeIn:.018,peak:o.peak==null?.9:o.peak});
   }
   // A real dynamic light. This is what actually makes a hit feel expensive.
   function flash(pos,color,power,dur){
@@ -30939,6 +31151,8 @@ const chopperFX = (function(){
   // the animation, VFX, impact and HUD controls rather than center-screen text.
   function banner(){ return; }
 
+  function yawFromPlayer(){return (typeof player!=='undefined'&&player)?player.rotation.y:0;}
+
   return {
     ready:()=>ready,
     update(dt){
@@ -30975,13 +31189,24 @@ const chopperFX = (function(){
       if(!ensure()||!player)return;
       const yaw=player.rotation.y,p=player.position.clone();
       const f=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
-      const at=p.clone().addScaledVector(f,.72);at.y+=.72;
-      const fin=step===2;
-      ring(p,{color:fin?PAL.rose:PAL.gold,dur:fin?.28:.20,from:.35,to:fin?3.0:2.0,peak:fin?.8:.55});
-      for(let i=0;i<(fin?3:2);i++)spark(at.clone().add(new THREE.Vector3((Math.random()-.5)*.55,Math.random()*.45,(Math.random()-.5)*.55)),
-        {map:tex.star,color:i%2?PAL.cream:(fin?PAL.rose:PAL.gold),from:fin?.34:.25,dur:.24+Math.random()*.12,
-         vel:new THREE.Vector3((Math.random()-.5)*1.2,.7+Math.random()*.7,(Math.random()-.5)*1.2),grav:-2.2});
-      if(fin)screenFlash('rgba(255,158,199,.28)',.22,130);
+      const at=p.clone().addScaledVector(f,.78);at.y+=.05;
+      const fin=step===2,roll=[-.42,.42,-.10][step];
+      // Two broad layered crescents cost only two textured planes. The third hit
+      // adds one extra oversized layer, a ground sweep and a short screen punch.
+      slashArc(at,yaw,{color:PAL.cream,roll,dur:fin?.30:.22,from:fin?1.05:.82,to:fin?2.05:1.55,peak:1});
+      slashArc(at,yaw,{color:fin?PAL.rose:PAL.gold,roll:roll+(step===1?.09:-.09),dur:fin?.34:.26,
+        from:fin?1.15:.9,to:fin?2.25:1.72,peak:fin?.82:.68});
+      ring(p,{color:fin?PAL.rose:PAL.gold,dur:fin?.36:.22,from:.30,to:fin?4.0:2.25,peak:fin?.82:.48});
+      if(hit){
+        for(let i=0;i<(fin?5:3);i++)spark(at.clone().add(new THREE.Vector3((Math.random()-.5)*.65,.55+Math.random()*.45,(Math.random()-.5)*.65)),
+          {map:tex.star,color:i%2?PAL.cream:(fin?PAL.rose:PAL.gold),from:fin?.38:.28,dur:.25+Math.random()*.12,
+           vel:new THREE.Vector3((Math.random()-.5)*1.5,.8+Math.random()*.8,(Math.random()-.5)*1.5),grav:-2.3});
+      }
+      if(fin){
+        slashArc(at.clone().addScaledVector(f,.15),yaw,{color:PAL.plum,roll:.62,dur:.38,from:1.25,to:2.55,peak:.55});
+        ring(p,{color:PAL.cream,dur:.44,from:.25,to:5.0,y:.16,peak:.62});
+        screenFlash('rgba(255,158,199,.42)',.30,190);
+      }
     },
     anchorTelegraph(at){
       if(!ensure())return;
@@ -31053,11 +31278,11 @@ const chopperFX = (function(){
       b1.rotation.x=Math.PI/2;b1.position.y=.09;
       const b2=b1.clone();b2.position.y=-.09;
       keg.add(body,b1,b2);
-      keg.scale.setScalar(10);
+      keg.scale.setScalar(6);
       keg.position.copy(pos);keg.position.y+=.2;keg.rotation.y=Math.random()*3;
       group.add(keg);
       const fuse=sprite(tex.glow,PAL.ember,.4);fuse.material.opacity=1;
-      fuse.position.copy(keg.position);fuse.position.y+=.3;
+      fuse.position.copy(keg.position);fuse.position.y+=1.25;
       keg.userData.fuse=fuse;
       telegraph(pos,1.5,.25,PAL.ember);
       return keg;
@@ -31086,33 +31311,73 @@ const chopperFX = (function(){
       if(!ensure()||!player)return;
       const p=player.position.clone(),yaw=player.rotation.y;
       const f=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
-      const m=p.clone().addScaledVector(f,1.15);m.y+=.9;
-      spark(m,{map:tex.star,color:PAL.gold,from:.7,to:2.6,dur:.34,fadeIn:.02});
-      for(let i=0;i<8;i++){
-        const dir=f.clone().applyAxisAngle(new THREE.Vector3(0,1,0),(Math.random()-.5)*.8);
-        spark(m,{map:tex.glow,color:i%2?PAL.cream:PAL.gold,from:.3,to:.8,dur:.42+Math.random()*.22,
-          vel:dir.multiplyScalar(5+Math.random()*5).setY(.4+Math.random()),grav:-1.5});
+      const m=p.clone().addScaledVector(f,1.2);m.y+=.9;
+      // Huge muzzle bloom + three arena-scale calm fronts. Large surfaces read
+      // stronger than dozens of particles and remain cheap on mobile GPUs.
+      spark(m,{map:tex.star,color:PAL.cream,from:1.4,to:4.0,dur:.36,fadeIn:.015});
+      spark(m,{map:tex.glow,color:PAL.gold,from:1.0,to:3.2,dur:.42,fadeIn:.015});
+      for(let i=0;i<3;i++)ring(p,{color:i===0?PAL.cream:(i===1?PAL.aqua:PAL.sea),dur:.72+i*.18,
+        from:.55+i*.20,to:10.5+i*2.8,y:.08+i*.07,peak:.92-i*.16});
+      const calm=new THREE.Mesh(new THREE.CircleGeometry(1,28),new THREE.MeshBasicMaterial({color:PAL.deep,transparent:true,
+        opacity:0,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));
+      calm.rotation.x=-Math.PI/2;calm.position.copy(p);calm.position.y+=.035;group.add(calm);
+      push(calm,{dur:5.0,from:2.0,to:12.5,fadeIn:.22,peak:.16});
+      for(let i=-1;i<=1;i++){
+        const q=m.clone().addScaledVector(f,1.8+i*.8);
+        slashArc(q,yaw,{color:i===0?PAL.cream:PAL.aqua,roll:Math.PI/2,dur:.46+i*.05,from:1.0,to:2.8+i*.3,peak:i===0?.82:.48,y:.7});
       }
-      ring(p,{color:PAL.sea,dur:.72,from:.5,to:9.0});
-      ring(p,{color:PAL.aqua,dur:.90,from:.3,to:12.0,y:.2,peak:.65});
-      screenFlash('rgba(63,182,216,.32)',.28,220);
+      screenFlash('rgba(63,182,216,.46)',.36,300);
+    },
+    krakenStart(pos){
+      if(!ensure())return;
+      ring(pos,{color:PAL.aqua,dur:.72,from:.8,to:10.0,peak:1});
+      ring(pos,{color:PAL.sea,dur:.92,from:.5,to:13.0,y:.18,peak:.75});
+      for(let i=0;i<4;i++){
+        const a=i*Math.PI/2+.35;
+        const q=pos.clone().add(new THREE.Vector3(Math.cos(a)*3.0,.1,Math.sin(a)*3.0));
+        const tent=new THREE.Mesh(new THREE.CylinderGeometry(.18,.75,5.8,7,1,true),new THREE.MeshBasicMaterial({color:i%2?PAL.sea:PAL.aqua,
+          transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));
+        tent.position.copy(q);tent.position.y+=2.7;tent.rotation.z=(Math.random()-.5)*.32;tent.rotation.x=(Math.random()-.5)*.22;group.add(tent);
+        push(tent,{dur:1.05+i*.06,from:.25,to:1.35,fadeIn:.07,peak:.46});
+      }
+      screenFlash('rgba(63,182,216,.62)',.46,360);
     },
     krakenPulse(pos,frame){
       if(!ensure())return;
-      ring(pos,{color:frame%2?PAL.sea:PAL.aqua,dur:.62,from:.7,to:7.0,peak:.8});
-      ring(pos,{color:PAL.cream,dur:.44,from:.5,to:4.3,y:.18,peak:.5});
-      for(let i=0;i<4;i++){
-        const a=(i/4)*Math.PI*2+frame*.25;
-        const p=pos.clone().add(new THREE.Vector3(Math.cos(a)*2.4,.35,Math.sin(a)*2.4));
-        spark(p,{map:tex.glow,color:i%2?PAL.sea:PAL.aqua,from:.42,to:.8,dur:.50,
-          vel:new THREE.Vector3(Math.cos(a)*.7,1.8,Math.sin(a)*.7),grav:-2.0});
+      const alt=(frame/28)%2>1;
+      ring(pos,{color:alt?PAL.sea:PAL.aqua,dur:.68,from:.75,to:8.8,peak:.86});
+      ring(pos,{color:PAL.cream,dur:.48,from:.45,to:5.2,y:.18,peak:.48});
+      for(let i=0;i<2;i++){
+        const a=(i*Math.PI)+frame*.10;
+        const p=pos.clone().add(new THREE.Vector3(Math.cos(a)*2.8,.5,Math.sin(a)*2.8));
+        spark(p,{map:tex.glow,color:i?PAL.sea:PAL.aqua,from:.65,to:1.2,dur:.55,
+          vel:new THREE.Vector3(Math.cos(a)*.7,2.1,Math.sin(a)*.7),grav:-2.1});
       }
+    },
+    stormStart(pos){
+      if(!ensure())return;
+      ring(pos,{color:PAL.gold,dur:.54,from:.45,to:6.8,peak:.95});
+      ring(pos,{color:PAL.rose,dur:.68,from:.3,to:4.7,y:.17,peak:.68});
+      slashArc(pos,yawFromPlayer(),{color:PAL.cream,roll:-.45,dur:.38,from:1.2,to:3.1,peak:.9,y:.9});
+      slashArc(pos,yawFromPlayer(),{color:PAL.gold,roll:.45,dur:.42,from:1.3,to:3.4,peak:.72,y:.9});
+      screenFlash('rgba(255,215,106,.46)',.34,240);
     },
     stormHit(pos,idx){
       if(!ensure())return;
-      ring(pos,{color:idx%2?PAL.gold:PAL.rose,dur:.30,from:.3,to:2.4,peak:.8});
-      for(let i=0;i<3;i++)spark(pos.clone().setY(pos.y+.7),{map:tex.star,color:i%2?PAL.cream:PAL.gold,from:.3,dur:.28,
-        vel:new THREE.Vector3((Math.random()-.5)*1.8,.9+Math.random(),(Math.random()-.5)*1.8),grav:-2.6});
+      const y=player?player.rotation.y:0;
+      slashArc(pos,y,{color:idx%2?PAL.gold:PAL.rose,roll:idx%2?.52:-.52,dur:.28,from:.9,to:2.0,peak:.92,y:.75});
+      ring(pos,{color:idx%2?PAL.cream:PAL.gold,dur:.30,from:.28,to:2.9,peak:.76});
+      for(let i=0;i<2;i++)spark(pos.clone().setY(pos.y+.7),{map:tex.star,color:i?PAL.cream:PAL.gold,from:.34,dur:.30,
+        vel:new THREE.Vector3((Math.random()-.5)*1.7,1.0+Math.random(),(Math.random()-.5)*1.7),grav:-2.4});
+    },
+    stormFinish(pos){
+      if(!ensure())return;
+      ring(pos,{color:PAL.gold,dur:.58,from:.45,to:7.2,peak:1});
+      ring(pos,{color:PAL.rose,dur:.68,from:.3,to:5.2,y:.20,peak:.72});
+      const y=player?player.rotation.y:0;
+      slashArc(pos,y,{color:PAL.cream,roll:-.72,dur:.46,from:1.5,to:4.0,peak:1,y:1.0});
+      slashArc(pos,y,{color:PAL.rose,roll:.72,dur:.50,from:1.6,to:4.2,peak:.78,y:1.0});
+      screenFlash('rgba(255,244,210,.62)',.42,280);
     },
     broadside(){
       if(!ensure()||!player)return;
@@ -31120,18 +31385,15 @@ const chopperFX = (function(){
       const f=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
       const rt=new THREE.Vector3(Math.sin(yaw+Math.PI/2),0,Math.cos(yaw+Math.PI/2));
       for(let s2=-1;s2<=1;s2+=2){
-        const muzzle=p.clone().addScaledVector(rt,s2*1.8);muzzle.y+=.85;
-        spark(muzzle,{map:tex.star,color:PAL.gold,from:1.0,to:3.0,dur:.34,fadeIn:.02});
-        const dir=rt.clone().multiplyScalar(s2).add(f.clone().multiplyScalar(.18)).normalize();
-        for(let k=0;k<6;k++)spark(muzzle.clone().addScaledVector(f,(k-2.5)*.10),
-          {map:tex.glow,color:k%2?PAL.gold:PAL.cream,from:.38,to:.82,dur:.48+k*.025,
-           vel:dir.clone().multiplyScalar(7+k*1.3).setY(.45+Math.random()*.35),grav:-1.4});
+        const muzzle=p.clone().addScaledVector(rt,s2*1.9);muzzle.y+=.85;
+        spark(muzzle,{map:tex.star,color:PAL.cream,from:1.4,to:4.0,dur:.34,fadeIn:.01});
+        spark(muzzle,{map:tex.glow,color:PAL.gold,from:1.0,to:3.0,dur:.44,fadeIn:.01});
+        const q=muzzle.clone().addScaledVector(rt,s2*2.6);
+        slashArc(q,yaw+Math.PI/2,{color:PAL.gold,roll:s2*.18,dur:.48,from:1.4,to:3.6,peak:.72,y:.75});
       }
-      ring(p,{color:PAL.gold,dur:.58,from:.6,to:8.4,peak:.95});
-      ring(p,{color:PAL.rose,dur:.72,from:.4,to:5.2,y:.28,peak:.68});
-      for(let i=0;i<5;i++)spark(p.clone().setY(p.y+.8),{map:tex.star,color:i%2?PAL.cream:PAL.gold,from:.34,dur:.42,
-        vel:new THREE.Vector3((Math.random()-.5)*3,1.4+Math.random()*1.6,(Math.random()-.5)*3),grav:-2.8});
-      screenFlash('rgba(255,215,106,.44)',.34,260);
+      ring(p,{color:PAL.gold,dur:.62,from:.6,to:9.2,peak:1});
+      ring(p,{color:PAL.cream,dur:.78,from:.35,to:6.4,y:.24,peak:.65});
+      screenFlash('rgba(255,215,106,.58)',.42,300);
     },
     dispose(){
       if(!ready)return;
@@ -31145,7 +31407,7 @@ const chopperFX = (function(){
 
 
 // =====================================================================
-// CHOPPER PIRATE KIT (V23.11.00) — standalone.
+// CHOPPER PIRATE KIT (V23.12.03) — standalone.
 // Chopper's own move engine. Shares no state, no timing, no code path
 // and no presentation with the Shadow Stalker / Velocity Weaver class.
 // =====================================================================
@@ -31187,7 +31449,7 @@ class ChopperPirateKit {
     if(!e||!e.userData||e.userData.dead)return;
     applyBulletDamage(e,Math.max(0,Number(amount)||0)*playerStats.power);
     chopperMeleeHits=Math.min(25,chopperMeleeHits+1);
-    chopperBroadsideCharge=Math.min(100,chopperBroadsideCharge+2);
+    // Broadside is cooldown-driven clone special in V23.12.03.
     if(chopperMeleeHits>=25){
       chopperMeleeHits=0;
       if(hearts<maxHearts){hearts++;renderHearts();}
@@ -31314,7 +31576,7 @@ class ChopperPirateKit {
     if(this.storm||this.cool.storm>0)return false;
     const targets=this._enemies().slice(0,6);if(!targets.length)return false;
     this.cool.storm=this.len.storm;invincibleTimer=Math.max(invincibleTimer||0,1.4);
-    chopperFX.screenFlash('rgba(255,215,106,.4)',.35,300);
+    chopperFX.stormStart(this.player.position.clone());
     this.storm={t:0,d:1.1,targets,next:0,last:this.player.position.clone()};return true;
   }
   doldrumsCannon(){
@@ -31331,10 +31593,10 @@ class ChopperPirateKit {
   }
   krakenRising(){
     if(this.kraken||this.cool.kraken>0)return false;
-    this.cool.kraken=this.len.kraken;chopperFX.screenFlash('rgba(63,182,216,.6)',.5,420);
+    this.cool.kraken=this.len.kraken;chopperFX.krakenStart(this.player.position.clone());
     triggerCombatShake(18,320);this.baseScale=this.player.scale.clone();this.kraken={t:0,d:6.0,frame:0};return true;
   }
-  broadside(){chopperFX.broadside();triggerCombatShake(20,340);this._radial(this.player.position,9,4.5);return true;}
+  broadside(){return triggerChopperBroadsideClones();}
 
   // ---- per-frame ----
   update(dt){
@@ -31424,7 +31686,7 @@ class ChopperPirateKit {
     if(this.storm){
       const s=this.storm;s.t+=dt;const should=Math.min(s.targets.length,Math.floor((s.t/s.d)*s.targets.length+1e-6));
       while(s.next<should){const t=s.targets[s.next++];if(!t||!t.parent||t.userData?.dead)continue;chopperFX.stormHit(t.position.clone(),s.next);this._hurt(t,999999);triggerCombatShake(12,200);}
-      if(s.t>=s.d){const last=s.targets[s.targets.length-1];if(last&&last.parent)this.player.position.set(last.position.x+.9,this.player.position.y,last.position.z+.3);this.storm=null;}
+      if(s.t>=s.d){const last=s.targets[s.targets.length-1];if(last&&last.parent)this.player.position.set(last.position.x+.9,this.player.position.y,last.position.z+.3);chopperFX.stormFinish(this.player.position.clone());triggerCombatShake(18,260);this.storm=null;}
     }
     if(this.cannon){const s=this.cannon;s.t+=dt;for(const e of this._enemies())e.userData.chopperBecalmed=.12;if(s.t>=s.d)this.cannon=null;}
     for(const e of this._enemies())if(e.userData.chopperBecalmed>0)e.userData.chopperBecalmed=Math.max(0,e.userData.chopperBecalmed-dt*0);
@@ -31455,11 +31717,12 @@ function ensureChopperKit(){
   }
   return chopperKit;
 }
-function disposeChopperKit(){ if(chopperKit){try{chopperKit.dispose();}catch(_e){} chopperKit=null;} }
+function disposeChopperKit(){ if(chopperKit){try{chopperKit.dispose();}catch(_e){} chopperKit=null;} clearChopperBroadsideClones(); }
 function updateChopperKit(dt){
-  if(!chopperClassIsActive()){ if(chopperKit)disposeChopperKit(); return; }
+  if(!chopperClassIsActive()){ if(chopperKit)disposeChopperKit(); else if(chopperBroadsideClones.length)clearChopperBroadsideClones(); return; }
   const k=ensureChopperKit(); if(!k)return;
   try{ k.update(dt); }catch(err){ console.error('Chopper kit update recovered:',err); }
+  try{ updateChopperBroadsideClones(dt); }catch(err){ console.error('Chopper Broadside clone update recovered:',err); }
 }
 function triggerChopperPrimary(w){
   const k=ensureChopperKit();if(!k||!w)return false;
@@ -33662,7 +33925,7 @@ function killZombie(z){
   updateEnemyCountHud();
   updateBossHealthHud();
   updateEnemyRadar();
-  if(chopperClassIsActive()){chopperBroadsideCharge=Math.min(100,chopperBroadsideCharge+4);chopperMeleeHits=Math.min(25,chopperMeleeHits+1);updateHoodedHud();}
+  if(chopperClassIsActive()){updateHoodedHud();}
   else if(hoodedIsActive()){spawnSoulOrb(z.position);hoodedUltimateCharge=Math.min(100,hoodedUltimateCharge+4);passiveState.shadowstepTimer=passiveForAvatar().killMoveDuration||0;updateHoodedHud();}
   if(archerIsActive()){
     const p=HERO_PASSIVES.rogue;
@@ -34827,7 +35090,7 @@ function startSurvival(){
   runRoundScoreBreakdown=[];
   secondaryUsedThisRound=false;
   ultimateUsedThisRound=false;
-  hearts=3;maxHearts=3;round=runStartRound;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;chopperBroadsideCharge=0;chopperMeleeHits=0;archerVolleyStep=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;barbarianFlurryStep=0;barbarianResetRuntime();clearBarbarianKinClones();barbarianKinCooldown=0;document.body.style.filter='';updateHoodedHud();
+  hearts=3;maxHearts=3;round=runStartRound;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;chopperBroadsideCharge=0;chopperMeleeHits=0;chopperBroadsideCooldown=0;chopperBroadsideCycleDuration=0;clearChopperBroadsideClones();archerVolleyStep=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;barbarianFlurryStep=0;barbarianResetRuntime();clearBarbarianKinClones();barbarianKinCooldown=0;document.body.style.filter='';updateHoodedHud();
   playerStats = startingStatsForActiveHero();
   // Base survival health is three hearts. Hero HP bonuses are represented by
   // HP levels above 1, so +2 starting HP produces five full hearts.
