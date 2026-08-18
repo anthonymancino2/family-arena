@@ -1692,7 +1692,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.17.00 - Thor Kit: Pillars, Domes, Mjolnir';
+const GAME_VERSION='23.18.00 - Arms Out (all clips) + Thunderstep Breaker + Mjolnir Echo';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3782,8 +3782,8 @@ const CHARACTER_COMBAT = {
         desc:'Alternating heavy left and right side swings. Each one launches a huge layered crescent that tears a fissure down the lane as it travels, piercing every enemy in its path, and detonates a wide shockwave at your feet as it leaves.'},
       earthbreaker:{name:'Earthbreaker Slam', price:220, slot:'secondary', kind:'earthbreaker', cooldown:1.0, damage:2.1, radius:4.875, arc:Math.PI*2,
         desc:'Smash the ground Hulk-style and erupt a circular damage zone that throws every enemy inside it outward.'},
-      war_cyclone:{name:'Storm Orbit', price:400, slot:'secondary', kind:'barbarian_whirlwind', cooldown:0, damage:0, radius:5.4,
-        desc:'Hold the Secondary button to keep Aesir inside a sustained wall of spinning axes, flame and pressure. The cyclone repeatedly chips down and hurls back everything inside the visible ring, and stops the instant the button is released. Cooldown begins on release at 1 second in Round 1 and steadily falls to zero by Round 30.'},
+      war_cyclone:{name:'Mjolnir Echo', price:400, slot:'secondary', kind:'barbarian_whirlwind', cooldown:0, damage:0, radius:5.4,
+        desc:'Every weapon strike leaves a thunder imprint hanging in the air. She lands the full combo, there is a beat of silence, then all three imprints detonate in reverse order and replay every hit. Strongest on a single target; hold the Secondary button to keep the replay cycling.'},
       savage_roar:{name:'Thunder Call + Storm Strike', price:460, slot:'secondary', kind:'barbarian_roar_slash_combo', cooldown:1.18, damage:1.3, radius:8.5, auto:true,
         desc:'A repeating two-step combo: Thunder Call first, then Storm Strike, then repeat. Every step uses Storm Strike\'s 1.18-second cooldown. Roar keeps its forward pressure cone and Rending keeps its front-fired cutting wave.'}
     }
@@ -11379,6 +11379,166 @@ function aesirAxeEnergyMat(o){
     depthWrite:!o.additive, depthTest:true, side:o.side});
 }
 
+
+/* ---------------------------------------------------------------------------
+   V23.18.00 — ARMS OUT ON EVERY CLIP, NOT JUST THE IDLE.
+
+   Measured on the shipped V23.17.00 payload, not guessed. armbake.py baked
+   +-8deg abduction into Rest_Pose ONLY. Elbow lateral offset, all 24 clips:
+
+       Rest_Pose            0.209   <- the one clip that got the bake
+       Jog / Sprint         0.099 / 0.105
+       Sword_Attack         0.092
+       Sword_Regular_A      0.075
+       Spell_Simple_Shoot   0.049   <- worst
+       Two-hand_Blast       0.052
+
+   Her coat is 0.344 wide at elbow height. So in every clip she actually plays
+   in combat her arms were INSIDE the mesh, and the only clip that looked fixed
+   was the one she is almost never in. That is why it read as "never fixed".
+
+   This runs after the AnimationMixer each frame and pushes each arm outward
+   from wherever the authored clip left it, so it covers all 24 clips and any
+   clip added later. The correction is scaled by how buried the arm already is,
+   so an already-wide clip (Rest_Pose) is left alone instead of double-corrected
+   into a stiff T-pose.
+   --------------------------------------------------------------------------- */
+const AESIR_ARM_POSE = {
+  enabled:true,
+  out:1.90,        // how hard the upper arm is pushed away from the torso
+  lift:0.32,       // upward bias so the arm rides over the skirt flare
+  fore:0.55,       // forearm follow-through, keeps the elbow from spiking out
+  reach:2.35,      // target elbow clearance, in upper-arm lengths (scale-free).
+                   // 2.35 x 0.135 = 0.317, just under the 0.344 coat half-width,
+                   // so combat clips saturate the correction while Rest_Pose
+                   // (already at 0.209 and pointing outward) is geometrically
+                   // inert and stays as authored.
+  attackScale:0.80 // ease off mid-swing so authored attacks stay readable
+};
+const AESIR_ARM_TUNER = true;   // on-screen sliders; Anthony has no console
+
+let _aesArmRig=null,_aesArmRigFor=null;
+const _aesP1=new THREE.Vector3(),_aesP2=new THREE.Vector3(),_aesP3=new THREE.Vector3(),
+      _aesQ1=new THREE.Vector3(),_aesQ2=new THREE.Vector3(),
+      _aesLat=new THREE.Vector3(),_aesChest=new THREE.Vector3(),_aesOut=new THREE.Vector3(),
+      _aesQa=new THREE.Quaternion(),_aesQb=new THREE.Quaternion(),_aesQc=new THREE.Quaternion();
+
+function aesirArmRig(){
+  // Retry while null: the Aesir GLB loads asynchronously, so the first frames
+  // after a class switch have no bones yet. Caching the miss would mean the
+  // arms were never corrected for the whole match.
+  if(_aesArmRigFor===player&&_aesArmRig)return _aesArmRig;
+  _aesArmRigFor=player; _aesArmRig=null;
+  if(!player)return null;
+  const b={};
+  player.traverse(o=>{ if(o.isBone&&o.name)b[o.name]=o; });
+  if(b.upperarm_l&&b.upperarm_r&&b.lowerarm_l&&b.lowerarm_r&&b.clavicle_l&&b.clavicle_r){
+    _aesArmRig={uL:b.upperarm_l,uR:b.upperarm_r,fL:b.lowerarm_l,fR:b.lowerarm_r,
+      hL:b.hand_l||b.lowerarm_l,hR:b.hand_r||b.lowerarm_r,cL:b.clavicle_l,cR:b.clavicle_r};
+  }
+  return _aesArmRig;
+}
+
+/* Swing one bone so its direction moves toward _aesOut by `amt`. The rotation is
+   built in WORLD space and converted into the bone's parent space, which is why
+   it behaves identically on every clip: a fixed local-axis nudge would abduct in
+   one pose and adduct in another, which is exactly how the old bake misbehaved. */
+function aesirPushArm(bone,child,amt){
+  if(!(amt>0.0001)||!bone||!child||!bone.parent)return;
+  bone.getWorldPosition(_aesQ1); child.getWorldPosition(_aesQ2);
+  _aesQ2.sub(_aesQ1);
+  const len=_aesQ2.length(); if(len<1e-5)return;
+  _aesQ2.divideScalar(len);
+  _aesQ1.copy(_aesQ2).addScaledVector(_aesOut,amt);
+  if(_aesQ1.lengthSq()<1e-8)return;
+  _aesQ1.normalize();
+  _aesQa.setFromUnitVectors(_aesQ2,_aesQ1);
+  bone.parent.getWorldQuaternion(_aesQb);
+  _aesQc.copy(_aesQb).conjugate().multiply(_aesQa).multiply(_aesQb);
+  bone.quaternion.premultiply(_aesQc);
+  bone.updateMatrixWorld(true);
+}
+
+function aesirApplyArmPose(){
+  const C=AESIR_ARM_POSE;
+  aesirArmTunerSync();
+  if(!C.enabled||!player||!barbarianIsActive())return;
+  const R=aesirArmRig(); if(!R)return;
+  R.cL.updateMatrixWorld(true); R.cR.updateMatrixWorld(true);
+  R.cL.getWorldPosition(_aesP1); R.cR.getWorldPosition(_aesP2);
+  _aesLat.subVectors(_aesP1,_aesP2);
+  if(_aesLat.lengthSq()<1e-8)return;
+  _aesLat.normalize();                                   // her own left, in world space
+  _aesChest.addVectors(_aesP1,_aesP2).multiplyScalar(0.5);
+  const soften=(player.userData.kayActionLock||0)>0?C.attackScale:1;
+  for(let i=0;i<2;i++){
+    const sign=i?-1:1;
+    const up=i?R.uR:R.uL, fo=i?R.fR:R.fL, ha=i?R.hR:R.hL;
+    up.updateMatrixWorld(true);
+    up.getWorldPosition(_aesP1); fo.getWorldPosition(_aesP2);
+    const armLen=_aesP1.distanceTo(_aesP2); if(armLen<1e-5)continue;
+    const have=_aesP3.subVectors(_aesP2,_aesChest).dot(_aesLat)*sign;
+    const want=C.reach*armLen;
+    const deficit=Math.max(0,Math.min(1,(want-have)/Math.max(1e-5,want)));
+    if(deficit<=0.001)continue;
+    _aesOut.copy(_aesLat).multiplyScalar(sign);
+    _aesOut.y+=C.lift; _aesOut.normalize();
+    aesirPushArm(up,fo,C.out*deficit*soften);
+    aesirPushArm(fo,ha,C.fore*deficit*soften);
+  }
+}
+
+/* On-device tuning. Anthony is on mobile Safari with no console, and the last
+   two builds were lost to me guessing an angle he could have set in ten seconds.
+   Dial it here, read the numbers off the panel, and I bake them in. */
+let _aesTunerBuilt=false;
+function aesirArmTunerSync(){
+  if(!AESIR_ARM_TUNER)return;
+  if(!_aesTunerBuilt){
+    if(!document.body)return;
+    _aesTunerBuilt=true;
+    const w=document.createElement('div');
+    w.id='aesArmTuner';
+    w.style.cssText='position:fixed;left:6px;top:150px;z-index:120;font:600 10px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#dff4ff;display:none;';
+    const rows=[['out','OUT',0,3,0.05],['lift','LIFT',-0.4,1,0.02],
+                ['fore','FORE',0,2,0.05],['reach','REACH',0.8,2.6,0.05]];
+    let html='<button id="aesArmTgl" style="background:rgba(10,26,48,.86);border:1px solid #57b7ff;'+
+      'color:#bfe9ff;border-radius:9px;padding:5px 9px;font:700 10px sans-serif;">ARMS</button>'+
+      '<div id="aesArmBox" style="display:none;margin-top:4px;background:rgba(6,16,30,.90);'+
+      'border:1px solid #2f6fa8;border-radius:9px;padding:7px 8px;width:152px;">';
+    for(const [k,label,mn,mx,st] of rows){
+      html+='<div style="margin-bottom:5px;"><span>'+label+
+        ' <b id="aesArmV_'+k+'"></b></span><br><input id="aesArmS_'+k+
+        '" type="range" min="'+mn+'" max="'+mx+'" step="'+st+'" style="width:100%;"></div>';
+    }
+    html+='<div id="aesArmOut" style="font:600 9px monospace;color:#9fe4ff;word-break:break-all;"></div></div>';
+    w.innerHTML=html;
+    document.body.appendChild(w);
+    const box=w.querySelector('#aesArmBox');
+    w.querySelector('#aesArmTgl').addEventListener('click',ev=>{
+      ev.stopPropagation(); box.style.display=box.style.display==='none'?'block':'none';});
+    const dump=()=>{
+      const o=w.querySelector('#aesArmOut');
+      if(o)o.textContent='out '+AESIR_ARM_POSE.out.toFixed(2)+' lift '+AESIR_ARM_POSE.lift.toFixed(2)+
+        ' fore '+AESIR_ARM_POSE.fore.toFixed(2)+' reach '+AESIR_ARM_POSE.reach.toFixed(2);
+    };
+    for(const [k] of rows){
+      const sl=w.querySelector('#aesArmS_'+k), vv=w.querySelector('#aesArmV_'+k);
+      sl.value=AESIR_ARM_POSE[k]; vv.textContent=Number(sl.value).toFixed(2);
+      const push=()=>{AESIR_ARM_POSE[k]=parseFloat(sl.value);vv.textContent=parseFloat(sl.value).toFixed(2);dump();};
+      sl.addEventListener('input',push); sl.addEventListener('change',push);
+      ['pointerdown','touchstart','touchmove'].forEach(e=>sl.addEventListener(e,ev=>ev.stopPropagation(),{passive:true}));
+    }
+    dump();
+  }
+  const el=document.getElementById('aesArmTuner');
+  if(el){
+    const show=!!(typeof gameRunning!=='undefined'&&gameRunning)&&barbarianIsActive();
+    const want=show?'block':'none';
+    if(el.style.display!==want)el.style.display=want;
+  }
+}
+
 function createAesirAxeSpirit(){
   const S=AESIR_AXE_SPIRIT;
   const rig=new THREE.Group(), spin=new THREE.Group(), scl=new THREE.Group();
@@ -11494,11 +11654,41 @@ function createAesirAxeSpirit(){
     rings.push({m,life:0,max:1,to:1});
   }
   let rc=0;
-  function ring(x,z,to,life,color){
+  function ring(x,z,to,life,color,y){
     const R=rings[rc]; rc=(rc+1)%S.ringPool;
-    R.m.position.set(x,0.05,z); R.to=to;
+    // y is optional: Thunderstep Breaker needs a ring born at torso height, not
+    // one more scorch mark on the floor.
+    R.m.position.set(x,(y===undefined?0.05:y),z); R.to=to;
     R.m.material.color.setHex(color||0xa8ecff);
     R.life=R.max=life||0.55; R.m.visible=true;
+  }
+
+  /* ---- MJOLNIR ECHO scars. Three suspended thunder imprints, one shared
+     plane geometry, one material each, allocated once. They sit nearly still
+     and flicker rather than emitting particles, so three of them cost almost
+     nothing and the move is hard-capped at three. ---- */
+  const scarGeo=new THREE.PlaneGeometry(1,1);
+  const scars=[];
+  for(let i=0;i<3;i++){
+    const sm=new THREE.MeshBasicMaterial({color:0xbfe9ff,transparent:true,opacity:0,
+      side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending});
+    const q=new THREE.Mesh(scarGeo,sm);
+    q.visible=false; q.renderOrder=7; q.frustumCulled=false; scene.add(q);
+    scars.push({m:q,mat:sm,live:false,x:0,y:0,z:0});
+  }
+  let scarN=0;
+  function scarPlant(x,y,z,size){
+    if(scarN>=scars.length)return;
+    const S2=scars[scarN++];
+    S2.x=x; S2.y=y; S2.z=z; S2.live=true;
+    S2.m.position.set(x,y,z);
+    S2.m.scale.setScalar(size||1);
+    S2.m.visible=true; S2.mat.opacity=0.85;
+    if(camera)S2.m.lookAt(camera.position);
+  }
+  function scarClear(){
+    for(const q of scars){q.live=false;q.m.visible=false;q.mat.opacity=0;}
+    scarN=0;
   }
 
   /* ---- LIGHT PILLARS: a column of sky that lands where the axe lands. This is
@@ -11587,6 +11777,7 @@ function createAesirAxeSpirit(){
   let charge=0, yaw=0, yawWant=0, twitchIn=2.2, side=1, clock=0;
   let act=null, actT=0, actDur=0, actStruck=false, actKind='', dmgSpec=null;
   let mjolReach=0, mjolYaw=0, hostYawCache=0, domeStep=0;
+  let tsPathDone=false, echoStep=0, echoBoom=0;
   let attention=null;
 
   function shortAngle(f,t){ let d=(t-f)%(Math.PI*2); if(d>Math.PI)d-=Math.PI*2; if(d<-Math.PI)d+=Math.PI*2; return d; }
@@ -11608,7 +11799,10 @@ function createAesirAxeSpirit(){
     actKind=kind; actT=0; actStruck=false; act=true; dmgSpec=spec||null;
     side=Math.random()<0.5?-1:1;
     actDur = kind==='ragnarok'?2.2 : kind==='cleave'?1.05 : kind==='chain'?1.1
-           : kind==='orbit'?3.2 : kind==='mjolnir'?1.35 : kind==='dome'?1.5 : 0.5;
+           : kind==='orbit'?3.2 : kind==='mjolnir'?1.35 : kind==='dome'?1.5
+           : kind==='thunderstep'?0.62 : kind==='echo'?1.62 : 0.5;
+    tsPathDone=false; echoStep=0; echoBoom=0;
+    if(kind==='echo')scarClear();
     mjolReach=0; mjolYaw=hostYawCache;
     attention=nearestEnemy(16);
     return true;
@@ -11651,6 +11845,20 @@ function createAesirAxeSpirit(){
         mjolReach=reach*fwd;
         anchor.set(hx+Math.sin(mjolYaw)*mjolReach, hy+1.35*HS, hz+Math.cos(mjolYaw)*mjolReach);
         sTarget=BS*(1.0+fwd*0.75);
+      }else if(actKind==='thunderstep'){
+        // THUNDERSTEP BREAKER. The axe runs out along the dash line ahead of
+        // her, then snaps back to the strike point on the contact frame.
+        const ram=k<0.5?(k/0.5):1, lead=6.0*HS*ram;
+        anchor.set(hx+Math.sin(hostYawCache)*lead, hy+(0.6+ram*0.7)*HS,
+                   hz+Math.cos(hostYawCache)*lead);
+        sTarget=BS*(1.1+ram*0.35);
+      }else if(actKind==='echo'){
+        // MJOLNIR ECHO. It stays close and jabs with her instead of orbiting.
+        const ph=actT*7.4, sw=Math.sin(ph)*0.85;
+        anchor.set(hx+Math.sin(hostYawCache+sw)*1.7*HS,
+                   hy+(1.2+Math.sin(ph*1.7)*0.32)*HS,
+                   hz+Math.cos(hostYawCache+sw)*1.7*HS);
+        sTarget=BS*1.22;
       }else if(actKind==='dome'){
         // THUNDER DOME. It climbs to the crown of the arena and drops a shell
         // of lightning on everything at once.
@@ -11690,8 +11898,8 @@ function createAesirAxeSpirit(){
     rig.position.addScaledVector(vel,dt);
 
     /* ---- orientation: upright, yawing to face what it watches ---- */
-    if(act && (actKind==='orbit'||actKind==='ragnarok'||actKind==='chain'||actKind==='mjolnir'||actKind==='dome')){
-      scl.rotation.y+=dt*(actKind==='orbit'?26:actKind==='mjolnir'?34:12);
+    if(act && (actKind==='orbit'||actKind==='ragnarok'||actKind==='chain'||actKind==='mjolnir'||actKind==='dome'||actKind==='echo'||actKind==='thunderstep')){
+      scl.rotation.y+=dt*(actKind==='orbit'?26:actKind==='mjolnir'?34:actKind==='thunderstep'?30:actKind==='echo'?20:12);
       _eul.set(0,yaw,0); _q.setFromEuler(_eul);
       spin.quaternion.slerp(_q,1-Math.pow(0.02,dt));
     }else{
@@ -11809,6 +12017,98 @@ function createAesirAxeSpirit(){
           burst(hx,0.1,hz,40,3.6);
           if(dmgSpec)aesirSpiritDamage(hx,hz,4.4*HS,dmgSpec.d*0.8,dmgSpec.s,dmgSpec.k);
         }
+      }else if(actKind==='thunderstep'){
+        /* THUNDERSTEP BREAKER.
+           The ground lightning is fired once, at full length, on the frame the
+           button goes down. That is the whole identity of the move: the
+           electricity is already at the target while she is still crossing the
+           gap. Firing it up front also means zero added input latency, which
+           matters more on a phone than any windup would. */
+        if(!tsPathDone){
+          tsPathDone=true;
+          const fx=Math.sin(hostYawCache), fz=Math.cos(hostYawCache), reach=6.4*HS;
+          for(let i=0;i<6;i++){                       // 6 branches, inside the 5-7 budget
+            const t0=0.08+i*0.145, t1=Math.min(1.02,t0+0.36);
+            const sp=(i%2?1:-1)*(0.30+i*0.15)*HS;
+            bolt(hx+fx*reach*t0-fz*sp*0.30, 0.07, hz+fz*reach*t0+fx*sp*0.30,
+                 hx+fx*reach*t1+fz*sp,      0.07, hz+fz*reach*t1-fx*sp,
+                 0.26*HS, 0.30+i*0.025, 0x7fd8ff, 0.13*HS);
+          }
+          crackFan(hx+fx*reach*0.80, hz+fz*reach*0.80, 4, 1.9*HS, 0.44);
+          ring(hx+fx*reach*0.45, hz+fz*reach*0.45, 1.4*HS, 0.30, 0x9fe4ff);
+        }
+        // she chases her own lightning: a short tether, not a particle cloud
+        if(Math.random()<dt*32)
+          bolt(p.x,p.y,p.z,hx,hy+1.35*HS,hz,0.18,0.11,0x9be8ff,0.10*HS);
+        if(actT>actDur*0.48&&!actStruck){
+          actStruck=true;
+          const z0=nearestEnemy(4.8*HS);
+          const cx=z0?z0.position.x:hx+Math.sin(hostYawCache)*2.3*HS;
+          const cz=z0?z0.position.z:hz+Math.cos(hostYawCache)*2.3*HS;
+          const ty=(z0?z0.position.y:hy)+1.05*HS;
+          // compressed thunder ring, born at torso height and thrown outward
+          ring(cx,cz,3.4*HS,0.34,0xffffff,ty);
+          ring(cx,cz,2.4*HS,0.28,0x9fe4ff,ty+0.20*HS);
+          ring(cx,cz,2.0*HS,0.42,0xbff7ff);
+          for(let i=0;i<3;i++){
+            const a=i/3*6.283+Math.random();
+            bolt(cx,ty,cz,cx+Math.cos(a)*2.5*HS,ty+(Math.random()-0.35)*0.9*HS,
+                 cz+Math.sin(a)*2.5*HS,0.20*HS,0.20,0xeaffff,0.13*HS);
+          }
+          burst(cx,ty,cz,24,2.6);
+          if(dmgSpec){
+            // light stagger for the crowd, full damage topped up on the target
+            aesirSpiritDamage(cx,cz,dmgSpec.r*HS,dmgSpec.d*0.35,0.18,dmgSpec.k*0.40);
+            if(z0)aesirSpiritDamageOne(z0,dmgSpec.d*0.65,dmgSpec.s,dmgSpec.k);
+          }
+          // contact frame drives the strike animation, not the button press
+          if(player&&player.userData.playKayClip)
+            player.userData.playKayClip('storm strike b',true,true,0.22);
+          aesirStormFlash(0.18,90);
+          triggerCombatShake(8,140);
+        }
+      }else if(actKind==='echo'){
+        /* MJOLNIR ECHO.
+           Three combo contacts each plant a suspended thunder imprint. After a
+           beat of silence the imprints detonate in REVERSE order, so the fight
+           appears to replay her combo by itself. Hard-capped at three scars. */
+        const beat=[0.12,0.27,0.42];
+        for(let i=0;i<3;i++){
+          if(echoStep===i&&k>=beat[i]){
+            echoStep=i+1;
+            const z=nearestEnemy(3.4*HS);
+            const sx=z?z.position.x:hx+Math.sin(hostYawCache)*1.6*HS;
+            const sz=z?z.position.z:hz+Math.cos(hostYawCache)*1.6*HS;
+            const sy=(z?z.position.y:hy)+(0.85+i*0.20)*HS;
+            scarPlant(sx,sy,sz,(0.95+i*0.14)*HS);
+            bolt(p.x,p.y,p.z,sx,sy,sz,0.15,0.12,0xeaffff,0.12*HS);
+            burst(sx,sy,sz,7,1.5);
+            if(dmgSpec)aesirSpiritDamage(sx,sz,dmgSpec.r*HS,dmgSpec.d,dmgSpec.s,dmgSpec.k);
+          }
+        }
+        // the scars hang almost motionless and flicker; no particle spew
+        for(const q of scars){
+          if(!q.live)continue;
+          q.mat.opacity=0.50+Math.sin(clock*23+q.y*8)*0.24;
+          if(camera)q.m.lookAt(camera.position);
+        }
+        const boom=[0.70,0.80,0.90];
+        for(let i=0;i<3;i++){
+          if(echoBoom===i&&k>=boom[i]){
+            echoBoom=i+1;
+            const q=scars[2-i];                        // last hit detonates first
+            if(q&&q.live){
+              q.live=false; q.m.visible=false; q.mat.opacity=0;
+              ring(q.x,q.z,2.0*HS,0.26,0xffffff,q.y);
+              bolt(q.x,q.y+2.1*HS,q.z,q.x,q.y-0.55*HS,q.z,0.16*HS,0.18,0xbff7ff,0.15*HS);
+              burst(q.x,q.y,q.z,16,2.1);
+              if(dmgSpec)aesirSpiritDamage(q.x,q.z,dmgSpec.r*0.8*HS,dmgSpec.d*0.55,
+                                           dmgSpec.s*0.6,dmgSpec.k*0.5);
+              aesirStormFlash(0.11,70);
+              triggerCombatShake(5,90);
+            }
+          }
+        }
       }else if(actKind==='dome'){
         if(actT<0.55&&Math.random()<dt*26)
           bolt(p.x+(Math.random()-.5)*3.4*HS,p.y+2.4*HS,p.z+(Math.random()-.5)*3.4*HS,
@@ -11837,7 +12137,7 @@ function createAesirAxeSpirit(){
           bolt(tgt.x,tgt.y+5.0*HS,tgt.z,tgt.x,tgt.y,tgt.z,0.26,0.24,0xbff7ff,0.20*HS);
         }
       }
-      if(actT>=actDur){ act=null; actKind=''; dmgSpec=null; }
+      if(actT>=actDur){ if(actKind==='echo')scarClear(); act=null; actKind=''; dmgSpec=null; }
     }
 
     /* ---- fx pools ---- */
@@ -11904,6 +12204,8 @@ function createAesirAxeSpirit(){
     for(const P of pillars){scene.remove(P.m);P.m.geometry.dispose();P.mat.dispose();}
     for(const D of domes){scene.remove(D.m);D.m.geometry.dispose();D.mat.dispose();}
     for(const C of cracks){scene.remove(C.m);C.m.geometry.dispose();C.mat.dispose();}
+    for(const q of scars){scene.remove(q.m);q.mat.dispose();}
+    scarGeo.dispose();
     geo.dispose(); ghostGeo.dispose(); ghostMat.dispose();
     matCore.dispose(); matHalo.dispose(); matEdge.dispose(); spGeo.dispose(); sparks.material.dispose();
   }
@@ -11988,6 +12290,9 @@ function aesirResolveClip(requested){
   if(/stun|freeze|hit|hurt|damage|flinch/.test(n)) return ['Push',.90,false,0];
 
   // --- Thor performances ---
+  if(/thunderstep/.test(n)) return ['Sword_Dash_RM',1.06,false,0];
+  if(/storm strike b/.test(n)) return ['Sword_Regular_B',1.04,false,0];
+  if(/echo/.test(n)) return ['Sword_Regular_Combo',1.08,false,0];
   if(/mjolnir|throw|recall/.test(n)) return ['OverhandThrow',.95,false,0];
   if(/bifrost|ascend|skyfall|descend/.test(n)) return ['Land_Three_Point',.85,false,0];
   if(/thunder dome|dome|godblast|summon/.test(n)) return ['Two-hand_Blast',.82,false,0];
@@ -15240,6 +15545,17 @@ function doDash(){
   }
   if(hoodedIsActive()&&!chopperClassIsActive()){spawnShadowSmoke(player.position.x,player.position.y+.55,player.position.z,24);spawnAfterimage();shadowAfterimageTimer=.04;invincibleTimer=Math.max(invincibleTimer,DASH_DURATION+.12);}
   else spawnBurst(player.position.x,0.4,player.position.z,9,FX_MAT_DUST,3.4);
+  // V23.18.00 THUNDERSTEP BREAKER rides the dash: fast engage, DASH_COOLDOWN
+  // is already the fast cooldown the move wants, and it needs no new button.
+  if(barbarianIsActive()&&aesirAxe&&!rhinoIsActive()){
+    if(aesirAxe.provoke('thunderstep',{r:2.3,d:1.45,s:0.32,k:3.4})){
+      if(player.userData.playKayClip)
+        player.userData.playKayClip('thunderstep',true,true,0.30);
+      aesirStormFlash(0.16,80);
+      toast('THUNDERSTEP');
+      if(navigator.vibrate)navigator.vibrate([12,18,26]);
+    }
+  }
   const btn = document.getElementById('dashBtn');
   btn.classList.add('cooling');
   setTimeout(()=>btn.classList.remove('cooling'), DASH_COOLDOWN*1000);
@@ -15604,13 +15920,14 @@ function triggerBarbarianWhirlwind(){
   toast('WAR AXE CYCLONE');
   return true;
 }
-function barbarianStormOrbit(){
-  // V23.15.00 STORM ORBIT on the secondary. The axe stops pretending to be a
-  // weapon and becomes a storm: it orbits her, tethered by arcs, shocking
-  // whatever it sweeps past.
+function barbarianMjolnirEcho(){
+  // V23.18.00 MJOLNIR ECHO replaces Storm Orbit on the secondary. She plays the
+  // authored combo; each contact plants a suspended thunder imprint, and after a
+  // beat they detonate in reverse order. Holding the secondary re-arms it as
+  // soon as the previous replay is past its commit point.
   if(!gameRunning||!barbarianIsActive()||!player||!aesirAxe)return false;
-  if(!aesirAxe.provoke('orbit',{r:3.0,d:0.85,s:0.30,k:3.2}))return false;
-  if(player.userData.playKayClip)player.userData.playKayClip('cyclone',true,false,.35);
+  if(!aesirAxe.provoke('echo',{r:2.4,d:1.15,s:0.30,k:3.0}))return false;
+  if(player.userData.playKayClip)player.userData.playKayClip('echo',true,false,.35);
   triggerCombatShake(6,140);
   return true;
 }
@@ -15620,8 +15937,13 @@ function barbarianWhirlPulse(){
   const pos={x:player.position.x,y:player.position.y,z:player.position.z};
   // Thick counter-rotating axe arcs plus a full-radius pressure beat.
   const spin=(performance.now()*0.0046)%(Math.PI*2);
-  for(let i=0;i<4;i++){
-    spawnAxeSwingTrail(pos,spin+i*(Math.PI*.5),i%2?1:-1,1.72,i%2?0xff8a28:0xfff0c8);
+  // The orange War Axe Cyclone arcs are the old identity. Skip them whenever the
+  // storm spirit is the one performing; Green Rhino has no spirit, so it keeps
+  // its original look untouched.
+  if(!aesirAxe){
+    for(let i=0;i<4;i++){
+      spawnAxeSwingTrail(pos,spin+i*(Math.PI*.5),i%2?1:-1,1.72,i%2?0xff8a28:0xfff0c8);
+    }
   }
   knightShockRing(pos,c.radius*.52,0xff5a18,.15);
   knightShockRing(pos,c.radius*.78,0xffd49a,.20);
@@ -15674,7 +15996,7 @@ function barbarianUpdateWhirlwind(dt){
   r.whirlDust=(r.whirlDust||0)-dt;
   if(r.whirlPulse<=0){ r.whirlPulse=BARB_WHIRL.pulse; barbarianWhirlPulse(); }
   // V23.15.00: keep the spirit orbiting for as long as the secondary is held
-  if(aesirAxe)barbarianStormOrbit();
+  if(aesirAxe)barbarianMjolnirEcho();
   if(r.whirlDust<=0){
     r.whirlDust=.16;
     if(knightFxBudget(1))spawnBurst(player.position.x,player.position.y+.05,player.position.z,isMobile?2:4,FX_MAT_SPARK,2.0);
@@ -33817,6 +34139,8 @@ function update(dt){
   if(player && player.userData.kayMixer){
     player.userData.kayMixer.update(dt);
     player.userData.kayActionLock = Math.max(0, (player.userData.kayActionLock || 0) - dt);
+    // V23.18.00: arms out, applied AFTER the mixer so it wins on all 24 clips.
+    aesirApplyArmPose();
   }
   updateAesirAxeSpirit(dt);
   if(barbarianIsActive()){
