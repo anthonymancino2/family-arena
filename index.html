@@ -1,4 +1,4 @@
-<!-- V23.12.00 Chopper Pirate Combat Revision: removes move-name pop-up banners; replaces the Pirate default Primary with one black forward cannonball using the game's standard non-Archer forward auto-aim cone; moves Anchor Drop to Secondary, targets the nearest enemy within half the arena radius and renders the anchor at 3x size; removes Bulwark Guard; rebuilds Boarding Dash to carry touched enemies to the endpoint, kill normal enemies there, stun Brutes/bosses on first Boarding hit and kill them on the second, with shockwaves at both dash endpoints; Powder Kegs render at 10x size and their blast is lethal; restores Chopper support in the Ability/Ultimate HUD so his selected ultimate button appears. Save-compatible weapon and ability IDs are preserved/migrated. -->
+<!-- V23.12.01 Pirate Efficient Spectacle + Two Primaries: restores Cutlass Combo as Primary 1 and adds the black Cannon Shot as Primary 2; Anchor Drop remains a Secondary in the retired Guard save slot, still targets the nearest enemy within half-map distance and stays 3x size. Boarding Dash carry/execute/stun rules and 10x lethal Powder Kegs are preserved. Pirate-only VFX are aggressively optimized for iPhone: repeated TubeGeometry slash trails and per-hit/per-projectile PointLights are removed from the hot path, dash particle counts are cut, impact debris/treasure/pillars are reduced, and cannonballs use lightweight emissive geometry instead of dynamic lights. Ultimate HUD support and move-name banner removal remain. -->
 <!-- V23.11.00 Chopper Pirate Kit: forks a genuinely standalone ChopperPirateKit class. Chopper no longer instantiates the Velocity Weaver engine at all - his own class owns his cooldowns, combo state, damage, enemy slow and per-frame update, and every trigger routes to it before the rogue kit is consulted. Fixes Boarding Dash damaging the player: it warped him ONTO the target with zero i-frames, so enemy contact collision hurt him. It now stops 2 units short and grants 0.75s of real invulnerability. Bulwark Guard grants 2s of genuine i-frames and physically shoves enemies out of reach. Large visual upgrade: real dynamic PointLight flashes, thick TubeGeometry blade trails, ground telegraph rings before every AoE, tumbling debris, rising light pillars, full-screen colour washes and a move-name banner so it is always obvious which move fired. -->
 <!-- V23.10.00 Chopper Own Class: Chopper is no longer a cosmetic skin over the Shadow Stalker Rogue. gameplayAvatarType('chopper') now returns 'chopper', so no rogue or archer system can reach him: no purple shadow afterimage trail, no shadow smoke, no soul orbs, no Hooded-Rogue shadow clones flanking him, and no Eclipse ultimate. He gets his own signature instead - BROADSIDE, with its own POWDER meter and its own charge counters that the rogue can never read or reset. Second primary replaced: the Keelhaul Spin whirlpool is gone, replaced by Anchor Drop, a gold ship anchor that falls and cracks the deck. Slash arcs now sweep vertically through the air in front of him at chibi scale instead of lying flat on the ground at radius 1.5, which is what rendered as a large white puddle. -->
 <!-- V23.09.00 Chopper Storybook Pirate: removes ALL avatar deformation. _updateScale() previously stretched the player along Z for the lunge and wobbled X/Z for the guard; because the primary auto-fires every ~0.22s that stretch was effectively permanent and smeared the whole model sideways. Chopper is now locked to uniform scale, stays fully opaque (no 30% ghost) and is never touched by any move. Boarding Dash no longer silently refuses to fire when no enemy is in range - it always performs a committed leap. Adds a procedural storybook-pirate FX layer (canvas-generated sprites, zero new payload): layered white/gold/rose crescent slashes with a brighter every-third-hit finisher, sea-green whirlpool for Keelhaul Spin, foam wake and splash rings for Boarding Dash, an iridescent bubble shield for Bulwark Guard, real little gold-banded barrels with pulsing fuses for Powder Keg Toss, a muzzle bloom and rolling calm for Doldrums Cannon, and rising foam columns for Kraken Rising. Gold coins, twinkles and hearts spray on impact. -->
@@ -1680,7 +1680,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.11.00 - Chopper Pirate Kit';
+const GAME_VERSION='23.12.01 - Pirate Efficient Spectacle';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3666,16 +3666,18 @@ const CHARACTER_COMBAT = {
     }
   },
   chopper: {
-    // Save IDs stay compatible, but the Pirate now has one default cannon Primary
-    // and three Secondaries: Boarding Dash, Anchor Drop and Powder Keg Toss.
+    // Two Primaries: the original Cutlass Combo stays, Cannon Shot is added as Primary 2.
+    // Anchor uses the retired Guard save ID so existing save structure remains stable.
     defaultId:'phantom_flurry',
     baseMoveMult:1.22,
     weapons:{
-      phantom_flurry:{name:'Cannon Shot', price:0, slot:'primary', kind:'velocity_sonic_piston', cooldown:0.38, damage:1.35, auto:true,
+      phantom_flurry:{name:'Cutlass Combo', price:0, slot:'primary', kind:'velocity_sonic_piston', cooldown:0.22, damage:1.35, auto:true,
+        desc:'A rolling three-hit cutlass chain — overhead chop, horizontal slash, then a committed lunging stab. Each landed hit flashes a lightweight steel arc and shoves the target back a step.'},
+      shadow_sweep:{name:'Cannon Shot', price:0, slot:'primary', kind:'velocity_arc_sweep', cooldown:0.38, damage:1.35, auto:true,
         desc:'Fire one heavy black cannonball forward. It uses the same standard forward auto-aim cone as the other default non-Archer ranged attacks and snaps to a valid enemy in front.'},
       shadowstep:{name:'Boarding Dash', price:0, slot:'secondary', kind:'velocity_quantum_slingshot', cooldown:0,
         desc:'Dash toward the nearest target, pulling enemies into the rush and carrying them to the endpoint. Normal enemies are executed there; Brutes and bosses are stunned on the first Boarding hit and executed on the second.'},
-      shadow_sweep:{name:'Anchor Drop', price:0, slot:'secondary', kind:'velocity_arc_sweep', cooldown:0,
+      smoke_bomb:{name:'Anchor Drop', price:0, slot:'secondary', kind:'velocity_phasing_resonance', cooldown:0,
         desc:'Drop a giant anchor directly onto the closest enemy within half the playable-map radius. The anchor itself is three times larger than before.'},
       vipers_fan:{name:'Powder Keg Toss', price:0, slot:'secondary', kind:'velocity_synaptic_snare', cooldown:0,
         desc:'Throw four enormous powder kegs around the Pirate. Each barrel is ten times larger than before and its detonation instantly defeats anything caught in the blast.'}
@@ -14254,11 +14256,10 @@ const HERO_ABILITIES = { rhino:[RHINO_CRASHING_BOLT,RHINO_SHATTERED_DOMAIN,RHINO
   barbarian:[BARBARIAN_PRIMAL_RAGE, BARBARIAN_WORLD_BREAKER, BARBARIAN_RAGNAROK_WAVE] };
 const REMOVED_WEAPON_IDS=['radiant_cleave','blade_cyclone','holy_wave','shield_bash','banner_spear','knight_banner_spear','primal_wave'];
 function sanitizeRemovedAbilitySelection(){
-  // V23.12.00 Pirate loadout migration: Anchor moved from Primary to Secondary
-  // and the old Bulwark Guard slot now resolves to Anchor instead.
+  // V23.12.01 Pirate migration: Cutlass remains Primary 1, Cannon occupies the old
+  // Anchor primary ID, and Anchor now occupies the retired Bulwark Guard secondary ID.
   if(state&&state.avatarType==='chopper'){
-    if(currentPrimaryWeaponId==='shadow_sweep') currentPrimaryWeaponId=null;
-    if(currentWeaponId==='smoke_bomb') currentWeaponId='shadow_sweep';
+    if(currentWeaponId==='shadow_sweep') currentWeaponId='smoke_bomb';
   }
   // V23.05.01 Shadow Stalker migration: old Hooded Rogue weapons no longer exist.
   if(['hooded_blade','ninja_uzi','spin','clone_stars','clone_spin'].includes(currentPrimaryWeaponId)) currentPrimaryWeaponId=null;
@@ -30964,7 +30965,7 @@ const chopperFX = (function(){
           live.splice(i,1);
         }
       }
-      while(live.length>300){const e=live.shift();group.remove(e.obj);
+      while(live.length>140){const e=live.shift();group.remove(e.obj);
         if(e.obj.geometry)e.obj.geometry.dispose();
         if(e.obj.material)e.obj.material.dispose();}
     },
@@ -30974,14 +30975,13 @@ const chopperFX = (function(){
       if(!ensure()||!player)return;
       const yaw=player.rotation.y,p=player.position.clone();
       const f=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
-      const at=p.clone().addScaledVector(f,.62);
+      const at=p.clone().addScaledVector(f,.72);at.y+=.72;
       const fin=step===2;
-      blade(at,yaw,{radius:fin?1.15:.9,span:fin?Math.PI*1.1:Math.PI*.82,
-        tilt:[1.0,-1.0,0][step],y:fin?.68:.8,thick:fin?1.5:1,
-        mid:fin?PAL.rose:PAL.gold,edge:fin?PAL.plum:PAL.rose,sparks:fin?9:5});
-      flash(at.clone().setY(p.y+.85),fin?PAL.rose:PAL.gold,fin?3.2:1.5,fin?.3:.2);
-      if(hit)treasure(at.clone().setY(p.y+.8),fin?9:4,{hearts:fin?2:0});
-      if(fin){ring(p,{color:PAL.rose,dur:.4,from:.5,to:3.6,peak:.8});screenFlash('rgba(255,158,199,.5)',.34,220);}
+      ring(p,{color:fin?PAL.rose:PAL.gold,dur:fin?.28:.20,from:.35,to:fin?3.0:2.0,peak:fin?.8:.55});
+      for(let i=0;i<(fin?3:2);i++)spark(at.clone().add(new THREE.Vector3((Math.random()-.5)*.55,Math.random()*.45,(Math.random()-.5)*.55)),
+        {map:tex.star,color:i%2?PAL.cream:(fin?PAL.rose:PAL.gold),from:fin?.34:.25,dur:.24+Math.random()*.12,
+         vel:new THREE.Vector3((Math.random()-.5)*1.2,.7+Math.random()*.7,(Math.random()-.5)*1.2),grav:-2.2});
+      if(fin)screenFlash('rgba(255,158,199,.28)',.22,130);
     },
     anchorTelegraph(at){
       if(!ensure())return;
@@ -31002,28 +31002,25 @@ const chopperFX = (function(){
     },
     anchorImpact(at){
       if(!ensure())return;
-      flash(at.clone().setY(at.y+.6),PAL.gold,7,.4);
-      ring(at,{color:PAL.gold,dur:.45,from:.5,to:6.0});
-      ring(at,{color:PAL.cream,dur:.6,from:.3,to:3.6,y:.3,peak:.8});
-      pillar(at,PAL.gold,3.4,.45);
-      debris(at,14);treasure(at.clone().setY(at.y+.6),16,{hearts:3});
-      screenFlash('rgba(255,215,106,.55)',.4,260);
+      ring(at,{color:PAL.gold,dur:.42,from:.5,to:5.6});
+      ring(at,{color:PAL.cream,dur:.50,from:.3,to:3.1,y:.22,peak:.65});
+      debris(at,6);
+      for(let i=0;i<4;i++)spark(at.clone().setY(at.y+.5),{map:tex.star,color:i%2?PAL.gold:PAL.cream,from:.28,dur:.35,
+        vel:new THREE.Vector3((Math.random()-.5)*2,1+Math.random()*1.5,(Math.random()-.5)*2),grav:-3});
+      screenFlash('rgba(255,215,106,.32)',.28,170);
     },
     boardingDash(start,end){
       if(!ensure())return;
-      ring(start,{color:PAL.aqua,dur:.52,from:.35,to:5.4,peak:.92});
-      ring(start,{color:PAL.white,dur:.38,from:.25,to:3.3,peak:.82});
-      ring(end,{color:PAL.cream,dur:.62,from:.3,to:6.0,peak:1});
-      ring(end,{color:PAL.aqua,dur:.46,from:.25,to:4.1,peak:.88});
-      flash(end.clone().setY(end.y+.8),PAL.aqua,4,.32);
+      ring(start,{color:PAL.aqua,dur:.40,from:.35,to:4.6,peak:.78});
+      ring(end,{color:PAL.cream,dur:.52,from:.3,to:5.6,peak:.95});
+      ring(end,{color:PAL.aqua,dur:.38,from:.25,to:3.6,peak:.72});
       const d=end.clone().sub(start);
-      for(let i=0;i<=14;i++){
-        const p=start.clone().addScaledVector(d,i/14);p.y+=.4;
-        spark(p,{map:tex.glow,color:i%2?PAL.aqua:PAL.white,from:.62,to:.06,dur:.3,fadeIn:.02});
-        if(i%2===0)spark(p.clone().setY(p.y+.35),{map:tex.star,color:PAL.cream,from:.32,dur:.45,
-          vel:new THREE.Vector3((Math.random()-.5)*1.6,1.5,(Math.random()-.5)*1.6),grav:-3.2});
+      for(let i=0;i<6;i++){
+        const p=start.clone().addScaledVector(d,(i+.5)/6);p.y+=.42;
+        spark(p,{map:tex.glow,color:i%2?PAL.aqua:PAL.white,from:.48,to:.05,dur:.24,fadeIn:.02});
       }
-      treasure(end.clone().setY(end.y+.6),7,{hearts:1});
+      for(let i=0;i<3;i++)spark(end.clone().setY(end.y+.55),{map:tex.star,color:PAL.cream,from:.3,dur:.36,
+        vel:new THREE.Vector3((Math.random()-.5)*1.8,1.2+Math.random(),(Math.random()-.5)*1.8),grav:-3});
     },
     guardOpen(dur){
       if(!ensure()||!player)return;
@@ -31051,8 +31048,8 @@ const chopperFX = (function(){
       const keg=new THREE.Group();
       const wood=new THREE.MeshLambertMaterial({color:0x8a5a33,flatShading:true,transparent:true});
       const gold=new THREE.MeshLambertMaterial({color:0xe8b13c,flatShading:true,transparent:true});
-      const body=new THREE.Mesh(new THREE.CylinderGeometry(.22,.22,.34,14),wood);
-      const b1=new THREE.Mesh(new THREE.TorusGeometry(.225,.032,8,16),gold);
+      const body=new THREE.Mesh(new THREE.CylinderGeometry(.22,.22,.34,8),wood);
+      const b1=new THREE.Mesh(new THREE.TorusGeometry(.225,.032,6,10),gold);
       b1.rotation.x=Math.PI/2;b1.position.y=.09;
       const b2=b1.clone();b2.position.y=-.09;
       keg.add(body,b1,b2);
@@ -31076,11 +31073,11 @@ const chopperFX = (function(){
     kegBlow(keg){
       if(!ensure()||!keg)return;
       const p=keg.position.clone();
-      flash(p.clone().setY(p.y+.5),PAL.ember,8,.4);
-      ring(p,{color:PAL.gold,dur:.48,from:.3,to:5.0});
-      ring(p,{color:PAL.ember,dur:.62,from:.2,to:3.2,y:.3,peak:.85});
-      pillar(p,PAL.ember,3.0,.42);
-      debris(p,12,0x9a6634);treasure(p,16,{hearts:3});
+      ring(p,{color:PAL.gold,dur:.46,from:.4,to:5.0});
+      ring(p,{color:PAL.ember,dur:.54,from:.25,to:3.3,y:.24,peak:.75});
+      debris(p,5,0x9a6634);
+      for(let i=0;i<4;i++)spark(p.clone().setY(p.y+.45),{map:tex.glow,color:i%2?PAL.ember:PAL.gold,from:.32,to:.7,dur:.35,
+        vel:new THREE.Vector3((Math.random()-.5)*3,1.4+Math.random()*1.5,(Math.random()-.5)*3),grav:-3.2});
       if(keg.userData.fuse){group.remove(keg.userData.fuse);keg.userData.fuse.material.dispose();}
       group.remove(keg);
       keg.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});
@@ -31090,36 +31087,32 @@ const chopperFX = (function(){
       const p=player.position.clone(),yaw=player.rotation.y;
       const f=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
       const m=p.clone().addScaledVector(f,1.15);m.y+=.9;
-      flash(m,PAL.cream,9,.34);
-      spark(m,{map:tex.star,color:PAL.gold,from:.5,to:3.2,dur:.4,fadeIn:.02});
-      for(let i=0;i<20;i++){
-        const dir=f.clone().applyAxisAngle(new THREE.Vector3(0,1,0),(Math.random()-.5)*.9);
-        spark(m,{map:tex.glow,color:i%3?PAL.cream:PAL.gold,from:.32,to:1.05,
-          dur:.55+Math.random()*.5,
-          vel:dir.multiplyScalar(5+Math.random()*7).setY(.5+Math.random()),grav:-1.4});
+      spark(m,{map:tex.star,color:PAL.gold,from:.7,to:2.6,dur:.34,fadeIn:.02});
+      for(let i=0;i<8;i++){
+        const dir=f.clone().applyAxisAngle(new THREE.Vector3(0,1,0),(Math.random()-.5)*.8);
+        spark(m,{map:tex.glow,color:i%2?PAL.cream:PAL.gold,from:.3,to:.8,dur:.42+Math.random()*.22,
+          vel:dir.multiplyScalar(5+Math.random()*5).setY(.4+Math.random()),grav:-1.5});
       }
-      ring(p,{color:PAL.sea,dur:.8,from:.5,to:9.0});
-      ring(p,{color:PAL.aqua,dur:1.0,from:.3,to:13.0,y:.2,peak:.7});
-      screenFlash('rgba(63,182,216,.45)',.36,320);
+      ring(p,{color:PAL.sea,dur:.72,from:.5,to:9.0});
+      ring(p,{color:PAL.aqua,dur:.90,from:.3,to:12.0,y:.2,peak:.65});
+      screenFlash('rgba(63,182,216,.32)',.28,220);
     },
     krakenPulse(pos,frame){
       if(!ensure())return;
-      ring(pos,{color:frame%2?PAL.sea:PAL.aqua,dur:.7,from:.6,to:7.2});
-      flash(pos.clone().setY(pos.y+1.2),PAL.sea,5,.4);
-      for(let i=0;i<8;i++){
-        const a=(i/8)*Math.PI*2+frame*.35;
-        const p=pos.clone().add(new THREE.Vector3(Math.cos(a)*2.3,.2,Math.sin(a)*2.3));
-        pillar(p,PAL.sea,2.6,.55);
-        spark(p,{map:tex.star,color:PAL.cream,from:.36,dur:.9,
-          vel:new THREE.Vector3(Math.cos(a)*.9,2.4,Math.sin(a)*.9),grav:-1.8});
+      ring(pos,{color:frame%2?PAL.sea:PAL.aqua,dur:.62,from:.7,to:7.0,peak:.8});
+      ring(pos,{color:PAL.cream,dur:.44,from:.5,to:4.3,y:.18,peak:.5});
+      for(let i=0;i<4;i++){
+        const a=(i/4)*Math.PI*2+frame*.25;
+        const p=pos.clone().add(new THREE.Vector3(Math.cos(a)*2.4,.35,Math.sin(a)*2.4));
+        spark(p,{map:tex.glow,color:i%2?PAL.sea:PAL.aqua,from:.42,to:.8,dur:.50,
+          vel:new THREE.Vector3(Math.cos(a)*.7,1.8,Math.sin(a)*.7),grav:-2.0});
       }
     },
     stormHit(pos,idx){
       if(!ensure())return;
-      blade(pos,idx*1.7,{radius:1.25,span:Math.PI,y:.85,dur:1,thick:1.4,
-        mid:PAL.gold,edge:PAL.rose,sparks:7});
-      flash(pos.clone().setY(pos.y+.9),PAL.gold,5,.28);
-      treasure(pos.clone().setY(pos.y+.8),10,{hearts:1});
+      ring(pos,{color:idx%2?PAL.gold:PAL.rose,dur:.30,from:.3,to:2.4,peak:.8});
+      for(let i=0;i<3;i++)spark(pos.clone().setY(pos.y+.7),{map:tex.star,color:i%2?PAL.cream:PAL.gold,from:.3,dur:.28,
+        vel:new THREE.Vector3((Math.random()-.5)*1.8,.9+Math.random(),(Math.random()-.5)*1.8),grav:-2.6});
     },
     broadside(){
       if(!ensure()||!player)return;
@@ -31127,22 +31120,18 @@ const chopperFX = (function(){
       const f=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
       const rt=new THREE.Vector3(Math.sin(yaw+Math.PI/2),0,Math.cos(yaw+Math.PI/2));
       for(let s2=-1;s2<=1;s2+=2){
-        for(let i=0;i<6;i++){
-          const o=p.clone().addScaledVector(rt,s2*(.6+i*.36)).addScaledVector(f,-.4+i*.18);
-          o.y+=.8;
-          const dir=rt.clone().multiplyScalar(s2).add(f.clone().multiplyScalar(.2)).normalize();
-          flash(o,PAL.cream,3.5,.26);
-          spark(o,{map:tex.star,color:PAL.gold,from:.55,to:.1,dur:.32,fadeIn:.02});
-          for(let k=0;k<7;k++)
-            spark(o,{map:tex.glow,color:k%2?PAL.gold:PAL.cream,from:.36,to:.85,
-              dur:.6+k*.05,vel:dir.clone().multiplyScalar(8+k*1.8).setY(.6),grav:-1.3});
-        }
+        const muzzle=p.clone().addScaledVector(rt,s2*1.8);muzzle.y+=.85;
+        spark(muzzle,{map:tex.star,color:PAL.gold,from:1.0,to:3.0,dur:.34,fadeIn:.02});
+        const dir=rt.clone().multiplyScalar(s2).add(f.clone().multiplyScalar(.18)).normalize();
+        for(let k=0;k<6;k++)spark(muzzle.clone().addScaledVector(f,(k-2.5)*.10),
+          {map:tex.glow,color:k%2?PAL.gold:PAL.cream,from:.38,to:.82,dur:.48+k*.025,
+           vel:dir.clone().multiplyScalar(7+k*1.3).setY(.45+Math.random()*.35),grav:-1.4});
       }
-      ring(p,{color:PAL.gold,dur:.6,from:.5,to:8.5});
-      ring(p,{color:PAL.rose,dur:.85,from:.3,to:5.0,y:.35,peak:.8});
-      pillar(p,PAL.gold,6,.7);
-      treasure(p.clone().setY(p.y+1),26,{hearts:6});
-      screenFlash('rgba(255,215,106,.7)',.55,420);
+      ring(p,{color:PAL.gold,dur:.58,from:.6,to:8.4,peak:.95});
+      ring(p,{color:PAL.rose,dur:.72,from:.4,to:5.2,y:.28,peak:.68});
+      for(let i=0;i<5;i++)spark(p.clone().setY(p.y+.8),{map:tex.star,color:i%2?PAL.cream:PAL.gold,from:.34,dur:.42,
+        vel:new THREE.Vector3((Math.random()-.5)*3,1.4+Math.random()*1.6,(Math.random()-.5)*3),grav:-2.8});
+      screenFlash('rgba(255,215,106,.44)',.34,260);
     },
     dispose(){
       if(!ready)return;
@@ -31164,8 +31153,9 @@ let chopperKit = null;
 class ChopperPirateKit {
   constructor(){
     this.player=player;
-    this.cool={primary:0,anchor:0,dash:0,kegs:0,storm:0,cannon:0,kraken:0};
-    this.len ={primary:0.38,anchor:0.50,dash:1.10,kegs:4.0,storm:9.0,cannon:14.0,kraken:24.0};
+    this.cool={cannonShot:0,anchor:0,dash:0,kegs:0,storm:0,cannon:0,kraken:0};
+    this.len ={cannonShot:0.38,anchor:0.50,dash:1.10,kegs:4.0,storm:9.0,cannon:14.0,kraken:24.0};
+    this.combo=0;this.comboResetIn=0;this.swing=null;
     this.anchor=null;this.dash=null;this.kegs=null;this.storm=null;this.cannon=null;this.kraken=null;
     this.cannonballs=[];
     this.baseScale=player.scale.clone();
@@ -31212,6 +31202,16 @@ class ChopperPirateKit {
     }
     return hits;
   }
+  _cone(origin,yaw,range,arc,dmg){
+    let hits=0;
+    for(const e of this._enemies()){
+      const dx=e.position.x-origin.x,dz=e.position.z-origin.z;
+      if(dx*dx+dz*dz>range*range)continue;
+      const a=Math.atan2(dx,dz),diff=Math.abs(((a-yaw+Math.PI*3)%(Math.PI*2))-Math.PI);
+      if(diff<=arc/2){this._hurt(e,dmg);hits++;}
+    }
+    return hits;
+  }
   _killRadial(center,radius){
     let hits=0;
     for(const e of [...this._enemies()]){
@@ -31227,27 +31227,39 @@ class ChopperPirateKit {
     return 0;
   }
 
-  // ---- PRIMARY: Cannon Shot ----
+  // ---- PRIMARY 1: Cutlass Combo ----
+  cutlass(){
+    if(this.swing)return false;
+    const step=this.combo%3;this.combo++;this.comboResetIn=1.1;
+    const yaw=this.player.rotation.y,fin=step===2;
+    const dmg=CHOPPER_TUNING.damage.sonicPiston*(fin?1.7:1);
+    const hits=this._cone(this.player.position,yaw,fin?3.2:2.6,Math.PI*(fin?1.1:.8),dmg);
+    chopperFX.cutlass(step,hits);
+    triggerCombatShake(hits?(fin?11:6):2,hits?(fin?160:95):55);
+    this.swing={t:0,d:fin?.26:.18};
+    return true;
+  }
+
+  // ---- PRIMARY 2: Cannon Shot ----
   cannonShot(){
-    if(this.cool.primary>0)return false;
-    this.cool.primary=this.len.primary;
-    const target=findAutoAimTarget(18); // standard default forward cone (dot >= .77)
+    if(this.cool.cannonShot>0)return false;
+    this.cool.cannonShot=this.len.cannonShot;
+    const target=findAutoAimTarget(18); // same default forward auto-aim cone (dot >= .77)
     let dir=this._fwd();
     if(target){
       dir=target.position.clone().sub(this.player.position);dir.y=0;
-      if(dir.lengthSq()>.0001)dir.normalize(); else dir=this._fwd();
+      if(dir.lengthSq()>.0001)dir.normalize();else dir=this._fwd();
       this.player.rotation.y=Math.atan2(dir.x,dir.z);
     }
     const pos=this.player.position.clone().addScaledVector(dir,.85);pos.y+=.78;
     const mesh=new THREE.Mesh(
-      new THREE.SphereGeometry(.24,14,10),
-      new THREE.MeshLambertMaterial({color:0x070707,emissive:0x000000,flatShading:true})
+      new THREE.SphereGeometry(.24,8,6),
+      new THREE.MeshBasicMaterial({color:0x050505})
     );
     mesh.position.copy(pos);scene.add(mesh);
-    const glow=new THREE.PointLight(0xffb347,1.8,3.2,2);glow.position.copy(pos);scene.add(glow);
-    this.cannonballs.push({mesh,glow,dir:dir.clone(),life:0,maxLife:1.25,speed:15.5,hit:new Set()});
-    spawnBurst(pos.x,pos.y,pos.z,7,FX_MAT_SPARK,2.6);
-    triggerCombatShake(4,85);
+    this.cannonballs.push({mesh,dir:dir.clone(),life:0,maxLife:1.25,speed:15.5,hit:new Set()});
+    spawnBurst(pos.x,pos.y,pos.z,3,FX_MAT_SPARK,2.2);
+    triggerCombatShake(3,65);
     return true;
   }
 
@@ -31328,11 +31340,13 @@ class ChopperPirateKit {
   update(dt){
     if(!this.player||!this.player.parent)return;
     for(const k in this.cool)if(this.cool[k]>0)this.cool[k]=Math.max(0,this.cool[k]-dt);
+    if(this.comboResetIn>0){this.comboResetIn=Math.max(0,this.comboResetIn-dt);if(this.comboResetIn===0)this.combo=0;}
+    if(this.swing){this.swing.t+=dt;if(this.swing.t>=this.swing.d)this.swing=null;}
 
     for(let i=this.cannonballs.length-1;i>=0;i--){
       const b=this.cannonballs[i];b.life+=dt;
       const prev=b.mesh.position.clone();
-      b.mesh.position.addScaledVector(b.dir,b.speed*dt);b.glow.position.copy(b.mesh.position);
+      b.mesh.position.addScaledVector(b.dir,b.speed*dt);
       b.mesh.rotation.x+=dt*8;b.mesh.rotation.z+=dt*5;
       let remove=b.life>=b.maxLife||bulletBlockedAt(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z);
       for(const z of this._enemies()){
@@ -31342,7 +31356,7 @@ class ChopperPirateKit {
           b.hit.add(z);this._hurt(z,CHOPPER_TUNING.damage.sonicPiston);chopperFX.stormHit(z.position.clone(),1);remove=true;
         }
       }
-      if(remove){scene.remove(b.mesh);scene.remove(b.glow);b.mesh.geometry.dispose();b.mesh.material.dispose();this.cannonballs.splice(i,1);}
+      if(remove){scene.remove(b.mesh);b.mesh.geometry.dispose();b.mesh.material.dispose();this.cannonballs.splice(i,1);}
     }
 
     if(this.anchor){
@@ -31417,7 +31431,7 @@ class ChopperPirateKit {
     if(this.kraken){
       const s=this.kraken;s.t+=dt;s.frame++;const grow=1+1.6*Math.min(1,s.t/.4)*(s.t>s.d-.5?Math.max(0,(s.d-s.t)/.5):1);
       this.player.scale.set(this.baseScale.x*grow,this.baseScale.y*grow,this.baseScale.z*grow);
-      if(s.frame%16===0){chopperFX.krakenPulse(this.player.position.clone(),s.frame);this._radial(this.player.position,6.0,1.1);triggerCombatShake(10,160);}
+      if(s.frame%28===0){chopperFX.krakenPulse(this.player.position.clone(),s.frame);this._radial(this.player.position,6.0,1.1);triggerCombatShake(10,160);}
       if(s.t>=s.d){this.player.scale.copy(this.baseScale);this.kraken=null;}
     }
     chopperFX.update(dt);
@@ -31427,7 +31441,7 @@ class ChopperPirateKit {
   dispose(){
     if(this.kraken&&this.player)this.player.scale.copy(this.baseScale);
     if(this.kegs)for(const k of this.kegs.list)chopperFX.kegBlow(k.keg);
-    for(const b of this.cannonballs){if(b.mesh){scene.remove(b.mesh);b.mesh.geometry.dispose();b.mesh.material.dispose();}if(b.glow)scene.remove(b.glow);}
+    for(const b of this.cannonballs){if(b.mesh){scene.remove(b.mesh);b.mesh.geometry.dispose();b.mesh.material.dispose();}}
     this.cannonballs=[];chopperFX.dispose();
   }
 }
@@ -31448,18 +31462,15 @@ function updateChopperKit(dt){
   try{ k.update(dt); }catch(err){ console.error('Chopper kit update recovered:',err); }
 }
 function triggerChopperPrimary(w){
-  const k=ensureChopperKit(); if(!k||!w)return false;
-  if(w.kind==='velocity_sonic_piston'){
-    const fired=k.cannonShot();
-    if(fired)velocityWeaverPlayClip('tachyonDome');
-    return fired;
-  }
+  const k=ensureChopperKit();if(!k||!w)return false;
+  if(w.kind==='velocity_sonic_piston'){const f=k.cutlass();if(f)velocityWeaverPlayClip('sonicPiston');return f;}
+  if(w.kind==='velocity_arc_sweep'){const f=k.cannonShot();if(f)velocityWeaverPlayClip('tachyonDome');return f;}
   return false;
 }
 function triggerChopperSecondary(w){
   const k=ensureChopperKit(); if(!k||!w)return false;
   if(w.kind==='velocity_quantum_slingshot'){const f=k.boardingDash();if(f)velocityWeaverPlayClip('quantumSlingshot');return f;}
-  if(w.kind==='velocity_arc_sweep'){const f=k.anchorDrop();if(f)velocityWeaverPlayClip('arcLineSweep');return f;}
+  if(w.kind==='velocity_phasing_resonance'){const f=k.anchorDrop();if(f)velocityWeaverPlayClip('arcLineSweep');return f;}
   if(w.kind==='velocity_synaptic_snare'){const f=k.powderKegs();if(f)velocityWeaverPlayClip('synapticSnare');return f;}
   return false;
 }
