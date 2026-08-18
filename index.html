@@ -1,3 +1,4 @@
+<!-- V23.18.00 Aesir Fresh Primaries + Global Ultimate Test Mode: replaces Aesir's legacy Primary identities with Storm-Step Blitz and Celestial Hammer-Pulse. Storm-Step uses a jagged collision-resolved dash, pooled lightning ribbons and swept path shock damage; Celestial Hammer-Pulse commands the independent floating axe spirit to remote-slam the nearest target and emit concentrated thunder-clap knockback waves. All avatar Ultimate cooldowns are disabled for development testing; active-duration locks remain so transformations/sequences cannot overlap themselves. -->
 <!-- V23.13.03 Aesir Front Pose + Natural Axe Hold: keeps exported-model 3 as the active Aesir rig, but fixes the unnatural axe presentation by using the rig's current bind/rest pose as the WeaponReady idle/preview stance instead of sampling a late recovery frame from an attack clip. The avatar preview is rotated to a clean front-facing hero angle and no missing Idle clip fallback is used. Gameplay idle/recovery returns to the same natural hand-on-axe pose, while the Thor-inspired lightning VFX and native Mesh2Motion combat routing remain intact. -->
 <!-- V23.13.02 Aesir Model-3 Native Grip Fix: replaces Aesir with the newly uploaded exported-model 3.glb (34 authored Mesh2Motion clips). Keeps the Stormforged Thor-inspired lightning presentation, removes references to clips absent from the new rig, and routes idle/combat/recovery only through native weapon-bearing takes. The axe remains part of the single skinned mesh: no fake duplicate weapon, runtime re-parenting, squash/stretch, per-axis deformation, donor retargeting, or procedural bone twisting is used. -->
 <!-- V23.13.01 Aesir Stormforged Grip + Native: fixes the avatar-select metadata to report the new Mesh2Motion 34-clip rig, replaces the generic caster idle with a weapon-ready pose sampled directly from the native Sword_Regular_A_Rec animation, and restricts Aesir combat routing to weapon-safe Sword/Ground-Pound/Power-Up/Jog clips so the embedded axe stays in the cleanest authored hand relationship possible. No squash/stretch, per-axis model scaling, donor retargeting, or procedural whole-body warping is used. -->
@@ -209,7 +210,7 @@ only as an emergency visual fallback if the native fox asset fails.
 <!-- V22.11.26 Super Meteor Cleanup Guard: caps active scorched craters at three and clears meteor craters plus surviving enemy burn auras during round/reset cleanup. Damage and all gameplay values are unchanged. -->
 <!-- V22.11.25 Super Meteor Debris Crater Burn FX: adds fourteen capped molten debris fragments, a four-second scorched crater with pulsing lava ring, and a visible orange burn aura on surviving enemies. Gameplay values are unchanged. -->
 <!-- V22.11.24 Super Meteor Visual Upgrade: adds a fiery tail, rotating flame ring, pulsing inner landing warning, and dual expanding impact shockwaves. Damage, boss cap, stun, burn, radius, fall speed, and cooldown are unchanged. -->
-<!-- V22.11.23 Super Meteor Core: adds the Mage's third equipable ultimate. One enormous slow meteor targets the nearest enemy, falls from the sky, deals heavy area damage, deals 20% max HP to bosses, stuns survivors for 3 seconds, burns them for 5 seconds, and uses a 24-second cooldown. -->
+<!-- V22.11.23 Super Meteor Core: adds the Mage's third equipable ultimate. One enormous slow meteor targets the nearest enemy, falls from the sky, deals heavy area damage, deals 20% max HP to bosses, stuns survivors for 3 seconds, burns them for 5 seconds, and has no cooldown during development testing. -->
 <!-- V22.11.22 Blizzard Readability Guard: caps simultaneous impact-effect groups at six, clears them between rounds, and brightens landing markers for easier tracking. Gameplay values are unchanged. -->
 <!-- V22.11.20 Blizzard Icy Mist Plume: adds six capped translucent mist plumes that rise, widen, drift slightly, and fade within 0.85 seconds at each Blizzard impact. Gameplay values are unchanged. -->
 <!-- V22.11.19 Traveling Blizzard Spawn Bias: falling ice now shifts modestly toward the Mage's recent movement direction while preserving random coverage across the storm. Damage, freeze, radius, duration, spawn rate, and cooldown are unchanged. -->
@@ -1692,7 +1693,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.18.01 - Idle Arm Height Fix';
+const GAME_VERSION='23.18.00 - Arms Out (all clips) + Thunderstep Breaker + Mjolnir Echo';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3776,10 +3777,10 @@ const CHARACTER_COMBAT = {
     // She trades all mobility for reach, area denial and raw damage.
     baseMoveMult:0.68,
     weapons:{
-      rage_cleave:{name:'Storm Strike', price:0, slot:'primary', kind:'barbarian_melee', cooldown:0.64, damage:1.5, radius:3.40, arc:2.35,
-        desc:'A brutal three-hit axe combo. Every single beat throws a ground shockwave out of the impact point, so no swing is ever single-target. The overhead finisher hurls back everything it touches.'},
-      feral_onslaught:{name:'Storm Strike', price:400, slot:'legacy', hidden:true, kind:'barbarian_slash_wave', cooldown:1.18, damage:2.2, radius:2.9, arc:2.2, range:30, waveDamage:2.0, auto:true,
-        desc:'Alternating heavy left and right side swings. Each one launches a huge layered crescent that tears a fissure down the lane as it travels, piercing every enemy in its path, and detonates a wide shockwave at your feet as it leaves.'},
+      rage_cleave:{name:'Storm-Step Blitz', price:0, slot:'primary', kind:'aesir_storm_step_blitz', cooldown:0.52, damage:1.35, radius:1.55, range:7.2, auto:true,
+        desc:'Instantly burst forward through a jagged lane of electricity. The real movement follows collision-safe line segments while pooled lightning ribbons mark the path and shock every enemy crossed.'},
+      feral_onslaught:{name:'Celestial Hammer-Pulse', price:400, slot:'primary', kind:'aesir_celestial_hammer_pulse', cooldown:0.92, damage:1.85, radius:4.6, range:16, auto:true,
+        desc:'Command the independent floating axe to crash down on the nearest target. The remote impact releases concentrated thunder-clap rings that damage, stagger, and knock surrounding enemies away.'},
       earthbreaker:{name:'Earthbreaker Slam', price:220, slot:'secondary', kind:'earthbreaker', cooldown:1.0, damage:2.1, radius:4.875, arc:Math.PI*2,
         desc:'Smash the ground Hulk-style and erupt a circular damage zone that throws every enemy inside it outward.'},
       war_cyclone:{name:'Mjolnir Echo', price:400, slot:'secondary', kind:'barbarian_whirlwind', cooldown:0, damage:0, radius:5.4,
@@ -3818,6 +3819,7 @@ function arcaneEchoesCooldownForLevel(level=avatarLevel()){
 // Global development unlock switch for combat testing. This is game-wide and is
 // intentionally independent of the completed Fox Mage integration.
 const UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING = true;
+const TEST_NO_ULTIMATE_COOLDOWNS = true;
 function arcaneEchoesUnlocked(){
   return mageGameplayActive() && (UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING || avatarLevel()>=10);
 }
@@ -4020,7 +4022,7 @@ const SUPER_METEOR = {id:'super_meteor', name:'Super Meteor', price:900,
   desc:'Calls down one enormous slow meteor. The impact heavily damages nearby enemies, stuns survivors for 3 seconds, burns them for 5 seconds, and deals 20% max HP to bosses.'};
 
 const SKYFALL_BARRAGE = {id:'skyfall_barrage', name:'Skyfall Barrage', price:780,
-  desc:'Ultimate-tier damage. For 7 seconds, giant translucent arrows rain onto enemy clusters with clear landing markers and strong area damage. Boss damage is capped at 25% per cast. Uses a 25-second cooldown.'};
+  desc:'Ultimate-tier damage. For 7 seconds, giant translucent arrows rain onto enemy clusters with clear landing markers and strong area damage. Boss damage is capped at 25% per cast. No cooldown during development testing.'};
 const KNIGHT_DEFENSIVE_WHIRLWIND = {id:'knight_whirlwind', name:'Defensive Whirlwind', price:420, avatar:'knight', unlockLevel:6,
   desc:'A controlled sword-and-shield rotation that lets you move slowly, deflects weak enemy projectiles, and repeatedly damages and pushes enemies outward. Duration starts at 3.8 seconds and grows by round, becoming permanent from Round 25. Cooldown scales from 8 seconds to 0 by Round 21.'};
 const KNIGHT_GUARDIAN_QUAKE = {id:'knight_guardian_quake', name:'Guardian Titan', price:760, avatar:'knight', unlockLevel:12,
@@ -4032,7 +4034,7 @@ const KNIGHT_ROYAL_GUARD_CLONES = {id:'knight_royal_guard_clones', name:'Knights
 const KNIGHT_JUDGMENT_ULTIMATE = {id:'knight_judgment', name:'Judgment of the King', price:920, avatar:'knight', unlockLevel:18,
   desc:'Ultimate-tier royal execution equipped in the Ability slot. Hammer rain begins immediately and continues throughout the sequence before the arena-wide final impact. The Knight can move during Judgment, cooldown scales down by round to 0 at Round 45, and boss damage remains capped.'};
 const SUPERNOVA_PIERCER = {id:'supernova_piercer', name:'Supernova Piercer', price:860,
-  desc:'Signature ultimate. Enter a 3-second rooted sniper charge, then fire a solar beam completely across the map. Instantly defeats non-boss enemies in its path and deals 50% max HP to bosses. Uses a 30-second cooldown.'};
+  desc:'Signature ultimate. Enter a 3-second rooted sniper charge, then fire a solar beam completely across the map. Instantly defeats non-boss enemies in its path and deals 50% max HP to bosses. No cooldown during development testing.'};
 // Coins earned per kill — a flat rate that inches up in later rounds so
 // the pricier weapons stay reachable in a long run.
 function tokensPerKill(){ return 5 + Math.floor(round/5); }
@@ -11408,18 +11410,11 @@ const AESIR_ARM_POSE = {
   out:1.90,        // how hard the upper arm is pushed away from the torso
   lift:0.32,       // upward bias so the arm rides over the skirt flare
   fore:0.55,       // forearm follow-through, keeps the elbow from spiking out
-  reach:2.35,      // target elbow clearance, in upper-arm lengths (scale-free)
-  /* V23.18.01 CEILING. My 23.18.00 claim that Rest_Pose was "geometrically
-     inert" was wrong, and the screenshot proved it. Measured: armbake.py had
-     already pushed the authored idle to 83.0 degrees off vertical - almost a
-     T-pose - and my outward push then held it there. maxRise caps how high an
-     arm may end up, expressed as the vertical component of its direction:
-       -0.62 => 51.7 deg off vertical, the rig's own natural A-pose angle.
-     While no action clip is playing (idle and locomotion) the cap is ABSOLUTE,
-     so it pulls the over-baked idle back down. During an action clip the cap is
-     max(authored, maxRise), so authored overhead poses like Two-hand_Blast and
-     the aerial attacks are never dragged down. */
-  maxRise:-0.62,
+  reach:2.35,      // target elbow clearance, in upper-arm lengths (scale-free).
+                   // 2.35 x 0.135 = 0.317, just under the 0.344 coat half-width,
+                   // so combat clips saturate the correction while Rest_Pose
+                   // (already at 0.209 and pointing outward) is geometrically
+                   // inert and stays as authored.
   attackScale:0.80 // ease off mid-swing so authored attacks stay readable
 };
 const AESIR_ARM_TUNER = true;   // on-screen sliders; Anthony has no console
@@ -11450,12 +11445,8 @@ function aesirArmRig(){
    built in WORLD space and converted into the bone's parent space, which is why
    it behaves identically on every clip: a fixed local-axis nudge would abduct in
    one pose and adduct in another, which is exactly how the old bake misbehaved. */
-let _aesArmAbsoluteCap=false;
 function aesirPushArm(bone,child,amt){
-  // amt may be 0: the height ceiling still has to run, because the idle's
-  // problem is the authored pose itself, not the correction.
-  if(!bone||!child||!bone.parent)return;
-  if(amt<0)amt=0;
+  if(!(amt>0.0001)||!bone||!child||!bone.parent)return;
   bone.getWorldPosition(_aesQ1); child.getWorldPosition(_aesQ2);
   _aesQ2.sub(_aesQ1);
   const len=_aesQ2.length(); if(len<1e-5)return;
@@ -11463,15 +11454,6 @@ function aesirPushArm(bone,child,amt){
   _aesQ1.copy(_aesQ2).addScaledVector(_aesOut,amt);
   if(_aesQ1.lengthSq()<1e-8)return;
   _aesQ1.normalize();
-  // height ceiling: never let the correction lift the arm past maxRise, and
-  // while she is idle or running pull an over-baked pose back down to it.
-  const capY=_aesArmAbsoluteCap?AESIR_ARM_POSE.maxRise
-                              :Math.max(_aesQ2.y,AESIR_ARM_POSE.maxRise);
-  if(_aesQ1.y>capY){
-    const flat=Math.sqrt(Math.max(0,1-capY*capY));
-    const h=Math.hypot(_aesQ1.x,_aesQ1.z)||1;
-    _aesQ1.set(_aesQ1.x/h*flat,capY,_aesQ1.z/h*flat);
-  }
   _aesQa.setFromUnitVectors(_aesQ2,_aesQ1);
   bone.parent.getWorldQuaternion(_aesQb);
   _aesQc.copy(_aesQb).conjugate().multiply(_aesQa).multiply(_aesQb);
@@ -11490,9 +11472,7 @@ function aesirApplyArmPose(){
   if(_aesLat.lengthSq()<1e-8)return;
   _aesLat.normalize();                                   // her own left, in world space
   _aesChest.addVectors(_aesP1,_aesP2).multiplyScalar(0.5);
-  const acting=(player.userData.kayActionLock||0)>0;
-  const soften=acting?C.attackScale:1;
-  _aesArmAbsoluteCap=!acting;
+  const soften=(player.userData.kayActionLock||0)>0?C.attackScale:1;
   for(let i=0;i<2;i++){
     const sign=i?-1:1;
     const up=i?R.uR:R.uL, fo=i?R.fR:R.fL, ha=i?R.hR:R.hL;
@@ -11502,6 +11482,7 @@ function aesirApplyArmPose(){
     const have=_aesP3.subVectors(_aesP2,_aesChest).dot(_aesLat)*sign;
     const want=C.reach*armLen;
     const deficit=Math.max(0,Math.min(1,(want-have)/Math.max(1e-5,want)));
+    if(deficit<=0.001)continue;
     _aesOut.copy(_aesLat).multiplyScalar(sign);
     _aesOut.y+=C.lift; _aesOut.normalize();
     aesirPushArm(up,fo,C.out*deficit*soften);
@@ -11522,8 +11503,7 @@ function aesirArmTunerSync(){
     w.id='aesArmTuner';
     w.style.cssText='position:fixed;left:6px;top:150px;z-index:120;font:600 10px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#dff4ff;display:none;';
     const rows=[['out','OUT',0,3,0.05],['lift','LIFT',-0.4,1,0.02],
-                ['fore','FORE',0,2,0.05],['reach','REACH',0.8,2.6,0.05],
-                ['maxRise','RISE',-1,0.2,0.02]];
+                ['fore','FORE',0,2,0.05],['reach','REACH',0.8,2.6,0.05]];
     let html='<button id="aesArmTgl" style="background:rgba(10,26,48,.86);border:1px solid #57b7ff;'+
       'color:#bfe9ff;border-radius:9px;padding:5px 9px;font:700 10px sans-serif;">ARMS</button>'+
       '<div id="aesArmBox" style="display:none;margin-top:4px;background:rgba(6,16,30,.90);'+
@@ -11542,8 +11522,7 @@ function aesirArmTunerSync(){
     const dump=()=>{
       const o=w.querySelector('#aesArmOut');
       if(o)o.textContent='out '+AESIR_ARM_POSE.out.toFixed(2)+' lift '+AESIR_ARM_POSE.lift.toFixed(2)+
-        ' fore '+AESIR_ARM_POSE.fore.toFixed(2)+' reach '+AESIR_ARM_POSE.reach.toFixed(2)+
-        ' rise '+AESIR_ARM_POSE.maxRise.toFixed(2);
+        ' fore '+AESIR_ARM_POSE.fore.toFixed(2)+' reach '+AESIR_ARM_POSE.reach.toFixed(2);
     };
     for(const [k] of rows){
       const sl=w.querySelector('#aesArmS_'+k), vv=w.querySelector('#aesArmV_'+k);
@@ -12313,7 +12292,8 @@ function aesirResolveClip(requested){
   if(/stun|freeze|hit|hurt|damage|flinch/.test(n)) return ['Push',.90,false,0];
 
   // --- Thor performances ---
-  if(/thunderstep/.test(n)) return ['Sword_Dash_RM',1.06,false,0];
+  if(/storm[- ]?step|stormstep|thunderstep/.test(n)) return ['Sword_Dash_RM',1.06,false,0];
+  if(/celestial hammer|hammer[- ]?pulse/.test(n)) return ['Two-hand_Blast',.90,false,0];
   if(/storm strike b/.test(n)) return ['Sword_Regular_B',1.04,false,0];
   if(/echo/.test(n)) return ['Sword_Regular_Combo',1.08,false,0];
   if(/mjolnir|throw|recall/.test(n)) return ['OverhandThrow',.95,false,0];
@@ -19770,10 +19750,7 @@ function knightGuardianQuakeChargeDuration(){
 function knightGuardianQuakeEquipped(){
   return equippedAbilityId==='knight_guardian_quake';
 }
-function knightGuardianQuakeCooldownDuration(){
-  const cfg=knightRoyalCloneConfig();
-  return Math.max(0.5,Number(cfg.cooldown)||0);
-}
+function knightGuardianQuakeCooldownDuration(){ return 0; }
 function knightGuardianGiantSizeMult(){
   if(!knightIsActive()) return 1;
   return (knightRuntime.guardianQuakeSequence||knightRuntime.guardianGiantBuffTimer>0)
@@ -22112,12 +22089,7 @@ function knightJudgmentCenter(){
 function knightJudgmentFieldRadius(){
   return Math.max(6, arenaSize*0.98);
 }
-function knightJudgmentCooldownForRound(){
-  const r=Math.max(1,Number(round)||1);
-  if(r>=45) return 0;
-  const t=(r-1)/44;
-  return Math.max(0,30*(1-t));
-}
+function knightJudgmentCooldownForRound(){ return 0; }
 function knightJudgmentRemainingTime(){
   const c=KNIGHT_CFG.ultimate;
   if(knightRuntime.ultPhase<=0) return undefined;
@@ -24790,7 +24762,7 @@ function updateRhinoCrashingBolt(dt){
         document.body.style.filter='';
         toast('CRASHING BOLT · COMPLETE');
         r.crashing=null;
-        r.crashingCooldown=18;
+        r.crashingCooldown=0;
       }else{
         // The visual reset is intentional: a fresh leap is the unmistakable
         // signal that the next wave is beginning.
@@ -24817,11 +24789,7 @@ function rhinoTitanDuration(){
     ? KNIGHT_CFG.guardianQuakeGiant.buffDuration
     : 15;
 }
-function rhinoTitanCooldownDuration(){
-  return typeof knightGuardianQuakeCooldownDuration==='function'
-    ? knightGuardianQuakeCooldownDuration()
-    : 10;
-}
+function rhinoTitanCooldownDuration(){ return 0; }
 function rhinoTitanDamageMult(){
   return (typeof KNIGHT_CFG!=='undefined'&&KNIGHT_CFG.guardianQuakeGiant)
     ? KNIGHT_CFG.guardianQuakeGiant.damageMult
@@ -24978,7 +24946,7 @@ function updateRhinoTitanRampage(dt){
    leap off-screen -> center crash + 8s stun -> 5s stonefall -> giant meteor.
    Shared stone geometry/materials keep the many-projectile phase inexpensive.
    --------------------------------------------------------------------- */
-const RHINO_ARMAGEDDON_COOLDOWN=24;
+const RHINO_ARMAGEDDON_COOLDOWN=0;
 const RHINO_ARMAGEDDON_STUN=8.0;
 const RHINO_ARMAGEDDON_BARRAGE_TIME=10.0;
 const RHINO_ARMAGEDDON_DROP_INTERVAL=.95;
@@ -25658,8 +25626,82 @@ function aesirThorUltimateCrown(pos,radius=6){
   knightShockRing(pos,radius*.7,0x5fd7ff,.45);knightShockRing(pos,radius,0xffffff,.52);
 }
 
+
+function aesirDamageAlongSegment(a,b,radius,damage,stun=.22,knock=3.0,hitSet=null){
+  const dx=b.x-a.x,dz=b.z-a.z,len2=dx*dx+dz*dz||1;
+  let hits=0;
+  for(const z of zombies){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    if(hitSet&&hitSet.has(z.uuid))continue;
+    const px=z.position.x-a.x,pz=z.position.z-a.z;
+    const t=Math.max(0,Math.min(1,(px*dx+pz*dz)/len2));
+    const cx=a.x+dx*t,cz=a.z+dz*t;
+    const ex=z.position.x-cx,ez=z.position.z-cz;
+    if(ex*ex+ez*ez>radius*radius)continue;
+    if(hitSet)hitSet.add(z.uuid);
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,stun);
+    const dl=Math.hypot(ex,ez)||1;
+    z.userData.knockbackX=(z.userData.knockbackX||0)+(ex/dl)*knock;
+    z.userData.knockbackZ=(z.userData.knockbackZ||0)+(ez/dl)*knock;
+    applyBulletDamage(z,damage*playerStats.power);hits++;
+  }
+  return hits;
+}
+function aesirStormStepBlitz(w){
+  if(!player||!gameRunning)return false;
+  faceEnemyTarget(findNearestEnemy(Math.max(10,w.range||7.2)));
+  const yaw=player.rotation.y, fwd=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+  const side=new THREE.Vector3(fwd.z,0,-fwd.x), start=player.position.clone();
+  const reach=w.range||7.2, hit=new Set(), pts=[start.clone()];
+  const bends=[-.34,.42,-.24];
+  let cur=start.clone();
+  for(let i=0;i<3;i++){
+    const target=start.clone().addScaledVector(fwd,reach*((i+1)/3)).addScaledVector(side,bends[i]);
+    const safe=resolveCollision(target.x,target.z,player.position.y);
+    const next=new THREE.Vector3(safe.x,player.position.y,safe.z);
+    aesirDamageAlongSegment(cur,next,w.radius||1.55,w.damage||1.35,.24,3.6,hit);
+    aesirLightningArc(cur.clone().add(new THREE.Vector3(0,.18,0)),next.clone().add(new THREE.Vector3(0,.18,0)),0x9fe8ff,.22);
+    knightShockRing(next,1.15+i*.18,i===2?0xffffff:0x72dbff,.22);
+    pts.push(next.clone());cur.copy(next);
+  }
+  player.position.copy(cur);
+  player.rotation.y=yaw;
+  invincibleTimer=Math.max(invincibleTimer||0,.18);
+  if(aesirAxe)aesirAxe.provoke('thunderstep',{d:(w.damage||1.35)*.55,r:2.1,s:.18,k:2.8});
+  if(player.userData.playKayClip)player.userData.playKayClip('storm-step blitz',true,true,.22);
+  spawnBurst(cur.x,cur.y+.45,cur.z,isMobile?6:10,FX_MAT_SPARK,2.8);
+  triggerCombatShake(hit.size?8:4,105);
+  if(navigator.vibrate)navigator.vibrate(hit.size?[18,8,24]:12);
+  return true;
+}
+function aesirCelestialHammerPulse(w){
+  if(!player||!gameRunning)return false;
+  const target=findNearestEnemy(w.range||16);
+  if(target)faceEnemyTarget(target);
+  const yaw=player.rotation.y;
+  const fallback=new THREE.Vector3(player.position.x+Math.sin(yaw)*4.5,player.position.y,player.position.z+Math.cos(yaw)*4.5);
+  const impact=target?target.position.clone():fallback;
+  if(aesirAxe){
+    aesirAxe.provoke('cleave',{d:w.damage||1.85,r:w.radius||4.6,s:.34,k:8.5});
+  }else{
+    aesirSpiritDamage(impact.x,impact.z,w.radius||4.6,w.damage||1.85,.34,8.5);
+    aesirSkyBolt(impact,1.35,0xe8f7ff);
+  }
+  if(player.userData.playKayClip)player.userData.playKayClip('celestial hammer-pulse',true,true,.34);
+  // Three cheap, staggered thunder-clap fronts make the impact read as pressure,
+  // while the axe spirit owns the actual remote slam and damage payload.
+  [0,95,190].forEach((ms,i)=>setTimeout(()=>{
+    if(!gameRunning||!barbarianIsActive())return;
+    knightShockRing(impact,(2.0+i*1.15),i===2?0xffffff:0x8fe6ff,.26+i*.05);
+    if(i===2){spawnBurst(impact.x,impact.y+.25,impact.z,isMobile?8:14,FX_MAT_SPARK,3.4);triggerCombatShake(11,145);}
+  },ms));
+  return true;
+}
+
 function doBarbarianAttack(w){
   spawnHeroIdentityAura();
+  if(w.kind==='aesir_storm_step_blitz')return aesirStormStepBlitz(w);
+  if(w.kind==='aesir_celestial_hammer_pulse')return aesirCelestialHammerPulse(w);
   if(barbarianUltimateActive>0){
     barbarianPrimalAttackAccent(player.position);
     // Primary/Secondary attacks receive the transformation's 50% damage buff.
@@ -25998,10 +26040,7 @@ function doBarbarianAttack(w){
    PRIMAL RAGE. Previously kill-charged and living on the Ultimate button;
    now a cooldown-based Ability-slot ultimate like Wolverine's, since
    Berserker Kin has taken over the Ultimate button's kill-charge meter. */
-function barbarianPrimalCooldownForRound(){
-  const r=Math.max(1,Number(round)||1);
-  return Math.max(0,22-Math.min(22,(r-1)*.5));
-}
+function barbarianPrimalCooldownForRound(){ return 0; }
 /* Persistent ground fire dropped by Primal Rage. Nothing else in her kit
    leaves anything behind, so this is the ultimate's signature. */
 function barbarianDropBurnZone(pos,radius){
@@ -26147,7 +26186,7 @@ function triggerPrimalRage(){
   if((r.mjolCooldown||0)>0)return false;
   if(!aesirAxe.provoke('mjolnir',{r:4.4,d:2.6,s:0.55,k:6.0}))return false;
   markUltimateUsed();
-  r.mjolCooldown=8;
+  r.mjolCooldown=0;
   if(player.userData.playKayClip)player.userData.playKayClip('mjolnir throw',true,true,.55);
   aesirStormFlash(0.42,150);
   triggerCombatShake(12,200);
@@ -26161,7 +26200,7 @@ function triggerThunderDome(){
   if((r.domeCooldown||0)>0)return false;
   if(!aesirAxe.provoke('dome',{r:8.5,d:3.4,s:0.9,k:5.5}))return false;
   markUltimateUsed();
-  r.domeCooldown=12;
+  r.domeCooldown=0;
   invincibleTimer=Math.max(invincibleTimer||0,1.4);
   if(player.userData.playKayClip)player.userData.playKayClip('thunder dome',true,true,1.1);
   aesirStormFlash(0.72,240);
@@ -26203,10 +26242,7 @@ function updatePrimalRage(dt){
 /* ============================================================ ULTIMATE 2
    WORLD BREAKER. Hulk-style telegraphed two-handed overhead slam: a short
    invulnerable wind-up, then one huge ground shockwave with heavy knockback. */
-function barbarianWorldBreakerCooldownForRound(){
-  const r=Math.max(1,Number(round)||1);
-  return Math.max(0,28-Math.min(28,(r-1)*.6));
-}
+function barbarianWorldBreakerCooldownForRound(){ return 0; }
 function triggerWorldBreaker(){
   // V23.15.00 THUNDER CLEAVE. The old four-front rolling-shockwave routine and
   // its axe-swing-trail dressing are gone; the axe spirit performs the whole
@@ -26292,10 +26328,7 @@ function updateWorldBreaker(dt){
    PRIMAL AXE WAVE (upgraded to ultimate scale). Four flaming axe waves fly
    out in a cross pattern, then boomerang home in one return slam — the
    traveling-line half of the kit that echoes Wolverine's Adamantium Quake. */
-function barbarianRagnarokCooldownForRound(){
-  const r=Math.max(1,Number(round)||1);
-  return Math.max(0,30-Math.min(30,(r-1)*.62));
-}
+function barbarianRagnarokCooldownForRound(){ return 0; }
 /* A real thrown weapon, not another ring. Primal Axe Wave is the only
    barbarian ultimate whose damage LEAVES her - it flies, pierces the lane and
    comes home. That is its whole identity next to Rage and World Breaker. */
@@ -26993,7 +27026,7 @@ function updatePhoenixFireball(dt){
 // The charge roots the Archer, shows a readable full-map aiming line, then
 // releases a narrow solar beam. No whiteout and no full-screen tint.
 // ---------------------------------------------------------------------
-const SUPERNOVA_COOLDOWN=30;
+const SUPERNOVA_COOLDOWN=0;
 const SUPERNOVA_CHARGE_DURATION=3;
 const SUPERNOVA_BEAM_LIFETIME=.68;
 const SUPERNOVA_BEAM_HALF_WIDTH=1.65;
@@ -27331,7 +27364,7 @@ function updateSupernovaPiercer(dt){
 // Giant translucent arrows fall from above onto enemy clusters with clear
 // ground markers. Effects remain local and never cover the whole screen.
 // ---------------------------------------------------------------------
-const SKYFALL_COOLDOWN=25;
+const SKYFALL_COOLDOWN=0;
 const SKYFALL_DURATION=7;
 const SKYFALL_IMPACT_RADIUS=2.65;
 const SKYFALL_BOSS_CAP=.25;
@@ -27718,7 +27751,7 @@ function updateSkyfallBarrage(dt){
 // Mage ultimate-tier abilities. Both use the shared ability HUD slot.
 // Visual rule: local spectacle only—never apply a full-screen color tint.
 // ---------------------------------------------------------------------
-const BLIZZARD_COOLDOWN=16;
+const BLIZZARD_COOLDOWN=0;
 const BLIZZARD_DURATION=10, BLIZZARD_FREEZE=3, BLIZZARD_IMPACT_RADIUS=3.1;
 function blizzardRadius(){ return Math.max(12, arenaSize*.45); } // exactly 45% of playable map radius
 let blizzardCooldownTimer=0;
@@ -27731,6 +27764,7 @@ let activeBlizzardImpactGroups=[];
 const BLIZZARD_IMPACT_EFFECT_CAP=6;
 
 function abilityButtonCooldown(seconds){
+  if(TEST_NO_ULTIMATE_COOLDOWNS)return;
   const btn=document.getElementById('abilityBtn');
   if(btn){btn.classList.add('cooling');setTimeout(()=>btn.classList.remove('cooling'),seconds*1000);}
 }
@@ -28227,7 +28261,7 @@ function updateSuperMeteorWarningMarkers(){
   }
 }
 
-const SUPER_METEOR_COOLDOWN=24;
+const SUPER_METEOR_COOLDOWN=0;
 const SUPER_METEOR_STUN=3;
 const SUPER_METEOR_BURN=5;
 const SUPER_METEOR_RADIUS=30.0;
@@ -29858,10 +29892,7 @@ function wolverineUpdate(dt){
 const WOLV_FRENZY_STRIKES=18;
 const WOLV_FRENZY_MAX_TIME=9;
 
-function wolverineFrenzyCooldownForRound(){
-  const r=Math.max(1,Number(round)||1);
-  return Math.max(0,26-Math.min(26,(r-1)*.62));
-}
+function wolverineFrenzyCooldownForRound(){ return 0; }
 function triggerWolverineFrenzy(){
   if(!wolverineIsActive()||!gameRunning||!player)return false;
   const r=wolverineRuntime;
@@ -29991,10 +30022,7 @@ function wolverineUpdateFrenzy(dt){
 /* ========================================================= ULTIMATE 2
    ADAMANTIUM QUAKE. Six fissures race outward, erupt at the boundary, then
    collapse inward. Three fixed stages on a timer, so it always completes. */
-function wolverineQuakeCooldownForRound(){
-  const r=Math.max(1,Number(round)||1);
-  return Math.max(0,30-Math.min(30,(r-1)*.68));
-}
+function wolverineQuakeCooldownForRound(){ return 0; }
 function triggerWolverineQuake(){
   if(!wolverineIsActive()||!gameRunning||!player)return false;
   const r=wolverineRuntime;
@@ -30119,9 +30147,9 @@ let wolverineCloneEpoch=0;
 function wolverineCloneConfig(){
   const r=Math.max(1,Number(round)||1);
   if(r<10) return {count:0,duration:0,cooldown:0};
-  if(r<=15) return {count:5,duration:8,cooldown:10};
-  if(r<=20) return {count:5,duration:15,cooldown:5};
-  return {count:5,duration:30,cooldown:.8};
+  if(r<=15) return {count:5,duration:8,cooldown:0};
+  if(r<=20) return {count:5,duration:15,cooldown:0};
+  return {count:5,duration:30,cooldown:0};
 }
 function wolverineCloneUnlocked(){
   return wolverineIsActive() && Math.max(1,Number(round)||1)>=10;
@@ -30446,7 +30474,7 @@ class VelocityWeaver {
     // captured at cast time, which read as "the joystick stops working while
     // attacking" and, because Primary auto-fires, meant near-permanent lockup.
     this.cooldowns={sonicPiston:0,arcLineSweep:0,quantumSlingshot:0,phasingResonance:0,synapticSnare:0,infiniteSpeedBlitz:0,tachyonDome:0,speedforceCataclysm:0};
-    this.cooldownLengths={quantumSlingshot:.45,phasingResonance:4.0,synapticSnare:3.0,infiniteSpeedBlitz:8.0,tachyonDome:14.0,speedforceCataclysm:24.0};
+    this.cooldownLengths={quantumSlingshot:.45,phasingResonance:4.0,synapticSnare:3.0,infiniteSpeedBlitz:0,tachyonDome:0,speedforceCataclysm:0};
     this._ambientSaved=null;this._catMaterials=null;this._baseScale=player.scale.clone();
     this._scaleDirty=false;this._flashActive=false;
     this._lastGhostPos=player.position.clone();this._catFrame=0;
@@ -31190,7 +31218,7 @@ class ChopperPirateKit {
   constructor(){
     this.player=player;
     this.cool={cannonShot:0,anchor:0,dash:0,kegs:0,storm:0,cannon:0,kraken:0};
-    this.len ={cannonShot:0.38,anchor:0.50,dash:1.10,kegs:1.0,storm:18.0,cannon:16.0,kraken:15.0};
+    this.len ={cannonShot:0.38,anchor:0.50,dash:1.10,kegs:1.0,storm:0,cannon:0,kraken:0};
     this.combo=0;this.comboResetIn=0;this.swing=null;
     this.anchor=null;this.dash=null;this.kegs=[];this.kegCastLock=0;this.cannonCastLock=0;this.storm=null;this.cannon=null;this.kraken=null;this.tidal=null;
     this.dashEchoes=[];
@@ -31241,10 +31269,7 @@ class ChopperPirateKit {
     if(r>=30)return 5;if(r>=22)return 4;if(r>=15)return 3;if(r>=8)return 2;return 1;
   }
   _kegCooldown(){return this._roundCooldown(1.0,30);}
-  _krakenCooldown(){
-    if(typeof knightGuardianQuakeCooldownDuration==='function')return knightGuardianQuakeCooldownDuration();
-    const r=Math.max(1,Number(round)||1);return r<10?.5:(r<=15?10:(r<=20?5:.8));
-  }
+  _krakenCooldown(){return 0;}
   _kill(e){
     if(!e||!e.userData||e.userData.dead)return false;
     e.userData.hp=0;
@@ -31885,7 +31910,7 @@ function performWeaponAttack(w, countsAsPrimary=true){
     doRhinoAttack(w);
   } else if(w.kind==='barbarian_roar_slash_combo'){
     doBarbarianRoarSlashCombo(w);
-  } else if(w.kind==='barbarian_melee' || w.kind==='earthbreaker' || w.kind==='barbarian_spin' || w.kind==='barbarian_flurry' || w.kind==='barbarian_slash_wave' || w.kind==='barbarian_roar'){
+  } else if(w.kind==='aesir_storm_step_blitz' || w.kind==='aesir_celestial_hammer_pulse' || w.kind==='barbarian_melee' || w.kind==='earthbreaker' || w.kind==='barbarian_spin' || w.kind==='barbarian_flurry' || w.kind==='barbarian_slash_wave' || w.kind==='barbarian_roar'){
     doBarbarianAttack(w);
   } else if(isKnightWeaponKind(w.kind)){
     doKnightAttack(w);
