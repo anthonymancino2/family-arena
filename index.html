@@ -1,3 +1,4 @@
+<!-- V23.26.00 Aesir Whirlwind Thunder Six + Primary Round Balance: Aesir Whirlwind now emits six evenly spaced electric lane attacks every five active seconds; normal enemies touched are instantly eliminated while Brutes/Bosses are stunned and take only a small boss-safe damage packet. Storm-Step Blitz and Celestial Hammer-Pulse are rebalanced so their V23.25 damage values are the Round-30 ceiling rather than Round-1 values, scaling upward from reduced early-round damage. Global development zero-cooldown behavior remains enabled for selectable moves, while integrated Aegis keeps its requested internal re-arm timer. -->
 <!-- V23.25.00 Aesir Secondary Scaling + Global No-Cooldown Test: lowers both Aesir idle arms by removing the single-arm support override and preserving the authored Rest_Pose; enables development zero-cooldown behavior for selectable moves across all avatars; scales Bifrost Singularity from one outward core to six evenly spaced cores at Round 30; integrates the 10-second Aegis Shield-Wall into Bifrost and Lightning Tether with its own 10s-to-2s round-scaled re-arm timer; upgrades Lightning Tether into a stronger round-scaled chain-drain reaching ten hits at Round 30; and replaces standalone Aegis with an Aesir Whirlwind that matches the Knight Defensive Whirlwind rules, damage, pulse, knockback, deflection, duration scaling, and movement penalty. -->
 <!-- V23.24.00 Aesir HUD Debug Cleanup: removes the on-screen ARMS tuning/debug control from normal gameplay by disabling the Aesir arm tuner. No arm pose values, animation corrections, axe behavior, primaries, secondaries, or global zero-cooldown Ultimate testing are changed. -->
 <!-- V23.23.00 Aesir Idle Arm Regression Fix: preserves the already-corrected non-axe/free arm exactly as authored in Rest_Pose by removing the V23.20 forced-down world-space override. Only the single axe-side support arm is adjusted during true idle, and that support pose is deliberately lower/softer so the hand reads as supporting the floating axe instead of reaching overhead. Divine Secondaries, approved Primaries, Celestial flight orientation, and global zero-cooldown Ultimate testing remain unchanged. -->
@@ -1700,7 +1701,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.25.00 - Aesir Secondary Scaling Test';
+const GAME_VERSION='23.26.00 - Aesir Whirlwind Thunder Six + Primary Balance';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -15973,6 +15974,7 @@ function triggerBarbarianWhirlwind(){
   r.whirlTimer=knightDefensiveWhirlwindDurationForRound();
   r.whirlPulse=0;
   r.whirlElapsed=0;
+  r.whirlThunderNext=5.0;
   r.whirlDust=0;
   barbarianBuildWhirlVisual();
   player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,.18);
@@ -16021,10 +16023,61 @@ function barbarianWhirlPulse(){
   const hits=knightRadial(pos,c.radius,c.damage,{knock:c.knockback,stun:c.stun,bruteMult:c.bruteMult,bossMult:c.bossMult});
   if(hits)triggerCombatShake(6,85);
 }
+function barbarianWhirlThunderSix(){
+  if(!player||!gameRunning)return;
+  const origin=player.position.clone();
+  origin.y+=0.62;
+  const laneReach=Math.max(18,Math.min(arenaSize+2,32));
+  const laneHalfWidth=1.15;
+  const stunTime=2.0;
+  const toughDamage=0.55*playerStats.power;
+  let hitCount=0;
+  const hitSet=new Set();
+  for(let i=0;i<6;i++){
+    const a=player.rotation.y+i*(Math.PI*2/6);
+    const end=new THREE.Vector3(
+      player.position.x+Math.sin(a)*laneReach,
+      origin.y,
+      player.position.z+Math.cos(a)*laneReach
+    );
+    // One jagged core plus a ground ring at the leading edge keeps this dramatic
+    // without turning the six-way burst into a particle storm on mobile.
+    aesirLightningArc(origin,end,i%2?0xffffff:0x72dcff,.34);
+    knightShockRing(end,1.0,i%2?0xffffff:0x72dcff,.22);
+    const dx=end.x-origin.x,dz=end.z-origin.z,len2=dx*dx+dz*dz||1;
+    for(const z of [...zombies]){
+      if(!z||!z.userData||z.userData.dead||z.userData.spawnPending||hitSet.has(z.uuid))continue;
+      const px=z.position.x-origin.x,pz=z.position.z-origin.z;
+      const t=Math.max(0,Math.min(1,(px*dx+pz*dz)/len2));
+      const cx=origin.x+dx*t,cz=origin.z+dz*t;
+      if(Math.hypot(z.position.x-cx,z.position.z-cz)>laneHalfWidth)continue;
+      hitSet.add(z.uuid);hitCount++;
+      const type=z.userData.archetype||'walker';
+      if(type!=='boss'&&type!=='brute'){
+        z.userData.hp=0;
+        z.userData.dead=false;
+        killZombie(z);
+      }else{
+        z.userData.hitStun=Math.max(z.userData.hitStun||0,stunTime);
+        applyBulletDamage(z,toughDamage);
+        const kx=z.position.x-player.position.x,kz=z.position.z-player.position.z,kl=Math.hypot(kx,kz)||1;
+        z.userData.knockbackX=(z.userData.knockbackX||0)+(kx/kl)*2.2;
+        z.userData.knockbackZ=(z.userData.knockbackZ||0)+(kz/kl)*2.2;
+      }
+      spawnBurst(z.position.x,z.position.y+.65,z.position.z,isMobile?4:7,FX_MAT_SPARK,2.6);
+    }
+  }
+  knightShockRing(player.position,3.2,0xffffff,.30);
+  knightShockRing(player.position,4.5,0x72dcff,.38);
+  if(hitCount)triggerCombatShake(12,180);
+  aesirStormFlash(.18,95);
+  if(navigator.vibrate)navigator.vibrate([18,10,28]);
+}
+
 function barbarianEndWhirlwind(){
   const r=barbarianRuntime;
   if(!r.whirlFx&&!((r.whirlTimer||0)>0))return;
-  r.whirlTimer=0;r.whirlPulse=0;
+  r.whirlTimer=0;r.whirlPulse=0;r.whirlThunderNext=0;
   r.whirlCooldown=Math.max(r.whirlCooldown||0,barbarianWhirlCooldownForRound());
   barbarianClearWhirlVisual();
   if(!player)return;
@@ -16049,6 +16102,10 @@ function barbarianUpdateWhirlwind(dt){
   r.whirlPulse-=dt;
   r.whirlDust=(r.whirlDust||0)-dt;
   if(r.whirlPulse<=0){ r.whirlPulse=BARB_WHIRL.pulse; barbarianWhirlPulse(); }
+  if((r.whirlThunderNext||0)>0 && (r.whirlElapsed||0)>=(r.whirlThunderNext||5)){
+    barbarianWhirlThunderSix();
+    r.whirlThunderNext+=5.0;
+  }
   if(r.whirlDust<=0){
     r.whirlDust=.16;
     if(knightFxBudget(1))spawnBurst(player.position.x,player.position.y+.05,player.position.z,isMobile?2:4,FX_MAT_SPARK,2.0);
@@ -25675,6 +25732,12 @@ function aesirThorUltimateCrown(pos,radius=6){
 }
 
 
+function aesirPrimaryDamageScaleForRound(){
+  // V23.26: the formerly full-strength Primary damage is now the Round-30 ceiling.
+  // Round 1 starts at 35% and rises smoothly to 100% at Round 30.
+  const r=Math.max(1,Math.min(30,Number(round)||1));
+  return 0.35+0.65*((r-1)/29);
+}
 function aesirDamageAlongSegment(a,b,radius,damage,stun=.22,knock=3.0,hitSet=null){
   const dx=b.x-a.x,dz=b.z-a.z,len2=dx*dx+dz*dz||1;
   let hits=0;
@@ -25700,6 +25763,8 @@ function aesirStormStepBlitz(w){
   faceEnemyTarget(findNearestEnemy(Math.max(10,w.range||7.2)));
   const yaw=player.rotation.y, fwd=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
   const side=new THREE.Vector3(fwd.z,0,-fwd.x), start=player.position.clone();
+  const primaryScale=aesirPrimaryDamageScaleForRound();
+  const scaledDamage=(w.damage||1.35)*primaryScale;
   const reach=w.range||7.2, hit=new Set(), pts=[start.clone()];
   const bends=[-.34,.42,-.24];
   let cur=start.clone();
@@ -25707,7 +25772,7 @@ function aesirStormStepBlitz(w){
     const target=start.clone().addScaledVector(fwd,reach*((i+1)/3)).addScaledVector(side,bends[i]);
     const safe=resolveCollision(target.x,target.z,player.position.y);
     const next=new THREE.Vector3(safe.x,player.position.y,safe.z);
-    aesirDamageAlongSegment(cur,next,w.radius||1.55,w.damage||1.35,.24,3.6,hit);
+    aesirDamageAlongSegment(cur,next,w.radius||1.55,scaledDamage,.24,3.6,hit);
     aesirLightningArc(cur.clone().add(new THREE.Vector3(0,.18,0)),next.clone().add(new THREE.Vector3(0,.18,0)),0x9fe8ff,.22);
     knightShockRing(next,1.15+i*.18,i===2?0xffffff:0x72dbff,.22);
     pts.push(next.clone());cur.copy(next);
@@ -25715,7 +25780,7 @@ function aesirStormStepBlitz(w){
   player.position.copy(cur);
   player.rotation.y=yaw;
   invincibleTimer=Math.max(invincibleTimer||0,.18);
-  if(aesirAxe)aesirAxe.provoke('thunderstep',{d:(w.damage||1.35)*.55,r:2.1,s:.18,k:2.8});
+  if(aesirAxe)aesirAxe.provoke('thunderstep',{d:scaledDamage*.55,r:2.1,s:.18,k:2.8});
   if(player.userData.playKayClip)player.userData.playKayClip('storm-step blitz',true,true,.22);
   spawnBurst(cur.x,cur.y+.45,cur.z,isMobile?6:10,FX_MAT_SPARK,2.8);
   triggerCombatShake(hit.size?8:4,105);
@@ -25727,13 +25792,15 @@ function aesirCelestialHammerPulse(w){
   const target=findNearestEnemy(w.range||16);
   if(target)faceEnemyTarget(target);
   const yaw=player.rotation.y;
+  const primaryScale=aesirPrimaryDamageScaleForRound();
+  const scaledDamage=(w.damage||1.85)*primaryScale;
   const forwardReach=Math.min(10,w.range||16);
   const fallback=new THREE.Vector3(player.position.x+Math.sin(yaw)*forwardReach,player.position.y,player.position.z+Math.cos(yaw)*forwardReach);
   const impact=target?target.position.clone():fallback;
   if(aesirAxe){
-    aesirAxe.provoke('cleave',{d:w.damage||1.85,r:w.radius||4.6,s:.34,k:8.5,reach:Math.min(10,w.range||16)});
+    aesirAxe.provoke('cleave',{d:scaledDamage,r:w.radius||4.6,s:.34,k:8.5,reach:Math.min(10,w.range||16)});
   }else{
-    aesirSpiritDamage(impact.x,impact.z,w.radius||4.6,w.damage||1.85,.34,8.5);
+    aesirSpiritDamage(impact.x,impact.z,w.radius||4.6,scaledDamage,.34,8.5);
     aesirSkyBolt(impact,1.35,0xe8f7ff);
   }
   if(player.userData.playKayClip)player.userData.playKayClip('celestial hammer-pulse',true,true,.34);
