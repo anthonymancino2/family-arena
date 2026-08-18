@@ -1,3 +1,4 @@
+<!-- V23.12.07 Visible Anchor + Triple Tide: Anchor Rain holograms are made strongly visible on bright maps with high-opacity giant primitive silhouettes, lower spawn height and readable descent timing. Broadside hologram clones are much less transparent while remaining ultra-light and invincible. Anchor Drop now scales from close-range single-anchor coverage at early rounds to half-map coverage, five simultaneous anchors and zero cooldown at Round 30. Tidal Cataclysm is rebuilt as three slow arena-crossing waves spawned across ten seconds: normals die on first contact, large non-boss enemies are slowed for 10 seconds and die on second wave contact, bosses take 3% max HP per wave. -->
 <!-- V23.12.06 Pirate Mobile Scaling + Tidal Repair: Broadside Chopper clones are rebuilt as ultra-light holographic Chopper silhouettes instead of full skinned Mesh2Motion rigs, eliminating per-clone skeleton/mixer/texture cost while keeping Knight-style AI, aggro, movement, invincibility and 10% damage. Enemy melee now explicitly recognizes Chopper clones as invincible targets instead of falling through to playerTakeHit(). Cannon Shot fire cooldown scales linearly to 0 by Round 20; Anchor Drop is 3x larger than V23.12.05, its fall speed accelerates by round and its cooldown reaches 0 at Round 20; Powder Keg cooldown is 1s at Round 1 and scales to 0 at Round 30. Anchor Rain now uses enormous low-detail holographic anchors for 10 seconds. Tidal Cataclysm is rebuilt as a visible arena-wide solid water wall and its stale Doldrums HUD/active-state routing is corrected. -->
 <!-- V23.12.05 Pirate Anchor Routing Fix: fixes Chopper Secondary dispatch so Boarding Dash, Anchor Drop, and Powder Keg Toss route into the standalone ChopperPirateKit instead of falling through to generic shootFromPosition(), which caused the rapid yellow/white projectile stream seen when Anchor was equipped. Anchor Drop is now guaranteed to perform only its tracked giant falling-anchor attack. No balance or requested V23.12.04 Pirate behavior changed. -->
 <!-- V23.12.04 Pirate Anchor/Titan/Tidal Pass: Cannon Shot now pierces up to three targets, executing normal enemies on contact, then detonates on the third contact with a tight 2-second stun and small shockwave damage. Anchor Drop now tracks the nearest valid enemy within half-map range until the actual drop so it lands on the enemy instead of a stale coordinate. Cutlass Storm is replaced by a 10-second Giant Anchor Rain with frequent low-cost anchor drops, lethal direct impacts and nearby blast damage. Kraken Rising now follows Knight Guardian Titan rules: 5x visual size, 15-second duration, 5x damage, 2.6x combat reach, 0.85 movement multiplier, Primary/Secondary access during Titan, other specials locked, and Knight-matched cooldown applied after the transformation ends. Doldrums Cannon is replaced by Tidal Cataclysm, one giant arena-sweeping water wall using a few large meshes instead of particle spam. -->
@@ -1684,7 +1685,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.12.06 - Mobile Scaling + Tidal Fix';
+const GAME_VERSION='23.12.07 - Visible Anchor + Triple Tide';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3682,7 +3683,7 @@ const CHARACTER_COMBAT = {
       shadowstep:{name:'Boarding Dash', price:0, slot:'secondary', kind:'velocity_quantum_slingshot', cooldown:0,
         desc:'Dash toward the nearest target, pulling enemies into the rush and carrying them to the endpoint. Normal enemies are executed there; Brutes and bosses are stunned on the first Boarding hit and executed on the second.'},
       chopper_anchor_drop:{name:'Anchor Drop', price:0, slot:'secondary', kind:'velocity_phasing_resonance', cooldown:0,
-        desc:'Drop a massive anchor onto the closest enemy within half the playable-map radius. The anchor is 3x larger than the previous build, falls faster every round, and its cooldown reaches zero at Round 20.'},
+        desc:'Drop giant anchors near Chopper. Range, fall speed and simultaneous anchor count scale by round: from 1 close-range anchor early to 5 anchors at half-map range with zero cooldown at Round 30.'},
       vipers_fan:{name:'Powder Keg Toss', price:0, slot:'secondary', kind:'velocity_synaptic_snare', cooldown:0,
         desc:'Throw four giant powder kegs around the Pirate. They remain 6x original size and instantly defeat anything caught in the blast. Cooldown starts at 1 second and scales to zero by Round 30.'}
     }
@@ -15035,7 +15036,7 @@ function tintChopperBroadsideClone(root,index){
 }
 function decorateChopperBroadsideClone(wrap,index){
   const sea=index%2?0x59d9ff:0x79ffd9;
-  const mat=new THREE.MeshBasicMaterial({color:sea,transparent:true,opacity:.28,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const mat=new THREE.MeshBasicMaterial({color:sea,transparent:true,opacity:.58,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
   const ring=new THREE.Mesh(new THREE.RingGeometry(.34,.62,24),mat.clone());
   ring.rotation.x=-Math.PI/2;ring.position.y=.035;wrap.add(ring);
   const flare=new THREE.Mesh(new THREE.RingGeometry(.16,.38,20),mat.clone());
@@ -15107,8 +15108,8 @@ function createChopperBroadsideHoloClone(index){
   // clone AI/damage/aggro rules remain identical.
   const wrap=new THREE.Group();
   const sea=index%2?0x63e7ff:0x73ffd9;
-  const mat=new THREE.MeshBasicMaterial({color:sea,transparent:true,opacity:.46,depthWrite:false});
-  const pale=new THREE.MeshBasicMaterial({color:0xeaffff,transparent:true,opacity:.34,depthWrite:false});
+  const mat=new THREE.MeshBasicMaterial({color:sea,transparent:true,opacity:.82,depthWrite:false});
+  const pale=new THREE.MeshBasicMaterial({color:0xeaffff,transparent:true,opacity:.72,depthWrite:false});
   const body=new THREE.Mesh(new THREE.SphereGeometry(.48,7,5),mat);body.scale.set(1,.92,.82);body.position.y=.55;wrap.add(body);
   const head=new THREE.Mesh(new THREE.SphereGeometry(.40,7,5),mat);head.position.y=1.18;wrap.add(head);
   const brim=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.075,8),pale);brim.position.y=1.48;wrap.add(brim);
@@ -15604,7 +15605,7 @@ function spawnBarbarianSlashWave(w,side=-1){
   // pressure wave rather than a sideways thrown crescent.
   const sheet=new THREE.Mesh(
     new THREE.PlaneGeometry(3.5,0.78),
-    new THREE.MeshBasicMaterial({color:0xffb356,transparent:true,opacity:.24,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
+    new THREE.MeshBasicMaterial({color:0xffb356,transparent:true,opacity:.38,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
   );
   sheet.position.set(0,.18,-.02);
   sheet.name='barbarianWaveSheet';
@@ -31230,14 +31231,14 @@ const chopperFX = (function(){
       if(!ensure())return null;
       opts=opts||{};
       const rain=!!opts.rain;
-      // Secondary Anchor Drop is exactly 3x the V23.12.05 visual scale (3 -> 9).
-      // Anchor Rain uses even larger low-detail holograms: silhouette > texture detail.
-      const scale=rain?13.5:9.0, dur=Number(opts.dur)||(rain?.46:.28), height=rain?14.5:8.2;
-      telegraph(at,rain?3.8:2.5,dur,rain?PAL.aqua:PAL.ember);
+      // V23.12.07: Secondary anchors are 3x larger again (9 -> 27).
+      // Anchor Rain favors a giant readable holographic silhouette over detail.
+      const scale=rain?18.0:27.0, dur=Number(opts.dur)||(rain?.92:.28), height=rain?9.5:8.2;
+      telegraph(at,rain?5.2:3.2,dur,rain?PAL.aqua:PAL.ember);
       const anchor=new THREE.Group();
       const gm=rain
-        ? new THREE.MeshBasicMaterial({color:0x7fe8ff,transparent:true,opacity:.34,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
-        : new THREE.MeshLambertMaterial({color:0xe8b13c,flatShading:true,transparent:true});
+        ? new THREE.MeshBasicMaterial({color:0x71e9ff,transparent:true,opacity:.84,depthWrite:false,side:THREE.DoubleSide,blending:THREE.NormalBlending})
+        : new THREE.MeshLambertMaterial({color:0xe8b13c,flatShading:true,transparent:true,opacity:.96});
       // Only four primitive pieces. No textures and no dynamic lights.
       const shank=new THREE.Mesh(new THREE.CylinderGeometry(.085,.105,1.35,6),gm);
       const stock=new THREE.Mesh(new THREE.BoxGeometry(.95,.10,.10),gm);stock.position.y=.42;
@@ -31246,7 +31247,7 @@ const chopperFX = (function(){
       anchor.add(shank,stock,ringTop,arm);anchor.scale.setScalar(scale);
       anchor.position.copy(at);anchor.position.y+=height;anchor.rotation.y=Math.random()*Math.PI*2;anchor.rotation.z=(Math.random()-.5)*.08;
       group.add(anchor);
-      push(anchor,{dur,from:1,to:1,fadeIn:.01,peak:rain?.58:1,vel:new THREE.Vector3(0,-height/dur,0),rot:new THREE.Vector3(0,rain?1.2:2.0,0)});
+      push(anchor,{dur,from:scale,to:scale,fadeIn:.015,peak:rain?.94:1,vel:new THREE.Vector3(0,-height/dur,0),rot:new THREE.Vector3(0,rain?.75:2.0,0),onEnd:()=>{anchor.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});}});
       return anchor;
     },
     anchorImpact(at){
@@ -31381,9 +31382,9 @@ const chopperFX = (function(){
       };
       const W=Math.max(26,Number(width)||32);
       // Solid translucent volumes remain readable against Summer/Spring bright floors.
-      mk(W,4.8,1.55,0x168fb8,.34,1.8,0);
-      mk(W*.98,2.1,1.85,0x35cde0,.28,4.25,-.12);
-      mk(W,0.36,2.15,0xeaffff,.62,5.34,-.18);
+      mk(W,4.8,1.55,0x168fb8,.58,1.8,0);
+      mk(W*.98,2.1,1.85,0x35cde0,.48,4.25,-.12);
+      mk(W,0.36,2.15,0xeaffff,.88,5.34,-.18);
       const floor=new THREE.Mesh(new THREE.PlaneGeometry(W,5.2),new THREE.MeshBasicMaterial({color:0x117a9c,transparent:true,opacity:.24,depthWrite:false,side:THREE.DoubleSide}));
       floor.rotation.x=-Math.PI/2;floor.position.set(0,-.70,0);wave.add(floor);
       wave.position.copy(start);wave.position.y=player.position.y;wave.rotation.y=yaw;group.add(wave);
@@ -31483,7 +31484,7 @@ const chopperFX = (function(){
 
 
 // =====================================================================
-// CHOPPER PIRATE KIT (V23.12.06) — standalone.
+// CHOPPER PIRATE KIT (V23.12.07) — standalone.
 // Chopper's own move engine. Shares no state, no timing, no code path
 // and no presentation with the Shadow Stalker / Velocity Weaver class.
 // =====================================================================
@@ -31527,10 +31528,19 @@ class ChopperPirateKit {
     return Math.max(0,base*((zeroRound-r)/(zeroRound-1)));
   }
   _cannonCooldown(){return this._roundCooldown(.38,20);}
-  _anchorCooldown(){return this._roundCooldown(.50,20);}
+  _anchorProgress(){return Math.min(1,(Math.max(1,Number(round)||1)-1)/29);}
+  _anchorCooldown(){return this._roundCooldown(.60,30);}
   _anchorFallDuration(){
-    const r=Math.min(20,Math.max(1,Number(round)||1)),p=(r-1)/19;
-    return .28-(.16*p); // .28s -> .12s by Round 20
+    const p=this._anchorProgress();
+    return .42-(.26*p); // .42s at Round 1 -> .16s at Round 30
+  }
+  _anchorRange(){
+    const p=this._anchorProgress(),halfMap=Math.max(6,(typeof arenaSize==='number'?arenaSize:30)*.5);
+    return 3.8+(halfMap-3.8)*p;
+  }
+  _anchorCount(){
+    const r=Math.max(1,Number(round)||1);
+    if(r>=30)return 5;if(r>=22)return 4;if(r>=15)return 3;if(r>=8)return 2;return 1;
   }
   _kegCooldown(){return this._roundCooldown(1.0,30);}
   _krakenCooldown(){
@@ -31628,14 +31638,26 @@ class ChopperPirateKit {
   // ---- SECONDARY: Anchor Drop ----
   anchorDrop(){
     if(this.anchor||this.cool.anchor>0)return false;
-    const maxRange=Math.max(1,(typeof arenaSize==='number'?arenaSize:30)*.5);
-    const tgt=this._nearest(maxRange);
-    if(!tgt)return false;
+    const maxRange=this._anchorRange(),count=this._anchorCount(),p=this.player.position;
+    const candidates=this._enemies().map(e=>({e,d:(e.position.x-p.x)**2+(e.position.z-p.z)**2}))
+      .filter(x=>x.d<=maxRange*maxRange).sort((a,b)=>a.d-b.d);
+    if(!candidates.length)return false;
     this.cool.anchor=this._anchorCooldown();
-    const at=tgt.position.clone();at.y=this.player.position.y;
-    const dropD=this._anchorFallDuration();
-    const visual=chopperFX.anchorTelegraph(at,{dur:dropD});
-    this.anchor={t:0,d:dropD,at,target:tgt,visual,done:false};
+    const dropD=this._anchorFallDuration(),drops=[];
+    for(let i=0;i<count;i++){
+      let target=candidates[i]?.e||null,at;
+      if(target){at=target.position.clone();}
+      else{
+        // Always show the full unlocked anchor count. Extra anchors fill a tight ring
+        // around Chopper if fewer enemies are available than anchors.
+        const a=(i/count)*Math.PI*2+this.player.rotation.y,rr=Math.min(maxRange,2.0+maxRange*.32);
+        at=new THREE.Vector3(p.x+Math.sin(a)*rr,p.y,p.z+Math.cos(a)*rr);
+      }
+      at.y=this.player.position.y;
+      const visual=chopperFX.anchorTelegraph(at,{dur:dropD});
+      drops.push({t:0,d:dropD,at,target,visual,done:false});
+    }
+    this.anchor={drops};
     return true;
   }
 
@@ -31678,17 +31700,19 @@ class ChopperPirateKit {
     if(this.storm||this.cool.storm>0||this._titanActive())return false;
     this.cool.storm=this.len.storm;invincibleTimer=Math.max(invincibleTimer||0,.8);
     chopperFX.anchorRainStart(this.player.position.clone());
-    this.storm={t:0,d:10.0,next:0,interval:.38,drops:[],idx:0};return true;
+    this.storm={t:0,d:10.0,next:0,interval:.42,drops:[],idx:0};return true;
   }
   doldrumsCannon(){
     if(this.tidal||this.cool.cannon>0||this._titanActive())return false;
     this.cool.cannon=this.len.cannon;
     const yaw=this.player.rotation.y,dir=this._fwd();
-    const radius=Math.max(18,typeof arenaSize==='number'?arenaSize:30),halfWidth=radius*1.18;
+    const radius=Math.max(18,typeof arenaSize==='number'?arenaSize:30),halfWidth=radius*1.20;
     const center=new THREE.Vector3(0,this.player.position.y,0);
-    const start=center.clone().addScaledVector(dir,-radius*1.28),end=center.clone().addScaledVector(dir,radius*1.28);
-    const wave=chopperFX.tidalStart(start,end,yaw,halfWidth*2);triggerCombatShake(14,260);
-    this.tidal={t:0,d:3.4,start,end,wave,hit:new Set(),dir,halfWidth};return true;
+    const start=center.clone().addScaledVector(dir,-radius*1.35),end=center.clone().addScaledVector(dir,radius*1.35);
+    // Three waves form over the first 10 seconds. Each wave itself crosses slowly.
+    this.tidal={t:0,spawnEvery:10/3,nextSpawn:0,spawned:0,totalWaves:3,waveDuration:8.0,start,end,dir,yaw,halfWidth,waves:[],contacts:new Map()};
+    chopperFX.screenFlash('rgba(16,126,166,.58)',.36,280);triggerCombatShake(12,220);
+    return true;
   }
   krakenRising(){
     if(this.kraken||this.cool.kraken>0||this.storm||this.tidal)return false;
@@ -31739,17 +31763,20 @@ class ChopperPirateKit {
     }
 
     if(this.anchor){
-      const a=this.anchor;a.t+=dt;
-      if(!a.done&&a.target&&a.target.parent&&!a.target.userData?.dead){a.at.copy(a.target.position);a.at.y=this.player.position.y;if(a.visual){a.visual.position.x=a.at.x;a.visual.position.z=a.at.z;}}
-      if(!a.done&&a.t>=a.d){
-        a.done=true;chopperFX.anchorImpact(a.at);
-        let hits=0;
-        if(a.target&&a.target.parent&&!a.target.userData?.dead){this._hurt(a.target,CHOPPER_TUNING.damage.arcLineSweep*1.8);hits++;}
-        const r=2.2*this._titanReach();
-        for(const z of this._enemies()){if(z===a.target)continue;const dx=z.position.x-a.at.x,dz=z.position.z-a.at.z;if(dx*dx+dz*dz<=r*r){this._hurt(z,CHOPPER_TUNING.damage.arcLineSweep*.55);hits++;}}
-        triggerCombatShake(hits?18:12,280);
+      const batch=this.anchor;
+      for(const a of batch.drops){
+        if(a.done)continue;a.t+=dt;
+        if(a.target&&a.target.parent&&!a.target.userData?.dead){a.at.copy(a.target.position);a.at.y=this.player.position.y;if(a.visual){a.visual.position.x=a.at.x;a.visual.position.z=a.at.z;}}
+        if(a.t>=a.d){
+          a.done=true;chopperFX.anchorImpact(a.at);
+          let hits=0;
+          if(a.target&&a.target.parent&&!a.target.userData?.dead){this._hurt(a.target,CHOPPER_TUNING.damage.arcLineSweep*1.8);hits++;}
+          const r=1.75*this._titanReach();
+          for(const z of this._enemies()){if(z===a.target)continue;const dx=z.position.x-a.at.x,dz=z.position.z-a.at.z;if(dx*dx+dz*dz<=r*r){this._hurt(z,CHOPPER_TUNING.damage.arcLineSweep*.45);hits++;}}
+          triggerCombatShake(hits?14:9,180);
+        }
       }
-      if(a.done)this.anchor=null;
+      if(batch.drops.every(a=>a.done))this.anchor=null;
     }
 
     if(this.dash){
@@ -31814,8 +31841,8 @@ class ChopperPirateKit {
         const alive=this._enemies();let at;
         if(alive.length&&Math.random()<.78){const t=alive[Math.floor(Math.random()*alive.length)];at=t.position.clone();}
         else{const a=Math.random()*Math.PI*2,r=Math.sqrt(Math.random())*Math.max(8,(typeof arenaSize==='number'?arenaSize:30)*.86);at=new THREE.Vector3(Math.cos(a)*r,this.player.position.y,Math.sin(a)*r);}
-        at.y=this.player.position.y;chopperFX.anchorTelegraph(at,{rain:true,dur:.46});
-        s.drops.push({at,t:.46,idx:s.idx});
+        at.y=this.player.position.y;chopperFX.anchorTelegraph(at,{rain:true,dur:.92});
+        s.drops.push({at,t:.92,idx:s.idx});
       }
       for(let i=s.drops.length-1;i>=0;i--){const d=s.drops[i];d.t-=dt;if(d.t>0)continue;
         chopperFX.anchorRainImpact(d.at,d.idx);triggerCombatShake(d.idx%4===0?12:7,d.idx%4===0?170:90);
@@ -31829,19 +31856,38 @@ class ChopperPirateKit {
       if(s.t>=s.d&&s.drops.length===0){chopperFX.stormFinish(this.player.position.clone());triggerCombatShake(16,240);this.storm=null;}
     }
     if(this.tidal){
-      const s=this.tidal;s.t+=dt;const p=Math.min(1,s.t/s.d),ease=p*p*(3-2*p);const pos=s.start.clone().lerp(s.end,ease);chopperFX.tidalUpdate(s.wave,pos,p);
-      const halfW=s.halfWidth||Math.max(18,(typeof arenaSize==='number'?arenaSize:30)*1.18),thick=2.2;
-      for(const z of this._enemies()){
-        if(s.hit.has(z))continue;
-        const rel=z.position.clone().sub(pos),along=rel.dot(s.dir),side=Math.abs(rel.x*s.dir.z-rel.z*s.dir.x);
-        if(Math.abs(along)<=thick&&side<=halfW){
-          s.hit.add(z);
-          if(this._isLarge(z)){this._hurt(z,3.2);z.userData.hitStun=Math.max(z.userData.hitStun||0,3.0);z.position.addScaledVector(s.dir,3.0);}
-          else this._kill(z);
-        }
+      const s=this.tidal;s.t+=dt;s.nextSpawn-=dt;
+      while(s.spawned<s.totalWaves&&s.nextSpawn<=0){
+        const idx=s.spawned++;s.nextSpawn+=s.spawnEvery;
+        const wave=chopperFX.tidalStart(s.start,s.end,s.yaw,s.halfWidth*2);
+        s.waves.push({idx,t:0,d:s.waveDuration,wave,hit:new Set()});
+        triggerCombatShake(9,150);
       }
-      if(p>=1){chopperFX.tidalFinish(s.wave,pos);triggerCombatShake(18,300);this.tidal=null;}
+      for(let wi=s.waves.length-1;wi>=0;wi--){
+        const w=s.waves[wi];w.t+=dt;const p=Math.min(1,w.t/w.d),ease=p*p*(3-2*p),pos=s.start.clone().lerp(s.end,ease);
+        chopperFX.tidalUpdate(w.wave,pos,p);
+        const thick=2.65;
+        for(const z of this._enemies()){
+          if(w.hit.has(z))continue;
+          const rel=z.position.clone().sub(pos),along=rel.dot(s.dir),side=Math.abs(rel.x*s.dir.z-rel.z*s.dir.x);
+          if(Math.abs(along)>thick||side>s.halfWidth)continue;
+          w.hit.add(z);
+          if(this._isBoss(z)){
+            const maxHp=Math.max(1,Number(z.userData.maxHp)||Number(z.userData.hp)||1);
+            applyBulletDamage(z,maxHp*.03); // small, deterministic 3% boss max-HP chip per wave
+            z.userData.chopperTidalSlow=Math.max(z.userData.chopperTidalSlow||0,10.0);
+          }else if(this._isLarge(z)){
+            const contacts=(s.contacts.get(z)||0)+1;s.contacts.set(z,contacts);
+            z.userData.chopperTidalSlow=Math.max(z.userData.chopperTidalSlow||0,10.0);
+            if(contacts>=2)this._kill(z);
+            else z.position.addScaledVector(s.dir,1.25);
+          }else this._kill(z);
+        }
+        if(p>=1){chopperFX.tidalFinish(w.wave,pos);s.waves.splice(wi,1);triggerCombatShake(12,180);}
+      }
+      if(s.spawned>=s.totalWaves&&s.waves.length===0)this.tidal=null;
     }
+    for(const z of this._enemies()){if(z.userData&&z.userData.chopperTidalSlow>0)z.userData.chopperTidalSlow=Math.max(0,z.userData.chopperTidalSlow-dt);}
     if(this.kraken){
       const s=this.kraken;s.t+=dt;s.frame++;
       const intro=Math.min(1,s.t/.42),outro=s.t>s.d-.42?Math.max(0,(s.d-s.t)/.42):1,grow=1+(5-1)*Math.min(intro,outro);
@@ -31851,10 +31897,10 @@ class ChopperPirateKit {
     }
     chopperFX.update(dt);
   }
-  enemyTimeScale(e){return 1;}
+  enemyTimeScale(e){return (e&&e.userData&&e.userData.chopperTidalSlow>0)?.38:1;}
   isGuarding(){return false;}
   dispose(){
-    if(this.kraken&&this.player)this.player.scale.copy(this.kraken.base||this.baseScale);if(this.tidal&&this.tidal.wave)chopperFX.tidalFinish(this.tidal.wave,this.tidal.end||this.player.position);
+    if(this.kraken&&this.player)this.player.scale.copy(this.kraken.base||this.baseScale);if(this.tidal&&this.tidal.waves){for(const w of this.tidal.waves){if(w&&w.wave)chopperFX.tidalFinish(w.wave,this.tidal.end||this.player.position);}}
     if(this.kegs&&this.kegs.length)for(const batch of this.kegs)for(const k of batch.list)chopperFX.kegBlow(k.keg);
     for(const b of this.cannonballs){if(b.mesh){scene.remove(b.mesh);b.mesh.geometry.dispose();b.mesh.material.dispose();}}
     this.cannonballs=[];chopperFX.dispose();
