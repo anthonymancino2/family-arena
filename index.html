@@ -1,3 +1,4 @@
+<!-- V23.19.00 Celestial Forward-Fire Fallback: Celestial Hammer-Pulse no longer bobs vertically over Aesir when no enemy is inside acquisition range. With a target, the independent axe still attacks that enemy. Without a target, it now launches horizontally straight down Aesir's facing lane, spins forward to a fixed reach, then drives into the ground there and emits the same thunder-clap damage/knockback pulse. Global zero-cooldown Ultimate testing remains enabled for every avatar. -->
 <!-- V23.18.00 Aesir Fresh Primaries + Global Ultimate Test Mode: replaces Aesir's legacy Primary identities with Storm-Step Blitz and Celestial Hammer-Pulse. Storm-Step uses a jagged collision-resolved dash, pooled lightning ribbons and swept path shock damage; Celestial Hammer-Pulse commands the independent floating axe spirit to remote-slam the nearest target and emit concentrated thunder-clap knockback waves. All avatar Ultimate cooldowns are disabled for development testing; active-duration locks remain so transformations/sequences cannot overlap themselves. -->
 <!-- V23.13.03 Aesir Front Pose + Natural Axe Hold: keeps exported-model 3 as the active Aesir rig, but fixes the unnatural axe presentation by using the rig's current bind/rest pose as the WeaponReady idle/preview stance instead of sampling a late recovery frame from an attack clip. The avatar preview is rotated to a clean front-facing hero angle and no missing Idle clip fallback is used. Gameplay idle/recovery returns to the same natural hand-on-axe pose, while the Thor-inspired lightning VFX and native Mesh2Motion combat routing remain intact. -->
 <!-- V23.13.02 Aesir Model-3 Native Grip Fix: replaces Aesir with the newly uploaded exported-model 3.glb (34 authored Mesh2Motion clips). Keeps the Stormforged Thor-inspired lightning presentation, removes references to clips absent from the new rig, and routes idle/combat/recovery only through native weapon-bearing takes. The axe remains part of the single skinned mesh: no fake duplicate weapon, runtime re-parenting, squash/stretch, per-axis deformation, donor retargeting, or procedural bone twisting is used. -->
@@ -1693,7 +1694,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.18.00 - Arms Out (all clips) + Thunderstep Breaker + Mjolnir Echo';
+const GAME_VERSION='23.19.00 - Aesir Celestial Forward-Fire';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3780,7 +3781,7 @@ const CHARACTER_COMBAT = {
       rage_cleave:{name:'Storm-Step Blitz', price:0, slot:'primary', kind:'aesir_storm_step_blitz', cooldown:0.52, damage:1.35, radius:1.55, range:7.2, auto:true,
         desc:'Instantly burst forward through a jagged lane of electricity. The real movement follows collision-safe line segments while pooled lightning ribbons mark the path and shock every enemy crossed.'},
       feral_onslaught:{name:'Celestial Hammer-Pulse', price:400, slot:'primary', kind:'aesir_celestial_hammer_pulse', cooldown:0.92, damage:1.85, radius:4.6, range:16, auto:true,
-        desc:'Command the independent floating axe to crash down on the nearest target. The remote impact releases concentrated thunder-clap rings that damage, stagger, and knock surrounding enemies away.'},
+        desc:'Command the independent floating axe to crash down on the nearest target. If no enemy is close enough, the axe fires straight forward to maximum reach and slams there. The impact releases concentrated thunder-clap rings that damage, stagger, and knock surrounding enemies away.'},
       earthbreaker:{name:'Earthbreaker Slam', price:220, slot:'secondary', kind:'earthbreaker', cooldown:1.0, damage:2.1, radius:4.875, arc:Math.PI*2,
         desc:'Smash the ground Hulk-style and erupt a circular damage zone that throws every enemy inside it outward.'},
       war_cyclone:{name:'Mjolnir Echo', price:400, slot:'secondary', kind:'barbarian_whirlwind', cooldown:0, damage:0, radius:5.4,
@@ -11826,9 +11827,29 @@ function createAesirAxeSpirit(){
       const k=actT/actDur;
       const tgt=attention&&!attention.userData.dead?attention.position:null;
       if(actKind==='cleave'){
-        if(k<0.45){ anchor.set(tgt?tgt.x:hx, hy+3.3*HS, tgt?tgt.z:hz); sTarget=BS*2.2; }
-        else if(k<0.56){ anchor.set(tgt?tgt.x:hx, hy+0.45*HS, tgt?tgt.z:hz); }
-        else { anchor.set(tgt?tgt.x:hx, hy+1.5*HS, tgt?tgt.z:hz); sTarget=BS; }
+        if(tgt){
+          // Targeted Celestial Hammer-Pulse: rise above the actual enemy, then slam.
+          if(k<0.45){ anchor.set(tgt.x, hy+3.3*HS, tgt.z); sTarget=BS*2.2; }
+          else if(k<0.56){ anchor.set(tgt.x, hy+0.45*HS, tgt.z); }
+          else { anchor.set(tgt.x, hy+1.5*HS, tgt.z); sTarget=BS; }
+        }else{
+          // V23.19.00 no-target fallback: NEVER bounce above Aesir.
+          // Fire the independent axe horizontally down her facing lane, then
+          // drive it into the floor at full extension for the hammer pulse.
+          const reach=(dmgSpec&&Number.isFinite(dmgSpec.reach)?dmgSpec.reach:9.0)*HS;
+          const fx=Math.sin(hostYawCache), fz=Math.cos(hostYawCache);
+          if(k<0.52){
+            const travel=THREE.MathUtils.smoothstep(k/0.52,0,1)*reach;
+            anchor.set(hx+fx*travel, hy+1.35*HS, hz+fz*travel);
+            sTarget=BS*(1.15+0.55*(travel/reach));
+          }else if(k<0.60){
+            anchor.set(hx+fx*reach, hy+0.22*HS, hz+fz*reach);
+            sTarget=BS*1.7;
+          }else{
+            anchor.set(hx+fx*reach, hy+0.85*HS, hz+fz*reach);
+            sTarget=BS;
+          }
+        }
       }else if(actKind==='chain'){
         anchor.set(hx, hy+3.0*HS, hz); sTarget=BS*1.5;
       }else if(actKind==='orbit'){
@@ -11944,7 +11965,9 @@ function createAesirAxeSpirit(){
           bolt(p.x+(Math.random()-.5)*2.2,p.y+2.0,p.z+(Math.random()-.5)*2.2,p.x,p.y+0.3,p.z,0.18,0.16,0x9fe0ff);
         if(actT>0.56&&!actStruck){
           actStruck=true;
-          const cx=tgt?tgt.x:p.x, cz=tgt?tgt.z:p.z;
+          const reach=(dmgSpec&&Number.isFinite(dmgSpec.reach)?dmgSpec.reach:9.0)*HS;
+          const cx=tgt?tgt.x:(hx+Math.sin(hostYawCache)*reach);
+          const cz=tgt?tgt.z:(hz+Math.cos(hostYawCache)*reach);
           ring(cx,cz,4.8*HS,0.7,0xdff4ff); ring(cx,cz,2.8*HS,0.5,0x8fd0ff);
           pillar(cx,cz,1.5*HS,11*HS,0.55,0xeaffff);
           crackFan(cx,cz,7,4.6*HS,0.85);
@@ -25679,10 +25702,11 @@ function aesirCelestialHammerPulse(w){
   const target=findNearestEnemy(w.range||16);
   if(target)faceEnemyTarget(target);
   const yaw=player.rotation.y;
-  const fallback=new THREE.Vector3(player.position.x+Math.sin(yaw)*4.5,player.position.y,player.position.z+Math.cos(yaw)*4.5);
+  const forwardReach=Math.min(10,w.range||16);
+  const fallback=new THREE.Vector3(player.position.x+Math.sin(yaw)*forwardReach,player.position.y,player.position.z+Math.cos(yaw)*forwardReach);
   const impact=target?target.position.clone():fallback;
   if(aesirAxe){
-    aesirAxe.provoke('cleave',{d:w.damage||1.85,r:w.radius||4.6,s:.34,k:8.5});
+    aesirAxe.provoke('cleave',{d:w.damage||1.85,r:w.radius||4.6,s:.34,k:8.5,reach:Math.min(10,w.range||16)});
   }else{
     aesirSpiritDamage(impact.x,impact.z,w.radius||4.6,w.damage||1.85,.34,8.5);
     aesirSkyBolt(impact,1.35,0xe8f7ff);
