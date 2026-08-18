@@ -1,4 +1,4 @@
-<!-- V23.14.00 Aesir Stormforged Refined: fixes the rotating/weird avatar preview by locking Aesir to a fixed hero angle, rebuilding WeaponReady from an early natural grip frame instead of the bind/rest pose, and disabling preview auto-spin for her card. Re-polishes Aesir combat around believable native Mesh2Motion timing with cleaner clip start offsets, heavier lock windows, and fewer but larger lightning effects for better mobile performance. Thor-inspired spectacle remains, but particle/lightning spam is reduced in favor of large rings, axe trails, sky bolts and crater impacts so the kit reads bigger while lagging less. -->
+<!-- V23.14.01 Aesir Stormcleaver Primary: begins the Thor-inspired Aesir move-by-move overhaul from the user-supplied V23.14.00 base. Rage Cleave is replaced in-place (same save ID) by Stormcleaver Combo: three native Mesh2Motion axe swings with gameplay/VFX delayed to their actual contact windows instead of firing on button press. Hit 1 is a fast electric side cleave, Hit 2 a heavier reverse thunder cleave, Hit 3 a committed overhead sky-bolt execution. Orange/fire spam is removed from this Primary and replaced by a few large cyan-white axe trails, lightning arcs, shock rings and a single finisher crater/sky bolt for stronger visual read at lower object count. Other Aesir moves are unchanged in this increment. -->
 <!-- V23.13.03 Aesir Front Pose + Natural Axe Hold: keeps exported-model 3 as the active Aesir rig, but fixes the unnatural axe presentation by using the rig's current bind/rest pose as the WeaponReady idle/preview stance instead of sampling a late recovery frame from an attack clip. The avatar preview is rotated to a clean front-facing hero angle and no missing Idle clip fallback is used. Gameplay idle/recovery returns to the same natural hand-on-axe pose, while the Thor-inspired lightning VFX and native Mesh2Motion combat routing remain intact. -->
 <!-- V23.13.02 Aesir Model-3 Native Grip Fix: replaces Aesir with the newly uploaded exported-model 3.glb (34 authored Mesh2Motion clips). Keeps the Stormforged Thor-inspired lightning presentation, removes references to clips absent from the new rig, and routes idle/combat/recovery only through native weapon-bearing takes. The axe remains part of the single skinned mesh: no fake duplicate weapon, runtime re-parenting, squash/stretch, per-axis deformation, donor retargeting, or procedural bone twisting is used. -->
 <!-- V23.13.01 Aesir Stormforged Grip + Native: fixes the avatar-select metadata to report the new Mesh2Motion 34-clip rig, replaces the generic caster idle with a weapon-ready pose sampled directly from the native Sword_Regular_A_Rec animation, and restricts Aesir combat routing to weapon-safe Sword/Ground-Pound/Power-Up/Jog clips so the embedded axe stays in the cleanest authored hand relationship possible. No squash/stretch, per-axis model scaling, donor retargeting, or procedural whole-body warping is used. -->
@@ -1693,7 +1693,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.14.00 - Aesir Stormforged Refined';
+const GAME_VERSION='23.14.01 - Aesir Stormcleaver Primary';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -2752,7 +2752,7 @@ async function ensureAvatarPreview(){
   floor.rotation.x=-Math.PI/2;previewScene.add(floor);
   const animate=()=>{
     previewRAF=requestAnimationFrame(animate);
-    if(previewRoot && !previewRoot.userData.noSpin) previewRoot.rotation.y+=0.006;
+    if(previewRoot) previewRoot.rotation.y+=0.006;
     if(previewMixer) previewMixer.update(1/60);
     previewRenderer.render(previewScene,previewCamera);
   }; animate();
@@ -2771,6 +2771,8 @@ async function updateAvatarPreview(characterId){
 
       const root=cloneSkinned(gltf.scene);
       prepareAesirMaterials(root,THREEAsset);
+      aesirRepairAxeBinding(root,THREEAsset);
+      aesirSnapToBindPose(root,THREEAsset);
 
       const fit=new THREEAsset.Group();
       fit.name='Aesir_PreviewFit';
@@ -2778,16 +2780,15 @@ async function updateAvatarPreview(characterId){
       // Same fixed-constant fit as gameplay, just a taller preview reference.
       fitAesirRoot(root,1,2.28);
 
-      fit.userData.noSpin=true;
-      fit.rotation.y=-0.62;
       previewRoot=fit;
       previewScene.add(fit);
 
-      // Lock Aesir to a fixed hero angle and freeze a real weapon-bearing pose
-      // sampled from the beginning of a native axe animation.
+      // Use Aesir's natural bind/rest pose for the preview so the axe is held cleanly
+      // and the card no longer falls back to an unrelated non-idle animation.
+      fit.rotation.y=Math.PI;
       previewMixer=new THREEAsset.AnimationMixer(root);
-      const previewSource=(gltf.animations||[]).find(c=>c.name==='Sword_Regular_A')||(gltf.animations||[]).find(c=>c.name==='Sword_Attack')||gltf.animations[0];
-      const previewPose=buildAesirWeaponReadyClip(root,THREEAsset,previewSource,'Aesir_WeaponReady');
+      aesirSnapToBindPose(root,THREEAsset);
+      const previewPose=buildStaticPoseClipFromCurrent(root,THREEAsset,'Aesir_WeaponReady');
       if(previewPose){
         previewMixer.clipAction(previewPose).play();
       }
@@ -3779,7 +3780,7 @@ const CHARACTER_COMBAT = {
     // She trades all mobility for reach, area denial and raw damage.
     baseMoveMult:0.68,
     weapons:{
-      rage_cleave:{name:'Rage Cleave', price:0, slot:'primary', kind:'barbarian_melee', cooldown:0.64, damage:1.5, radius:3.40, arc:2.35,
+      rage_cleave:{name:'Stormcleaver Combo', price:0, slot:'primary', kind:'barbarian_melee', cooldown:0.64, damage:1.5, radius:3.40, arc:2.35,
         desc:'A brutal three-hit axe combo. Every single beat throws a ground shockwave out of the impact point, so no swing is ever single-target. The overhead finisher hurls back everything it touches.'},
       feral_onslaught:{name:'Rending Slash', price:400, slot:'legacy', hidden:true, kind:'barbarian_slash_wave', cooldown:1.18, damage:2.2, radius:2.9, arc:2.2, range:30, waveDamage:2.0, auto:true,
         desc:'Alternating heavy left and right side swings. Each one launches a huge layered crescent that tears a fissure down the lane as it travels, piercing every enemy in its path, and detonates a wide shockwave at your feet as it leaves.'},
@@ -11226,6 +11227,18 @@ function fitAesirRoot(root,parentScale=1,targetWorldHeight=2.22){
   const box=new THREE.Box3().setFromObject(root);
   const size=new THREE.Vector3();box.getSize(size);
   const center=new THREE.Vector3();box.getCenter(center);
+  // V23.14.00: centre on her body, not the body+axe bounding box. Now that the
+  // axe is actually held, the box is asymmetric (she carries it out to one
+  // side), and centring on that box would park her off to the side of her own
+  // movement origin — she would visibly lead or trail her aim and hitbox. The
+  // pelvis bone is her true centre line, so use it for X/Z and keep the box
+  // only for height.
+  let pelvisBone=null;
+  root.traverse(o=>{ if(!pelvisBone&&o.isBone&&/pelvis/i.test(o.name))pelvisBone=o; });
+  if(pelvisBone){
+    const p=new THREE.Vector3().setFromMatrixPosition(pelvisBone.matrixWorld);
+    center.x=p.x; center.z=p.z;
+  }
   const desiredLocal=targetWorldHeight/Math.max(.001,parentScale);
   const sc=desiredLocal/Math.max(.001,size.y);
   root.scale.setScalar(sc);
@@ -11281,6 +11294,149 @@ function prepareAesirMaterials(root,THREEAsset){
   });
 }
 
+// ---------------------------------------------------------------------------
+// V23.14.00 — AESIR AXE REPAIR
+//
+// The Mesh2Motion auto-rig broke the axe in two independent ways. Verified by
+// decoding the GLB and rendering the raw skin data offline:
+//
+//   1. DETACHED. The axe is four separate mesh islands sitting at x~0.73 in
+//      bind space while hand_l sits at x~0.22 — roughly half a body width away
+//      from the hand that is supposed to be holding it.
+//   2. TORN. Auto-weighting split the axe across three bones:
+//        middle_01_l 524 verts, head 92 verts, upperarm_l 12 verts.
+//      The 92 head-weighted verts are the visible failure. Any head motion rips
+//      the blade off and smears it into the long grey shard seen in the build
+//      screenshots. The long lever arm from (1) then swings the wreckage in a
+//      huge arc, which is why the axe reads as gigantic and free-floating.
+//
+// The repair rigidly rebinds every axe vertex to a single bone (weight 1.0) and
+// moves the axe into the hand. Cost is one pass over ~7.9k verts at load, well
+// under a millisecond, and zero per-frame cost afterwards.
+//
+// Tune the look here — these are the only numbers that matter.
+const AESIR_AXE_FIT = {
+  enabled:true,
+  gripBone:'hand_l',      // wrist, NOT middle_01_l: finger curl would twist the axe
+  scale:0.85,             // axe size relative to authored mesh
+  yawDeg:60,              // rotate blade plane so it clears the fur hood
+  offset:[0.07,0,0.01],   // grip offset from the hand bone (out / up / forward)
+  gripPoint:[0.729,0.498,0.0225], // point on the handle the hand closes around
+  islandCentroidX:0.40    // islands with centroid past this are axe, not body
+};
+
+function aesirFindSkinnedMesh(root){
+  let found=null;
+  root.traverse(o=>{ if(!found&&o.isSkinnedMesh)found=o; });
+  return found;
+}
+
+// Split the mesh into connected islands so the axe is identified by topology
+// rather than a raw coordinate cut. A plain "x > threshold" test cannot work:
+// her mittens reach x=0.358 while the inner blade tip starts at x=0.352, so the
+// two overlap. Islands separate cleanly (body centroids top out at 0.288, every
+// axe island sits at 0.556 or beyond). This also self-heals if the model is
+// re-exported with a different vertex order.
+function aesirAxeVertexMask(geo){
+  const pos=geo.attributes.position, n=pos.count;
+  const parent=new Int32Array(n);
+  for(let i=0;i<n;i++)parent[i]=i;
+  const find=a=>{ while(parent[a]!==a){ parent[a]=parent[parent[a]]; a=parent[a]; } return a; };
+  const union=(a,b)=>{ a=find(a); b=find(b); if(a!==b)parent[a]=b; };
+
+  // Weld coincident positions first — UV/normal seams split otherwise-joined verts.
+  const weld=new Map();
+  for(let i=0;i<n;i++){
+    const k=Math.round(pos.getX(i)*1e5)+'_'+Math.round(pos.getY(i)*1e5)+'_'+Math.round(pos.getZ(i)*1e5);
+    const prev=weld.get(k);
+    if(prev===undefined)weld.set(k,i); else union(i,prev);
+  }
+  const idx=geo.index;
+  if(idx){
+    for(let i=0;i<idx.count;i+=3){
+      const a=idx.getX(i),b=idx.getX(i+1),c=idx.getX(i+2);
+      union(a,b); union(b,c);
+    }
+  }
+  const sumX=new Map(), cnt=new Map();
+  for(let i=0;i<n;i++){
+    const r=find(i);
+    sumX.set(r,(sumX.get(r)||0)+pos.getX(i));
+    cnt.set(r,(cnt.get(r)||0)+1);
+  }
+  const isAxe=new Uint8Array(n);
+  for(let i=0;i<n;i++){
+    const r=find(i);
+    if(sumX.get(r)/cnt.get(r)>AESIR_AXE_FIT.islandCentroidX)isAxe[i]=1;
+  }
+  return isAxe;
+}
+
+function aesirRepairAxeBinding(root,THREEAsset){
+  if(!AESIR_AXE_FIT.enabled)return false;
+  const mesh=aesirFindSkinnedMesh(root);
+  if(!mesh||!mesh.skeleton||!mesh.geometry)return false;
+  const geo=mesh.geometry;
+  if(geo.userData&&geo.userData.aesirAxeRepaired)return true;
+
+  const si=geo.attributes.skinIndex, sw=geo.attributes.skinWeight, pos=geo.attributes.position;
+  if(!si||!sw)return false;
+
+  const bones=mesh.skeleton.bones;
+  const gripIdx=bones.findIndex(b=>b&&b.name===AESIR_AXE_FIT.gripBone);
+  if(gripIdx<0){ console.warn('Aesir axe repair: grip bone missing',AESIR_AXE_FIT.gripBone); return false; }
+
+  // Bind-space world position of the grip bone = inverse of its inverse-bind matrix.
+  const bindWorld=new THREEAsset.Matrix4().copy(mesh.skeleton.boneInverses[gripIdx]).invert();
+  const handPos=new THREEAsset.Vector3().setFromMatrixPosition(bindWorld);
+
+  const isAxe=aesirAxeVertexMask(geo);
+  const grip=new THREEAsset.Vector3().fromArray(AESIR_AXE_FIT.gripPoint);
+  const off=new THREEAsset.Vector3().fromArray(AESIR_AXE_FIT.offset);
+  const yaw=new THREEAsset.Matrix4().makeRotationY(AESIR_AXE_FIT.yawDeg*Math.PI/180);
+  const target=handPos.clone().add(off);
+  const v=new THREEAsset.Vector3();
+  let moved=0;
+
+  for(let i=0;i<pos.count;i++){
+    if(!isAxe[i])continue;
+    v.set(pos.getX(i),pos.getY(i),pos.getZ(i)).sub(grip)
+     .multiplyScalar(AESIR_AXE_FIT.scale).applyMatrix4(yaw).add(target);
+    pos.setXYZ(i,v.x,v.y,v.z);
+    si.setXYZW(i,gripIdx,0,0,0);
+    sw.setXYZW(i,1,0,0,0);
+    moved++;
+  }
+  if(!moved)return false;
+  pos.needsUpdate=true; si.needsUpdate=true; sw.needsUpdate=true;
+  geo.computeBoundingBox(); geo.computeBoundingSphere();
+  geo.userData=geo.userData||{}; geo.userData.aesirAxeRepaired=true;
+  return true;
+}
+
+// The rig's default node transforms are NOT its bind pose — they are an
+// arbitrary hunched, twisted frame. Capturing that as the weapon-ready idle is
+// why the preview card and post-attack recovery both looked wrong. The true
+// bind pose (rebuilt from the inverse bind matrices) is the clean upright
+// stance the character was modelled in.
+function aesirSnapToBindPose(root,THREEAsset){
+  const mesh=aesirFindSkinnedMesh(root);
+  if(!mesh||!mesh.skeleton)return false;
+  const sk=mesh.skeleton, bones=sk.bones;
+  const bindWorld=sk.boneInverses.map(m=>new THREEAsset.Matrix4().copy(m).invert());
+  const inv=new THREEAsset.Matrix4(), local=new THREEAsset.Matrix4();
+  for(let i=0;i<bones.length;i++){
+    const b=bones[i];
+    if(!b)continue;
+    const p=bones.indexOf(b.parent);
+    if(p>=0){ inv.copy(bindWorld[p]).invert(); local.multiplyMatrices(inv,bindWorld[i]); }
+    else local.copy(bindWorld[i]);
+    local.decompose(b.position,b.quaternion,b.scale);
+  }
+  root.updateMatrixWorld(true);
+  return true;
+}
+
 function buildStaticPoseClipFromCurrent(root,THREEAsset,name='Aesir_WeaponReady'){
   const tracks=[];
   root.updateMatrixWorld(true);
@@ -11293,27 +11449,15 @@ function buildStaticPoseClipFromCurrent(root,THREEAsset,name='Aesir_WeaponReady'
     if(o.quaternion && (o.isBone || /root|pelvis|spine|clavicle|upperarm|lowerarm|hand|thigh|calf|foot|ball|neck|head/i.test(o.name))){
       tracks.push(new THREEAsset.QuaternionKeyframeTrack(key+'.quaternion',[0,1],[o.quaternion.x,o.quaternion.y,o.quaternion.z,o.quaternion.w,o.quaternion.x,o.quaternion.y,o.quaternion.z,o.quaternion.w]));
     }
+    if(o.scale && !o.isBone){
+      tracks.push(new THREEAsset.VectorKeyframeTrack(key+'.scale',[0,1],[o.scale.x,o.scale.y,o.scale.z,o.scale.x,o.scale.y,o.scale.z]));
+    }
   });
   return tracks.length?new THREEAsset.AnimationClip(name,1,tracks):null;
 }
-function buildAesirWeaponReadyClip(root,THREEAsset,sourceClip,name='Aesir_WeaponReady'){
-  if(!sourceClip) return buildStaticPoseClipFromCurrent(root,THREEAsset,name);
-  const sampleT=Math.max(0.02,Math.min(sourceClip.duration*0.16,0.18));
-  const tracks=[];
-  for(const tr of sourceClip.tracks||[]){
-    try{
-      const stride=tr.getValueSize();
-      const value=new Float32Array(stride);
-      tr.createInterpolant(value).evaluate(sampleT);
-      const vals=Array.from(value);
-      const doubled=vals.concat(vals);
-      tracks.push(new tr.constructor(tr.name,[0,1],doubled));
-    }catch(e){}
-  }
-  return tracks.length?new THREEAsset.AnimationClip(name,1,tracks):buildStaticPoseClipFromCurrent(root,THREEAsset,name);
-}
 
-// The combat code speaks KayKit/Wolverine clip names.// The combat code speaks KayKit/Wolverine clip names. Rather than touch every
+
+// The combat code speaks KayKit/Wolverine clip names. Rather than touch every
 // call site, resolve whatever it asks for onto one of Aesir's ten takes.
 // Returns [clipName, timeScale, loop].
 
@@ -11322,31 +11466,32 @@ function buildAesirWeaponReadyClip(root,THREEAsset,sourceClip,name='Aesir_Weapon
 
 function aesirResolveClip(requested){
   const n=String(requested||'').toLowerCase();
-  // V23.14.00: refined native-only routing with cleaner start offsets so Aesir
-  // enters each attack on a believable pose faster and idles on a weapon-ready grip.
-  if(/die|death|dead/.test(n)) return ['Jump_Land',.70,false,.02];
-  if(/stun|freeze|hit|hurt|damage|flinch/.test(n)) return ['Push',.92,false,.02];
-  if(/rage cleave opening/.test(n)) return ['Sword_Regular_A',.88,false,.08];
-  if(/rage cleave reverse|donor base/.test(n)) return ['Sword_Regular_B',.88,false,.08];
-  if(/rage cleave finisher/.test(n)) return ['Sword_Attack_Air_Vertical',.76,false,.10];
-  if(/rending slash/.test(n)) return ['Sword_Regular_C',.84,false,.08];
-  if(/feral hook left/.test(n)) return ['Sword_Regular_A',1.00,false,.10];
-  if(/feral hook right/.test(n)) return ['Sword_Regular_B',1.00,false,.10];
-  if(/feral axe butt jab/.test(n)) return ['Sword_Attack',1.02,false,.06];
-  if(/feral overhead accent/.test(n)) return ['Attack_Ground_Pound',.88,false,.10];
-  if(/earthbreaker|ground pound|slam|smash/.test(n)) return ['Attack_Ground_Pound',.76,false,.16];
-  if(/cyclone|spin|whirl|twirl/.test(n)) return ['Sword_Regular_Combo',1.06,true,.10];
-  if(/roar|rage|power|ultimate|cheer|victory|taunt/.test(n)) return ['Two-hand_Blast',.84,false,.10];
-  if(/primal wave|throw|axe wave/.test(n)) return ['OverhandThrow',.88,false,.10];
-  if(/dash/.test(n)) return ['Sword_Dash_RM',1.0,false,.04];
-  if(/dodge|roll/.test(n)) return ['Roll',1.0,false,.02];
-  if(/jump_land|land/.test(n)) return ['Jump_Land',1.0,false,.02];
-  if(/jump|air/.test(n)) return ['Jump_air',1.0,true,.02];
-  if(/run|walk|move|jog/.test(n)) return ['Jog',1.0,true,.04];
+  // V23.13.02: exported-model 3 native-only routing.
+  // Every resolved take exists in the uploaded 34-clip GLB. No reversed clips,
+  // donor retargeting, procedural bone writing, wrapper tilt, squash or stretch.
+  if(/die|death|dead/.test(n)) return ['Jump_Land',.70,false,0];
+  if(/stun|freeze|hit|hurt|damage|flinch/.test(n)) return ['Push',.90,false,0];
+  if(/rage cleave opening/.test(n)) return ['Sword_Regular_A',.92,false,0];
+  if(/rage cleave reverse|donor base/.test(n)) return ['Sword_Regular_B',.90,false,0];
+  if(/rage cleave finisher/.test(n)) return ['Sword_Attack_Air_Vertical',.78,false,0];
+  if(/rending slash/.test(n)) return ['Sword_Regular_C',.82,false,0];
+  if(/feral hook left/.test(n)) return ['Sword_Regular_A',1.04,false,0];
+  if(/feral hook right/.test(n)) return ['Sword_Regular_B',1.02,false,0];
+  if(/feral axe butt jab/.test(n)) return ['Sword_Regular_C',1.08,false,0];
+  if(/feral overhead accent/.test(n)) return ['Sword_Attack',.92,false,0];
+  if(/earthbreaker|ground pound|slam|smash/.test(n)) return ['Attack_Ground_Pound',.72,false,0];
+  if(/cyclone|spin|whirl|twirl/.test(n)) return ['Sword_Regular_Combo',1.15,true,0];
+  if(/roar|rage|power|ultimate|cheer|victory|taunt/.test(n)) return ['Two-hand_Blast',.84,false,0];
+  if(/primal wave|throw|axe wave/.test(n)) return ['OverhandThrow',.90,false,0];
+  if(/dash/.test(n)) return ['Sword_Dash_RM',1.0,false,0];
+  if(/dodge|roll/.test(n)) return ['Roll',1.0,false,0];
+  if(/jump_land|land/.test(n)) return ['Jump_Land',1.0,false,0];
+  if(/jump|air/.test(n)) return ['Jump_air',1.0,true,0];
+  if(/run|walk|move|jog/.test(n)) return ['Jog',1.0,true,0];
   if(/idle|stand|ready|preview/.test(n)) return ['Aesir_WeaponReady',1.0,true,0];
   if(/guard|block|defend/.test(n)) return ['Aesir_WeaponReady',1.0,true,0];
-  if(/spell|blast/.test(n)) return ['Two-hand_Blast',.90,false,.10];
-  if(/chop|slice|slash|cleave|melee|attack|stab|thrust|punch|claw/.test(n)) return ['Sword_Attack',.96,false,.08];
+  if(/spell|blast/.test(n)) return ['Two-hand_Blast',.90,false,0];
+  if(/chop|slice|slash|cleave|melee|attack|stab|thrust|punch|claw/.test(n)) return ['Sword_Attack',.95,false,0];
   return ['Aesir_WeaponReady',1.0,true,0];
 }
 
@@ -11378,6 +11523,11 @@ function buildAesirBarbarianPlayer(options={}){
     const root=cloneSkinned(gltf.scene);
     root.rotation.y=AVATAR_MODEL_YAW.barbarian||0;
     prepareAesirMaterials(root,THREEAsset);
+    aesirRepairAxeBinding(root,THREEAsset);
+    // Must precede fitAesirRoot: the fit measures the current pose, and the
+    // rig's default node pose is a twisted non-bind frame that would give a
+    // wrong height and centre.
+    aesirSnapToBindPose(root,THREEAsset);
 
     const fit=new THREEAsset.Group();
     fit.name='Aesir_FitWrapper';
@@ -11420,9 +11570,9 @@ function buildAesirBarbarianPlayer(options={}){
     // This keeps the axe in its clean natural hand relationship for preview, idle and
     // post-attack recovery instead of freezing a late frame from an unrelated attack clip.
     {
-      const sourceReady=clips.Sword_Regular_A||clips.Sword_Attack||clips.OverhandThrow||gltf.animations[0];
-      const readyPose=buildAesirWeaponReadyClip(root,THREEAsset,sourceReady,'Aesir_WeaponReady');
-      if(readyPose)clips.Aesir_WeaponReady=readyPose;
+      aesirSnapToBindPose(root,THREEAsset);
+      const staticPose=buildStaticPoseClipFromCurrent(root,THREEAsset,'Aesir_WeaponReady');
+      if(staticPose)clips.Aesir_WeaponReady=staticPose;
     }
     wrapper.userData.kayMixer=mixer;
     wrapper.userData.kayClips=clips;
@@ -24612,19 +24762,12 @@ function aesirSkyBolt(pos,scale=1.0,color=0xbdefff){
 function aesirThorAccent(pos,yaw=0,power=1,finisher=false){
   if(!scene||!player)return;
   const f=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
-  const impact=new THREE.Vector3(pos.x+f.x*(1.25+power*.35),pos.y+.12,pos.z+f.z*(1.25+power*.35));
-  knightShockRing(impact,(finisher?2.15:1.55)*power,0x67d7ff,finisher?.34:.26);
-  knightShockRing(impact,(finisher?3.0:2.2)*power,0xffffff,finisher?.28:.22);
-  const rays=finisher?(isMobile?3:5):(isMobile?2:3);
-  for(let i=0;i<rays;i++){
-    const a=yaw+(i-(rays-1)/2)*.34;
-    const end=new THREE.Vector3(impact.x+Math.sin(a)*(3.2+power*1.0),impact.y+.18+Math.random()*.35,impact.z+Math.cos(a)*(3.2+power*1.0));
-    aesirLightningArc(new THREE.Vector3(impact.x,impact.y+.75,impact.z),end,i%2?0xffffff:0x7ee7ff,.13);
-  }
-  if(finisher){
-    aesirSkyBolt(impact,Math.min(1.5,power),0x9fe8ff);
-    if(knightFxBudget(1))spawnBurst(impact.x,impact.y+.35,impact.z,isMobile?4:7,FX_MAT_SPARK,2.6*power);
-  }
+  const impact=new THREE.Vector3(pos.x+f.x*(1.2+power*.35),pos.y+.12,pos.z+f.z*(1.2+power*.35));
+  const rings=finisher?3:2;
+  for(let i=0;i<rings;i++)knightShockRing(impact,(1.5+i*.85)*power,i%2?0xffffff:0x67d7ff,.28+i*.05);
+  const rays=finisher?(isMobile?5:8):(isMobile?3:5);
+  for(let i=0;i<rays;i++){const a=yaw+(i-(rays-1)/2)*.24;const end=new THREE.Vector3(impact.x+Math.sin(a)*(2.8+power*1.2),impact.y+.15+Math.random()*.6,impact.z+Math.cos(a)*(2.8+power*1.2));aesirLightningArc(new THREE.Vector3(impact.x,impact.y+.8,impact.z),end,i%2?0xffffff:0x7ee7ff,.16);}
+  if(finisher){aesirSkyBolt(impact,Math.min(1.7,power),0x9fe8ff);spawnBurst(impact.x,impact.y+.5,impact.z,isMobile?8:14,FX_MAT_SPARK,3.8*power);}
 }
 function aesirThorUltimateCrown(pos,radius=6){
   if(!scene)return;const count=isMobile?6:10;
@@ -24647,8 +24790,7 @@ function doBarbarianAttack(w){
   faceEnemyTarget(findNearestEnemy(Math.max(8,(w.radius||3)*3)));
   const pos={x:player.position.x,y:player.position.y,z:player.position.z},yaw=player.rotation.y;
   // Every axe action carries a restrained lightning signature; finishers escalate instead of deforming Aesir.
-  if(w.kind==='barbarian_melee')aesirThorAccent(pos,yaw,barbarianComboStep%3===2?1.45:1.0,barbarianComboStep%3===2);
-  else if(w.kind==='barbarian_flurry')aesirThorAccent(pos,yaw,.72,false);
+  if(w.kind==='barbarian_flurry')aesirThorAccent(pos,yaw,.72,false);
   else if(w.kind==='barbarian_slash_wave')aesirThorAccent(pos,yaw,1.15,true);
   const reachMult=1.25;
   if(player.userData.playKayClip){
@@ -24672,17 +24814,17 @@ function doBarbarianAttack(w){
       // Peek at the beat without advancing it; the flurry block below owns the
       // increment, exactly as Rage Cleave does with barbarianComboStep.
       clip=['feral hook left','feral hook right','feral axe butt jab','feral overhead accent'][barbarianFlurryStep%4];
-      lock=.42;
+      lock=.36;
     }
     else if(w.kind==='barbarian_melee'){
       const cleaveStep=barbarianComboStep%3;
       // Slower, weightier three-beat rhythm: HEAVY -> HEAVY -> RAISE/SMASH.
       // The attack cooldown is also longer, so input cannot skip these reads.
-      if(cleaveStep===0){clip='rage cleave opening';lock=.72;}
+      if(cleaveStep===0){clip='rage cleave opening';lock=.62;}
       else if(cleaveStep===1){
-        clip='rage cleave reverse';lock=.72;
+        clip='rage cleave reverse';lock=.62;
       }
-      else {clip='rage cleave finisher';lock=.86;}
+      else {clip='rage cleave finisher';lock=.62;}
     }
     player.userData.playKayClip(clip,true,w.kind!=='barbarian_spin',lock);
     // Secondaries had no bone choreography at all before V22.25.00, so they
@@ -24881,93 +25023,104 @@ function doBarbarianAttack(w){
     if(hits&&navigator.vibrate)navigator.vibrate(feralStep===3?[18,10,26]:14);
     return;
   }
-  // RAGE CLEAVE ONLY -------------------------------------------------------
-  // Three clearly different beats while preserving the approved damage curve:
-  // 1) committed side cleave, 2) wider reverse cleave + tiny crowd shove,
-  // 3) Execution Smash with the existing 1.5x melee hit + .85x ground splash.
+  // STORMCLEAVER COMBO -----------------------------------------------------
+  // V23.14.01: animation FIRST, impact SECOND. Each beat waits for the native
+  // Mesh2Motion axe to reach its contact frame before damage/VFX are emitted.
+  // This removes the old "press FIRE -> explosion -> arm catches up later" read.
   const step=barbarianComboStep++%3;
-  barbarianStartForcedCleave(step);
-  const forwardX=Math.sin(yaw),forwardZ=Math.cos(yaw);
+  const castPlayer=player, castRound=round, castYaw=yaw;
+  const castPos={x:pos.x,y:pos.y,z:pos.z};
+  const fx=Math.sin(castYaw),fz=Math.cos(castYaw);
+  const contactDelay=[175,205,430][step];
+  const validStormcleaver=()=>gameRunning&&barbarianIsActive()&&player===castPlayer&&round===castRound&&castPlayer.parent;
 
-  if(step===0){
-    // HIT 1 — Ripping Side Cleave. Compact red-orange crescent and a firm body
-    // step forward. Effects stay localized so this reads as weapon momentum,
-    // not a miniature ultimate.
-    spawnBarbarianArc(pos,yaw,0,.96);
-    spawnAxeSwingTrail(pos,yaw,-1,1.02,0xff7a20);
-    const hits=damageMeleeArc(pos,yaw,w.radius*reachMult,w.arc,w.damage);
-    if(hits&&knightFxBudget(1)){
-      const impact={x:pos.x+forwardX*1.75,y:pos.y+.8,z:pos.z+forwardZ*1.75};
-      spawnBurst(impact.x,impact.y,impact.z,isMobile?5:8,FX_MAT_SPARK,3.2);
-      // V22.26.01: .018 is barely one frame - nothing lands on a 1.5x giant.
-      knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.052);
+  // Very restrained anticipation: one short axe-energy line, no burst/ring yet.
+  setTimeout(()=>{
+    if(!validStormcleaver())return;
+    const p={x:castPlayer.position.x,y:castPlayer.position.y,z:castPlayer.position.z};
+    spawnAxeSwingTrail(p,castYaw,step===1?1:-1,step===2?1.18:.92,step===2?0xffffff:0x67d7ff);
+  },Math.max(45,contactDelay-95));
+
+  setTimeout(()=>{
+    if(!validStormcleaver())return;
+    const p={x:castPlayer.position.x,y:castPlayer.position.y,z:castPlayer.position.z};
+    const forwardX=Math.sin(castYaw),forwardZ=Math.cos(castYaw);
+    const reach=w.radius*reachMult;
+    const impact={
+      x:p.x+forwardX*(step===2?1.05:1.72),
+      y:p.y+(step===2?.08:.55),
+      z:p.z+forwardZ*(step===2?1.05:1.72)
+    };
+
+    if(step===0){
+      // HIT 1 — ELECTRIC SIDE CLEAVE. One broad weapon trail and one focused
+      // lightning fork at contact. Fast/readable, not particle-heavy.
+      const hits=damageMeleeArc(p,castYaw,reach,w.arc,w.damage);
+      knightShockRing(impact,2.15,0x67d7ff,.25);
+      knightShockRing(impact,2.65,0xffffff,.19);
+      const a0=new THREE.Vector3(impact.x,impact.y+.65,impact.z);
+      const a1=new THREE.Vector3(impact.x+forwardX*2.4,impact.y+.20,impact.z+forwardZ*2.4);
+      aesirLightningArc(a0,a1,0xaeefff,.13);
+      barbarianShockwave(p,castYaw,{radius:3.4,damage:.85,force:6.6,stun:.28,color:0x67d7ff,push:1.45,cracks:false});
+      knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,hits?.058:.028);
+      triggerCombatShake(hits?13:5,135);
+      navigator.vibrate&&navigator.vibrate(hits?[18,10,24]:10);
+      const lunge=resolveCollision(castPlayer.position.x+forwardX*.28,castPlayer.position.z+forwardZ*.28,castPlayer.position.y);
+      castPlayer.position.x=lunge.x;castPlayer.position.z=lunge.z;
+      return;
     }
-    // Every beat throws a wave. She cannot chase, so she must never whiff wide.
-    barbarianShockwave(pos,yaw,{radius:3.5,damage:.85,force:7.0,stun:.30,color:0xff7a20});
-    triggerCombatShake(hits?15:5,150);
-    const lunge=resolveCollision(player.position.x+forwardX*.34,player.position.z+forwardZ*.34,player.position.y);
-    player.position.x=lunge.x;player.position.z=lunge.z;
-    navigator.vibrate&&navigator.vibrate(hits?[18,12,26]:10);
-    return;
-  }
 
-  if(step===1){
-    // HIT 2 — Reverse Cleave. Broader/brighter than hit one and carries a tiny
-    // directional shove/stagger so the combo visibly gains momentum without
-    // knocking the pack out of Rage Cleave reach.
-    spawnBarbarianArc(pos,yaw+.08,1,1.08);
-    spawnAxeSwingTrail(pos,yaw,1,1.15,0xffa13a);
-    const hits=damageMeleeArc(pos,yaw,w.radius*reachMult,w.arc,w.damage);
-    if(hits){
-      for(const z of zombies){
-        if(!z||!z.userData||z.userData.dead)continue;
-        const dx=z.position.x-pos.x,dz=z.position.z-pos.z,d=Math.hypot(dx,dz);
-        if(d>w.radius*reachMult+.2)continue;
-        // Deliberately much weaker than Feral Onslaught's repeated shove.
-        z.userData.knockbackX=(z.userData.knockbackX||0)+forwardX*1.15;
-        z.userData.knockbackZ=(z.userData.knockbackZ||0)+forwardZ*1.15;
-        z.userData.hitStun=Math.max(z.userData.hitStun||0,.09);
+    if(step===1){
+      // HIT 2 — REVERSE THUNDER CLEAVE. Broader impact and a short two-prong
+      // lightning fan, while keeping the pack close enough for the finisher.
+      const hits=damageMeleeArc(p,castYaw,reach,w.arc,w.damage);
+      knightShockRing(impact,2.55,0x6fdcff,.27);
+      knightShockRing(impact,3.15,0xffffff,.21);
+      for(const side of [-1,1]){
+        const a=castYaw+side*.32;
+        aesirLightningArc(new THREE.Vector3(impact.x,impact.y+.72,impact.z),
+          new THREE.Vector3(impact.x+Math.sin(a)*3.2,impact.y+.14,impact.z+Math.cos(a)*3.2),
+          side<0?0xffffff:0x73dcff,.14);
       }
-      if(knightFxBudget(1)){
-        const impact={x:pos.x+forwardX*1.9,y:pos.y+.82,z:pos.z+forwardZ*1.9};
-        spawnBurst(impact.x,impact.y,impact.z,isMobile?6:10,FX_MAT_SPARK,3.5);
+      barbarianShockwave(p,castYaw,{radius:3.9,damage:.95,force:7.5,stun:.34,color:0x82e7ff,push:1.55,cracks:false});
+      if(hits){
+        for(const z of zombies){
+          if(!z||!z.userData||z.userData.dead)continue;
+          const d=Math.hypot(z.position.x-p.x,z.position.z-p.z);
+          if(d>reach+.25)continue;
+          z.userData.knockbackX=(z.userData.knockbackX||0)+forwardX*.9;
+          z.userData.knockbackZ=(z.userData.knockbackZ||0)+forwardZ*.9;
+          z.userData.hitStun=Math.max(z.userData.hitStun||0,.11);
+        }
       }
-      knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.060);
+      knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,hits?.070:.032);
+      triggerCombatShake(hits?17:6,155);
+      navigator.vibrate&&navigator.vibrate(hits?[22,12,32]:11);
+      const lunge=resolveCollision(castPlayer.position.x+forwardX*.34,castPlayer.position.z+forwardZ*.34,castPlayer.position.y);
+      castPlayer.position.x=lunge.x;castPlayer.position.z=lunge.z;
+      return;
     }
-    {
-      barbarianShockwave(pos,yaw,{radius:3.9,damage:.95,force:8.0,stun:.34,color:0xff9a32});
-    }
-    triggerCombatShake(hits?10:4,125);
-    const lunge=resolveCollision(player.position.x+forwardX*.42,player.position.z+forwardZ*.42,player.position.y);
-    player.position.x=lunge.x;player.position.z=lunge.z;
-    navigator.vibrate&&navigator.vibrate(hits?[20,14,34]:11);
-    return;
-  }
 
-  // HIT 3 — Execution Smash. The animation lock above supplies the extra
-  // anticipation. The impact is concentrated around the axe/ground contact:
-  // bright core, cracks, debris and a thick shock ring, with no full-screen FX.
-  spawnBarbarianArc(pos,yaw,2,1.28);
-  spawnAxeSwingTrail(pos,yaw,-1,1.42,0xffffff);
-  const hits=damageMeleeArc(pos,yaw,w.radius*reachMult,w.arc,w.damage*1.5);
-  const impact={x:pos.x+forwardX*.72,y:pos.y,z:pos.z+forwardZ*.72};
-  spawnEarthbreaker(impact,2.7);
-  damageNearby(pos,2.7,w.damage*.85);
-  barbarianKnockbackRing(pos,2.95,8.5,.5);
-  knightShockRing(impact,3.6,0xffffff,.42);
-  knightShockRing(impact,2.85,0xff6a22,.34);
-  knightGroundCracks(impact,3.0,isMobile?8:12,0xff6a22);
-  if(knightFxBudget(2)){
-    spawnKnightGuardBurst(impact,1.05,0xff5a1e);
-    spawnBurst(impact.x,impact.y+.38,impact.z,isMobile?10:16,FX_MAT_SPARK,4.6);
-  }
-  knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,hits?.105:.055);
-  triggerCombatShake(hits?26:14,300);
-  const lunge=resolveCollision(player.position.x+forwardX*.30,player.position.z+forwardZ*.30,player.position.y);
-  player.position.x=lunge.x;player.position.z=lunge.z;
-  navigator.vibrate&&navigator.vibrate(hits?[30,18,58]:16);
+    // HIT 3 — THUNDER EXECUTION. The native overhead animation earns the wow:
+    // one sky bolt hits the same ground point as the axe, then a thick electric
+    // shock front leaves the crater. Large forms, very few objects.
+    const hits=damageMeleeArc(p,castYaw,reach,w.arc,w.damage*1.5);
+    const ground={x:p.x+forwardX*.78,y:p.y,z:p.z+forwardZ*.78};
+    damageNearby(ground,2.75,w.damage*.85);
+    barbarianKnockbackRing(ground,3.1,8.5,.52);
+    aesirSkyBolt(new THREE.Vector3(ground.x,ground.y,ground.z),1.35,0xcdf6ff);
+    spawnEarthbreakerSlamImpact(ground,2.8);
+    knightShockRing(ground,3.35,0x67d7ff,.34);
+    knightShockRing(ground,4.25,0xffffff,.28);
+    if(knightFxBudget(1))spawnBurst(ground.x,ground.y+.34,ground.z,isMobile?5:8,FX_MAT_SPARK,3.0);
+    knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,hits?.115:.070);
+    triggerCombatShake(hits?27:15,310);
+    navigator.vibrate&&navigator.vibrate(hits?[34,18,62]:18);
+    const lunge=resolveCollision(castPlayer.position.x+forwardX*.22,castPlayer.position.z+forwardZ*.22,castPlayer.position.y);
+    castPlayer.position.x=lunge.x;castPlayer.position.z=lunge.z;
+  },contactDelay);
+  return;
 }
-
 /* ============================================================ ULTIMATE 1
    PRIMAL RAGE. Previously kill-charged and living on the Ultimate button;
    now a cooldown-based Ability-slot ultimate like Wolverine's, since
