@@ -1,5 +1,6 @@
+<!-- V23.12.09 Pirate Anchor/Tide/Kraken Tune: Anchor Drop visual size is reduced 50% from V23.12.08. Anchor Rain now uses the same gold low-poly Anchor Drop visual construction while keeping a larger Ultimate-only scale. Tidal Cataclysm keeps the approved slow wave travel speed but now generates exactly five waves and ends only after the fifth wave fully crosses the arena. Broadside clone summons are explicitly allowed during Kraken Rising while all other Kraken special locks remain intact. -->
 <!-- V23.12.08 Anchor Visual Repair: fixes Anchor Drop over-scaling, makes Broadside clones solid/readable, and rebuilds Anchor Rain visibility with solid low-poly holographic anchors that reliably descend on-screen.
-<!-- V23.12.07 Visible Anchor + Triple Tide: Anchor Rain holograms are made strongly visible on bright maps with high-opacity giant primitive silhouettes, lower spawn height and readable descent timing. Broadside hologram clones are much less transparent while remaining ultra-light and invincible. Anchor Drop now scales from close-range single-anchor coverage at early rounds to half-map coverage, five simultaneous anchors and zero cooldown at Round 30. Tidal Cataclysm is rebuilt as three slow arena-crossing waves spawned across ten seconds: normals die on first contact, large non-boss enemies are slowed for 10 seconds and die on second wave contact, bosses take 3% max HP per wave. -->
+<!-- V23.12.07 Visible Anchor + Triple Tide: Anchor Rain holograms are made strongly visible on bright maps with high-opacity giant primitive silhouettes, lower spawn height and readable descent timing. Broadside hologram clones are much less transparent while remaining ultra-light and invincible. Anchor Drop now scales from close-range single-anchor coverage at early rounds to half-map coverage, five simultaneous anchors and zero cooldown at Round 30. Tidal Cataclysm is rebuilt as five slow arena-crossing waves spawned across ten seconds: normals die on first contact, large non-boss enemies are slowed for 10 seconds and die on second wave contact, bosses take 3% max HP per wave. -->
 <!-- V23.12.06 Pirate Mobile Scaling + Tidal Repair: Broadside Chopper clones are rebuilt as ultra-light holographic Chopper silhouettes instead of full skinned Mesh2Motion rigs, eliminating per-clone skeleton/mixer/texture cost while keeping Knight-style AI, aggro, movement, invincibility and 10% damage. Enemy melee now explicitly recognizes Chopper clones as invincible targets instead of falling through to playerTakeHit(). Cannon Shot fire cooldown scales linearly to 0 by Round 20; Anchor Drop is 3x larger than V23.12.05, its fall speed accelerates by round and its cooldown reaches 0 at Round 20; Powder Keg cooldown is 1s at Round 1 and scales to 0 at Round 30. Anchor Rain now uses enormous low-detail holographic anchors for 10 seconds. Tidal Cataclysm is rebuilt as a visible arena-wide solid water wall and its stale Doldrums HUD/active-state routing is corrected. -->
 <!-- V23.12.05 Pirate Anchor Routing Fix: fixes Chopper Secondary dispatch so Boarding Dash, Anchor Drop, and Powder Keg Toss route into the standalone ChopperPirateKit instead of falling through to generic shootFromPosition(), which caused the rapid yellow/white projectile stream seen when Anchor was equipped. Anchor Drop is now guaranteed to perform only its tracked giant falling-anchor attack. No balance or requested V23.12.04 Pirate behavior changed. -->
 <!-- V23.12.04 Pirate Anchor/Titan/Tidal Pass: Cannon Shot now pierces up to three targets, executing normal enemies on contact, then detonates on the third contact with a tight 2-second stun and small shockwave damage. Anchor Drop now tracks the nearest valid enemy within half-map range until the actual drop so it lands on the enemy instead of a stale coordinate. Cutlass Storm is replaced by a 10-second Giant Anchor Rain with frequent low-cost anchor drops, lethal direct impacts and nearby blast damage. Kraken Rising now follows Knight Guardian Titan rules: 5x visual size, 15-second duration, 5x damage, 2.6x combat reach, 0.85 movement multiplier, Primary/Secondary access during Titan, other specials locked, and Knight-matched cooldown applied after the transformation ends. Doldrums Cannon is replaced by Tidal Cataclysm, one giant arena-sweeping water wall using a few large meshes instead of particle spam. -->
@@ -1686,7 +1687,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.12.08 - Anchor Visual Repair';
+const GAME_VERSION='23.12.09 - Anchor Tide + Kraken Tune';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -14252,7 +14253,7 @@ const RHINO_SHATTERED_DOMAIN = {id:'rhino_shattered_domain', name:'Titan Rampage
 const RHINO_SKY_FATHER = {id:'rhino_sky_father', name:'Armageddon', price:900, avatar:'rhino', unlockLevel:18,
   desc:'Leap impossibly high off-screen, return to exact arena center and crash down, stunning every enemy already on the map for 8 seconds. Then the Mage\'s giant Super Meteors continuously rain across the arena for 10 seconds. Most normal enemies caught by an impact are instantly erased; survivors, including bosses, are stunned and burned.'};
 const CHOPPER_STAMPEDE = {id:'hooded_thousand_cuts', name:'Anchor Rain', price:0, avatar:'chopper', unlockLevel:1,
-  desc:'For 10 seconds, enormous holographic anchor silhouettes continuously crash across the battlefield. They favor huge readable shape over texture detail. Direct hits instantly defeat normal enemies and every landing creates nearby explosion damage.'};
+  desc:'Enormous gold low-poly anchors, matching Anchor Drop\'s visual style, continuously crash across the battlefield. They favor huge readable shape over texture detail. Direct hits instantly defeat normal enemies and every landing creates nearby explosion damage.'};
 const CHOPPER_GUARD_DOME = {id:'hooded_dancing_steel', name:'Tidal Cataclysm', price:0, avatar:'chopper', unlockLevel:1,
   desc:'Summon one enormous wall of ocean water that sweeps across the full arena. Normal enemies caught by the wall are erased; larger enemies are shoved, damaged and stunned when the wave passes.'};
 const CHOPPER_MONSTER_POINT = {id:'hooded_twilight_execution', name:'Kraken Rising', price:0, avatar:'chopper', unlockLevel:1,
@@ -29452,7 +29453,7 @@ function updateArcaneLaser(dt){
 // the game, but shares no state, no visuals and no code path with the rogue's
 // Shadow Eclipse.
 function triggerChopperBroadside(){
-  if(chopperKit&&chopperKit.kraken)return false;
+  // V23.12.09: Broadside crew are explicitly allowed during Kraken Rising.
   if(!gameRunning||!chopperClassIsActive())return false;
   if(player&&player.userData&&player.userData.playKayClip){
     try{ player.userData.playKayClip('2H_Melee_Attack_Spin',true,true,.5); }catch(_e){}
@@ -31234,14 +31235,13 @@ const chopperFX = (function(){
       if(!ensure())return null;
       opts=opts||{};
       const rain=!!opts.rain;
-      // V23.12.08: undo the accidental 27x compounding. Secondary returns to the
-      // intended 9x visual scale; Rain uses a separate large-but-screen-readable 7x silhouette.
-      const scale=rain?7.0:9.0, dur=Number(opts.dur)||(rain?1.35:.28), height=rain?7.2:6.4;
-      telegraph(at,rain?4.3:2.6,dur,rain?PAL.aqua:PAL.ember);
+      // V23.12.09: Secondary is 50% smaller than V23.12.08 (9x -> 4.5x).
+      // Anchor Rain deliberately reuses this exact gold low-poly anchor construction,
+      // but keeps its own larger Ultimate scale so the rain still reads as gigantic.
+      const scale=rain?7.0:4.5, dur=Number(opts.dur)||(rain?1.35:.28), height=rain?7.2:6.4;
+      telegraph(at,rain?4.3:2.1,dur,PAL.ember);
       const anchor=new THREE.Group();
-      const gm=rain
-        ? new THREE.MeshBasicMaterial({color:0x24d8ff,transparent:false,depthWrite:true,side:THREE.DoubleSide})
-        : new THREE.MeshLambertMaterial({color:0xe8b13c,flatShading:true,transparent:false});
+      const gm=new THREE.MeshLambertMaterial({color:0xe8b13c,flatShading:true,transparent:false});
       // Only four primitive pieces. No textures and no dynamic lights.
       const shank=new THREE.Mesh(new THREE.CylinderGeometry(.085,.105,1.35,6),gm);
       const stock=new THREE.Mesh(new THREE.BoxGeometry(.95,.10,.10),gm);stock.position.y=.42;
@@ -31371,7 +31371,7 @@ const chopperFX = (function(){
     },
     anchorRainImpact(pos,idx){
       if(!ensure())return;
-      ring(pos,{color:idx%2?PAL.gold:PAL.cream,dur:.40,from:.35,to:5.2,peak:.92});
+      ring(pos,{color:PAL.gold,dur:.40,from:.35,to:5.2,peak:.92});
       ring(pos,{color:PAL.ember,dur:.48,from:.2,to:3.3,y:.18,peak:.56});
       debris(pos,3,0x8a7654);
       if(idx%5===0)screenFlash('rgba(255,244,210,.32)',.20,120);
@@ -31712,8 +31712,9 @@ class ChopperPirateKit {
     const radius=Math.max(18,typeof arenaSize==='number'?arenaSize:30),halfWidth=radius*1.20;
     const center=new THREE.Vector3(0,this.player.position.y,0);
     const start=center.clone().addScaledVector(dir,-radius*1.35),end=center.clone().addScaledVector(dir,radius*1.35);
-    // Three waves form over the first 10 seconds. Each wave itself crosses slowly.
-    this.tidal={t:0,spawnEvery:10/3,nextSpawn:0,spawned:0,totalWaves:3,waveDuration:8.0,start,end,dir,yaw,halfWidth,waves:[],contacts:new Map()};
+    // V23.12.09: exactly five waves. Keep the approved slow 8-second arena-crossing
+    // speed; new waves launch every 2 seconds and the Ultimate ends only after wave #5 exits.
+    this.tidal={t:0,spawnEvery:2.0,nextSpawn:0,spawned:0,totalWaves:5,waveDuration:8.0,start,end,dir,yaw,halfWidth,waves:[],contacts:new Map()};
     chopperFX.screenFlash('rgba(16,126,166,.58)',.36,280);triggerCombatShake(12,220);
     return true;
   }
