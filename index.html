@@ -1,3 +1,4 @@
+<!-- V23.33.00 Storm-Step Contact Damage Repair: Storm-Step Overdrive now resolves lethal contact against every one of the three actual jagged Blitz segments instead of approximating the whole dash as one straight start-to-end line. The opening Blitz into arena center uses the same execution sweep. Non-boss enemies crossed by any visible segment are instantly defeated; bosses keep protected contact damage. Existing center-axe gravity pull, 3x axe, one-second rings, auto-Blitz timing, Whirlwind shutdown fix and global testing cooldown rules remain unchanged. -->
 <!-- V23.32.00 Aesir Whirlwind Reliable Shutdown: fixes Aesir Whirlwind occasionally remaining active/visually spinning after release or interruption. Releasing Secondary now always ends Aesir Whirlwind, including high-round infinite-duration states; cleanup explicitly clears gameplay timer, pulse, FX, spin visual timer/speed and pose lock. Round/reset/avatar-loss guards also force cleanup. Knight Whirlwind behavior is unchanged. -->
 <!-- V23.31.00 Center-Axe Gravity Blitz: Storm-Step Overdrive now visibly Blitz-dashes Aesir into exact arena center on activation. The independent axe then locks above arena center at 3x normal spirit size for the full 10-second duration, emitting one expanding electric ring every second. All live enemies, including those outside the playable boundary, are pulled toward exact map center at their own normal movement speed while Aesir continues the approved autonomous three-segment jagged Blitz hunt and contact-executes non-boss enemies. -->
 <!-- V23.30.00 Black-Hole Auto Blitz: Storm-Step Overdrive now teleports Aesir to exact arena center on activation, pulls every live enemy toward her at that enemy's own normal movement speed for the full 10 seconds, and autonomously repeats the original three-segment jagged Blitz dash toward random arena points. Non-boss contact remains instant-kill while bosses retain protected damage. Manual joystick/dash movement is suppressed only during this autonomous 10-second Ultimate. -->
@@ -1707,7 +1708,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.32.00 - Aesir Whirlwind Reliable Shutdown';
+const GAME_VERSION='23.33.00 - Storm-Step Contact Damage Repair';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -26835,6 +26836,18 @@ function triggerStormStepOverdrive(){
   knightShockRing(player.position,2.2,0x9fe8ff,.32);
   return true;
 }
+function aesirStormStepSweepSegment(a,b,r,now){
+  if(!a||!b)return;
+  const dx=b.x-a.x,dz=b.z-a.z,len2=dx*dx+dz*dz||1;
+  for(const z of [...zombies]){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    const px=z.position.x-a.x,pz=z.position.z-a.z;
+    const t=Math.max(0,Math.min(1,(px*dx+pz*dz)/len2));
+    const cx=a.x+dx*t,cz=a.z+dz*t;
+    if(Math.hypot(z.position.x-cx,z.position.z-cz)<=1.72)
+      aesirStormStepExecuteContact(z,r,now);
+  }
+}
 function aesirStormStepUltimateDash(targetX,targetZ){
   // EXACT approved Primary-era dash choreography: same reach, three bends,
   // collision resolution, lightning path and snap-forward feel. Only the yaw is
@@ -26848,12 +26861,17 @@ function aesirStormStepUltimateDash(targetX,targetZ){
   const sideVec=new THREE.Vector3(fwd.z,0,-fwd.x),start=player.position.clone();
   const reach=7.2,bends=[-.34,.42,-.24];
   let cur=start.clone();
+  const runtime=barbarianRuntime;
+  const hitNow=performance.now();
   for(let i=0;i<3;i++){
     const target=start.clone().addScaledVector(fwd,reach*((i+1)/3)).addScaledVector(sideVec,bends[i]);
     const safe=resolveCollision(target.x,target.z,player.position.y);
     const next=new THREE.Vector3(safe.x,player.position.y,safe.z);
     aesirLightningArc(cur.clone().add(new THREE.Vector3(0,.18,0)),next.clone().add(new THREE.Vector3(0,.18,0)),0x9fe8ff,.22);
     knightShockRing(next,1.15+i*.18,i===2?0xffffff:0x72dbff,.22);
+    // Damage follows the exact visible jagged segment, so no enemy can be
+    // skipped merely because the overall dash start/end line misses a bend.
+    aesirStormStepSweepSegment(cur,next,runtime,hitNow);
     cur.copy(next);
   }
   player.position.copy(cur);player.rotation.y=yaw;
@@ -26898,18 +26916,7 @@ function updateStormStepOverdrive(dt){
   if(r.stormStepDashTick<=0){
     r.stormStepDashTick=.22;
     aesirChooseStormStepAutoPoint();
-    const before=player.position.clone();
     aesirStormStepUltimateDash(r.stormStepTargetX,r.stormStepTargetZ);
-    const after=player.position.clone();
-    const dx=after.x-before.x,dz=after.z-before.z,len2=dx*dx+dz*dz||1;
-    const now=performance.now();
-    for(const z of [...zombies]){
-      if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-      const px=z.position.x-before.x,pz=z.position.z-before.z;
-      const t=Math.max(0,Math.min(1,(px*dx+pz*dz)/len2));
-      const cx=before.x+dx*t,cz=before.z+dz*t;
-      if(Math.hypot(z.position.x-cx,z.position.z-cz)<=1.55)aesirStormStepExecuteContact(z,r,now);
-    }
   }
 
   // Contact execution is continuous too, so enemies pulled into Aesir between
