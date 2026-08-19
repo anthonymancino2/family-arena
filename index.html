@@ -1,3 +1,4 @@
+<!-- V23.29.00 Olympus Supernova Fusion + True Storm-Step Restore: merges Wrath of Mount Olympus and Mjolnir Supernova into one 10-second center-stage Titan-scale invincible Ultimate. Activation teleports Aesir to exact arena center, grows her to the Knight Guardian Titan size multiplier, repeatedly emits expanding supernova rings for the full duration, and layers golden Olympus lightning strikes into the storm. Storm-Step Overdrive no longer uses a generic speed multiplier: it repeatedly invokes the original three-segment jagged Storm-Step dash movement/FX during its 10-second window, with normal-enemy contact execution and boss-safe damage. Global no-cooldown development testing remains enabled. -->
 <!-- V23.28.00 Storm-Step Ultimate + Thunderbrand Primary + Whirlwind Burst Fix: moves Storm-Step Blitz out of the Primary pool and rebuilds it as a 10-second Storm-Step Overdrive Ultimate transformation with continuous Round-30-class movement speed and contact execution of normal enemies while bosses take protected contact damage. Adds Thunderbrand Arc as the replacement controlled close-range Primary. Fixes Aesir Whirlwind's six-way lightning discharge by using a cumulative active-spin clock so the 5-second burst survives short early-round Whirlwind restarts. Global no-cooldown development testing remains enabled. -->
 <!-- V23.27.00 Aesir Divine Ultimates: replaces the three legacy Aesir Ultimate identities with Wrath of Mount Olympus, Mjolnir Supernova, and Twilight of the Gods - Ragnarok. Keeps global no-cooldown development testing, preserves existing save IDs, and uses capped pooled/lightweight FX plus main-loop runtime state for mobile performance. -->
 <!-- V23.26.00 Aesir Whirlwind Thunder Six + Primary Round Balance: Aesir Whirlwind now emits six evenly spaced electric lane attacks every five active seconds; normal enemies touched are instantly eliminated while Brutes/Bosses are stunned and take only a small boss-safe damage packet. Storm-Step Blitz and Celestial Hammer-Pulse are rebalanced so their V23.25 damage values are the Round-30 ceiling rather than Round-1 values, scaling upward from reduced early-round damage. Global development zero-cooldown behavior remains enabled for selectable moves, while integrated Aegis keeps its requested internal re-arm timer. -->
@@ -1703,7 +1704,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.28.00 - Storm-Step Ultimate + Thunderbrand Primary';
+const GAME_VERSION='23.29.00 - Olympus Supernova Fusion + True Storm-Step';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -14903,8 +14904,8 @@ const WOLVERINE_ADAMANTIUM_QUAKE = {id:'wolverine_quake', name:'Adamantium Quake
 const WOLVERINE_SHADOW_CLONES = {id:'wolverine_shadow_clones', name:'Savage Shadow Pack', price:0, avatar:'wolverine', unlockLevel:10,
   desc:'Wolverine signature move. Summon five invincible shadow clones that hunt independently using your unlocked claw moves. Each clone deals 10% of your damage. Follows the same round scaling as the Knight clone pack.'};
 
-const BARBARIAN_PRIMAL_RAGE = {id:'barbarian_primal_rage', name:'Wrath of Mount Olympus', price:0, avatar:'barbarian', unlockLevel:5,
-  desc:'Darken the battlefield and call one colossal pillar of pure golden lightning onto the target zone. Normal enemies caught in the core are vaporized instantly; bosses and large survivors take protected Ultimate damage. A glowing crater and divine aftershock remain at the strike point.'};
+const BARBARIAN_PRIMAL_RAGE = {id:'barbarian_primal_rage', name:'Wrath of Mount Olympus - Supernova', price:0, avatar:'barbarian', unlockLevel:5,
+  desc:'Teleport to exact arena center, grow to Guardian Titan size and become invincible for 10 seconds. A colossal Olympus lightning strike ignites the move, then Mjolnir supernova rings keep erupting outward for the entire duration while repeated golden sky bolts punish the arena.'};
 const BARBARIAN_THUNDER_DOME = {id:'barbarian_thunder_dome', name:'Mjolnir Supernova', price:850, avatar:'barbarian', unlockLevel:16,
   desc:'Command the floating axe into a giant spinning supernova. Plasma rings, wind and thunder expand across the arena, clearing normal enemies and hammering tougher targets with repeated protected damage.'};
 const BARBARIAN_WORLD_BREAKER = {id:'barbarian_world_breaker', name:'Mjolnir Supernova', price:800, avatar:'barbarian', unlockLevel:14,
@@ -14930,7 +14931,7 @@ const CHOPPER_MONSTER_POINT = {id:'hooded_twilight_execution', name:'Kraken Risi
 const HERO_ABILITIES = { rhino:[RHINO_CRASHING_BOLT,RHINO_SHATTERED_DOMAIN,RHINO_SKY_FATHER], chopper:[CHOPPER_STAMPEDE,CHOPPER_GUARD_DOME,CHOPPER_MONSTER_POINT], hooded:[HOODED_THOUSAND_CUTS,HOODED_DANCING_STEEL,HOODED_TWILIGHT_EXECUTION], mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
   knight:[KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER, KNIGHT_JUDGMENT_ULTIMATE],
   wolverine:[WOLVERINE_SHADOW_CLONES, WOLVERINE_BERSERKER_FRENZY, WOLVERINE_ADAMANTIUM_QUAKE],
-  barbarian:[BARBARIAN_PRIMAL_RAGE, BARBARIAN_WORLD_BREAKER, BARBARIAN_RAGNAROK_WAVE, BARBARIAN_STORM_STEP_OVERDRIVE] };
+  barbarian:[BARBARIAN_PRIMAL_RAGE, BARBARIAN_RAGNAROK_WAVE, BARBARIAN_STORM_STEP_OVERDRIVE] };
 const REMOVED_WEAPON_IDS=['radiant_cleave','blade_cyclone','holy_wave','shield_bash','banner_spear','knight_banner_spear','primal_wave'];
 function sanitizeRemovedAbilitySelection(){
   // V23.12.02 Pirate migration: Cannon and Anchor now own dedicated Chopper IDs.
@@ -15865,7 +15866,7 @@ let barbarianRuntime = {
   whirlTimer:0, whirlPulse:0, whirlCooldown:0, whirlElapsed:0, whirlThunderAccum:0, whirlDust:0, whirlFx:null,
   primalCooldown:0, primalFx:null, primalFxPulse:0,
   wbCooldown:0, wbActive:0, wbStage:0, wbTimer:0, wbOriginX:0, wbOriginZ:0,
-  rfCooldown:0, rfActive:0, rfStage:0, rfTimer:0, rfOriginX:0, rfOriginZ:0, stormStepActive:0, stormStepContactGate:new Map(), stormStepPrevX:0, stormStepPrevZ:0
+  rfCooldown:0, rfActive:0, rfStage:0, rfTimer:0, rfOriginX:0, rfOriginZ:0, stormStepActive:0, stormStepDashTick:0, stormStepContactGate:new Map(), stormStepPrevX:0, stormStepPrevZ:0
 };
 function barbarianResetRuntime(){
   rhinoResetRuntime();
@@ -15879,7 +15880,7 @@ function barbarianResetRuntime(){
     whirlTimer:0, whirlPulse:0, whirlCooldown:0, whirlElapsed:0, whirlThunderAccum:0, whirlDust:0, whirlFx:null,
     primalCooldown:0, primalFx:null, primalFxPulse:0,
     wbCooldown:0, wbActive:0, wbStage:0, wbTimer:0, wbOriginX:0, wbOriginZ:0,
-    rfCooldown:0, rfActive:0, rfStage:0, rfTimer:0, rfOriginX:0, rfOriginZ:0, stormStepActive:0, stormStepContactGate:new Map(), stormStepPrevX:0, stormStepPrevZ:0
+    rfCooldown:0, rfActive:0, rfStage:0, rfTimer:0, rfOriginX:0, rfOriginZ:0, stormStepActive:0, stormStepDashTick:0, stormStepContactGate:new Map(), stormStepPrevX:0, stormStepPrevZ:0
   };
 }
 // Berserker Kin: the free, kill-charged clone signature now living on the
@@ -16140,7 +16141,6 @@ function barbarianMoveMultiplier(){
   if(!barbarianIsActive()) return 1;
   let m=1;
   if((barbarianRuntime.whirlTimer||0)>0) m*=BARB_WHIRL.moveMult;
-  if((barbarianRuntime.stormStepActive||0)>0) m*=3.35; // sustained Round-30 Storm-Step development speed
   if(rhinoIsActive()&&rhinoCloudWhirlwindActive()) m*=KNIGHT_CFG.whirlwind.moveMult;
   return Math.max(0,m);
 }
@@ -23563,12 +23563,12 @@ function knightAbilityCooldownInfo(){
       };
     }
     case 'barbarian_primal_rage': {
-      const active=(barbarianRuntime.olympusActive||0)>0;
-      return {label:active?'OLYMPUS':'OLYMPUS',cd:0,active,activeTime:active?barbarianRuntime.olympusActive:undefined};
+      const active=(barbarianRuntime.olympusSupernovaActive||0)>0;
+      return {label:active?'OLYMPUS '+Math.max(0,barbarianRuntime.olympusSupernovaActive||0).toFixed(1):'OLYMPUS',cd:0,active,activeTime:active?barbarianRuntime.olympusSupernovaActive:undefined};
     }
     case 'barbarian_world_breaker': {
-      const active=(barbarianRuntime.supernovaActive||0)>0;
-      return {label:active?'SUPERNOVA':'SUPERNOVA',cd:0,active,activeTime:active?barbarianRuntime.supernovaActive:undefined};
+      const active=(barbarianRuntime.olympusSupernovaActive||0)>0;
+      return {label:active?'OLYMPUS '+Math.max(0,barbarianRuntime.olympusSupernovaActive||0).toFixed(1):'OLYMPUS',cd:0,active,activeTime:active?barbarianRuntime.olympusSupernovaActive:undefined};
     }
     case 'rhino_crashing_bolt': {
       const active=!!rhinoRuntime.crashing;return {label:active?'CRASHING':'CRASH BOLT',cd:rhinoRuntime.crashingCooldown||0,active,activeTime:active?rhinoRuntime.crashing.t:undefined};
@@ -23619,10 +23619,10 @@ function triggerBarbarianEquippedAbility(){
     return;
   }
   // During Primal Rage, only Primary and Secondary combat is allowed.
-  if(barbarianUltimateActive>0||(barbarianRuntime.stormStepActive||0)>0)return;
+  if(barbarianUltimateActive>0||(barbarianRuntime.stormStepActive||0)>0||(barbarianRuntime.olympusSupernovaActive||0)>0)return;
   if(equippedAbilityId==='barbarian_primal_rage') triggerPrimalRage();
-  else if(equippedAbilityId==='barbarian_world_breaker') triggerWorldBreaker();
-  else if(equippedAbilityId==='barbarian_thunder_dome') triggerWorldBreaker(); // legacy save migration
+  else if(equippedAbilityId==='barbarian_world_breaker') triggerPrimalRage();
+  else if(equippedAbilityId==='barbarian_thunder_dome') triggerPrimalRage(); // legacy save migration
   else if(equippedAbilityId==='barbarian_ragnarok_wave') triggerRagnarokWave();
   else if(equippedAbilityId==='barbarian_storm_step_overdrive') triggerStormStepOverdrive();
 }
@@ -26517,27 +26517,45 @@ function aesirRagnarokImpact(x,z,scale=1){
     }
   }
 }
+function aesirOlympusTitanSizeMult(){
+  return (typeof KNIGHT_CFG!=='undefined'&&KNIGHT_CFG.guardianQuakeGiant&&KNIGHT_CFG.guardianQuakeGiant.sizeMult)||5;
+}
+function aesirOlympusSyncScale(active){
+  if(!player||!barbarianIsActive())return;
+  const base=player.userData.baseAvatarScale||AVATAR_SCALE[state.avatarType]||1;
+  const mult=active?aesirOlympusTitanSizeMult():1;
+  const target=base*mult;
+  if(Math.abs((player.scale.x||0)-target)>.0001)player.scale.setScalar(target);
+  player.userData.avatarScale=target;player.userData.currentSizeMult=mult;
+  const inv=mult>1?1/mult:1;
+  if(player.userData.visibilityRing)player.userData.visibilityRing.scale.setScalar(inv);
+  if(player.userData.locator)player.userData.locator.scale.setScalar(inv);
+  if(player.userData.contactShadow)player.userData.contactShadow.scale.setScalar(inv);
+}
 function triggerPrimalRage(){
-  // WRATH OF MOUNT OLYMPUS
-  if(!gameRunning||!barbarianIsActive()||!player)return false;
+  // WRATH OF MOUNT OLYMPUS + MJOLNIR SUPERNOVA
+  if(!gameRunning||!barbarianIsActive()||!player||!aesirAxe)return false;
   const r=barbarianRuntime;
-  if(r.olympusActive>0)return false;
-  let target=null,best=Infinity;
-  for(const z of zombies){
-    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-    const d=Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z);
-    if(d<best){best=d;target=z;}
-  }
-  const yaw=player.rotation.y;
-  r.olympusX=target?target.position.x:player.position.x+Math.sin(yaw)*8;
-  r.olympusZ=target?target.position.z:player.position.z+Math.cos(yaw)*8;
-  r.olympusActive=1.65;r.olympusTimer=0;r.olympusStruck=false;
+  if((r.olympusSupernovaActive||0)>0)return false;
+
+  // Exact center, regardless of activation position.
+  player.position.set(0,player.position.y,0);
+  player.rotation.y=0;
+
+  r.olympusSupernovaActive=10.0;
+  r.olympusSupernovaTimer=0;
+  r.olympusSupernovaPulse=0;
+  r.olympusSupernovaBolt=0;
+  r.olympusSupernovaOpening=false;
+  r.olympusSupernovaFinal=false;
   markUltimateUsed();
-  invincibleTimer=Math.max(invincibleTimer||0,1.65);
-  if(player.userData.playKayClip)player.userData.playKayClip('power up',true,true,.7);
-  document.body.style.filter='brightness(.42) saturate(.72)';
-  toast('WRATH OF MOUNT OLYMPUS');
-  triggerCombatShake(10,180);
+  invincibleTimer=Math.max(invincibleTimer||0,10.15);
+  aesirOlympusSyncScale(true);
+  aesirAxe.provoke('orbit',{r:arenaSize,d:1.0,s:.35,k:3.0});
+  if(player.userData.playKayClip)player.userData.playKayClip('cyclone spin',true,true,1.0);
+  document.body.style.filter='brightness(.50) saturate(.82)';
+  toast('WRATH OF MOUNT OLYMPUS - SUPERNOVA');
+  aesirStormFlash(.62,220);triggerCombatShake(20,300);
   return true;
 }
 function triggerThunderDome(){
@@ -26560,22 +26578,29 @@ function updatePrimalRage(dt){
   if((barbarianRuntime.primalCooldown||0)>0)
     barbarianRuntime.primalCooldown=Math.max(0,barbarianRuntime.primalCooldown-dt);
   const r=barbarianRuntime;
-  if(r.olympusActive>0){
-    r.olympusActive-=dt;r.olympusTimer+=dt;
-    const ox=r.olympusX,oz=r.olympusZ;
-    if(r.olympusTimer<.72&&Math.random()<dt*12){
-      knightShockRing({x:ox,y:player.position.y,z:oz},2.0+r.olympusTimer*4.5,0xffd86a,.20);
-    }
-    if(!r.olympusStruck&&r.olympusTimer>=.72){
-      r.olympusStruck=true;
-      document.body.style.filter='brightness(2.15) saturate(.55)';
-      aesirUltimateGoldenBolt(ox,oz,3.2,30);
-      aesirUltimateCrater(ox,oz,7.2,0xffd45f);
-      knightShockRing({x:ox,y:player.position.y,z:oz},8.5,0xfff2a8,.62);
-      if(knightFxBudget(3))spawnBurst(ox,player.position.y+1.4,oz,isMobile?28:48,FX_MAT_SPARK,8.2);
+  if((r.olympusSupernovaActive||0)>0){
+    r.olympusSupernovaActive=Math.max(0,r.olympusSupernovaActive-dt);
+    r.olympusSupernovaTimer=(r.olympusSupernovaTimer||0)+dt;
+    r.olympusSupernovaPulse=(r.olympusSupernovaPulse||0)-dt;
+    r.olympusSupernovaBolt=(r.olympusSupernovaBolt||0)-dt;
+
+    // Keep center-stage, Titan-sized, and invincible for the complete ten seconds.
+    player.position.x=0;player.position.z=0;
+    aesirOlympusSyncScale(true);
+    invincibleTimer=Math.max(invincibleTimer||0,.30);
+    const origin={x:player.position.x,y:player.position.y,z:player.position.z};
+
+    // Wrath opening strike: same golden execution identity, now at arena center.
+    if(!r.olympusSupernovaOpening&&r.olympusSupernovaTimer>=.55){
+      r.olympusSupernovaOpening=true;
+      document.body.style.filter='brightness(2.05) saturate(.62)';
+      aesirUltimateGoldenBolt(origin.x,origin.z,3.6,32);
+      aesirUltimateCrater(origin.x,origin.z,7.8,0xffd45f);
+      knightShockRing(origin,9.2,0xfff2a8,.64);
+      if(knightFxBudget(3))spawnBurst(origin.x,origin.y+1.4,origin.z,isMobile?26:46,FX_MAT_SPARK,8.4);
       for(const e of [...zombies]){
         if(!e||!e.userData||e.userData.dead)continue;
-        if(Math.hypot(e.position.x-ox,e.position.z-oz)>7.2)continue;
+        if(Math.hypot(e.position.x-origin.x,e.position.z-origin.z)>7.8)continue;
         if(!aesirUltimateKillNormal(e)){
           aesirUltimateProtectedHit(e,.08,4.5*playerStats.power);
           e.userData.hitStun=Math.max(e.userData.hitStun||0,2.4);
@@ -26583,7 +26608,56 @@ function updatePrimalRage(dt){
       }
       triggerCombatShake(34,520);navigator.vibrate&&navigator.vibrate([80,25,120]);
     }
-    if(r.olympusActive<=0){r.olympusActive=0;document.body.style.filter='';}
+
+    // Supernova rings NEVER stop during the ten-second state. A repeating
+    // 2.4-second radial cycle keeps fresh rings spawning from the center.
+    if(r.olympusSupernovaPulse<=0){
+      r.olympusSupernovaPulse=.34;
+      const cycle=(r.olympusSupernovaTimer%2.4)/2.4;
+      const rad=3.2+cycle*Math.max(4,arenaSize-3.2);
+      knightShockRing(origin,rad,0xbfeaff,.38);
+      knightShockRing(origin,Math.max(1.8,rad*.78),0xffd96d,.28);
+      if(knightFxBudget(1))spawnBurst(origin.x,origin.y+1.0,origin.z,isMobile?5:9,FX_MAT_SPARK,3.6+cycle*3.0);
+      for(const e of [...zombies]){
+        if(!e||!e.userData||e.userData.dead)continue;
+        const d=Math.hypot(e.position.x-origin.x,e.position.z-origin.z);
+        if(Math.abs(d-rad)>3.0)continue;
+        if(!aesirUltimateKillNormal(e)){
+          aesirUltimateProtectedHit(e,.016,1.0*playerStats.power);
+          e.userData.hitStun=Math.max(e.userData.hitStun||0,.55);
+        }
+      }
+      triggerCombatShake(7+Math.floor(cycle*6),115);
+    }
+
+    // Olympus remains present inside the supernova instead of being only a
+    // one-frame opener: periodic golden sky pillars punctuate the ring storm.
+    if(r.olympusSupernovaTimer>.8&&r.olympusSupernovaBolt<=0){
+      r.olympusSupernovaBolt=1.10;
+      const live=zombies.filter(z=>z&&z.userData&&!z.userData.dead&&!z.userData.spawnPending);
+      const target=live.length?live[(Math.random()*live.length)|0]:null;
+      const a=Math.random()*Math.PI*2,rr=Math.sqrt(Math.random())*arenaSize*.72;
+      const bx=target?target.position.x:Math.cos(a)*rr;
+      const bz=target?target.position.z:Math.sin(a)*rr;
+      aesirUltimateGoldenBolt(bx,bz,1.15,23);
+      knightShockRing({x:bx,y:origin.y,z:bz},2.4,0xffe48a,.34);
+      if(target&&!aesirUltimateKillNormal(target)){
+        aesirUltimateProtectedHit(target,.015,.9*playerStats.power);
+        target.userData.hitStun=Math.max(target.userData.hitStun||0,.55);
+      }
+    }
+
+    if(r.olympusSupernovaActive<=0){
+      r.olympusSupernovaActive=0;
+      if(!r.olympusSupernovaFinal){
+        r.olympusSupernovaFinal=true;
+        knightShockRing(origin,arenaSize,0xffffff,.62);
+        knightShockRing(origin,arenaSize*.72,0xffd86a,.44);
+        aesirStormFlash(.85,260);triggerCombatShake(30,430);
+      }
+      aesirOlympusSyncScale(false);
+      document.body.style.filter='';
+    }
   }
 
   if(barbarianUltimateActive<=0)return;
@@ -26615,53 +26689,10 @@ function updatePrimalRage(dt){
    WORLD BREAKER. Hulk-style telegraphed two-handed overhead slam: a short
    invulnerable wind-up, then one huge ground shockwave with heavy knockback. */
 function barbarianWorldBreakerCooldownForRound(){ return 0; }
-function triggerWorldBreaker(){
-  // MJOLNIR SUPERNOVA
-  if(!gameRunning||!barbarianIsActive()||!player||!aesirAxe)return false;
-  const r=barbarianRuntime;
-  if(r.supernovaActive>0)return false;
-  if(!aesirAxe.provoke('orbit',{r:arenaSize,d:1.0,s:.35,k:3.0}))return false;
-  r.supernovaActive=5.2;r.supernovaTimer=0;r.supernovaPulse=0;r.supernovaCleared=false;
-  markUltimateUsed();
-  invincibleTimer=Math.max(invincibleTimer||0,5.2);
-  if(player.userData.playKayClip)player.userData.playKayClip('cyclone spin',true,true,1.0);
-  toast('MJOLNIR SUPERNOVA');
-  aesirStormFlash(.62,220);triggerCombatShake(18,280);
-  return true;
-}
+function triggerWorldBreaker(){ return triggerPrimalRage(); }
 function updateWorldBreaker(dt){
   const r=barbarianRuntime;
-  if(r.supernovaActive>0){
-    r.supernovaActive-=dt;r.supernovaTimer+=dt;r.supernovaPulse-=dt;
-    const origin={x:player.position.x,y:player.position.y,z:player.position.z};
-    if(r.supernovaPulse<=0){
-      r.supernovaPulse=.42;
-      const p=Math.min(1,r.supernovaTimer/4.2),rad=4+p*(arenaSize-4);
-      knightShockRing(origin,rad,0xbfeaff,.36);
-      knightShockRing(origin,rad*.78,0xffd96d,.26);
-      if(knightFxBudget(1))spawnBurst(origin.x,origin.y+1.0,origin.z,isMobile?5:9,FX_MAT_SPARK,3.8+p*3);
-      for(const e of [...zombies]){
-        if(!e||!e.userData||e.userData.dead)continue;
-        const d=Math.hypot(e.position.x-origin.x,e.position.z-origin.z);
-        if(Math.abs(d-rad)>3.2)continue;
-        if(!aesirUltimateKillNormal(e)){
-          aesirUltimateProtectedHit(e,.018,1.1*playerStats.power);
-          e.userData.hitStun=Math.max(e.userData.hitStun||0,.55);
-        }
-      }
-      triggerCombatShake(7+Math.floor(p*8),120);
-    }
-    if(!r.supernovaCleared&&r.supernovaTimer>=4.15){
-      r.supernovaCleared=true;
-      knightShockRing(origin,arenaSize,0xffffff,.62);
-      for(const e of [...zombies]){
-        if(!e||!e.userData||e.userData.dead)continue;
-        if(!aesirUltimateKillNormal(e))aesirUltimateProtectedHit(e,.06,3.0*playerStats.power);
-      }
-      aesirStormFlash(.9,260);triggerCombatShake(30,430);
-    }
-    if(r.supernovaActive<=0)r.supernovaActive=0;
-  }
+  // V23.29: old standalone Supernova runtime retired; Olympus fusion owns it.
   if((r.wbCooldown||0)>0)r.wbCooldown=Math.max(0,r.wbCooldown-dt);
   if(!(r.wbActive>0))return;
   r.wbActive-=dt;r.wbTimer=(r.wbTimer||0)+dt;
@@ -26730,47 +26761,74 @@ function updateWorldBreaker(dt){
 function triggerStormStepOverdrive(){
   if(!gameRunning||!barbarianIsActive()||!player)return false;
   const r=barbarianRuntime;if((r.stormStepActive||0)>0)return false;
-  r.stormStepActive=10.0;r.stormStepContactGate=new Map();r.stormStepPrevX=player.position.x;r.stormStepPrevZ=player.position.z;
+  r.stormStepActive=10.0;
+  r.stormStepDashTick=0;
+  r.stormStepContactGate=new Map();
+  r.stormStepPrevX=player.position.x;r.stormStepPrevZ=player.position.z;
   invincibleTimer=Math.max(invincibleTimer||0,.45);
   markUltimateUsed();toast('STORM-STEP OVERDRIVE');
-  if(aesirAxe)aesirAxe.provoke('thunderstep',{d:0,r:0,s:0,k:0});
-  if(player.userData.playKayClip)player.userData.playKayClip('storm-step blitz',true,true,.24);
   aesirStormFlash(.28,130);triggerCombatShake(12,180);
   return true;
+}
+function aesirStormStepUltimateDash(){
+  // This is intentionally the ORIGINAL Primary dash choreography: same three
+  // jagged segments, collision resolution, lightning path and snap-forward feel.
+  if(!player||!gameRunning)return;
+  faceEnemyTarget(findNearestEnemy(18));
+  const yaw=player.rotation.y,fwd=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+  const sideVec=new THREE.Vector3(fwd.z,0,-fwd.x),start=player.position.clone();
+  const reach=7.2,pts=[start.clone()],bends=[-.34,.42,-.24];
+  let cur=start.clone();
+  for(let i=0;i<3;i++){
+    const target=start.clone().addScaledVector(fwd,reach*((i+1)/3)).addScaledVector(sideVec,bends[i]);
+    const safe=resolveCollision(target.x,target.z,player.position.y);
+    const next=new THREE.Vector3(safe.x,player.position.y,safe.z);
+    aesirLightningArc(cur.clone().add(new THREE.Vector3(0,.18,0)),next.clone().add(new THREE.Vector3(0,.18,0)),0x9fe8ff,.22);
+    knightShockRing(next,1.15+i*.18,i===2?0xffffff:0x72dbff,.22);
+    cur.copy(next);pts.push(next.clone());
+  }
+  player.position.copy(cur);player.rotation.y=yaw;
+  if(aesirAxe)aesirAxe.provoke('thunderstep',{d:0,r:2.1,s:.18,k:2.8});
+  if(player.userData.playKayClip)player.userData.playKayClip('storm-step blitz',true,true,.22);
+  spawnBurst(cur.x,cur.y+.45,cur.z,isMobile?6:10,FX_MAT_SPARK,2.8);
+  triggerCombatShake(7,105);
 }
 function updateStormStepOverdrive(dt){
   const r=barbarianRuntime;if(!((r.stormStepActive||0)>0)||!player)return;
   r.stormStepActive=Math.max(0,r.stormStepActive-dt);
-  const now=performance.now();
-  // A restrained lightning wake follows movement; no particle cloud.
-  if(Math.random()<dt*22){
-    const p=player.position.clone().add(new THREE.Vector3(0,.22,0));
-    const back=p.clone().add(new THREE.Vector3(-Math.sin(player.rotation.y)*1.7,0,-Math.cos(player.rotation.y)*1.7));
-    aesirLightningArc(p,back,0x9fe8ff,.14);
-  }
-  const ax=r.stormStepPrevX,bz=r.stormStepPrevZ,bx=player.position.x,cz=player.position.z;
-  const sdx=bx-ax,sdz=cz-bz,slen2=sdx*sdx+sdz*sdz||1;
-  for(const z of [...zombies]){
-    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-    const px=z.position.x-ax,pz=z.position.z-bz;
-    const st=Math.max(0,Math.min(1,(px*sdx+pz*sdz)/slen2));
-    const cx=ax+sdx*st,zz=bz+sdz*st;
-    if(Math.hypot(z.position.x-cx,z.position.z-zz)>1.45)continue;
-    const type=z.userData.archetype||'walker';
-    if(type!=='boss'){
-      z.userData.hp=0;z.userData.dead=false;killZombie(z);
-      spawnBurst(z.position.x,z.position.y+.6,z.position.z,isMobile?5:9,FX_MAT_SPARK,2.6);
-    }else{
-      const last=r.stormStepContactGate.get(z.uuid)||0;
-      if(now-last<450)continue;
-      r.stormStepContactGate.set(z.uuid,now);
-      aesirUltimateProtectedHit(z,.025,1.5*playerStats.power);
-      z.userData.hitStun=Math.max(z.userData.hitStun||0,.22);
-      aesirLightningArc(player.position.clone().add(new THREE.Vector3(0,.7,0)),z.position.clone().add(new THREE.Vector3(0,.7,0)),0xffffff,.12);
+  r.stormStepDashTick=(r.stormStepDashTick||0)-dt;
+  invincibleTimer=Math.max(invincibleTimer||0,.22);
+
+  // Re-run the exact old Primary movement for the whole ten-second state.
+  // ~0.22s matches the old committed dash/animation beat instead of smooth speed.
+  if(r.stormStepDashTick<=0){
+    r.stormStepDashTick=.22;
+    const before=player.position.clone();
+    aesirStormStepUltimateDash();
+    const after=player.position.clone();
+    const dx=after.x-before.x,dz=after.z-before.z,len2=dx*dx+dz*dz||1;
+    const now=performance.now();
+    for(const z of [...zombies]){
+      if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+      const px=z.position.x-before.x,pz=z.position.z-before.z;
+      const t=Math.max(0,Math.min(1,(px*dx+pz*dz)/len2));
+      const cx=before.x+dx*t,cz=before.z+dz*t;
+      if(Math.hypot(z.position.x-cx,z.position.z-cz)>1.55)continue;
+      if(!aesirUltimateEnemyIsBoss(z)){
+        z.userData.hp=0;z.userData.dead=false;killZombie(z);
+        spawnBurst(z.position.x,z.position.y+.6,z.position.z,isMobile?5:9,FX_MAT_SPARK,2.6);
+      }else{
+        const last=r.stormStepContactGate.get(z.uuid)||0;
+        if(now-last<420)continue;
+        r.stormStepContactGate.set(z.uuid,now);
+        aesirUltimateProtectedHit(z,.025,1.5*playerStats.power);
+        z.userData.hitStun=Math.max(z.userData.hitStun||0,.22);
+      }
     }
   }
-  r.stormStepPrevX=player.position.x;r.stormStepPrevZ=player.position.z;
-  if(r.stormStepActive<=0){r.stormStepActive=0;r.stormStepContactGate.clear();aesirStormFlash(.12,60);}
+  if(r.stormStepActive<=0){
+    r.stormStepActive=0;r.stormStepDashTick=0;r.stormStepContactGate.clear();aesirStormFlash(.12,60);
+  }
 }
 
 function barbarianRagnarokCooldownForRound(){ return 0; }
