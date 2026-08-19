@@ -1,3 +1,6 @@
+<!-- V23.32.00 Aesir Whirlwind Reliable Shutdown: fixes Aesir Whirlwind occasionally remaining active/visually spinning after release or interruption. Releasing Secondary now always ends Aesir Whirlwind, including high-round infinite-duration states; cleanup explicitly clears gameplay timer, pulse, FX, spin visual timer/speed and pose lock. Round/reset/avatar-loss guards also force cleanup. Knight Whirlwind behavior is unchanged. -->
+<!-- V23.31.00 Center-Axe Gravity Blitz: Storm-Step Overdrive now visibly Blitz-dashes Aesir into exact arena center on activation. The independent axe then locks above arena center at 3x normal spirit size for the full 10-second duration, emitting one expanding electric ring every second. All live enemies, including those outside the playable boundary, are pulled toward exact map center at their own normal movement speed while Aesir continues the approved autonomous three-segment jagged Blitz hunt and contact-executes non-boss enemies. -->
+<!-- V23.30.00 Black-Hole Auto Blitz: Storm-Step Overdrive now teleports Aesir to exact arena center on activation, pulls every live enemy toward her at that enemy's own normal movement speed for the full 10 seconds, and autonomously repeats the original three-segment jagged Blitz dash toward random arena points. Non-boss contact remains instant-kill while bosses retain protected damage. Manual joystick/dash movement is suppressed only during this autonomous 10-second Ultimate. -->
 <!-- V23.29.00 Olympus Supernova Fusion + True Storm-Step Restore: merges Wrath of Mount Olympus and Mjolnir Supernova into one 10-second center-stage Titan-scale invincible Ultimate. Activation teleports Aesir to exact arena center, grows her to the Knight Guardian Titan size multiplier, repeatedly emits expanding supernova rings for the full duration, and layers golden Olympus lightning strikes into the storm. Storm-Step Overdrive no longer uses a generic speed multiplier: it repeatedly invokes the original three-segment jagged Storm-Step dash movement/FX during its 10-second window, with normal-enemy contact execution and boss-safe damage. Global no-cooldown development testing remains enabled. -->
 <!-- V23.28.00 Storm-Step Ultimate + Thunderbrand Primary + Whirlwind Burst Fix: moves Storm-Step Blitz out of the Primary pool and rebuilds it as a 10-second Storm-Step Overdrive Ultimate transformation with continuous Round-30-class movement speed and contact execution of normal enemies while bosses take protected contact damage. Adds Thunderbrand Arc as the replacement controlled close-range Primary. Fixes Aesir Whirlwind's six-way lightning discharge by using a cumulative active-spin clock so the 5-second burst survives short early-round Whirlwind restarts. Global no-cooldown development testing remains enabled. -->
 <!-- V23.27.00 Aesir Divine Ultimates: replaces the three legacy Aesir Ultimate identities with Wrath of Mount Olympus, Mjolnir Supernova, and Twilight of the Gods - Ragnarok. Keeps global no-cooldown development testing, preserves existing save IDs, and uses capped pooled/lightweight FX plus main-loop runtime state for mobile performance. -->
@@ -1704,7 +1707,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.29.00 - Olympus Supernova Fusion + True Storm-Step';
+const GAME_VERSION='23.32.00 - Aesir Whirlwind Reliable Shutdown';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -11829,6 +11832,7 @@ function createAesirAxeSpirit(){
   let tsPathDone=false, echoStep=0, echoBoom=0;
   let attention=null;
   let localPitchTarget=0, localRollTarget=0;
+  let externalPin=null, externalScale=1;
 
   function shortAngle(f,t){ let d=(t-f)%(Math.PI*2); if(d>Math.PI)d-=Math.PI*2; if(d<-Math.PI)d+=Math.PI*2; return d; }
 
@@ -11871,7 +11875,10 @@ function createAesirAxeSpirit(){
     localPitchTarget=0; localRollTarget=0;
 
     /* ---- anchor ---- */
-    if(act){
+    if(externalPin){
+      anchor.set(externalPin.x, externalPin.y, externalPin.z);
+      sTarget=BS*Math.max(0.05,externalScale||1);
+    }else if(act){
       const k=actT/actDur;
       const tgt=attention&&!attention.userData.dead?attention.position:null;
       if(actKind==='cleave'){
@@ -12290,6 +12297,8 @@ function createAesirAxeSpirit(){
 
   return {group:rig, update, provoke, dispose,
           warp(p){ rig.position.set(p.x+S.hoverRadius,p.y+S.hoverHeight,p.z); vel.set(0,0,0); },
+          pin(p,scale=1){ externalPin=p?{x:p.x,y:p.y,z:p.z}:null; externalScale=scale||1; if(externalPin){rig.position.set(externalPin.x,externalPin.y,externalPin.z);vel.set(0,0,0);} },
+          unpin(){ externalPin=null; externalScale=1; vel.set(0,0,0); },
           get scale(){ return sCur; }};
 }
 
@@ -14913,7 +14922,7 @@ const BARBARIAN_WORLD_BREAKER = {id:'barbarian_world_breaker', name:'Mjolnir Sup
 const BARBARIAN_RAGNAROK_WAVE = {id:'barbarian_ragnarok_wave', name:'Twilight of the Gods - Ragnarok', price:900, avatar:'barbarian', unlockLevel:18,
   desc:'Ascend beneath a cosmic aurora while meteors and lightning lances rain across the battlefield. Repeated impacts crack the arena, erase normal enemies caught in direct strikes, and batter bosses with protected damage before a final map-wide godstorm.'};
 const BARBARIAN_STORM_STEP_OVERDRIVE = {id:'barbarian_storm_step_overdrive', name:'Storm-Step Overdrive', price:950, avatar:'barbarian', unlockLevel:20,
-  desc:'For 10 seconds Aesir becomes living lightning and moves at her full Storm-Step development speed. Any normal enemy she physically touches is instantly erased; bosses survive and take protected contact damage. No cooldown during development testing.'};
+  desc:'Blitz-dash to arena center and leave the floating axe there at 3x size for 10 seconds. The axe emits a new expanding ring every second and pulls every enemy, even outside the arena, toward map center at normal speed while Aesir auto-Blitzes across random points and executes non-boss enemies on contact.'};
 
 const RHINO_CRASHING_BOLT = {id:'rhino_crashing_bolt', name:'World-Breaker Crashing Bolt', price:640, avatar:'rhino', unlockLevel:5,
   desc:'Dash to arena center, then perform four complete leap-and-crash cycles. Every crash launches one numbered circular kill wave; each wave takes about 3 seconds to reach the playable edge, and the next leap does not begin until the previous wave is completely finished.'};
@@ -15250,7 +15259,12 @@ function setupControls(){
     secondaryPressed=false;
     secondaryInputHeld=false;
     secondaryPointerId=null;
-    // Aesir Whirlwind follows Knight rules: release does not cancel the active spin.
+    // Aesir reliability rule: releasing Secondary ALWAYS ends its Whirlwind.
+    // This prevents Round-25+ Infinity duration or lost-pointer states from
+    // leaving the body/FX spinning forever. Knight Whirlwind is untouched.
+    if(typeof barbarianWhirlActive==='function' && barbarianWhirlActive()){
+      barbarianEndWhirlwind(true);
+    }
   };
   const beginSecondaryFire=e=>{
     if(e){e.preventDefault();e.stopPropagation();}
@@ -15866,10 +15880,11 @@ let barbarianRuntime = {
   whirlTimer:0, whirlPulse:0, whirlCooldown:0, whirlElapsed:0, whirlThunderAccum:0, whirlDust:0, whirlFx:null,
   primalCooldown:0, primalFx:null, primalFxPulse:0,
   wbCooldown:0, wbActive:0, wbStage:0, wbTimer:0, wbOriginX:0, wbOriginZ:0,
-  rfCooldown:0, rfActive:0, rfStage:0, rfTimer:0, rfOriginX:0, rfOriginZ:0, stormStepActive:0, stormStepDashTick:0, stormStepContactGate:new Map(), stormStepPrevX:0, stormStepPrevZ:0
+  rfCooldown:0, rfActive:0, rfStage:0, rfTimer:0, rfOriginX:0, rfOriginZ:0, stormStepActive:0, stormStepDashTick:0, stormStepContactGate:new Map(), stormStepPrevX:0, stormStepPrevZ:0, stormStepTargetX:0, stormStepTargetZ:0, stormStepRingTick:0
 };
 function barbarianResetRuntime(){
   rhinoResetRuntime();
+  try{if(aesirAxe&&aesirAxe.unpin)aesirAxe.unpin();}catch(_err){}
   try{if(typeof aesirResetSecondaries==='function')aesirResetSecondaries();}catch(_err){}
   try{barbarianClearWhirlVisual();}catch(_err){}
   try{barbarianClearPrimalRageVisual();}catch(_err){}
@@ -15880,7 +15895,7 @@ function barbarianResetRuntime(){
     whirlTimer:0, whirlPulse:0, whirlCooldown:0, whirlElapsed:0, whirlThunderAccum:0, whirlDust:0, whirlFx:null,
     primalCooldown:0, primalFx:null, primalFxPulse:0,
     wbCooldown:0, wbActive:0, wbStage:0, wbTimer:0, wbOriginX:0, wbOriginZ:0,
-    rfCooldown:0, rfActive:0, rfStage:0, rfTimer:0, rfOriginX:0, rfOriginZ:0, stormStepActive:0, stormStepDashTick:0, stormStepContactGate:new Map(), stormStepPrevX:0, stormStepPrevZ:0
+    rfCooldown:0, rfActive:0, rfStage:0, rfTimer:0, rfOriginX:0, rfOriginZ:0, stormStepActive:0, stormStepDashTick:0, stormStepContactGate:new Map(), stormStepPrevX:0, stormStepPrevZ:0, stormStepTargetX:0, stormStepTargetZ:0, stormStepRingTick:0
   };
 }
 // Berserker Kin: the free, kill-charged clone signature now living on the
@@ -16082,14 +16097,26 @@ function barbarianWhirlThunderSix(){
   if(navigator.vibrate)navigator.vibrate([18,10,28]);
 }
 
-function barbarianEndWhirlwind(){
+function barbarianEndWhirlwind(force=false){
   const r=barbarianRuntime;
-  if(!r.whirlFx&&!((r.whirlTimer||0)>0))return;
-  r.whirlTimer=0;r.whirlPulse=0;
-  if(typeof secondaryInputHeld==='undefined'||!secondaryInputHeld)r.whirlThunderAccum=0;
+  const wasActive=!!r.whirlFx||((r.whirlTimer||0)>0)||r.whirlTimer===Infinity;
+  // Always clear state, even if the visual group was already lost/removed.
+  r.whirlTimer=0;
+  r.whirlPulse=0;
+  r.whirlElapsed=0;
+  r.whirlDust=0;
+  if(force || typeof secondaryInputHeld==='undefined'||!secondaryInputHeld)r.whirlThunderAccum=0;
   r.whirlCooldown=Math.max(r.whirlCooldown||0,barbarianWhirlCooldownForRound());
   barbarianClearWhirlVisual();
-  if(!player)return;
+  if(player&&player.userData){
+    player.userData.spinVisualTimer=0;
+    player.userData.spinVisualSpeed=0;
+    // Release any stale cyclone animation lock so native idle/run can resume.
+    if(player.userData.kayCurrentName==='cyclone spin'||player.userData.kayCurrentName==='Sword_Regular_Combo'){
+      player.userData.kayActionLock=0;
+    }
+  }
+  if(!wasActive||!player)return;
   // Same Knight-style ending guard burst; no extra damage packet beyond normal pulses.
   const y=player.rotation.y;
   knightShockRing(player.position,BARB_WHIRL.radius*.72,0xdff7ff,.24);
@@ -16104,7 +16131,12 @@ function barbarianUpdateWhirlwind(dt){
   if((r.whirlCooldown||0)>0)r.whirlCooldown=Math.max(0,r.whirlCooldown-dt);
   if((r.domeCooldown||0)>0)r.domeCooldown=Math.max(0,r.domeCooldown-dt);
   if((r.mjolCooldown||0)>0)r.mjolCooldown=Math.max(0,r.mjolCooldown-dt);
-  if(!((r.whirlTimer||0)>0))return;
+  const whirlState=((r.whirlTimer||0)>0)||r.whirlTimer===Infinity||!!r.whirlFx;
+  if(whirlState && (!gameRunning||!barbarianIsActive()||!player)){
+    barbarianEndWhirlwind(true);
+    return;
+  }
+  if(!((r.whirlTimer||0)>0) && r.whirlTimer!==Infinity)return;
   r.whirlTimer=Math.max(0,(r.whirlTimer||0)-dt);
   if(r.whirlTimer<=0){barbarianEndWhirlwind();return;}
   r.whirlElapsed=(r.whirlElapsed||0)+dt;
@@ -26758,26 +26790,63 @@ function updateWorldBreaker(dt){
    PRIMAL AXE WAVE (upgraded to ultimate scale). Four flaming axe waves fly
    out in a cross pattern, then boomerang home in one return slam — the
    traveling-line half of the kit that echoes Wolverine's Adamantium Quake. */
+function aesirStormStepAutoActive(){
+  return !!(barbarianIsActive()&&barbarianRuntime&&(barbarianRuntime.stormStepActive||0)>0);
+}
+function aesirChooseStormStepAutoPoint(){
+  const r=barbarianRuntime;
+  // Pick a visibly different point inside the playable arena. The dash itself
+  // still travels exactly like the approved Primary-era Blitz; this point only
+  // chooses its heading automatically.
+  const maxR=Math.max(8,arenaSize*0.82);
+  const minR=Math.min(7,maxR*0.35);
+  let x=0,z=0;
+  for(let tries=0;tries<6;tries++){
+    const a=Math.random()*Math.PI*2;
+    const rad=minR+Math.sqrt(Math.random())*(maxR-minR);
+    x=Math.sin(a)*rad;z=Math.cos(a)*rad;
+    if(Math.hypot(x-player.position.x,z-player.position.z)>6.5)break;
+  }
+  const safe=resolveCollision(x,z,player.position.y);
+  r.stormStepTargetX=safe.x;r.stormStepTargetZ=safe.z;
+}
 function triggerStormStepOverdrive(){
   if(!gameRunning||!barbarianIsActive()||!player)return false;
   const r=barbarianRuntime;if((r.stormStepActive||0)>0)return false;
+  // Opening: visibly use the approved Blitz itself to reach exact arena center.
+  // Multiple 7.2-unit jagged beats preserve the original dash language even if
+  // Aesir starts at the far edge of the arena.
+  const center=resolveCollision(0,0,player.position.y);
+  for(let guard=0;guard<12&&Math.hypot(player.position.x-center.x,player.position.z-center.z)>0.45;guard++)
+    aesirStormStepUltimateDash(center.x,center.z);
+  player.position.x=center.x;player.position.z=center.z;
   r.stormStepActive=10.0;
-  r.stormStepDashTick=0;
+  r.stormStepDashTick=.22;
+  r.stormStepRingTick=1.0;
   r.stormStepContactGate=new Map();
   r.stormStepPrevX=player.position.x;r.stormStepPrevZ=player.position.z;
-  invincibleTimer=Math.max(invincibleTimer||0,.45);
+  r.stormStepTargetX=0;r.stormStepTargetZ=0;
+  // The axe is the fixed gravity core: centered, overhead and 3x spirit size.
+  if(aesirAxe&&aesirAxe.pin)aesirAxe.pin({x:0,y:player.position.y+4.2,z:0},3.0);
+  aesirChooseStormStepAutoPoint();
+  invincibleTimer=Math.max(invincibleTimer||0,10.05);
   markUltimateUsed();toast('STORM-STEP OVERDRIVE');
-  aesirStormFlash(.28,130);triggerCombatShake(12,180);
+  aesirStormFlash(.34,150);triggerCombatShake(14,200);
+  knightShockRing(player.position,2.2,0x9fe8ff,.32);
   return true;
 }
-function aesirStormStepUltimateDash(){
-  // This is intentionally the ORIGINAL Primary dash choreography: same three
-  // jagged segments, collision resolution, lightning path and snap-forward feel.
+function aesirStormStepUltimateDash(targetX,targetZ){
+  // EXACT approved Primary-era dash choreography: same reach, three bends,
+  // collision resolution, lightning path and snap-forward feel. Only the yaw is
+  // now chosen by the autonomous target point instead of joystick/nearest-enemy.
   if(!player||!gameRunning)return;
-  faceEnemyTarget(findNearestEnemy(18));
-  const yaw=player.rotation.y,fwd=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+  const tx=Number.isFinite(targetX)?targetX:player.position.x+Math.sin(player.rotation.y)*7.2;
+  const tz=Number.isFinite(targetZ)?targetZ:player.position.z+Math.cos(player.rotation.y)*7.2;
+  const yaw=Math.atan2(tx-player.position.x,tz-player.position.z);
+  player.rotation.y=yaw;if(player.userData)player.userData.facing=yaw;
+  const fwd=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
   const sideVec=new THREE.Vector3(fwd.z,0,-fwd.x),start=player.position.clone();
-  const reach=7.2,pts=[start.clone()],bends=[-.34,.42,-.24];
+  const reach=7.2,bends=[-.34,.42,-.24];
   let cur=start.clone();
   for(let i=0;i<3;i++){
     const target=start.clone().addScaledVector(fwd,reach*((i+1)/3)).addScaledVector(sideVec,bends[i]);
@@ -26785,7 +26854,7 @@ function aesirStormStepUltimateDash(){
     const next=new THREE.Vector3(safe.x,player.position.y,safe.z);
     aesirLightningArc(cur.clone().add(new THREE.Vector3(0,.18,0)),next.clone().add(new THREE.Vector3(0,.18,0)),0x9fe8ff,.22);
     knightShockRing(next,1.15+i*.18,i===2?0xffffff:0x72dbff,.22);
-    cur.copy(next);pts.push(next.clone());
+    cur.copy(next);
   }
   player.position.copy(cur);player.rotation.y=yaw;
   if(aesirAxe)aesirAxe.provoke('thunderstep',{d:0,r:2.1,s:.18,k:2.8});
@@ -26793,18 +26862,44 @@ function aesirStormStepUltimateDash(){
   spawnBurst(cur.x,cur.y+.45,cur.z,isMobile?6:10,FX_MAT_SPARK,2.8);
   triggerCombatShake(7,105);
 }
+function aesirStormStepExecuteContact(z,r,now){
+  if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)return;
+  if(!aesirUltimateEnemyIsBoss(z)){
+    z.userData.hp=0;z.userData.dead=false;killZombie(z);
+    spawnBurst(z.position.x,z.position.y+.6,z.position.z,isMobile?5:9,FX_MAT_SPARK,2.6);
+  }else{
+    const last=r.stormStepContactGate.get(z.uuid)||0;
+    if(now-last<420)return;
+    r.stormStepContactGate.set(z.uuid,now);
+    aesirUltimateProtectedHit(z,.025,1.5*playerStats.power);
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,.22);
+  }
+}
 function updateStormStepOverdrive(dt){
   const r=barbarianRuntime;if(!((r.stormStepActive||0)>0)||!player)return;
   r.stormStepActive=Math.max(0,r.stormStepActive-dt);
   r.stormStepDashTick=(r.stormStepDashTick||0)-dt;
-  invincibleTimer=Math.max(invincibleTimer||0,.22);
+  r.stormStepRingTick=(r.stormStepRingTick||1)-dt;
+  invincibleTimer=Math.max(invincibleTimer||0,.30);
 
-  // Re-run the exact old Primary movement for the whole ten-second state.
-  // ~0.22s matches the old committed dash/animation beat instead of smooth speed.
+  // The fixed center axe emits one fresh expanding electric ring every second.
+  // This is independent of Aesir's hunt position and lasts for the whole move.
+  if(r.stormStepRingTick<=0){
+    r.stormStepRingTick+=1.0;
+    const c=new THREE.Vector3(0,0.08,0);
+    knightShockRing(c,Math.max(5.5,arenaSize*0.98),0x9fe8ff,.78);
+    knightShockRing(c,Math.max(3.2,arenaSize*0.64),0xffffff,.54);
+    aesirLightningArc(new THREE.Vector3(0,4.2,0),new THREE.Vector3(0,.08,0),0xbff7ff,.18);
+    triggerCombatShake(4,70);
+  }
+
+  // Auto-hunt: every beat selects a new random arena point, then performs the
+  // SAME old Blitz dash toward it. There is no smooth AI movement replacement.
   if(r.stormStepDashTick<=0){
     r.stormStepDashTick=.22;
+    aesirChooseStormStepAutoPoint();
     const before=player.position.clone();
-    aesirStormStepUltimateDash();
+    aesirStormStepUltimateDash(r.stormStepTargetX,r.stormStepTargetZ);
     const after=player.position.clone();
     const dx=after.x-before.x,dz=after.z-before.z,len2=dx*dx+dz*dz||1;
     const now=performance.now();
@@ -26813,21 +26908,24 @@ function updateStormStepOverdrive(dt){
       const px=z.position.x-before.x,pz=z.position.z-before.z;
       const t=Math.max(0,Math.min(1,(px*dx+pz*dz)/len2));
       const cx=before.x+dx*t,cz=before.z+dz*t;
-      if(Math.hypot(z.position.x-cx,z.position.z-cz)>1.55)continue;
-      if(!aesirUltimateEnemyIsBoss(z)){
-        z.userData.hp=0;z.userData.dead=false;killZombie(z);
-        spawnBurst(z.position.x,z.position.y+.6,z.position.z,isMobile?5:9,FX_MAT_SPARK,2.6);
-      }else{
-        const last=r.stormStepContactGate.get(z.uuid)||0;
-        if(now-last<420)continue;
-        r.stormStepContactGate.set(z.uuid,now);
-        aesirUltimateProtectedHit(z,.025,1.5*playerStats.power);
-        z.userData.hitStun=Math.max(z.userData.hitStun||0,.22);
-      }
+      if(Math.hypot(z.position.x-cx,z.position.z-cz)<=1.55)aesirStormStepExecuteContact(z,r,now);
     }
   }
+
+  // Contact execution is continuous too, so enemies pulled into Aesir between
+  // dash beats cannot survive merely because no path segment crossed them.
+  const now=performance.now();
+  for(const z of [...zombies]){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    if(Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=1.6)
+      aesirStormStepExecuteContact(z,r,now);
+  }
+
   if(r.stormStepActive<=0){
-    r.stormStepActive=0;r.stormStepDashTick=0;r.stormStepContactGate.clear();aesirStormFlash(.12,60);
+    r.stormStepActive=0;r.stormStepDashTick=0;r.stormStepRingTick=0;r.stormStepContactGate.clear();
+    r.stormStepTargetX=0;r.stormStepTargetZ=0;
+    if(aesirAxe&&aesirAxe.unpin)aesirAxe.unpin();
+    aesirStormFlash(.12,60);
   }
 }
 
@@ -34814,7 +34912,7 @@ function update(dt){
   // Dash: a quick burst in the facing direction, overrides normal
   // movement input while active.
   if(dashCooldownTimer>0) dashCooldownTimer -= dt;
-  if(dashActive && !rhinoWorldBreakerMovementLocked()){
+  if(dashActive && !rhinoWorldBreakerMovementLocked() && !aesirStormStepAutoActive()){
     if(hoodedIsActive()&&!chopperClassIsActive()){shadowAfterimageTimer-=dt;if(shadowAfterimageTimer<=0){spawnAfterimage();shadowAfterimageTimer=.045;spawnShadowSmoke(player.position.x,player.position.y+.45,player.position.z,3);}}
     const nx = player.position.x + dashDir.x*DASH_SPEED*dt;
     const nz = player.position.z + dashDir.z*DASH_SPEED*dt;
@@ -34827,7 +34925,7 @@ function update(dt){
       dashActive=false;
       dashTimer=0;
     }
-  } else if((moveVec.x || moveVec.y) && !knightMovementLocked() && !rhinoWorldBreakerMovementLocked()){
+  } else if((moveVec.x || moveVec.y) && !knightMovementLocked() && !rhinoWorldBreakerMovementLocked() && !aesirStormStepAutoActive()){
     const forward = -moveVec.y, strafe = moveVec.x;
     const mx = Math.sin(camYaw)*forward - Math.cos(camYaw)*strafe;
     const mz = Math.cos(camYaw)*forward + Math.sin(camYaw)*strafe;
@@ -35106,6 +35204,24 @@ function update(dt){
       const type=z.userData.archetype||'walker';
       z.userData.attackCooldown=Math.max(0,(z.userData.attackCooldown||0)-enemyDt);
       z.userData.specialTimer=Math.max(0,(z.userData.specialTimer||0)-enemyDt);
+
+      // Storm-Step gravity phase: EVERY live enemy, even outside the arena,
+      // is pulled toward exact MAP CENTER (the fixed giant axe), not toward the
+      // roaming Aesir. Each enemy still travels at its own normal move speed.
+      if(aesirStormStepAutoActive()){
+        const pdx=-z.position.x,pdz=-z.position.z;
+        const pDist=Math.hypot(pdx,pdz);
+        if(pDist>.001){
+          const step=Math.min(pDist,Math.max(0,z.userData.speed||0)*enemyDt);
+          z.position.x+=pdx/pDist*step;
+          z.position.z+=pdz/pDist*step;
+          const desiredYaw=Math.atan2(pdx,pdz);
+          let yawDelta=((desiredYaw-z.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI;
+          z.rotation.y+=yawDelta*Math.min(1,enemyDt*9);
+          setEnemyMoveClip(z,'Running_A');
+        }
+        return;
+      }
 
       // Let impact recoil win over chase movement for a split second.
       if((z.userData.hitStun||0)>0){
