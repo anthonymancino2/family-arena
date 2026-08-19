@@ -1,3 +1,4 @@
+<!-- V23.51.00 Runtime Recovery: fixes a stale clearFoxSpiritGate() reset call left behind after Spirit Gate was merged/retired in V23.48. That deleted-function call aborted startSurvival before the 3D player/world could finish spawning. Uses clearFoxHexGarden() instead; preserves V23.50 narrow Primary hold-cadence guard and all current Fox V23.48 features. -->
 <!-- V23.50.00 Safe Combat QA Rollback: rolls back the risky V23.49 global execution-lock/frame-loop patch to the known-working V23.48 runtime. Adds a narrow held-Primary cadence guard based on each weapon's authored attack cycle, preventing Cloud and other hold-fire primaries from restarting every rendered frame while keeping development post-move cooldowns at zero. -->
 <!-- V23.48.00 Fox Spirit Bloom + Hex Garden + Mirror Gravity Core: merges Ninefold Astral Bloom and Spirit Gate Stampede into one hold-repeat Secondary with 2 seconds of cast-start invincibility, repurposes the former Spirit Gate slot into Foxfire Hex Garden area-control magic, and upgrades Crimson Mirror Dimension with center teleport, full-duration invincibility, a visible black-hole gravity core, and an on-screen non-boss execution finale. -->
 <!-- V23.47.00 Fox Crimson Mirror + Spirit Gate Stampede: replaces Arcane Laser in-place with a 10-second reality-warping Crimson Mirror Dimension Ultimate, adds Spirit Gate Stampede as a third Fox Secondary scaling from 3 to 9 spectral fox spirits by Round 30, preserves hold-to-repeat and existing Fox tail/locomotion authority. -->
@@ -1454,7 +1455,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.50.00 - Safe Combat QA Rollback';
+const GAME_VERSION='23.51.00 - Runtime Recovery + Safe Combat QA';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -29358,7 +29359,7 @@ function clearSuperMeteor(resetCooldown=true){
 
 function clearMageRoundSpecials(resetCooldowns=true,preserveMirrorCooldowns=false){
   clearFoxArcaneBloom();
-  clearFoxSpiritGate();
+  clearFoxHexGarden();
   clearCrimsonMirror();
   foxRapidPrimaryCadence=0;
   clearPhoenixFireball(false);
