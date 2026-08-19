@@ -1,3 +1,4 @@
+<!-- V23.34.00 Storm-Step Hard Execute: removes normal-enemy damage resolution from Storm-Step entirely. Every non-boss inside any of the three visible jagged dash corridors or the continuous close-contact radius is force-executed through killZombie() immediately, with a slightly wider swept corridor so extreme-speed movement cannot visually pass through enemies without counting. Bosses alone retain protected damage. All V23.33 center-axe gravity, 3x axe, one-second rings, auto-Blitz timing and Whirlwind fixes remain unchanged. -->
 <!-- V23.33.00 Storm-Step Contact Damage Repair: Storm-Step Overdrive now resolves lethal contact against every one of the three actual jagged Blitz segments instead of approximating the whole dash as one straight start-to-end line. The opening Blitz into arena center uses the same execution sweep. Non-boss enemies crossed by any visible segment are instantly defeated; bosses keep protected contact damage. Existing center-axe gravity pull, 3x axe, one-second rings, auto-Blitz timing, Whirlwind shutdown fix and global testing cooldown rules remain unchanged. -->
 <!-- V23.32.00 Aesir Whirlwind Reliable Shutdown: fixes Aesir Whirlwind occasionally remaining active/visually spinning after release or interruption. Releasing Secondary now always ends Aesir Whirlwind, including high-round infinite-duration states; cleanup explicitly clears gameplay timer, pulse, FX, spin visual timer/speed and pose lock. Round/reset/avatar-loss guards also force cleanup. Knight Whirlwind behavior is unchanged. -->
 <!-- V23.31.00 Center-Axe Gravity Blitz: Storm-Step Overdrive now visibly Blitz-dashes Aesir into exact arena center on activation. The independent axe then locks above arena center at 3x normal spirit size for the full 10-second duration, emitting one expanding electric ring every second. All live enemies, including those outside the playable boundary, are pulled toward exact map center at their own normal movement speed while Aesir continues the approved autonomous three-segment jagged Blitz hunt and contact-executes non-boss enemies. -->
@@ -1708,7 +1709,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.33.00 - Storm-Step Contact Damage Repair';
+const GAME_VERSION='23.34.00 - Storm-Step Hard Execute';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -26844,7 +26845,7 @@ function aesirStormStepSweepSegment(a,b,r,now){
     const px=z.position.x-a.x,pz=z.position.z-a.z;
     const t=Math.max(0,Math.min(1,(px*dx+pz*dz)/len2));
     const cx=a.x+dx*t,cz=a.z+dz*t;
-    if(Math.hypot(z.position.x-cx,z.position.z-cz)<=1.72)
+    if(Math.hypot(z.position.x-cx,z.position.z-cz)<=2.55)
       aesirStormStepExecuteContact(z,r,now);
   }
 }
@@ -26883,15 +26884,22 @@ function aesirStormStepUltimateDash(targetX,targetZ){
 function aesirStormStepExecuteContact(z,r,now){
   if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)return;
   if(!aesirUltimateEnemyIsBoss(z)){
-    z.userData.hp=0;z.userData.dead=false;killZombie(z);
-    spawnBurst(z.position.x,z.position.y+.6,z.position.z,isMobile?5:9,FX_MAT_SPARK,2.6);
-  }else{
-    const last=r.stormStepContactGate.get(z.uuid)||0;
-    if(now-last<420)return;
-    r.stormStepContactGate.set(z.uuid,now);
-    aesirUltimateProtectedHit(z,.025,1.5*playerStats.power);
-    z.userData.hitStun=Math.max(z.userData.hitStun||0,.22);
+    // HARD EXECUTE: Storm-Step normal-enemy contact is NOT a damage event.
+    // No power scaling, HP subtraction, boss cap, armor or shared hit routing.
+    // If the enemy intersects the visible Blitz corridor, it dies immediately.
+    const ex=z.position.clone();
+    z.userData.hp=0;
+    z.userData.dead=false;
+    killZombie(z);
+    spawnBurst(ex.x,ex.y+.6,ex.z,isMobile?5:9,FX_MAT_SPARK,2.6);
+    return;
   }
+  // Bosses are the only exception to the hard-execute rule.
+  const last=r.stormStepContactGate.get(z.uuid)||0;
+  if(now-last<420)return;
+  r.stormStepContactGate.set(z.uuid,now);
+  aesirUltimateProtectedHit(z,.025,1.5*playerStats.power);
+  z.userData.hitStun=Math.max(z.userData.hitStun||0,.22);
 }
 function updateStormStepOverdrive(dt){
   const r=barbarianRuntime;if(!((r.stormStepActive||0)>0)||!player)return;
@@ -26924,7 +26932,7 @@ function updateStormStepOverdrive(dt){
   const now=performance.now();
   for(const z of [...zombies]){
     if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-    if(Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=1.6)
+    if(Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=2.35)
       aesirStormStepExecuteContact(z,r,now);
   }
 
