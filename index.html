@@ -1,273 +1,6 @@
-<!-- V23.44.00 Fox Hold Autofire + Nine-Tail VFX Overhaul: fixes Fox Arcane Lance/Giant Fireball hold-repeat by separating pending release locks from development cooldowns, so held Primary/Secondary/Ultimate controls reliably recast when their current release/active state is ready. Adds a mobile-capped Fox-specific cast language across Fire & Ice, Rapid Fire & Ice, Arcane Lance, Giant Fireball, Blizzard, Arcane Laser, Super Meteor and Arcane Echoes: nine-tail foxfire point fans, layered rune/element halos, stronger launch crowns and ultimate activation sigils, while reusing the global FX ceiling/stress throttling. Existing fox guard/run/tail animation authority is unchanged. -->
-<!-- V23.43.00 Ranger/Aesir Ultimate Swap + Ranger Size Match: visually increases Green Rhino Ranger from the too-small V23.42 Archer-height estimate to a larger Archer-matched presentation in both selection preview and gameplay. Swaps Ultimate ownership without rewriting their behavior: Aesir's former Storm-Step slot now runs World-Breaker Crashing Bolt, while Ranger's former Crashing Bolt slot runs the full 10-second Storm-Step gravity/auto-Blitz sequence. Ranger uses a giant center boomerang as the fixed gravity-core weapon instead of Aesir's axe. -->
-<!-- V23.42.00 Ranger Titan Rig + Preview Size Repair: Titan mode now exclusively owns the Green Rhino Ranger player scale so Gamma Leap and other secondaries cannot cache/reapply giant transforms or fight the Titan state. The native fit wrapper is restored to its authored baseline outside active Whirlwind, preventing residual move rotations/tilts. Ranger avatar-selection preview now uses the same ~1.3024 visible height as the Archer preview instead of the old 2.28 tall reference. All V23.41 Whirlwind boomerang-burst behavior remains intact. -->
-<!-- V23.41.00 Ranger Whirlwind 5-Hit Boomerang Burst: every fifth actual Green Rhino Ranger Defensive Whirlwind enemy hit launches a round-scaled radial burst of giant boomerangs, starting at 4 and reaching 8 evenly spaced projectiles at Round 30. The burst boomerangs fly beyond the arena, hard-execute normal enemies on contact, and stun all non-normal enemies including bosses instead of executing them. Stormbreaker Giant Boomerangs and prior Ranger fixes remain intact. -->
-<!-- V23.40.00 Ranger Stormbreaker Giant Boomerangs: Stormbreaker Overdrive no longer creates an axe. It now launches round-scaled oversized independent boomerangs simultaneously in evenly spaced directions: 1 at early rounds, scaling to 4 at Round 30. Their gameplay collision radius exactly follows their visible radius. Normal enemies are hard-executed on first contact; Brutes/other large non-boss enemies are strongly slowed on first Stormbreaker contact and hard-executed on the second; bosses are never executed and instead take protected damage. Ranger Archer-size match, Twin Boomerang fix, and hold-only Whirlwind remain intact. -->
-<!-- V23.39.00 Ranger Archer-Size Match: Green Rhino Ranger's normal visible gameplay height now matches the Archer's final world height (~1.30 units) instead of Aesir's 2.22-unit height. Ranger Titan Rampage still scales from this new base using the same 5x multiplier. V23.38 Twin Boomerang and hold-only Whirlwind fixes remain intact. -->
-<!-- V23.38.00 Ranger Primary + Hold Whirlwind Fix: Green Rhino Ranger only. Twin Boomerang keeps its original 1.24-second throw-cycle as an active-move lock so global zero-cooldown testing cannot spawn a fresh pair every rendered frame. Defensive Whirlwind is strict hold-to-active: hold Secondary to spin and pulse; release/cancel/blur ends gameplay, FX and model spin immediately. No Ranger Whirlwind infinite-duration state remains. Aesir is unchanged. -->
-<!-- V23.37.00 Aesir Readability + Preview Fix: dramatically reduces Celestial Hammer-Pulse camera shake so zero-cooldown testing no longer leaves the view constantly unsettled, tones down Olympus-Supernova global brightness/flash intensity while preserving its ring/lightning spectacle, and restores Aesir avatar preview to a front-facing initial orientation instead of starting 180 degrees backward. Gameplay damage, ranges, durations, Titan rules and Storm-Step behavior are unchanged. -->
-<!-- V23.36.00 Aesir Titan Replacement: replaces Twilight of the Gods - Ragnarok with a true Titan transformation using the Knight Guardian Titan rules: 5x size, 15-second duration, 5x Primary/Secondary damage, 2.6x combat reach/radius, 0.85 movement speed, Primary and equipped Secondary remain available, other specials/signature are locked, activation is stun-only, and cooldown remains 0 in development testing. -->
-<!-- V23.35.00 Storm-Step Center Threshold Execute: during Storm-Step Overdrive, every live enemy inside or outside the arena is pulled rapidly toward exact map center. The pull runs at 2.75x each enemy's normal movement speed with a minimum gravity speed so slow units cannot stall. The instant any non-boss crosses into the inner half of the playable-map radius, it is force-executed immediately whether Aesir touched it or not. Bosses are exempt from execution but are still pulled toward center. Existing 10-second auto-Blitz, fixed 3x center axe, one-second rings, and Whirlwind shutdown remain unchanged. -->
-<!-- V23.34.00 Storm-Step Hard Execute: removes normal-enemy damage resolution from Storm-Step entirely. Every non-boss inside any of the three visible jagged dash corridors or the continuous close-contact radius is force-executed through killZombie() immediately, with a slightly wider swept corridor so extreme-speed movement cannot visually pass through enemies without counting. Bosses alone retain protected damage. All V23.33 center-axe gravity, 3x axe, one-second rings, auto-Blitz timing and Whirlwind fixes remain unchanged. -->
-<!-- V23.33.00 Storm-Step Contact Damage Repair: Storm-Step Overdrive now resolves lethal contact against every one of the three actual jagged Blitz segments instead of approximating the whole dash as one straight start-to-end line. The opening Blitz into arena center uses the same execution sweep. Non-boss enemies crossed by any visible segment are instantly defeated; bosses keep protected contact damage. Existing center-axe gravity pull, 3x axe, one-second rings, auto-Blitz timing, Whirlwind shutdown fix and global testing cooldown rules remain unchanged. -->
-<!-- V23.32.00 Aesir Whirlwind Reliable Shutdown: fixes Aesir Whirlwind occasionally remaining active/visually spinning after release or interruption. Releasing Secondary now always ends Aesir Whirlwind, including high-round infinite-duration states; cleanup explicitly clears gameplay timer, pulse, FX, spin visual timer/speed and pose lock. Round/reset/avatar-loss guards also force cleanup. Knight Whirlwind behavior is unchanged. -->
-<!-- V23.31.00 Center-Axe Gravity Blitz: Storm-Step Overdrive now visibly Blitz-dashes Aesir into exact arena center on activation. The independent axe then locks above arena center at 3x normal spirit size for the full 10-second duration, emitting one expanding electric ring every second. All live enemies, including those outside the playable boundary, are pulled toward exact map center at their own normal movement speed while Aesir continues the approved autonomous three-segment jagged Blitz hunt and contact-executes non-boss enemies. -->
-<!-- V23.30.00 Black-Hole Auto Blitz: Storm-Step Overdrive now teleports Aesir to exact arena center on activation, pulls every live enemy toward her at that enemy's own normal movement speed for the full 10 seconds, and autonomously repeats the original three-segment jagged Blitz dash toward random arena points. Non-boss contact remains instant-kill while bosses retain protected damage. Manual joystick/dash movement is suppressed only during this autonomous 10-second Ultimate. -->
-<!-- V23.29.00 Olympus Supernova Fusion + True Storm-Step Restore: merges Wrath of Mount Olympus and Mjolnir Supernova into one 10-second center-stage Titan-scale invincible Ultimate. Activation teleports Aesir to exact arena center, grows her to the Knight Guardian Titan size multiplier, repeatedly emits expanding supernova rings for the full duration, and layers golden Olympus lightning strikes into the storm. Storm-Step Overdrive no longer uses a generic speed multiplier: it repeatedly invokes the original three-segment jagged Storm-Step dash movement/FX during its 10-second window, with normal-enemy contact execution and boss-safe damage. Global no-cooldown development testing remains enabled. -->
-<!-- V23.28.00 Storm-Step Ultimate + Thunderbrand Primary + Whirlwind Burst Fix: moves Storm-Step Blitz out of the Primary pool and rebuilds it as a 10-second Storm-Step Overdrive Ultimate transformation with continuous Round-30-class movement speed and contact execution of normal enemies while bosses take protected contact damage. Adds Thunderbrand Arc as the replacement controlled close-range Primary. Fixes Aesir Whirlwind's six-way lightning discharge by using a cumulative active-spin clock so the 5-second burst survives short early-round Whirlwind restarts. Global no-cooldown development testing remains enabled. -->
-<!-- V23.27.00 Aesir Divine Ultimates: replaces the three legacy Aesir Ultimate identities with Wrath of Mount Olympus, Mjolnir Supernova, and Twilight of the Gods - Ragnarok. Keeps global no-cooldown development testing, preserves existing save IDs, and uses capped pooled/lightweight FX plus main-loop runtime state for mobile performance. -->
-<!-- V23.26.00 Aesir Whirlwind Thunder Six + Primary Round Balance: Aesir Whirlwind now emits six evenly spaced electric lane attacks every five active seconds; normal enemies touched are instantly eliminated while Brutes/Bosses are stunned and take only a small boss-safe damage packet. Storm-Step Blitz and Celestial Hammer-Pulse are rebalanced so their V23.25 damage values are the Round-30 ceiling rather than Round-1 values, scaling upward from reduced early-round damage. Global development zero-cooldown behavior remains enabled for selectable moves, while integrated Aegis keeps its requested internal re-arm timer. -->
-<!-- V23.25.00 Aesir Secondary Scaling + Global No-Cooldown Test: lowers both Aesir idle arms by removing the single-arm support override and preserving the authored Rest_Pose; enables development zero-cooldown behavior for selectable moves across all avatars; scales Bifrost Singularity from one outward core to six evenly spaced cores at Round 30; integrates the 10-second Aegis Shield-Wall into Bifrost and Lightning Tether with its own 10s-to-2s round-scaled re-arm timer; upgrades Lightning Tether into a stronger round-scaled chain-drain reaching ten hits at Round 30; and replaces standalone Aegis with an Aesir Whirlwind that matches the Knight Defensive Whirlwind rules, damage, pulse, knockback, deflection, duration scaling, and movement penalty. -->
-<!-- V23.24.00 Aesir HUD Debug Cleanup: removes the on-screen ARMS tuning/debug control from normal gameplay by disabling the Aesir arm tuner. No arm pose values, animation corrections, axe behavior, primaries, secondaries, or global zero-cooldown Ultimate testing are changed. -->
-<!-- V23.23.00 Aesir Idle Arm Regression Fix: preserves the already-corrected non-axe/free arm exactly as authored in Rest_Pose by removing the V23.20 forced-down world-space override. Only the single axe-side support arm is adjusted during true idle, and that support pose is deliberately lower/softer so the hand reads as supporting the floating axe instead of reaching overhead. Divine Secondaries, approved Primaries, Celestial flight orientation, and global zero-cooldown Ultimate testing remain unchanged. -->
-<!-- V23.22.00 Aesir Divine Secondaries: replaces Aesir's three retired Secondary identities with Bifrost Singularity, Aegis Shield-Wall, and Lightning Tether. Singularity launches a lightweight spatial core that pulls enemies inward before imploding; Aegis creates a front-facing hex wall that absorbs incoming hits and converts enemy shots into reflected projectiles; Lightning Tether locks the floating axe to the nearest enemy for continuous shock damage and health-drain healing. Existing approved Primaries, single-axe idle pose, Celestial flight orientation, and global zero-cooldown Ultimate testing remain intact. -->
-<!-- V23.21.00 Celestial Flight Orientation: keeps the approved single-axe idle arm pose, but changes Celestial Hammer-Pulse so the independent axe flies horizontally while travelling away from Aesir on the no-target forward-fire path, then restores to an upright/vertical pose before and during its return to the player. Global zero-cooldown Ultimate testing remains unchanged. -->
-<!-- V23.20.00 Aesir Single-Axe Idle Arm Pose: when Aesir is truly idle with one floating axe, only the arm nearest the axe remains raised while the opposite arm relaxes downward. The existing post-mixer arm correction is now axe-aware during Rest_Pose so it cannot re-raise both arms. If a future move explicitly reports two or more active axes, both arms are allowed to use the raised support treatment. Celestial Forward-Fire and global zero-cooldown Ultimate testing remain unchanged. -->
-<!-- V23.19.00 Celestial Forward-Fire Fallback: Celestial Hammer-Pulse no longer bobs vertically over Aesir when no enemy is inside acquisition range. With a target, the independent axe still attacks that enemy. Without a target, it now launches horizontally straight down Aesir's facing lane, spins forward to a fixed reach, then drives into the ground there and emits the same thunder-clap damage/knockback pulse. Global zero-cooldown Ultimate testing remains enabled for every avatar. -->
-<!-- V23.18.00 Aesir Fresh Primaries + Global Ultimate Test Mode: replaces Aesir's legacy Primary identities with Storm-Step Blitz and Celestial Hammer-Pulse. Storm-Step uses a jagged collision-resolved dash, pooled lightning ribbons and swept path shock damage; Celestial Hammer-Pulse commands the independent floating axe spirit to remote-slam the nearest target and emit concentrated thunder-clap knockback waves. All avatar Ultimate cooldowns are disabled for development testing; active-duration locks remain so transformations/sequences cannot overlap themselves. -->
-<!-- V23.13.03 Aesir Front Pose + Natural Axe Hold: keeps exported-model 3 as the active Aesir rig, but fixes the unnatural axe presentation by using the rig's current bind/rest pose as the WeaponReady idle/preview stance instead of sampling a late recovery frame from an attack clip. The avatar preview is rotated to a clean front-facing hero angle and no missing Idle clip fallback is used. Gameplay idle/recovery returns to the same natural hand-on-axe pose, while the Thor-inspired lightning VFX and native Mesh2Motion combat routing remain intact. -->
-<!-- V23.13.02 Aesir Model-3 Native Grip Fix: replaces Aesir with the newly uploaded exported-model 3.glb (34 authored Mesh2Motion clips). Keeps the Stormforged Thor-inspired lightning presentation, removes references to clips absent from the new rig, and routes idle/combat/recovery only through native weapon-bearing takes. The axe remains part of the single skinned mesh: no fake duplicate weapon, runtime re-parenting, squash/stretch, per-axis deformation, donor retargeting, or procedural bone twisting is used. -->
-<!-- V23.13.01 Aesir Stormforged Grip + Native: fixes the avatar-select metadata to report the new Mesh2Motion 34-clip rig, replaces the generic caster idle with a weapon-ready pose sampled directly from the native Sword_Regular_A_Rec animation, and restricts Aesir combat routing to weapon-safe Sword/Ground-Pound/Power-Up/Jog clips so the embedded axe stays in the cleanest authored hand relationship possible. No squash/stretch, per-axis model scaling, donor retargeting, or procedural whole-body warping is used. -->
-<!-- V23.13.00 Aesir Stormforged: replaces the old Aesir GLB with the newly uploaded Mesh2Motion rig carrying 34 authored clips. Removes the old CC0 donor/custom-bone pose dependency from the live Aesir path and routes Barbarian combat to native clips only, so attacks never warp, squash, stretch or procedurally twist the avatar. Rebuilds Aesir presentation around a mobile-efficient Thor-inspired lightning identity: electric axe crescents, sky bolts, rune rings, thunder columns and lightning shock fronts, with especially large spectacle on Earthbreaker, World Breaker and Primal Axe Wave. Existing Barbarian gameplay balance is preserved unless the visual system already drove the same hit. -->
-<!-- V23.12.10 Boarding Echo Blast: Boarding Dash now summons one lightweight, clearly visible Chopper echo at the dash endpoint. The echo waits exactly 0.5 seconds, then detonates with an 8.8-unit shockwave (four normal Chopper body-heights), instantly eliminating normal enemies inside the blast while dealing extra boss-safe/large-enemy damage. Existing Boarding Dash carry, first-hit stun / second-hit kill rules and endpoint shockwaves are preserved. -->
-<!-- V23.12.09 Pirate Anchor/Tide/Kraken Tune: Anchor Drop visual size is reduced 50% from V23.12.08. Anchor Rain now uses the same gold low-poly Anchor Drop visual construction while keeping a larger Ultimate-only scale. Tidal Cataclysm keeps the approved slow wave travel speed but now generates exactly five waves and ends only after the fifth wave fully crosses the arena. Broadside clone summons are explicitly allowed during Kraken Rising while all other Kraken special locks remain intact. -->
-<!-- V23.12.08 Anchor Visual Repair: fixes Anchor Drop over-scaling, makes Broadside clones solid/readable, and rebuilds Anchor Rain visibility with solid low-poly holographic anchors that reliably descend on-screen.
-<!-- V23.12.07 Visible Anchor + Triple Tide: Anchor Rain holograms are made strongly visible on bright maps with high-opacity giant primitive silhouettes, lower spawn height and readable descent timing. Broadside hologram clones are much less transparent while remaining ultra-light and invincible. Anchor Drop now scales from close-range single-anchor coverage at early rounds to half-map coverage, five simultaneous anchors and zero cooldown at Round 30. Tidal Cataclysm is rebuilt as five slow arena-crossing waves spawned across ten seconds: normals die on first contact, large non-boss enemies are slowed for 10 seconds and die on second wave contact, bosses take 3% max HP per wave. -->
-<!-- V23.12.06 Pirate Mobile Scaling + Tidal Repair: Broadside Chopper clones are rebuilt as ultra-light holographic Chopper silhouettes instead of full skinned Mesh2Motion rigs, eliminating per-clone skeleton/mixer/texture cost while keeping Knight-style AI, aggro, movement, invincibility and 10% damage. Enemy melee now explicitly recognizes Chopper clones as invincible targets instead of falling through to playerTakeHit(). Cannon Shot fire cooldown scales linearly to 0 by Round 20; Anchor Drop is 3x larger than V23.12.05, its fall speed accelerates by round and its cooldown reaches 0 at Round 20; Powder Keg cooldown is 1s at Round 1 and scales to 0 at Round 30. Anchor Rain now uses enormous low-detail holographic anchors for 10 seconds. Tidal Cataclysm is rebuilt as a visible arena-wide solid water wall and its stale Doldrums HUD/active-state routing is corrected. -->
-<!-- V23.12.05 Pirate Anchor Routing Fix: fixes Chopper Secondary dispatch so Boarding Dash, Anchor Drop, and Powder Keg Toss route into the standalone ChopperPirateKit instead of falling through to generic shootFromPosition(), which caused the rapid yellow/white projectile stream seen when Anchor was equipped. Anchor Drop is now guaranteed to perform only its tracked giant falling-anchor attack. No balance or requested V23.12.04 Pirate behavior changed. -->
-<!-- V23.12.04 Pirate Anchor/Titan/Tidal Pass: Cannon Shot now pierces up to three targets, executing normal enemies on contact, then detonates on the third contact with a tight 2-second stun and small shockwave damage. Anchor Drop now tracks the nearest valid enemy within half-map range until the actual drop so it lands on the enemy instead of a stale coordinate. Cutlass Storm is replaced by a 10-second Giant Anchor Rain with frequent low-cost anchor drops, lethal direct impacts and nearby blast damage. Kraken Rising now follows Knight Guardian Titan rules: 5x visual size, 15-second duration, 5x damage, 2.6x combat reach, 0.85 movement multiplier, Primary/Secondary access during Titan, other specials locked, and Knight-matched cooldown applied after the transformation ends. Doldrums Cannon is replaced by Tidal Cataclysm, one giant arena-sweeping water wall using a few large meshes instead of particle spam. -->
-<!-- V23.12.03 Chopper Broadside Clone Armada: Broadside is rebuilt to mirror the Knight Knights-of-the-Round clone special mechanically: persistent invincible clones, 2/5/10 round scaling, 8/15/30s durations, Knight-matched cooldown curve, first-priority enemy aggro, 2/3 player movement speed, formation/return behavior and 10% player-scaled damage. The summoned bodies use Chopper's own Mesh2Motion rig/animations with translucent sea-ghost pirate clone visuals and capped cosmetic FX for iPhone performance. The old cannon-barrage Broadside damage burst is removed. -->
-<!-- V23.12.02 Pirate Wow-Efficient Repair: restores life to Cutlass Combo with layered canvas slash crescents, impact sweeps and a stronger third-hit finisher without returning to TubeGeometry or per-hit PointLights. Cannon Shot is a separate second Primary. Anchor Drop now has its own Chopper-only Secondary ID instead of recycling old Primary/Guard IDs, preventing cross-slot save contamination; it still targets the nearest enemy within half-map distance and remains 3x size. Powder Kegs are 40% smaller than V23.12.01 (6x instead of 10x) while remaining lethal. All three Pirate ultimates receive larger-form, low-object-count spectacle effects for iPhone performance. -->
-<!-- V23.11.00 Chopper Pirate Kit: forks a genuinely standalone ChopperPirateKit class. Chopper no longer instantiates the Velocity Weaver engine at all - his own class owns his cooldowns, combo state, damage, enemy slow and per-frame update, and every trigger routes to it before the rogue kit is consulted. Fixes Boarding Dash damaging the player: it warped him ONTO the target with zero i-frames, so enemy contact collision hurt him. It now stops 2 units short and grants 0.75s of real invulnerability. Bulwark Guard grants 2s of genuine i-frames and physically shoves enemies out of reach. Large visual upgrade: real dynamic PointLight flashes, thick TubeGeometry blade trails, ground telegraph rings before every AoE, tumbling debris, rising light pillars, full-screen colour washes and a move-name banner so it is always obvious which move fired. -->
-<!-- V23.10.00 Chopper Own Class: Chopper is no longer a cosmetic skin over the Shadow Stalker Rogue. gameplayAvatarType('chopper') now returns 'chopper', so no rogue or archer system can reach him: no purple shadow afterimage trail, no shadow smoke, no soul orbs, no Hooded-Rogue shadow clones flanking him, and no Eclipse ultimate. He gets his own signature instead - BROADSIDE, with its own POWDER meter and its own charge counters that the rogue can never read or reset. Second primary replaced: the Keelhaul Spin whirlpool is gone, replaced by Anchor Drop, a gold ship anchor that falls and cracks the deck. Slash arcs now sweep vertically through the air in front of him at chibi scale instead of lying flat on the ground at radius 1.5, which is what rendered as a large white puddle. -->
-<!-- V23.09.00 Chopper Storybook Pirate: removes ALL avatar deformation. _updateScale() previously stretched the player along Z for the lunge and wobbled X/Z for the guard; because the primary auto-fires every ~0.22s that stretch was effectively permanent and smeared the whole model sideways. Chopper is now locked to uniform scale, stays fully opaque (no 30% ghost) and is never touched by any move. Boarding Dash no longer silently refuses to fire when no enemy is in range - it always performs a committed leap. Adds a procedural storybook-pirate FX layer (canvas-generated sprites, zero new payload): layered white/gold/rose crescent slashes with a brighter every-third-hit finisher, sea-green whirlpool for Keelhaul Spin, foam wake and splash rings for Boarding Dash, an iridescent bubble shield for Bulwark Guard, real little gold-banded barrels with pulsing fuses for Powder Keg Toss, a muzzle bloom and rolling calm for Doldrums Cannon, and rising foam columns for Kraken Rising. Gold coins, twinkles and hearts spray on impact. -->
-<!-- V23.08.00 Chopper Pirate Rebuild: swaps in the new Mesh2Motion Chopper GLB (15 authored clips, self-contained skeleton, no retargeting) and deletes the retired clip-synthesis hack that froze a single frame of an attack into Idle and Running_A - the cause of the locked, warped standing pose. Every move now resolves to a real clip: a rotating three-take cutlass combo, a two-handed spin sweep, a dodge-forward boarding dash, a guard-stance parry, a throw, a flintlock shot, and a genuine three-phase jump (takeoff, airborne hold, landing). Kit is re-themed as a pirate over unchanged save IDs. Visual pass adds sRGB texture handling, max anisotropy, cloth/leather PBR response, a view-space fresnel rim and a travelling key/bounce light rig - none of which touch UVs, texture repeat/offset or per-axis scale, so the painted artwork is never warped. -->
-<!-- V23.07.00 Chopper Mesh2Motion Rumble Rebuild: embeds the uploaded native-rig Mesh2Motion Chopper GLB, uses its 18 authored clips directly, adds Chopper-only combat names/presentation over save-compatible IDs, and routes movement/attacks/ultimates through the native animation set while reusing the existing lightweight procedural combat/VFX chassis. Asset remains single-texture/single-mesh and gzip embedded for iPhone size efficiency. -->
-<!-- V23.06.00 Velocity Weaver: replaces the Hooded Rogue and Chopper Shadow Stalker combat kit with a procedural speedster/arachnid kit: Sonic Piston, Arc Line Sweep, Quantum Slingshot, Phasing Resonance, Synaptic Snare, Infinite Speed Blitz, Tachyon Dome and Speedforce Cataclysm. Existing save IDs are preserved, enemy damage stays routed through applyBulletDamage(), projectile phasing is collision-real, Blitz hit-stop skips one game-logic frame per strike, and all movement/VFX are delta-time or rendered-frame driven. -->
-<!-- V23.05.01 Shadow Stalker Rogue: replaces the Hooded Rogue combat loadout with two procedural Primaries (Phantom Flurry, Shadow Sweep), three zero-cooldown Secondaries (Shadowstep, Smoke Bomb, Viper's Fan), and three selectable Ultimates (Thousand Cuts, Dancing Steel, Twilight Execution). All motion, projectile travel, smoke expansion, mesh scaling/fading and camera jitter are delta-time/requestAnimationFrame driven; no skeletal animation is required by these moves. Existing enemy HP/boss protection routes through applyBulletDamage(). Other avatars are unchanged. -->
-<!-- V23.04.02 Direct Warrior Texture Binding: fixes Warrior bosses remaining black on iPhone Safari after V23.04.01. Root cause: the FBX material identifiers do not reliably match their external JPG filenames, and Viking's weapon material is even authored with the typo 'wiking_weapons_texture'. This build no longer depends on FBXLoader resolving texture paths. The seven already-optimized embedded JPGs are loaded directly as THREE textures and assigned after FBX parse by the exact authored material names: egyptian_red_B_texture / egyptianweapons_texture, roman_D_texture / roman_clothes_texture / roman_weapons_texture, and viking_C_texture / wiking_weapons_texture. Imported material base colors are forced to white so the diffuse maps cannot be multiplied into black silhouettes. URLModifier remains only as a fallback. Boss size, animations, stats and file-size optimization are unchanged. Syntax/size audit included. -->
-<!-- V23.04.01 Warrior Boss Texture Fix: fixes the uploaded Warrior bosses rendering as black silhouettes on iPhone Safari. The animated FBX files reference seven external JPG maps rather than embedding them internally. This build embeds only those seven required maps and feeds them to FBXLoader through a LoadingManager URL modifier. To preserve boss detail without bloating the HTML, primary body/clothing sheets are reduced from 2048px to 768px, smaller weapon sheets to 512px, and Viking's dense weapon sheet stays 768px; optimized JPEG quality 78 is used. No blue/green variants, static models, Maya project, renders, video or unrelated textures are included. Existing 2.5x Green Ranger boss scale, three-warrior rotation, animation splits, boss stats/HUD and anti-one-shot behavior remain unchanged. Syntax/size audit included. -->
-<!-- V23.04.00 Warrior Pack Bosses: replaces every 5th-round boss body with the uploaded Free Warriors pack. Only three red animated FBX warriors are embedded (Egyptian, Roman, Viking); the six duplicate color variants, static OBJ/STL assets, Maya project, renders, textures copies and video are intentionally excluded. The selected FBX files already contain their required texture media and are gzip-compressed before base64 embedding to minimize the single-file HTML. Boss variants rotate Egyptian -> Roman -> Viking every boss tier. The supplied animation timeline is split at runtime into Idle 0-338, Run 339-362, Death 363-441 and Attack 442-514 at 30fps. Each boss visible body is normalized to 5.55 world units tall, exactly 2.5x the Green Ranger's normal 2.22-unit visual height. Existing boss HP progression, health HUD, specials and anti-one-shot rules remain unchanged. Warrior textures are preserved instead of receiving the generic zombie tint. Syntax/size audit included. -->
-<!-- V23.03.19 Half-Speed Twin Boomerang: Green Ranger Primary is now exactly half the speed of V23.03.18. Fire interval doubles from 0.62s to 1.24s and projectile travel multiplier halves from 1.12x to 0.56x. Projectile lifetime doubles proportionally so the boomerang retains the same attack range. Damage, hit radius, piercing and impact behavior remain unchanged. Cleanup and syntax audit included. -->
-<!-- V23.03.18 Heavier Twin Boomerang: slightly slows Green Ranger's Primary without changing damage, range, hit radius, piercing or impact behavior. Twin Boomerang fire cadence increases modestly from 0.52s to 0.62s, and projectile travel multiplier drops from 1.25x to 1.12x so the blades read as heavier rather than twitchy. Projectile lifetime is recalculated from the new speed so range remains unchanged. Cleanup and syntax audit included. -->
-<!-- V23.03.17 Titan Deactivation Fix: fixes Titan Rampage remaining visually giant after its timer expires. Root cause was Gamma Leap caching the player's giant scale at jump start and continuing to restore that cached scale after Titan Rampage had already ended. Gamma Leap now resolves its scale from the CURRENT Titan state every frame and at landing, so an in-progress leap cannot reapply expired Titan size. Titan shutdown is also centralized in endRhinoTitanRampage(), which disposes Titan FX, clears the timer, restores normal Ranger scale/helper scales, applies the Knight-matched cooldown and emits the ending feedback exactly once. Cleanup/syntax audit included. -->
-<!-- V23.03.16 Clean Gamma Leap Arc: removes Gamma Leap's warp-like airborne squash/stretch and body-tilt effect so Green Ranger now stays visually solid throughout the jump. The physical Bezier jump arc is raised from +4.35 to +5.25 Y while retaining the deliberate 1.30-second heavyweight timing, zero cooldown, Titan scaling, damage and landing impact. Cleanup and syntax audit included. -->
-<!-- V23.03.15 Ranger Round Table Clones: replaces the one-hit Einherjar Echo signature with a persistent Green Ranger clone army following the Knight Knights-of-the-Round rules exactly. Round 10-15 summons 2 invincible clones for 8s with 10s cooldown; Round 16-20 summons 5 for 15s with 5s cooldown; Round 21+ summons 10 for 30s with 0.8s cooldown. Clones draw enemy aggro before the player, move at 2/3 of the Ranger's current movement speed, return to formation after being far away too long, and deal 10% player-scaled damage. They use the Green Rhino native rig, normal size even during Titan Rampage, and cycle the Ranger Primary plus the currently equipped Secondary in simplified clone-safe forms. The Ranger signature is blocked during Titan Rampage, matching Knight Titan's clone restriction. Old Einherjar Echo runtime/code/charge HUD is removed. Cleanup and syntax audit included. -->
-<!-- V23.03.14 Ranger Defensive Whirlwind: removes Freight Train Charge and replaces that Ranger Secondary slot with Cloud's Defensive Whirlwind combat behavior. The Ranger version reuses the existing Knight/Cloud whirlwind tuning and visual helpers: the same round-scaled active duration, 0.22s damage pulses, outward knockback, stagger, projectile deflection, layered sword/shield-style spin arcs, activation flare and ending guard burst. Ranger Secondary rules remain authoritative, so this version has zero post-use cooldown and can restart immediately while Secondary is held once the current Whirlwind duration ends. The same 0.55 movement multiplier applies while spinning. Titan Rampage scales Whirlwind radius/damage with the giant form but still uses only the equipped Secondary. Green Rhino's clean model-fit wrapper now receives the spin instead of rotating the native-rigged gameplay root. Old Freight Train trigger/update/runtime/dispatch code is removed. Cleanup and syntax audit included. -->
-<!-- V23.03.13 Armageddon Super Meteor Barrage: replaces Armageddon's custom low-poly stone rain and single final meteor with the Mage's actual Super Meteor visual system. After the Ranger's existing off-screen leap, center crash and 8-second map-wide stun, Mage-style Super Meteors repeatedly fall across the arena for 10 full seconds using the same giant meteor mesh, lava wire shell, aura, flame ring, fire trail, warning marker, orange atmosphere, impact flash, shock rings, molten debris, crater and surviving-enemy burn aura as Super Meteor. Armageddon meteor impacts instantly eliminate most normal enemies inside the enormous Super Meteor radius; any survivor is stunned for 3 seconds and burned for 5 seconds, including bosses. Bosses remain protected from one-shot damage. The old Armageddon stone geometry/material pools, stonefall code and 85%-map final meteor implementation are removed. Cleanup and syntax audit included. -->
-<!-- V23.03.12 Five-Hit Stormbreaker: upgrades Stormbreaker Overdrive from a slow three-target throw into a fast five-hit chain. The axe now acquires up to five nearest living enemies, travels substantially faster between hits, and snaps back to the Ranger at an even higher return speed after hit #5. Each contact gets a brighter dual-ring/spark impact, hit #5 gets a much larger finishing detonation and hit-stop, and the returning catch gets a stronger visual burst. The move still has zero cooldown; holding Secondary can activate it again immediately after the axe is caught. Old nearest-3 targeting logic is removed. Cleanup and syntax audit included. -->
-<!-- V23.03.11 Armageddon Ultimate: replaces Wrath of the Sky-Father with ARMAGEDDON while preserving the legacy rhino_sky_father save ID. Activation sends Green Ranger extremely high off-screen, relocates him to exact arena center while hidden, then returns him in a violent center crash. The landing immediately stuns every enemy already on the map for 8.0 seconds. A five-second bombardment follows with many giant round stone projectiles using shared low-poly geometry/materials for iPhone efficiency; each stone has its own ground warning and impact burst. After the stone rain ends, one enormous meteor whose diameter is about 85% of the playable map diameter descends slowly onto center. Its final impact creates a huge map-wide shockwave and eliminates every normal enemy on the map. Bosses retain the project's anti-one-shot rule and instead receive the existing capped boss-safe damage. Old Sky-Father lightning/glow code and runtime state are removed. Cleanup and syntax audit included. -->
-<!-- V23.03.10 Equipped Titan Secondary + Steerable Long Charge: Titan Rampage no longer cycles through all Ranger Secondaries. While transformed, the Secondary button uses only the Secondary actually equipped before the match, with Titan damage/radius scaling applied to that move. Freight Train Charge distance is doubled from 6 to 12 units and rebuilt as a steerable heavy charge: it no longer follows one frozen activation direction. The charge advances incrementally each frame while its travel vector eases toward the Ranger's current facing, allowing responsive left/right steering without twitchy snapping. Duration is 1.45s to preserve heavyweight motion across the longer distance. Dragged enemies follow the curved charge path in stable lanes. Removed the now-unused Titan Secondary rotation index/helpers and stale NEXT-move toast logic. Cleanup and syntax audit included. -->
-<!-- V23.03.09 Ranger Titan Rotation Ultimate: replaces The Shattered Domain with TITAN RAMPAGE. The Green Rhino Ranger grows to the exact same size multiplier as Knight Guardian Titan (5x), uses the same 15-second active duration, and dynamically reuses the Knight Titan cooldown curve so both transformations stay synchronized if Knight tuning changes later. During Titan Rampage the Ranger can still use Twin Boomerang Primary, while every Secondary press ignores the equipped Secondary and rotates Stormbreaker Overdrive -> Gamma Leap -> Freight Train Charge -> repeat. Giant combat uses the Knight Titan's 5x damage multiplier and 2.6x combat reach/radius standard; movement timing itself remains heavy rather than becoming 2.6x faster. The old Shattered Domain meshes/runtime/update code are removed, legacy saves keep the same rhino_shattered_domain ID so no migration is required, and Titan scale/helper presentation is fully restored on expiration/reset. Cleanup and syntax audit included. -->
-<!-- V23.03.08 Full Arena Waves + Heavy Secondary Motion: fixes Crashing Bolt's kill wave stopping halfway across the arena. arenaSize is already the playable radius (~30), but the prior helper incorrectly multiplied it by 0.5, capping the wave near 15. The wave now travels slightly beyond the real playable boundary and uses a swept-radius contact test so enemies cannot be skipped between frames. Gamma Leap is slowed to a deliberate 1.30s arc. Freight Train Charge is slowed to 0.90s for its six-unit drive and no longer rotates the entire gameplay player root; only the Green Rhino model-fit wrapper receives a restrained forward lean, preventing the native rig from visually breaking. Dragged enemies ease into stable lanes instead of being hard-teleported into one overlapping cluster. Both moves keep zero cooldown/no post-move delay and receive stronger end impacts. Cleanup removes stale fast-timing comments/logic. -->
-<!-- V23.03.07 2s Landing Stun + Heavy Zero-Delay Secondaries: every World-Breaker Crashing Bolt landing now immediately stuns every enemy already present on the map for a full 2.0 seconds, including bosses, before that cycle's kill wave begins. Crashing Bolt wave travel time is reduced from ~5 seconds to exactly ~3 seconds from center to playable edge; the four leap/crash cycles remain fully sequential and numbered. Green Rhino Ranger Secondaries keep zero cooldown, and their runtime no longer writes hidden post-move cooldown values: holding Secondary starts the next activation on the very next eligible gameplay frame after the current move finishes. The individual moves are deliberately NOT sped up into twitch attacks: Stormbreaker Overdrive uses heavier 17/20-unit travel speeds and ends in a guarded catch shock burst; Gamma Leap uses a 1.30s weighted vault and ends with a layered tectonic impact; Freight Train Charge uses a deliberate 1.45s twelve-unit steerable drive and ends in a heavy forward rupture, radial burst and stronger camera stop. Cleanup removes stale 1.5s runtime cooldown remnants and old 5-second wave wording. -->
-<!-- V23.03.06 Zero Secondary Cooldown + Four Leap Waves: removes cooldown entirely from all three Green Rhino Ranger Secondary attacks. Hold Secondary now immediately starts the next use whenever the current move itself finishes, with no post-move cooldown. Rebuilds World-Breaker Crashing Bolt for unmistakable wave readability: the Ranger dashes to arena center once, then performs FOUR complete leap-and-crash cycles. Each cycle visibly leaps out of view, hangs overhead, descends inside the fiery force field, crashes into center, and launches exactly ONE kill wave. That wave must complete its full ~3-second trip to the playable edge before the next leap begins. Each impact announces WAVE 1/4 through WAVE 4/4. Normal enemies die only when contacted by the moving wave front; bosses remain protected by the existing per-hit cap. Cleanup and syntax audit included. -->
-<!-- V23.03.05 Ranger Cooldowns + Centerfall Crashing Bolt: sets all Green Rhino Ranger Secondary cooldowns to a no cooldown and makes their HUD/loadout metadata show the real cooldown. Rebuilds World-Breaker Crashing Bolt around a center-stage execution: the Ranger first dashes to the exact arena center, then performs a huge vertical leap completely out of view, descends back into center inside a giant fiery energy sphere, and crashes into the floor. The impact launches four total arena-wide circular kill waves (initial wave plus three repeats). Each wave expands slowly from center to the playable edge over ~5 seconds and instantly defeats normal enemies as the wave front touches them; bosses are never one-shot and instead take capped boss-safe wave damage. Waves are staggered so the arena repeatedly clears outward. Adds live Ultimate cooldown text so the player can always see when the equipped Ultimate is ready again. Cleanup and syntax audit included. -->
-<!-- V23.03.04 Hold Auto + Crashing Bolt Spectacle: standardizes all four combat controls around the same iPhone-safe hold behavior. Primary and Secondary keep their existing main-loop retry. The equipped Ultimate/Ability button and the large Signature button now also use persistent pointer ownership plus main-loop retry instead of setInterval/pointerleave behavior, so keeping a finger down automatically casts again the instant the move becomes ready. WORLD-BREAKER CRASHING BOLT receives a major spectacle rebuild: an expanding triple target seal, rotating radial runes, a vertical cyan-green sky column, descending lightning filaments, a visible overhead falling core, impact flash, crater, 12 rising rock spires, three staged shock fronts, radial lightning lances, debris bursts, delayed aftershock damage and a stronger decaying camera rumble. Effects are capped and short-lived for iPhone readability/performance. Other Ranger ultimates and combat balance are unchanged in this increment. -->
-<!-- V23.03.03 iPhone Loadout Scroll Fix: fixes the pre-game move screen becoming difficult or impossible to scroll in Safari. The root cause was the game's global button{touch-action:none} rule: every move card is a button, so vertical swipes beginning on a card were blocked and scrolling only worked randomly from gaps. The loadout screen now owns one native vertical scroll surface with momentum scrolling and pan-y touch handling, move cards explicitly allow vertical pan gestures, Back is fixed outside the scroll flow, the Continue button gets a reserved footer area, and the loadout summary is no longer sticky/overlaid on top of Ultimate cards. No combat or loadout behavior changed. -->
-<!-- V23.03.02 Pre-Game Move Loadout: adds a dedicated move-selection screen immediately after avatar selection and before Round Select/Theme. During development testing, every move for the selected avatar is available here at no cost. The player chooses one Primary, one Secondary and one Ultimate, sees a compact summary, then continues to the existing round/map flow. A small pending-loadout handoff reapplies those choices after startSurvival() performs its normal fresh-run reset, so the map actually starts with the selected moves. Existing pause/shop loadout swapping remains available. No combat balance changed. -->
-<!-- V23.03.01 Ranger Cooldown + Ultimate Fix: fixes the Green Ranger Ability-button routing so all three rhino_ World-Breaker ultimates actually reach their trigger functions. Stormbreaker Overdrive, Gamma Leap and Freight Train Charge now use one fixed 1.5-second Secondary cooldown each; Ranger speed stats/Fury no longer shorten that 1.5-second tactical cooldown. Internal per-move cooldown gates are synchronized to the same value. Cleanup removes the retired Rhino Charge, Boomerang Cyclone and Ricochet Bladestorm implementations plus their stale runtime fields; Twin Boomerang and the active World-Breaker kit remain. -->
-<!-- V23.03.00 Green Ranger World-Breaker Thunder God Kit: keeps Twin Boomerang as the Ranger Primary and replaces the Ranger's old Rhino Charge / Boomerang Cyclone / Ricochet Bladestorm package with the requested procedural World-Breaker kit. SECONDARIES: Stormbreaker Overdrive sequentially ricochets one detached spinning axe through the three nearest enemies and returns it; Gamma Leap follows a real quadratic Bezier arc, squashes the avatar in flight and lands with radial pushback plus expanding shattered-ground geometry; Freight Train Charge tilts the Ranger forward and drives exactly 6 units over 0.20s while enemies touched are physically pinned to a moving cluster in front until release. ULTIMATES: World-Breaker Crashing Bolt launches the Ranger off-screen, grows a landing reticle for 0.8s, snaps him down with a two-frame canvas inversion, decaying 3D camera rumble and eight rising rock spikes; Shattered Domain physically separates two long floor halves to expose a glowing cyan chasm; Wrath of the Sky-Father locks movement for 3s, applies a pulsing green/cyan body glow and drops twelve procedural lightning cylinders across the arena. SIGNATURE: Ranger's kill-charged special is now Einherjar Echo, a single translucent primitive phantom that performs one math-driven God-Shatter Chop then shrinks to zero and deletes itself. Native Ranger Attack/Run clips are used only as optional body flavor on the real procedural movement; all trajectory, deformation, collision and camera motion is runtime math. Enemy/boss progression from V23.02.00 is preserved. -->
-<!-- V23.02.00 Endless Enemy + Boss Progression: rebuilds survival progression without changing hero kits. Live survival remains uncapped beyond Round 50 (the Round Select menu still intentionally tops out at 50 for practice starts). Enemy counts now grow on a sustainable endless curve instead of +10 forever, normal-enemy HP/speed/attack cadence scale smoothly by round, and later rounds progressively favor Runners, Spitters, Brutes and Shadows. Every 5th round is a boss round: one dedicated boss spawns first, grows harder every boss tier through HP, movement, attack cadence and ranged pressure, and displays a live top-center boss health bar. Bosses have global per-hit protection: any single standard damage event is capped at 8% max HP, guaranteeing that a healthy boss cannot be one-hit killed. Boss rounds still include normal enemies, bosses count toward the round target, and all progression formulas continue indefinitely. -->
-<!-- V22.27.21 Primal Rage Giant Focus: Primal Rage is rebuilt around Aesir herself rather than impact effects. Activation now creates one stun-only shockwave with zero damage and zero knockback, then Aesir becomes exactly 3x her normal size for the full 15 seconds. Automatic burn zones, repeated area damage, random enemy damage pulses, damaging activation, and damaging expiration burst are removed. While transformed, Primary and Secondary attacks gain 50% damage and retain the existing faster attack cadence; only Primary and Secondary combat is allowed, so the Ability/Ultimate special routes and Berserker Kin signature are blocked until Primal Rage ends. The visual aura is reduced to a restrained foot-level rage ring so the enlarged avatar remains the clear visual focus. -->
-<!-- V22.27.20 Primal Rage Titan Form: Primal Rage only. Aesir now grows to the exact Guardian Titan size multiplier (5x) for the full 15-second transformation, with world-space rage aura rings, rising flame/energy columns, heavier activation and ending pulses, and extra visual accents on attacks while enraged. The transformation restores Aesir to her normal avatar scale when it expires or runtime state is reset. Existing Primal Rage burn-zone gameplay, damage pulses, cooldown, and every other move remain unchanged. -->
-<!-- V22.27.19 Primal Rage Titan Duration: changes only Primal Rage's active transformation time to exactly match the Knight Guardian Titan buffDuration of 15 seconds. The old 6.2-second runtime timer is now 15.0 seconds and the ability description is updated accordingly. No Primal Rage visual/size transformation has been added yet in this increment; all other moves are unchanged. -->
-<!-- V22.27.18 Savage Roar + Rending Slash Combo: merges the two Barbarian secondaries into one repeating move sequence. Each activation alternates ROAR -> RENDING SLASH -> ROAR -> RENDING SLASH, beginning with Savage Roar. The combined move uses Rending Slash's 1.18-second cooldown for every step. The rebuilt forward-cone Savage Roar and the current smaller front-fired Rending Slash keep their existing visuals, damage, range and behavior. Standalone Rending Slash is hidden from the shop and old Rending selections migrate to the combined move. Every other Barbarian move is unchanged. -->
-<!-- V22.27.17 Savage Roar Rebuild: Savage Roar only. Replaces the old mostly-radial triple ring with a planted, forward-facing pressure-cone attack. Three staged fan fronts visibly travel to the full 8.5-unit reach, with layered orange/ivory air sheets, ground pressure, dust/debris blowout, and a stagger-then-shove sequence. Gameplay damage, stagger and knockback now use the same forward cone and full visible range. A small foot-level ground pulse remains for impact, the 5-second attack-speed buff is preserved, cooldown remains 6 seconds, and every other Barbarian move is unchanged. -->
-<!-- V22.27.16 War Axe Cyclone Balance Pass: Cyclone cooldown is now 1.0 second at Round 1 and scales smoothly down to zero by Round 30. Sustained pulse damage is capped at 35% of each enemy's max HP per pulse so a single cyclone tick cannot one-shot a healthy normal enemy. Release-burst damage is also capped at 45% max HP per enemy. Hold-to-maintain input, 5.4 visual/gameplay radius match, visuals, movement penalty, and all other Barbarian moves remain unchanged. -->
-<!-- V22.27.15 War Axe Cyclone Hold + Major Visual Pass: War Axe Cyclone is now held-to-maintain and ends immediately on Secondary-button release. Its sustained damage/knockback radius is 5.4 and exactly matches the persistent outer cyclone visual. Adds three persistent rotating energy/steel rings, a broad axe-wake crown, ground pressure skirt, stronger pulse rings, and release cleanup. The existing round-based cooldown begins when the player releases the button. Other Barbarian moves are unchanged. -->
-<!-- V22.27.14 War Axe Cyclone Weight Pass: upgrades only Aesir's War Axe Cyclone presentation. Activation now begins with a heavier planted wind-up and gradual spin-speed ramp instead of snapping instantly to full speed; sustained pulses add thicker orange/ivory axe trails, foot-level dust, and clearer ground pressure rings while keeping the center readable; the ending adds a final committed sweep before the outward release burst. Duration, round-scaling cooldown, damage, radius, knockback, movement penalty, and every other move remain unchanged. -->
-<!-- V22.27.13 Earthbreaker Hit Range Matches Visual: changes only Earthbreaker Slam so its actual damage/knockback radius now matches the full outer shockwave visual instead of ending short of it. Cooldown stays at 1.0 second and the displayed base radius value, visuals, damage, and other Barbarian moves are otherwise unchanged. -->
-<!-- V22.27.12 Earthbreaker 1s Cooldown + 50% Range: Barbarian Earthbreaker Slam only. Changes the cooldown from 2.0 seconds to 1.0 second and increases the attack radius from 3.25 to 4.875 units (50% larger). The spectacle pass, damage, knockback force, animation timing, and every other move remain unchanged. -->
-<!-- V22.27.11 Earthbreaker Slam Spectacle: Barbarian Earthbreaker Slam only. Rebuilds the Secondary's presentation into a slower planted power attack: a longer axe-over-shoulder load, visible weight drop, impact freeze, crater-first ground contact, heavy rock/debris eruption, radiating cracks, then a thick outward shockwave and a brief buried-axe recovery. The approved 2.0-second cooldown, 2.1 damage, radius, 9.5 knockback, and every other move remain unchanged. -->
-<!-- V22.27.10 Earthbreaker Cooldown: Barbarian Earthbreaker Slam only. Sets the Secondary's cooldown to exactly 2.0 seconds between activations. Damage, radius, knockback, animation, visuals, and every other move remain unchanged. -->
-<!-- V22.27.09 Aesir Rending Slash Secondary: moves Rending Slash from the Barbarian Primary pool into the Secondary pool because its wide piercing wave and area control are too strong for a basic attack. Rage Cleave remains Aesir's Primary. Existing Rending Slash visuals, 50%-reduced wave size, slower/heavier cadence, damage, range, fissure, shockwave, and knockback are unchanged. Legacy runtime selection is migrated so a previously equipped Rending Slash Primary becomes the equipped Secondary when possible. Every other move is unchanged. -->
-<!-- V22.27.08 Aesir Rending Wave Size Reduction: second Primary only. Keeps the front-read, heavier Rending Slash presentation but reduces the travelling wave itself by roughly 50% from V22.27.07 so it is less oversized on screen. The projectile's frontal energy sheet, crescent layers, muzzle, wake, and hit radius are all scaled down together to preserve visual-to-hit consistency. Swing timing, heavier cadence, forward-fired direction, melee commitment, fissure behaviour, damage, and every other move remain unchanged. -->
-<!-- V22.27.07 Aesir Rending Front-Read Cleanup: second Primary only. Keeps the wider, heavier Rending Slash but fixes the new readability issue where the wave can look like it was fired sideways. The travelling slash visual is re-oriented into a flatter forward-facing shock-front with its side-lean removed, a centred horizontal energy sheet added across the lane, and the crescent arc rebuilt to read like a broad wall launched from directly in front of Aesir rather than peeled off a side swing. Width, slower cadence, front-fired direction, damage, range, fissure behaviour, and every other move remain unchanged. -->
-<!-- V22.27.06 Aesir Rending Wide + Heavy: second Primary only. Rending Slash is widened dramatically and slowed down to better fit the Barbarian. The front-fired crescent is now about three times wider visually and in hit coverage, the immediate melee cut uses a much broader lane, and the move cadence/pose timing are lengthened so Aesir no longer snaps through the attack so quickly. The short forward shove at release is also reduced so the move feels heavier and less twitchy. Travel distance, front-fired direction, fissure behavior, damage values, and every other move remain unchanged. -->
-<!-- V22.27.05 Rending Diagnostic Hard Lock: diagnostic build for Aesir Primary 2 only. Rending Slash no longer plays the baked RendingSlash_BakedRising clip underneath the procedural pose. It uses neutral Idle as the animation base, disables Rending impact-shock body rocking, removes hip/spine lean drive, and hard-locks the entire fitted Aesir wrapper to zero translation and zero rotation for the duration of the move. Only the upper-torso turn, arms, hands, axe choreography and front-fired projectile remain. This is intentionally an isolation build to identify the source of the floating/boat motion; gameplay values and every other move are unchanged. -->
-<!-- V22.27.04 Aesir Rending Hard Ground Lock: second Primary only. Fixes the persistent boat/floating motion at its actual source: Rending Slash no longer applies whole-model pitch, bank, vertical wrapper travel, or impact-shock rocking to the Aesir fit wrapper. During both Rending diagonals the wrapper is hard-grounded at Y=0 and kept upright; only forward/back commitment and a restrained yaw are allowed while the real spine/arm chain performs the swing. This prevents the character's feet from orbiting around the model pivot as if riding a wave. Front-fired crescent direction/timing, damage, cadence, range, fissure, shockwave, knockback, locomotion, and every other move are unchanged. -->
-<!-- V22.27.03 Aesir Grounded Rending Slash: second Primary only. Fixes the newly observed "floating / riding a wave" read by removing almost all vertical body translation from Rending Slash's fit-wrapper motion. The Barbarian now stays planted and weighty during both alternating diagonals, driving the move with torso turn, lean and forward commitment instead of bobbing upward and downward. Projectile timing, forward-fired wave direction, damage, cadence, range, shockwave, fissure, knockback, locomotion, and every other move are unchanged. -->
-<!-- V22.27.02 Aesir Rending Timing + Pose Cleanup: second Primary only. Rending Slash's projectile release is now delayed to the committed strike moment so the front-fired crescent no longer launches early during the wind-up, and both alternating diagonals are re-authored with a more grounded, less corkscrewed body pose and a cleaner follow-through hold. The move still alternates left/right physical swings and still throws the wave straight forward from in front of Aesir. Damage, cadence, range, shockwave, fissure, knockback, locomotion, and every other move are unchanged. -->
-<!-- V22.27.01 Aesir Front-Fired Rending Slash: fixes the approved readability issue on the Barbarian's second Primary only. Rending Slash still alternates its heavy left/right body swing, but the travelling crescent now clearly forms in front of Aesir and launches straight forward from her facing direction instead of appearing to peel randomly off the side of the animation. The generic tracer visuals are replaced with a dedicated front-fired crescent group, with a centred muzzle flare, forward wake, hotter nose flash, and restrained side lean so the arc reads as a projectile shot from the front. Ground fissure timing, damage, cadence, range, knockback, locomotion, and every other move are unchanged. -->
-<!-- V22.27.00 Aesir Area Bruiser: reworks the Barbarian's identity, her three weakest moves and her three ultimates. IDENTITY - baseMoveMult drops from 1.04 to 0.68, making her the slowest avatar in the roster by a wide margin (Rogue 1.35, Archer 1.12, Hooded 1.10, Mage 1.00, Knight 0.96). To compensate, a new shared barbarianShockwave() helper fires a damaging, knocking-back ground wave out of the impact point of EVERY primary beat - Rage Cleave 1 and 2, Rending Slash, and all four Feral Onslaught beats - so she can never land a single-target hit. WAR AXE CYCLONE is rebuilt from a hold-to-repeat spin attack into a sustained duration whirlwind that works exactly like the Knight/Cloud Defensive Whirlwind, sharing its round-scaling duration (4s +0.5s per round, infinite from Round 25) and cooldown curve (8s / 3s / 1.5s / 0s), with its own activation flare, pulse damage, movement slowdown, HUD timer and release burst. RENDING SLASH's wave gains an echo crescent, a serrated cutting edge and a fissure that chases it down the lane. SAVAGE ROAR now sends three separate pressure fronts rolling outward on a stagger, each landing its own damage and shove, plus visible breath cones. ULTIMATES are now three genuinely different things rather than three novas: Primal Rage is a six-second transformation that buffs attack speed and scorches lasting fire fields into the ground as she walks; World Breaker is one enormous slam that sends four shockwave fronts sweeping outward across the whole arena as ring bands; and Primal Axe Wave throws six giant spinning axes as real travelling projectiles that pierce their lanes, turn around at full extension and fly back in for a recall slam. All three descriptions were rewritten to match. -->
-<!-- V22.26.01 Aesir Weight and Follow-Through: second pass on the Barbarian, targeting "clunky" and "no sense of impact". Measured cause of the clunk: the elbow only moved 5-10 degrees across an entire swing, so the whole arm swept as one rigid rod. The move table is now generated with real elbow mechanics - the forearm folds 90-120 degrees during the wind-up with the hand trailing the elbow, snaps to within 10 degrees of locked at contact, then leads slightly through the follow-through. Elbow travel is now 79-117 degrees on every swing. Three further anti-clunk changes: limb aim now blends with great-circle slerp instead of linear lerp, so arcs sweep at a constant angular rate instead of racing through the middle; a kinetic chain samples hips, chest, shoulder, forearm and hand at staggered times so the body leads and the blade drags by up to 120 degrees mid-swing; and every release from an impact freeze now leaves from a standstill, removing the velocity pop that was measurable on Rage Cleave beat one. Impact: each move declares a contact frame that seeds a damped body shock through the fit wrapper and neck, the body now sinks into every blow instead of only the overheads, and hit-stop on the Barbarian's landing frames was raised from near-invisible values to 0.052-0.105s with matching camera shake. Earthbreaker Slam was re-authored to haul the axe over the right shoulder with a wound torso so it no longer duplicates the overhead Execution Smash. Damage, reach, cooldowns, knockback, hit windows, the wave projectile and every other avatar are unchanged. -->
-<!-- V22.26.00 Aesir Live Limb Animation: fixes the root cause of the Barbarian's "glitchy / half-finished" moves. Both Primaries were routed to stubs that only rocked the whole model via the fit wrapper - barbarianStartSlashPose was a literal no-op and barbarianStartForcedCleave only wrote fit.rotation - so the arms, hands and axe never moved on Rage Cleave or Rending Slash. The per-limb pose engine that already contained cleave1/2/3 and rendingA/B was dead code, shelved because it could corkscrew the skeleton. That instability is now fixed properly with an idempotence guard (aesirPoseBase/aesirPoseCommit) that rewinds any bone the AnimationMixer did not refresh, so premultiplied rotations can never compound. Both Primaries now drive the real engine. Animation quality pass: per-key easing curves (load / snap / release) replace uniform smoothstep so swings have anticipation, a violent ~6-frame strike and a held contact freeze; whole-body yaw/tilt/bank drive is layered on top of the limb aim so the fighter turns into the blow; blade roll on the grip so the axe head leads the arc; Rending Slash alternates its two diagonals again. A finished pose now releases kayActionLock/kayCurrentName so the character returns to Idle/Move instead of freezing on the clamped attack frame, and the cached axe grip matrix is invalidated when the rig is rebuilt. Damage, reach, cooldowns, knockback, hit windows, the wave projectile and every other avatar are unchanged - this pass is purely visual. -->
-<!-- V22.25.07 Rending Slash Baked Aesir Rising Cut: Primary 2 only. Replaces the rejected V22.25.06 reversed-Skill diagonal experiment with one dedicated AnimationClip authored directly against Aesir's own skeleton and Prop1 weapon node. The move is baked into five readable phases: planted low-side anticipation, coiled wind-up, accelerating rising diagonal cut, high opposite-shoulder follow-through, and clean recovery. No runtime donor retargeting or procedural arm solver is used for Rending Slash. Rage Cleave remains unchanged. Damage, 30 range, 0.88 cadence, knockback, slash-wave VFX, locomotion and 1.5x size remain unchanged. -->
-<!-- V22.25.06 Rending Slash Aesir-Native Diagonal Rebuild: Primary 2 only. Rejects the V22.25.04/.05 cross-rig donor retarget after live iPhone testing showed collapsed arms, torso distortion and incorrect axe orientation. Rending Slash now uses only Aesir's own authored Skill motion as its skeleton-safe base: the first beat runs the overhead take backward to create a low-to-high rising diagonal, the second runs it forward as a high-to-low descending diagonal. A lightweight fit-wrapper weight shift/roll supplies the diagonal commitment without writing individual bones, so the Aesir skeleton and axe cannot be corrupted. Rage Cleave, locomotion, 1.5x size, damage, 30 range, 0.88 cadence, knockback and VFX are unchanged. -->
-<!-- V22.25.03 Rage Cleave Swing 2 CC0 Donor: Primary 1 hit 2 now uses a real authored two-handed melee animation donated from KayKit's current CC0 Adventurers Barbarian GLB, retargeted at runtime onto the existing Aesir skeleton as local rest-pose deltas. The Aesir model is unchanged. Hit 1 remains the approved native/safe cleave; hit 3 remains the native Skill overhead. If the CC0 donor is not ready, hit 2 falls back to the V22.25.02 safe reverse cleave. Damage, range, cooldown, knockback, 1.5x size, locomotion, Rending Slash, and every other move are unchanged. -->
-<!-- V22.25.02 Rage Cleave Animation Repair: fixes Primary 1 entering a distorted/frozen Aesir pose after attacks. Rage Cleave no longer uses the aggressive full-skeleton aim solver that could drive the rig into a bad held orientation. It now keeps the native weapon/arm motion, adds a lightweight whole-body commitment overlay for the two opposing cleaves, uses the native Skill take for the overhead finisher, and explicitly releases back to locomotion after each beat. Damage, range, cooldown, knockback, 1.5x size, locomotion and every other move are unchanged. -->
-<!-- V22.25.01 Rending Slash Independent Animation Base: first move-by-move distinct-animation test. Rending Slash no longer plays the Aesir model's shared authored Attack take underneath its procedural left/right axe choreography. It now uses neutral Idle only as a skeleton base while the dedicated rendingA/rendingB pose trajectories fully own the torso, shoulders, arms, hands and axe, preventing the move from visually collapsing back into the same swing used by Rage Cleave. Locomotion, movement speed, damage, range, cadence, slash-wave behavior and every other move are unchanged. -->
-<!-- V22.25.00 Barbarian Distinct Move Animation: ROOT CAUSE FIX. Every Barbarian melee beat previously resolved to the same authored 'Attack' take, separated only by a 0.28-0.86s start offset inside that take's single ~0.6s swing window, and the Aesir GLB ships only ten clips so no second swing existed to switch to. The old layer rotated Spine1 and the clavicles ~20 degrees, which reads as a lean; the arms carrying the axe were never posed. This version adds a real pose engine that aims the arm chain at world-space targets per move, so Rage Cleave's three beats, Rending Slash's two sides, the four Feral beats, the Cyclone, Earthbreaker and Savage Roar each have their own trajectory. Damage, reach, cooldowns, knockback and all other avatars are unchanged. -->
-<!-- V22.24.01 Alternating Rending Slash: second Primary now alternates committed LEFT and RIGHT side swings; each creates exactly one large orange/white crescent slash wave. Wave range remains the approved approximately five-toon lane. Cadence is 0.88s. No other move changed. -->
-<!-- V22.22.15 Rage Cleave Forced Bone Motion: bypasses custom AnimationClip playback for Rage Cleave hits 1-2 and instead writes the real Aesir spine, clavicle, arm, hand and axe Prop1 transforms after AnimationMixer.update() every frame. This prevents the native mixer from overwriting the custom left-to-right and right-to-left cleaves. Hit 3 remains the native Skill overhead smash. Approved 0.92 cadence, 3.40 reach, damage and knockback are unchanged. No other move changed. -->
-<!-- V22.22.05 Aesir Head + Hood Geometry Repair: fixes the imported Aesir hood/head shell disappearing from side/back angles by rendering its authored thin-shell geometry double-sided with stable depth/shadow settings, and removes the remaining artificial emissive face lift so the original painted face texture/geometry reads as authored. Keeps the approved 1.5x Barbarian size, world-space ground ring, combat, damage, cooldowns, and every move unchanged. -->
-<!-- V22.22.04 Aesir Face + Ground Ring Repair: reduces the imported Aesir material emissive boost so the hand-painted face reads naturally instead of glowing/flattening, softens environment response, and rebuilds the Barbarian locator ring as true world-space geometry that stays centered under the feet without inheriting the 1.5x wrapper scale. No move logic, damage, cooldowns, animation routing, or other avatars are changed. -->
-<!-- V22.22.03 Earthbreaker Weight + Barbarian Scale: slows only Earthbreaker Slam into a committed overhead attack with a readable wind-up, delayed ground impact, and recovery while preserving its existing 2.1 damage and 9.5 knockback. The playable Aesir Barbarian is now a true 1.5x larger in world space, with preview/model fitting adjusted so the scale is not cancelled by the fixed-height normalization. Rage Cleave, Feral Onslaught, and all other moves remain unchanged. -->
-<!-- V22.22.02 Feral Onslaught Polish: upgrades only the Barbarian's Feral Onslaught Primary. Adds a four-beat rapid visual rhythm, tighter contact sparks/hit-stop, forward-driving micro-lunges on landed hits, and light foot-dust pressure while preserving its existing 0.68 per-hit damage, reach, 3.2 shove force, and 0.14s stagger. Rage Cleave and every other move remain unchanged. -->
-<!-- V22.22.01 Rage Cleave Polish: upgrades only the Barbarian Rage Cleave primary. The three hits now escalate distinctly: a committed opening side cleave, a broader reverse cleave with a light stagger/push, and a heavier overhead Execution Smash with stronger anticipation, localized axe-head flash, ground cracks/debris, hit-stop, and the existing finisher damage/knockback balance. No Feral Onslaught, Secondary, Ultimate, signature, or other-avatar gameplay is changed. -->
-<!-- V22.22.00 Aesir Berserker Overhaul: expands the Barbarian from one primary
-combo and a rotating secondary into a full Hulk-and-Wolverine-style kit. Adds
-Feral Onslaught as a second Primary (fast low-damage flurry with per-hit
-knockback), keeps Rage Cleave as Primary 1 with a real knockback finisher,
-adds Savage Roar as a third Secondary (AOE knockback ring + 5s attack-speed
-buff) alongside Earthbreaker Slam and War Axe Cyclone, and retires the old
-Primal Axe Wave shop weapon in favor of three selectable Ability-slot
-Ultimates: Primal Rage (now cooldown-based instead of kill-charged, with real
-knockback on every pulse), World Breaker (a telegraphed two-handed overhead
-slam with a wind-up and a huge knockback shockwave), and Primal Axe Wave
-(upgraded to ultimate scale: four flaming axe waves thrown in a cross pattern
-followed by a boomerang return slam). The kill-charged meter on the
-Ultimate button now summons Berserker Kin, two invincible clone Barbarians
-that hunt independently, mirroring the Knight/Wolverine clone-signature
-pattern. Earthbreaker Slam and War Axe Cyclone now apply real outward
-knockback instead of a crude reposition nudge. No other avatar's kit,
-damage, or balance changes.
--->
-<!-- V22.14.76 Cloud Native Rig Test
-Adds the uploaded Cloud from World of Final Fantasy model as a sixth selectable
-test avatar without replacing any existing hero. Uses its native 43-joint skin
-and bundled Walk animation. Cloud stays out of the enemy roster and temporarily
-uses the simple Hooded Rogue melee rules only as a compatibility shell.
-Model by Robukan, licensed CC-BY-4.0.
--->
-<!-- V22.14.75 Fox Mage Final QA + Lock-In
-The Nine-Tailed Fox is now treated as the production Mage throughout selection,
-preview, gameplay, abilities, Arcane Echoes, lifecycle cleanup, and save migration.
-Legacy ninefox IDs remain migration-only. The original KayKit Mage remains available
-only as an emergency visual fallback if the native fox asset fails.
--->
-<!-- V22.19.03 Remove Zulu + Wolverine Fix + Cat Grounded: removes Zulu from the selectable/playable roster, corrects Wolverine's inverted embedded root before visible-mesh fitting and grounding, keeps Wolverine mesh-only bounds so helper bones cannot distort placement, grounds Cat lower so it sits on the arena floor, and preserves Cat's 180-degree forward-axis correction plus full Knight test kit. -->
-<!-- V22.19.02 Knight Test + Avatar Visual Repairs: routes Zulu and Cat through the complete Knight gameplay shell for testing, updates knightIsActive() to respect gameplayAvatarType(), fits Cat to Cloud's 1.48-unit visible height, rotates Cat 180 degrees so movement and facing agree, replaces Wolverine's skeleton-wide fit/placement with visible-mesh-only bounds so remote Mixamo helper bones cannot push the actual body off-camera, and locks Zulu to its upright bind pose because the merged animation set is still incompatible with the rig. -->
-<!-- V22.19.01 Roster Repair + Rogue Kits: fixes Wolverine's invisible-dot preview/gameplay scaling by bypassing remote Mixamo helper-bone bounds; routes Zulu and the cat avatar to the actual Hooded Rogue combat slot ("hooded", not the Archer slot named "rogue"); removes Zulu from Archer-only passive routing; and prevents Zulu's incompatible merged Idle clip from folding the rig onto the ground. -->
-<!-- V22.19.00 Carrot Scout: adds the Carrot as a ninth playable avatar running the Tempest Archer kit, so it can be compared against the Rogue directly before deciding whether to replace it. The source is a Blender 2.79 file holding three duplicate scene rigs; assimp reads the geometry but drops Blender armatures entirely, so the export went through Blender 4.0 instead. Kept the main Armature and Carrot mesh, applied Mirror and Subsurf at level 1 for 3,919 verts on a 44-bone rig with a full nine-joint tail chain, and rebuilt the shipped Walk and Jog as Walk and Running_A. The file has no Idle, so one was authored as a two-second breathing loop written through direct fcurve construction. Vertex coloured with no texture, which the shared material pass now preserves. Embedded GLB is 363KB. -->
-<!-- V22.18.00 Berserker Wolverine: adds Wolverine as an eighth playable avatar with his own combat kit rather than a borrowed one. The pack's mesh folder is an unrigged static export, but every Mixamo file in animation/ is a with-skin export carrying the full rigged character on a 44-joint skeleton, so one of those became the base and thirteen clips were merged onto it. Buffers were requantised (indices uint16, joints uint8, weights normalised uint8), keyframes decimated to 30fps and the roar trimmed from 19s to 3s, taking the embedded GLB from 3.8MB to 2.7MB. Kit: Adamantium Claws and Savage Flurry (primaries); Lunging Pounce, Rage Roar and Claw Cyclone (secondaries); Berserker Frenzy and Adamantium Quake (ultimates); Savage Shadow Pack for five invincible clones on the Knight's round-scaled rules at 10% player damage. Healing Factor regenerates a heart every 18 seconds. All specials share the Knight round-teardown so nothing survives a round end. -->
-<!-- V22.17.00 Mini Zulu Warrior: adds the Mini Zulu Warrior (RektoCraft Studios) as a seventh playable avatar running the complete Tempest Archer move set through gameplayAvatarType(). The source pack is an FBX character plus roughly fifty loose Mixamo animation files; those were converted to glTF, eleven clips merged onto the shared 65-bone skeleton and renamed to the names findClipByWords() looks for, redundant scale and per-bone translation tracks stripped, and the 2K texture resampled to 512, giving a 1.9MB embedded GLB instead of 4.4MB. Two archer passive checks that tested state.avatarType==='rogue' directly were switched to gameplayAvatarType() so Tailwind fires for him as well. -->
-<!-- V22.16.00 Crossbreaker X-Wave + Onslaught Launch: fixes the two crashes behind both broken moves. (1) isMobile was referenced by twelve effect functions but never declared anywhere in the file, so every one of those calls threw a ReferenceError - during Royal Onslaught the throw landed inside the per-frame perimeter update, which stopped renderer.render() and froze the screen permanently at the first point. isMobile is now defined and the frame loop survives any single update error. (2) cloudCrossbreakerCapVisuals() and cloudCrossbreakerDestroyWave() were called but never defined, so the Crossbreaker X wave threw on creation and was silently swallowed - the projectile literally never existed. Both are now implemented and the wave is a real growing X-shaped projectile that carries its own damage, expands and dims as it leaves the arena, and self-destructs through three independent paths. Royal Onslaught crosses the map to five designated perimeter endpoints at half the old launch speed, each at least 115 degrees around the perimeter from the previous endpoint and never near the point two back, executing everything crossed on the line while the slow pace gathers the crowd behind an invulnerable Knight. Royal Onslaught is now three endpoints, no damage during the crossings, and a full time stop: every enemy inside the playable area is frozen solid from activation until the third endpoint lands, while enemies outside the arena close at full speed and freeze as they cross in. The Knight then takes the centre, in-area enemies resume at 50%, and three cycles of five slash waves fire two seconds apart, wiping the arena on each cycle. Royal bullet time is scoped to the playable area rather than the whole world. The contact-kill and play-area purge paths are retained but no longer called: detection is uncapped and marks enemies on touch, so no enemy can survive by being late in a rate-limited kill queue. After the fifth endpoint he takes the centre of the map and fires five X slash waves outward past the arena boundary, executing every enemy inside it, then repeats that volley on a 1.5 second cooldown for up to six turns total or until the last enemy is dead. The finale waves run on an independent clock with a setTimeout backstop, so they finish their flight after the arena wipe stops the gameplay loop and can never be left in the scene. Crossbreaker Slash now stops and disappears at the weapon's declared 50ft range instead of flying up to 72ft across the long axis, with the fade retimed to reach zero exactly at whichever limit ends the flight. It is also halved in size and its travel speed is cut to 8.625 ft/s, 18.75% of the original, while the Onslaught centre slashes drop to 29 u/s. Lifetime ceilings and concurrent-wave caps are raised to match so no wave expires in mid-air, and overlapping Onslaught volleys now own their waves independently instead of the newest volley culling the previous one. Enemies remain at 50% speed for the whole move, including any that spawn mid-move. -->
-<!-- V22.13.99 Royal Onslaught Shadow Trail: adds lightweight avatar afterimage clones during Royal Onslaught dashes. Each dash now leaves several short-lived Knight shadow images at roughly 15% opacity between the start and end of the dash, creating a super-speed silhouette without restoring the removed ground trail. Gameplay, damage, cooldowns, capture rules, and version-label synchronization are unchanged. -->
-<!-- V23.01.01 Ranger impact fix. FIXES the crash that made the whole kit look broken: spawnRhinoBoomerang() reused the Aesir bullet kind 'barbarian_slash_wave', whose branch in updateBullets() reads b.userData - a field fireBullet() never creates - so every frame a blade was airborne threw a TypeError and aborted the entire update pass (enemies, timers, FX, shake). Blades now carry kind 'rhino_boomerang' with their own userData and motion, and the shared read site is guarded so the Aesir's Primal Axe cannot hit the same fault. FIXES the ultimate leaving document.body.style.filter permanently at brightness(1.18) saturate(1.35), which bleached the rest of the run. ADDS the warrior weight the class was missing: every blade contact lands a ring, spark burst, travel-line knockback, stagger and a throttled camera kick + hit-stop; Twin Boomerang gains crossing swing trails, a release shake, a hit-scaled kick and a planted forward step; Rhino Charge gains per-body impact FX, camera kick and knockback-field throw (one hit-stop per charge so the plough cannot stall); Boomerang Cyclone now renders two real orbiting blades instead of two one-frame sparks, kicks per connecting tick and closes on a heavy release burst. No damage, cooldown, range or balance values changed. -->
-<!-- V23.00.01 Ranger fixes. Adds the missing updateAvatarPreview() branch for the Ranger, which previously fell through to the remote KayKit URL table and threw "undefined is not an object (evaluating 'url.lastIndexOf')" on the avatar card. Matches the Aesir's size exactly by moving AVATAR_SCALE.rhino to 1.5 and fitting the local root to 2.22/1.5, so Primal Rage's x3, the contact shadow and the locator ring all behave identically for both skins. Fixes the moveset: V23.00.00 only converted the positive avatarType==='barbarian' checks, leaving nineteen negated guards that silently disabled Rage Cleave, Rending Slash, War Axe Cyclone, the shockwave passive, all three ultimates and Berserker Kin for the Ranger. Those now route through barbarianIsActive(), and barbarianStartPose() drives the Ranger's native Attack take for every beat that would pose the Aesir. -->
-<!-- V23.00.00 Green Rhino Ranger + payload reduction. ADDS the Green Rhino Ranger, a native-rigged avatar that runs the complete Aesir Barbarian combat class through gameplayAvatarType(), the same way Cloud runs the Knight class. The source FBX ships one take with four ranges baked in (Idle 0-55, Run 58-77, Attack 80-125, Death 128-204 at 30fps); these are sliced apart with AnimationUtils.subclip and driven by the model's own 27-joint skeleton, with a boomerang bone-attached to each hand. Attack playback rate varies per requested move so one baked swing covers fast chops through heavy slams, and Run playback tracks measured displacement. All fourteen direct state.avatarType==='barbarian' checks now route through a new barbarianIsActive() class predicate so both skins keep Relentless Fury, War Axe Cyclone, targeting and the ultimate effects. REMOVES three model payloads no code path could reach - Wolverine (roster-removed in V22.19.07), Zulu (V22.19.03) and the Cat/carrot avatar - prunes the shared KayKit rig from 76 clips to the 15 the game actually names, and re-encodes the title-screen background from PNG to JPEG. No gameplay, balance, cooldown or save behaviour changes. -->
-<!-- V22.13.98 Version Label Synchronization: synchronizes the static browser title and all visible landing-page/build labels to V22.13.98 using the centralized GAME_VERSION value. Gameplay, Royal Onslaught behavior, visuals, cooldowns, and balance are unchanged. -->
-<!-- V22.13.97 Royal Onslaught Trail Removal + Freeze Guard: completely removes the Royal Onslaught ground dash-lane/trail geometry and its delayed cleanup path, then isolates each strike inside a runtime safety boundary so one visual or target-state failure cannot stop the entire gameplay update loop between strikes. Damage, capture window, bullet time, elimination behavior, cooldown scaling, and remaining impact visuals are unchanged. -->
-<!-- V22.13.96 Royal Onslaught Freeze Fix: replaces wall-clock capture/elapsed timing with gameplay-delta timing so pause truly freezes Royal Onslaught instead of letting it finish in the background, removes the per-sigil 16ms interval introduced in the visual flare pass, and caps the most expensive repeated sigil effects during long sequences. Damage, elimination rules, bullet time, cooldown scaling, camera behavior, and core visuals are unchanged. -->
-<!-- V22.13.95 Royal Onslaught Visual Flare: significantly upgrades Royal Onslaught presentation with a richer bullet-time veil, larger activation sigils, brighter multi-layer dash lanes, route-space flare shards, heavier endpoint impact columns, and a more spectacular crown finisher while preserving the verified damage rules, target capture/elimination behavior, cooldown scaling, and iPhone-safe caps. -->
-<!-- V22.13.94 Royal Onslaught Live Balance + Camera Verification: keeps every Onslaught dash endpoint inside the playable arena, caps long-sequence camera shake, accelerates boss-only continuation slightly after the minimum 20 hits, stabilizes the Knight at a safe readable final position near arena edges, reconfirms the elevated round-start camera reset, and preserves projectile visibility/performance during extended bullet time. Damage rules, capture window, elimination requirement, non-boss one-hit behavior, cooldown scaling, and invulnerability are unchanged. -->
-<!-- V22.13.93 Royal Onslaught Combat + Cleanup Verification: hardens captured-enemy tracking through spawn warnings and removal, rotates designated targets fairly so bosses and survivors cannot be ignored, guarantees measurable boss progress on every endpoint strike, restores bullet time/markers/atmosphere on pause, round completion, reset, avatar change, or interruption, replaces the meaningless 9999-second active HUD with elapsed-strike/capture status, and caps optional extended-sequence visuals without changing damage rules, capture window, elimination requirement, cooldown scaling, or invulnerability. -->
-<!-- V22.13.92 Royal Onslaught Target Tracking + Bullet-Time Atmosphere: visibly marks every enemy captured at activation or during the three-second spawn window, distinguishes designated endpoint impacts from steel route-contact hits, adds a restrained royal bullet-time screen tint and activation/restoration pulses, strengthens slowed enemy-projectile trails, and cleans all temporary markers reliably. Damage, non-boss one-hit rules, boss elimination sequence, capture window, cooldown scaling, and camera behavior are unchanged. -->
-<!-- V22.13.91 Whirlwind Button Countdown: adds a large live remaining-time readout directly inside the Defensive Whirlwind Secondary button while active. The timer updates in tenths of a second and shows infinity from Round 25 onward. Whirlwind duration, cooldown scaling, damage, knockback, projectile deflection, movement penalty, and all Royal Onslaught behavior are unchanged. -->
-<!-- V22.13.90 Royal Onslaught Non-Boss One-Hit: every non-boss enemy struck by Royal Onslaught is now instantly defeated, whether hit as a designated endpoint, crossed during a ghost-pass route, reached by the completion sweep, or caught by the crown finisher. Bosses retain repeated controlled damage and remain the only enemies that can survive an Onslaught hit. The minimum-20 expanding elimination sequence, 3-second capture window, bullet time, cooldown scaling, camera angle, Guardian Titan restrictions, and Mage Primary routing are unchanged. -->
-<!-- V22.13.89 Royal Onslaught Elimination Sequence: Royal Onslaught now begins with a minimum 20 designated strikes, then automatically extends beyond 20 until every enemy captured at activation or spawned during the first 3 seconds has been eliminated. Route-contact enemies still take full strike damage without increasing the designated sequence count. The move waits for the 3-second capture window to close before finishing, and captured bosses can now be defeated through repeated Onslaught strikes instead of being trapped behind the former total-damage cap. Bullet time, cooldown scaling, round-based target skipping, invulnerability, camera angle, Guardian Titan restrictions, and Mage Primary routing remain unchanged. -->
-<!-- V22.13.88 Royal Onslaught Spawn Window + Round Camera Angle: Royal Onslaught now locks in every enemy present at activation plus every enemy created during the following 3 seconds. Eligible enemies are prioritized as endpoint targets and any eligible survivor not contacted during the 20-strike route receives one full completion-sweep strike before the crown finisher, guaranteeing map-wide coverage without increasing the designated 20-hit count. The default camera pitch now resets to a steeper third-person top-down angle at game/round load while remaining below bird's-eye. Bullet time, cooldown scaling, damage rules, boss caps, ghost-pass route damage, Guardian Titan restrictions, and Mage Primary routing remain unchanged. -->
-<!-- V22.13.87 Royal Onslaught Twenty-Hit Map Clear: expands Royal Onslaught from 6 to 20 designated strikes, adds round-scaled target skipping that reaches five skipped enemies between endpoint targets at Round 20, and damages every enemy crossed by each ghost-pass dash without counting route contacts toward the 20-strike sequence. Bullet time remains at 20% enemy/projectile speed. Cooldown now uses the same round-scaled curve as Judgment of the King, reaching zero at Round 45. Boss caps, invulnerability, Mage Primary routing, and Guardian Titan restrictions remain unchanged. -->
-<!-- V22.13.86 Royal Onslaught Bullet Time: while Royal Onslaught is active, every existing enemy and any enemy spawned during the sequence runs at 20% normal movement, attack, special-action, and animation speed. Existing and newly fired enemy projectiles also travel and animate at 20% speed, creating a Matrix-style bullet-time impression while the Knight's six-hit presentation remains readable. Duration, damage, invulnerability, boss caps, cooldown, targeting, and Mage Primary-slot routing are unchanged. -->
-<!-- V22.13.85 Royal Onslaught Spectacle Polish: upgrades the six-hit Knight ultimate with visible dash lanes, alternating sword/shield strike identities, escalating impact scale, improved unique-target selection, and a crown-shaped royal finisher. Optional effects are short-lived and capped for dense iPhone battles. Damage, invulnerability, six-strike count, boss cap, cooldown, Guardian Titan restrictions, and Mage Primary-slot routing are unchanged. -->
-<!-- V22.13.84 Royal Onslaught + Mage Primary Slots: replaces the reactive Aegis Counter with Royal Onslaught, a fast active Knight ultimate that chains six invulnerable royal dashes through nearby enemies and finishes with a crown shockwave. The move uses the former Aegis loadout ID for save compatibility but no longer waits for an incoming hit. Mage Fire & Ice and Rapid Fire & Ice are now explicit Primary-slot choices; Arcane Lance and Giant Fireball remain Secondary choices. -->
-<!-- V22.13.83 Knight Balance and iPhone Performance Guard: adds adaptive Knight effect budgeting during Guardian Titan, ten-clone, and Judgment overlap; lowers only optional Judgment rain density under heavy load; prevents delayed clone asset callbacks from repopulating cleared summons; and tightens repeated-round cleanup of Knight-only effects. Damage, hitboxes, clone count/duration/cooldown, Judgment timing and damage, Titan rules, Shield Toss stun, and enemy projectile behavior are unchanged. -->
-<!-- V22.13.82 Full Knight Consistency Pass: synchronizes the visible build identity, corrects stale Knight shop descriptions to match current round-scaled cooldowns and approved behavior, removes the obsolete Judgment Valor wording, expands legacy loadout sanitation for retired Knight systems including Banner Spear aliases, and standardizes current Guardian Titan terminology in live code comments. Combat damage, timing, effects, unlock levels, Titan restrictions, and balance are unchanged. -->
-<!-- V22.13.81 Knights of the Round Final Polish: gives royal clones a distinct crown-and-aura identity, uses stable one-ring/two-ring army formation slots to reduce overlap, strengthens readable attack/departure cues, and throttles optional clone effects when 10 knights are active for iPhone performance. Clone count, duration, cooldown, invincibility, aggro priority, inherited moves, return rules, and 10% damage are unchanged. -->
-<!-- V22.13.80 Shield Toss Three-Second Stun: Shield Toss now applies a full 3.0-second stun on contact to every enemy class, including normal enemies, Brutes, and bosses. Stun resistance is bypassed for this move so all surviving targets receive the same duration. Damage, boss caps, knockback, range, ricochet, cooldown, return behavior, Titan scaling, and visuals are unchanged. -->
-<!-- V22.13.79 Shield Toss Final Polish: strengthens the shield-first launch read, adds a cleaner directional departure flare, gives bosses and Brutes unmistakable localized stun feedback, refines the return wake, and upgrades the guarded catch with a compact royal lock-in burst. Damage, full universal stun, range, ricochet, cooldown, boss caps, Titan scaling, collision, and return timing are unchanged. -->
-<!-- V22.13.78 Guardian Titan Reset Guard: centralizes Guardian Titan shutdown so round transitions, death/reset, avatar changes, and new runs always restore normal player scale, helper-effect scale, Titan hit/impact tracking, charge/shatter sequence state, input ownership, and normal camera-fog presentation. Natural Titan expiration still starts the approved tiered cooldown; forced cleanup never carries a stale pending cooldown into the next state. Also updates the HUD abbreviation to G. TITAN. Combat balance and visuals are unchanged. -->
-<!-- V22.13.77 Guardian Titan Camera Cap: renames Guardian Quake to Guardian Titan in visible Knight unlock/loadout text and caps the automatic third-person Titan pullback so starting from zoom tiers 7-8 it stays between the normal wide views and bird's-eye instead of jumping excessively far away. Charge/Earth Shatter behavior, Titan size, 5x damage, 15-second duration, defense, Primary/Secondary access, cooldown timing, boss caps, and Shield Toss universal stun are unchanged. -->
-<!-- V22.13.76 Guardian Titan Readability Performance Guard: caps rapid Titan knockback-impact effect groups during dense multi-enemy hits, suppresses optional Titan footsteps when the shared Knight effect budget is already crowded, and keeps launch feedback localized so Primary, Shield Toss, and Defensive Whirlwind remain readable on iPhone. Damage, hitboxes, reach, stun, knockback force, Titan duration, defense, camera, cooldowns, and allowed combat slots are unchanged. -->
-<!-- V22.13.75 Guardian Titan Primary Secondary Consistency: verifies the Knight attacks intentionally allowed during the 15-second Titan buff. Royal Sword Combo and Royal Vanguard effects now sit at giant body/weapon height, Shield Bash movement and shield-face presentation scale with Titan reach, and impact sparks align with enlarged contact points. Shield Toss and Defensive Whirlwind retain their existing Titan-scaled range, collision, radius, and visuals. No signature or ultimate move is enabled during Titan mode; damage, boss caps, cooldowns, defense, and duration are unchanged. -->
-<!-- V22.13.74 Guardian Titan Combat Slots: Guardian Quake remains the only special move active during its charge, Earth Shatter, and 15-second Titan state. Primary and Secondary attacks remain fully usable during the post-quake Titan buff with existing Titan reach, visuals, 5x damage, and knockback scaling. Other equipped Knight Abilities and the Knights of the Round signature summon cannot be newly activated until Titan mode ends; specials already active before Guardian Quake are not forcibly cancelled. -->
-<!-- V22.13.73 Guardian Titan Summon Consistency: verifies Knights of the Round and Judgment of the King during Guardian Quake Titan mode. Royal clones remain normal-sized but now summon and orbit outside the 5x Knight body with Titan-aware formation spacing, return distance, and capped arrival effects. Judgment remains arena-centered, movement-safe, and compatible before, during, or after Titan mode without changing damage, boss caps, cooldowns, duration, camera, or Titan state. -->
-<!-- V22.13.72 Guardian Titan Aegis Consistency: completes the next Titan full-moveset verification increment for Aegis Counter. The guard timing field, block flash, counter slash, shock rings, radial hit area, impact sparks, and feedback now scale with the approved Titan combat/visual limits while boss damage caps and all counter balance remain unchanged. Also removes the stale Auto/Manual wording from Guardian Quake progression text. -->
-<!-- V22.13.71 Guardian Quake Manual Steering: removes the separate AUTO/MANUAL toggle from the gameplay HUD. Guardian Charge now always uses the player's movement steering while held. Guardian Quake timing, Titan size, damage, defense, cooldown behavior, camera/fog safeguards, boss caps, impact polish, and Shield Toss universal stun are unchanged. -->
-<!-- V22.13.70 Guardian Titan Impact Polish: Titan-mode Knight hits now add scale-matched ground shock rings, directional launch streaks, compact dust/debris, and movement-weight footsteps. Effects are capped and localized for iPhone performance and gameplay visibility. Size, damage, duration, defense, cooldown timing, camera/fog behavior, boss caps, knockback rules, and Shield Toss universal stun are unchanged. -->
-<!-- V22.13.69 Shield Toss Universal Stun: Shield Toss now applies its full stun duration to every enemy class, including Brutes and bosses. Damage, boss damage resistance/caps, knockback resistance, flight path, return behavior, cooldown, Titan scaling, and visuals are unchanged. -->
-<!-- V22.13.68 Guardian Titan Knockback: when Guardian Quake leaves the Knight in giant Titan mode, attacks now launch much smaller enemies backward with a heavy visible knockback. Titan-sized hits strongly punt normal enemies and still push brutes, while bosses remain resistant. The giant-size, defense, camera, and full-moveset behavior are unchanged. -->
-<!-- V22.13.67 Guardian Titan Visibility Fix: removes the washed-out white gameplay screen during Guardian Quake Titan mode. Titan camera distance now correctly expands the scene fog range, and player-attached locator/ground-helper effects are inverse-scaled so they remain normal-sized instead of becoming giant translucent overlays. Knight size, damage, defense, duration, cooldown, and full moveset behavior are unchanged. -->
-<!-- V22.13.66 Guardian Titan Fivefold Power: Titan mode now supports the Knight's complete combat kit. Primary combo reach, Vanguard hit areas, auto-targeting, lunges, Shield Toss size/range/collision/launch height, and Whirlwind radius/visuals all scale for the 5x body while damage values remain unchanged.
-<!-- V22.13.64 Guardian Titan Defense Camera: adds automatic giant-mode camera pullback and Titan damage rules to Guardian Quake. During the full 5x-size action and 15-second giant buff, normal enemies deal no damage, the largest non-boss Brutes deal only 10% damage through a deterministic accumulated-damage meter, and bosses still deal full damage. The camera automatically backs away enough to keep the giant Knight readable, including a safe third-person fallback when the player entered giant mode from POV. -->
-<!-- V22.13.61 Banner Spear Removed: completely removes the Knight Banner Spear move from unlocks, shop/loadout data, HUD icons, runtime state, buffs, damage reduction, movement/targeting logic, visual effects, cleanup, clone move inheritance, and attack dispatch. Shield Toss and Defensive Whirlwind remain the Knight Secondary choices. Judgment hammer rain behavior remains based on V22.13.60. -->
-<!-- V22.13.51 Knights of the Round Spectacle: upgrades the Knight signature summon with a large royal summoning seal, sequential gold/steel arrival columns, crown flashes, formation trails, visible attack animations, stronger clone strike effects, and a coordinated departure collapse. Effects remain localized and translucent for gameplay readability. Clone count, duration, cooldown, invincibility, aggro priority, inherited moves, movement rules, and 10% damage remain unchanged. -->
-<!-- V22.13.48 Shield Toss Heroic Polish: upgrades the Knight's Shield Toss with a stronger shield-first launch pose, a royal departure crest, denser steel-gold-ivory flight wakes, heavier contact bursts, clearer return-path energy, and a more satisfying guarded catch. Damage, stun, range, ricochet behavior, cooldown, boss caps, scoring, and all other moves remain unchanged. -->
-<!-- V22.13.47 Royal Vanguard Spectacle Upgrade: makes the upgraded Knight Primary clearly more impressive than Royal Sword Combo. Every Vanguard step now gains a unique royal sigil, stronger body-commitment trail, denser layered steel-gold-ivory effects, and a visibly escalating three-stage presentation. The shield-bash finisher receives a large crown crest, triple shock-ring impact, and wider royal burst. Damage, cooldown, unlock level, hitboxes, scoring, clones, and all other abilities remain unchanged. -->
-<!-- V22.13.46 Royal Vanguard Motion Polish: upgrades Guarded Thrust, Cleaving Guard, and Shield Bash inside Royal Vanguard Combo with more forceful body motion, clearer step-to-step escalation, larger disciplined weapon trails, heavier impact feedback, and a stronger royal finisher presentation. Damage, cooldowns, unlocks, scoring, clone logic, maps, and non-Vanguard systems remain unchanged. -->
-<!-- V22.13.45 Knight Primary Motion Polish: upgrades the Knight's main Royal Sword Combo with more heroic body commitment, cleaner chained swing motion, stronger slash geometry, heavier hit flashes, added guard-follow-through, and a more impressive finisher shockwave so the class feels prouder and more satisfying to pilot. Damage, unlocks, cooldowns, scoring, clone logic, maps, and all non-primary Knight systems remain unchanged. -->
-<!-- V22.13.44 Scoring Runtime Recovery: fixes the actual failure introduced by the Overall Score update. secondaryUsedThisRound and ultimateUsedThisRound were assigned before their let declarations, causing a temporal-dead-zone ReferenceError that stopped the main game script before themes, avatar models, arena objects, enemies, and gameplay initialization could finish. The duplicate early assignments are removed; the intended declarations and per-round resets remain intact. No avatar, map, combat, navigation, Knight, clone, or scoring formula behavior was otherwise changed. -->
-<!-- V22.13.43 High Score Rollback Repair: rebuilt from the clean V22.13.39 overall-score build and reapplied only the home-screen starter Top 3 plus synchronized version labels. No avatar preview, theme selection, game startup, Three.js loading, navigation, combat, or arena code was changed. Starter scores are display-only and are replaced one-by-one by real cloud records. -->
-<!-- V22.13.39 Overall Score System: replaces the old rounds-minus-time survival score with a full point system. Every cleared round awards escalating survival points, speed points based on its enemy-count pace budget, the existing flawless bonus, and bonuses for clearing without Secondary or Ultimate/Ability activation. Clearing with Primary attacks only earns an additional bonus. The combined clear time of all completed rounds produces a capped run-wide pace bonus. Results now show a complete score breakdown, and local/cloud leaderboards display total points. New scores use a versioned numeric encoding while legacy scores remain readable through conservative conversion. -->
-<!-- V22.13.38 Knight Special Slot Fix: Knights of the Round now occupies the large Knight signature button formerly used by Judgment. Its button displays readiness, cooldown, active clone count, and remaining duration. Judgment of the King is moved into the equipable ultimate-tier Ability list at Level 18 and uses the Ability button while retaining its 100% Valor requirement and existing attack sequence. Enemy melee and projectile hits on Knight clones are fully absorbed by the invincible clone and never call playerTakeHit; clone health is independent and infinite. -->
-<!-- V22.13.37 Knights of the Round: renames the Knight clone Ability from Royal Guard Clones to Knights of the Round across the shop, HUD, unlock notice, toast, and build labels. Clone count, duration, cooldown, invincibility, aggro, move inheritance, damage, movement, and cleanup are unchanged. -->
-<!-- V22.13.36 Knights of the Round: adds a Level-10 Knight clone Ability. Rounds 10-15 summon 2 invincible clones for 8 seconds with a 10-second cooldown; Rounds 16-20 summon 5 for 15 seconds with a 5-second cooldown; Round 21 onward summons 10 for 30 seconds with a 1.5-second cooldown. Clones deal 10% of player damage, take aggro before the player, seek enemies within 12 units, and return after remaining more than 11 units from the player for 10 seconds. Their attack rotation expands with Knight unlock levels. -->
-<!-- V22.13.35 Guardian Quake Combo: combines Guardian Charge and Earth Shatter into one Ability. Hold the Ability button through the completed charge to flow directly into Earth Shatter; releasing early cancels the follow-up. A smaller AUTO/MANUAL toggle appears beside the Ability button only when Guardian Quake is equipped. AUTO steers toward the nearest living enemy while held; MANUAL preserves normal movement steering. Any future infinite charge duration is capped at 20 seconds. The old separate Guardian Charge and Earth Shatter ability entries are removed; their existing damage, collision, impact, resistance, and visual logic are reused. -->
-<!-- V22.13.34 Whirlwind Secondary Scaling: Defensive Whirlwind moves from the Ability slot to the Knight Secondary slot and unlocks at Level 6. Its cooldown now scales by round: 8s for Rounds 1-10, 3s for 11-15, 1.5s for 16-20, and 0s from Round 21 onward. Duration begins at 3.8s on Round 1, increases by 0.5s each round through Round 24, and becomes permanent from Round 25 onward. The Secondary HUD displays active time or infinity. Existing whirlwind damage, knockback, projectile deflection, movement penalty, visuals, and passive version are unchanged. -->
-<!-- V22.13.33 Vanguard Hold Combo: Royal Vanguard Combo now continuously advances through Guarded Thrust, Cleaving Guard, and Shield Bash while the Primary FIRE button is held. Releasing the button stops the sequence immediately without a buffered extra strike. Individual taps still advance one combo step at a time. Damage, cadence, effects, unlock level, and other Knight moves are unchanged. -->
-<!-- V22.13.24 Landscape Radar Placement: moves the enemy radar from the center-left camera/player area to the bottom-left corner in landscape, reduces it to 74px (66px on very short browser views), and keeps portrait placement unchanged. Radar behavior and gameplay are unchanged. -->
-<!-- V22.13.23 Global Score and Scroll Fix: landing page now shows the highest live-url survival score from a Firestore-backed global leaderboard instead of the selected local player's score. Personal overall score and global rank moved to Round Select. All non-game screens regain vertical scrolling in landscape/browser mode. The added landscape-50% and portrait-two-thirds movement restrictions were removed, restoring the original movement/look control split. Existing combat and score balance are unchanged. -->
-<!-- V22.13.22 Shield Toss Hit Feedback: improves Shield Toss impact presentation with separate outgoing steel/gold and returning ivory/gold flashes, stronger metal sparks, heavier Brute/boss impact bursts, temporary shield-spin wobble on heavy contact, and smooth spin recovery. Damage, stun, hit detection, route, cooldown, and balance are unchanged. -->
-<!-- V22.13.21 Shield Toss Return Polish: improves only the return phase with smooth homing, subtle banking, a distinct ivory/gold return trail, cleaner hand-height catch alignment, a brief catch animation, guard burst, catch ring, and light vibration. Damage, stun, hit detection, ricochet, outgoing flight, cooldown, and balance are unchanged. -->
-<!-- V22.13.20 Shield Toss Flight Polish: improves only the outgoing Shield Toss flight with faster readable spin, slight heavy-shield wobble, smoother release timing, a brief royal launch burst, steel/gold/ivory metallic wake, and a subtle speed curve that starts strong and eases before return. Damage, stun, hit detection, ricochet, return behavior, cooldown, and balance are unchanged. -->
-<!-- V22.13.19 Shield Toss Function Restoration: restores the nonworking Knight Shield Toss by adding the missing knightBuildShieldMesh() implementation that the move calls. Adds a visible steel/gold royal shield, safe creation guards, and defensive cleanup so failed creation cannot leave the Knight shield-away state stuck. Existing flight, return, hit damage, stun, cooldown, ricochet, and balance remain unchanged. -->
-<!-- V22.13.17 Aegis Counter Impact Polish: minimum successful-counter polish increment. Adds a localized shield block flash, royal crest, steel/gold spark burst, larger layered counter slash trails, dual shock rings, stronger impact sparks, and hit-responsive shake/vibration. Counter damage, radius, stun, cooldown, boss cap, recovery, and failure behavior are unchanged. -->
-<!-- V22.13.16 Aegis Guard Window Clarity: minimum Aegis polish increment. Replaces the single timing ring with layered ivory/gold/steel guard rings, adds four shield-timing ticks, a localized guard burst, smoother animation timing, and a rotating/pulsing countdown effect. Counter damage, success behavior, failure recovery, cooldown, and balance are unchanged. -->
-<!-- V22.13.15 Guardian Charge Polish: upgrades Guardian Charge with a smoother acceleration start, steadier limited steering, a layered shield-front wake, repeated readable charge trails, distinct normal/heavy collision flashes, clearer enemy push-aside feedback, denser cracked-path presentation, and a heavier dual-ring ending burst. Damage, duration, speed cap, steering rate, cooldown, knockback, stun, and boss caps are unchanged. -->
-<!-- V22.13.14 Earth Shatter Polish: upgrades Earth Shatter with a royal launch sigil, readable rise/fall streaks, a layered steel-gold-ivory landing flash, three visible shockwave tiers, ten ground cracks, capped outward rock eruption, low dust plumes, stronger launch feedback on affected enemies, and heavier impact shake. Damage, radius, cooldown, rise/fall timing, stun, knockback, boss cap, and resistance duration are unchanged. -->
-<!-- V22.13.13 Defensive Whirlwind Polish: upgrades both Knight Whirlwind variants with layered sword-and-shield arcs, stronger spin momentum, visible projectile-deflection sparks, a clearer protective center field, and a finishing shield guard stance. Passive Whirlwind uses gold/ivory while the equipable Defensive Whirlwind uses steel/ivory. Damage, duration, cooldown, pulse rate, knockback, and trigger rules are unchanged. -->
-<!-- V22.13.12 Cleaving Guard Polish: upgrades Cleaving Guard with a layered gold/ivory/steel sweep, brighter crowd-separation impact arcs, stronger sparks and dust across the sweep lane, improved hit-stop, a planted shield-forward recovery, and clearer defensive follow-through. Damage, arc, knockback, and other moves are unchanged. -->
-<!-- V22.13.11 Guarded Thrust Polish: upgrades Guarded Thrust with a brief guard anticipation, layered ivory/gold/steel spear projection, a brighter tip, localized piercing impact effects, stronger sparks and hit-stop, controlled forward commitment, and guarded recovery. Damage, range, boss caps, and other moves are unchanged. -->
-<!-- V22.13.10 Shield Bash Polish: upgrades Shield Bash with a two-stage controlled lunge, layered shield trail, dual impact rings, stronger localized metal sparks and dust, clearer stun crest feedback, improved hit-stop, smoother recovery timing, and brief guard resistance. Damage values and other moves are unchanged. -->
-<!-- V22.13.09 Browser Pause Placement: moves Pause to the top of Safari/browser landscape's far-right utility rail so it no longer crowds or overlaps Jump and the combat grid. Home-screen-app layout, movement zones, combat controls, and gameplay are unchanged. -->
-<!-- V22.13.08 Browser Landscape Layout V2: detects normal Safari/browser tabs separately from the installed home-screen app and gives browser landscape a dedicated two-column combat grid. Fire/Dash occupy the bottom row, Jump/Look Fwd the row above, Shield sits centered above them, Judgment moves farther left and higher, and camera/pause controls stay in a slim far-right utility rail. Movement-zone rules and standalone layout are unchanged. -->
-<!-- V22.13.07 Responsive Landscape UI Fix: makes the between-round shop vertically scrollable in landscape/Safari, adds a compressed browser-height control layout without Jump/Look Fwd overlap, restricts movement start to the left 50% in landscape and left two-thirds in portrait, and preserves separate right-side look/combat input space. Gameplay values are unchanged. -->
-<!-- V22.13.06 Landscape HUD Polish: reorganizes short-screen landscape controls into clear right-thumb columns. Shield/Secondary now matches Jump's compact size and no longer overlaps Look Fwd, Dash sits closer to Fire, utility controls are smaller, Judgment is slightly larger, and right-edge safe spacing is increased. Gameplay and input behavior are unchanged. -->
-<!-- V22.13.05 Royal Sword Combo Polish: upgrades the Knight's three-hit primary combo with larger layered slash trails, distinct impact flashes, stronger steel/gold sparks, improved hit-stop, controlled forward/lateral body commitment, and a heavier third-hit shockwave with localized cracks. Damage, hit radius, combo multipliers, and other moves are unchanged. -->
-<!-- V22.13.04 Passive Whirlwind Clarity: the Knight passive HUD now labels fifth-kill progress as WHIRLWIND x/5, glows when one kill away, and clearly displays PASSIVE WHIRLWIND during an automatic proc. Equipable Defensive Whirlwind remains separately labeled and keeps its own cooldown. Gameplay, damage, trigger count, and Primary input behavior are unchanged. -->
-<!-- V22.13.03 Primary Hold Reliability Fix: Primary auto-attack now keeps ownership of the exact finger/pointer that started the hold, ignores unrelated pointer releases, and no longer stops when iOS Safari emits lostpointercapture while the finger is still down. Tap behavior, attack cooldowns, damage, VFX, and Whirlwind logic are unchanged. -->
-<!-- V22.13.02 Cloud Sync Merge: brings the Round Records cloud sync layer
-     (Firebase Firestore round-best board, background/foreground refresh,
-     offline-safe local-first writes) into the Knight Responsiveness /
-     Royal Guardian rebuild line. No Knight, Mage, Archer, Rogue, or
-     Barbarian gameplay changed; no round-select or meteor-atmosphere
-     behavior changed. This is purely combining two branches that had
-     diverged from the same V22.12.01 base -- one adding cloud sync, the
-     other rebuilding Knight -- with no duplicated code either way. -->
-<!-- V22.13.01 Knight Responsiveness Pass: sharply reduces Knight primary and secondary lockouts, expands combo input buffering, and shortens attack animation blend/recovery timing so tap and hold attacks flow more like Mage and Archer. Damage, hit areas, passives, abilities, and VFX are unchanged. -->
-<!-- V22.12.01 Meteor Apocalypse Atmosphere: the four-meteor Super Meteor sequence now dims arena lighting over 0.75s, lays an ember red-orange ambient glow over the arena, pulses only the current quadrant's warning bright and fast while the other three stay dim and steady, flashes the arena orange on each impact, rumbles the camera subtly while a meteor falls, and smoothly restores the original lighting after meteor four. Quadrant order, 1.5s inter-meteor delay, meteor size, damage radius, 20% boss damage, 3s stun, 5s burn, and 24s cooldown are all unchanged. -->
-<!-- V22.12.00 Round Select & Round Records: adds a Start Round screen after avatar selection (Rounds 1-50, all unlocked during build/test), rebuilds the round kill target as a pure function so any round can be entered directly, anchors the chosen starting theme to the round the run actually begins on, grants a catch-up stat/coin loadout proportional to the skipped rounds, and adds per-round personal-best and world-best records with a cloud-sync-ready Store API. Runs started above Round 1 are practice runs: round records still count, crystals and the main leaderboard do not. -->
-<!-- V22.11.33 Four Warning Circles: all four Super Meteor landing circles now appear immediately. The current quadrant keeps its existing bright pulsing marker, completed quadrant warnings disappear on impact, and all remaining markers clear after meteor four or during reset cleanup. Gameplay values are unchanged. -->
-<!-- V22.11.31 Four Meteor Stability Guard: caps overlapping giant meteor impact groups at two, clears all tracked impact effects during cleanup, and adds a sequence failsafe if an active meteor object is unexpectedly lost. Gameplay values and four-quadrant timing are unchanged. -->
-<!-- V22.11.30 Meteor Quadrant Guide: adds a subtle temporary cross that divides the circular arena into four equal quadrants and softly highlights the quadrant receiving the current meteor. The guide disappears after the fourth impact or during cleanup. Gameplay values are unchanged. -->
-<!-- V22.11.29 Four Quadrant Meteor Sequence: one cast now drops four Super Meteors in order across map quadrants 1, 2, 3, and 4. Each next meteor begins falling no cooldown after the previous meteor impacts. Existing meteor size, impact radius, damage, boss cap, stun, burn, and cooldown are preserved. -->
-<!-- V22.11.26 Super Meteor Cleanup Guard: caps active scorched craters at three and clears meteor craters plus surviving enemy burn auras during round/reset cleanup. Damage and all gameplay values are unchanged. -->
-<!-- V22.11.25 Super Meteor Debris Crater Burn FX: adds fourteen capped molten debris fragments, a four-second scorched crater with pulsing lava ring, and a visible orange burn aura on surviving enemies. Gameplay values are unchanged. -->
-<!-- V22.11.24 Super Meteor Visual Upgrade: adds a fiery tail, rotating flame ring, pulsing inner landing warning, and dual expanding impact shockwaves. Damage, boss cap, stun, burn, radius, fall speed, and cooldown are unchanged. -->
-<!-- V22.11.23 Super Meteor Core: adds the Mage's third equipable ultimate. One enormous slow meteor targets the nearest enemy, falls from the sky, deals heavy area damage, deals 20% max HP to bosses, stuns survivors for 3 seconds, burns them for 5 seconds, and has no cooldown during development testing. -->
-<!-- V22.11.22 Blizzard Readability Guard: caps simultaneous impact-effect groups at six, clears them between rounds, and brightens landing markers for easier tracking. Gameplay values are unchanged. -->
-<!-- V22.11.20 Blizzard Icy Mist Plume: adds six capped translucent mist plumes that rise, widen, drift slightly, and fade within 0.85 seconds at each Blizzard impact. Gameplay values are unchanged. -->
-<!-- V22.11.19 Traveling Blizzard Spawn Bias: falling ice now shifts modestly toward the Mage's recent movement direction while preserving random coverage across the storm. Damage, freeze, radius, duration, spawn rate, and cooldown are unchanged. -->
-<!-- V22.11.18 Moving Blizzard Boundary: adds a persistent cyan-violet Blizzard radius marker that follows the Mage, pulses subtly, and cleans up when the storm or round ends. Falling ice continues spawning around the moving storm center. -->
-<!-- V22.11.17 No Audio Audit: verified the project contains no audio tags, audio files, Web Audio API calls, HTML Audio objects, music systems, SFX functions, volume controls, or mute controls. Character animation .play() calls remain because they are visual animation, not sound. -->
-<!-- V22.11.16 Blizzard Follows Player: while active, Blizzard's center updates to the Mage's current position every frame, so the storm moves with the player. Damage, freeze, radius, duration, spawn rate, and cooldown are unchanged. -->
-<!-- V22.11.15 Sync Game Update Button: makes the home Sync Game control more obvious with a brighter animated blue treatment, larger icon, stacked Sync Game / Game Update label, and update badge. Functionality is unchanged. -->
-<!-- V22.11.12 Blizzard Skill Freeze Fix: replaces the undefined FX_MAT_ICE particle reference with the existing FX_MAT_SPARK material so Blizzard impacts no longer stop the gameplay update loop. Visual size, damage, freeze, radius, duration, spawn rate, and cooldown are unchanged. -->
-<!-- V22.11.11 Blizzard Impact Shatter: strengthens each ice impact with a larger capped ice-shatter burst and a 1.8-second rotating frost mark with seven fading ground cracks. Damage, freeze, radius, duration, spawn rate, and cooldown are unchanged. -->
-<!-- V22.11.10 Blizzard Ice Mass Visual Pass: replaces each simple falling icosahedron with a layered glowing ice core, translucent faceted shell, and five jagged spikes. The shell and core counter-rotate while falling. Damage, radius, duration, freeze, spawn rate, and cooldown are unchanged. -->
-<!-- V22.11.09 Arcane Lance Final Regression Guard: Reality Tear now spawns only when Arcane Lance expires naturally, not when removed by hitting an enemy. Version labels synchronized. -->
-<!-- V22.11.08 Arcane Resonance Stability Fix: applies the approved +10% brute and +5% boss Arcane Lance bonus on marked targets, attaches the persistent marker to the live enemy group, and cleans it correctly between rounds. -->
-<!-- V22.11.07 Arcane Cleanup Pass: clears active Reality Tears, resonance markers, and resonance timers during enemy/round cleanup so Arcane Lance effects cannot leak into later rounds. -->
-<!-- V22.11.06 Arcane Effect Performance Guard: removes a stray pre-HTML constant, caps active Reality Tears at four, cleans expired tears from the cap list, and removes duplicate Mana Rupture visual calls while preserving the effect. -->
-<!-- V22.11.04 Arcane Mana Rupture: enemies defeated while Arcane Resonance is active release a compact arcane explosion that damages nearby enemies. Boss splash is capped. -->
-<!-- V22.11.03 Arcane Reality Tear: Arcane Lance now leaves a 3-second cyan-violet rift when removed. Enemies inside take light repeated magic damage; boss ticks are capped. -->
-<!-- V22.11.02 Arcane Resonance Marker: adds a persistent pulsing violet dual-ring marker above enemies while the 5-second Arcane Resonance status is active. Re-hits refresh the same marker instead of stacking duplicates. Gameplay values are unchanged. -->
-<!-- V22.11.00 Arcane Crystal Fragments: adds eight capped cyan/violet crystal fragments that burst outward, tumble, fall slightly, and fade on Arcane Lance enemy hits. Gameplay values are unchanged. -->
-<!-- V22.10.99 Arcane Crystal Crack: adds five brief blue-white crack lines across the visible Arcane Mark on enemies struck by Arcane Lance. Gameplay values are unchanged. -->
-<!-- V22.10.98 Visible Enemy Arcane Mark: replaces the hidden placeholder state with a visible dual-ring violet mark that expands, spins, and fades over struck enemies. Gameplay values are unchanged. -->
-<!-- V22.10.96 Arcane Lance Freeze Fix: stores the brief cast-charge timer directly on the bullet object instead of reading undefined bullet.userData. This restores firing without changing visuals or gameplay values. -->
-<!-- V22.10.94 Arcane Lance Impact Burst: adds a cyan-violet impact ring, compact ground sigil, and capped crystal spark burst on every Arcane Lance enemy hit. Damage and all gameplay values are unchanged. -->
-<!-- V22.10.90 Arcane Lance 3x Full Scale: triples the complete Arcane Lance visual hierarchy, including spearhead, core, rings, rune shards, ribbon, and trail, while leaving damage, cooldown, speed, piercing, and collision unchanged. -->
-<!-- V22.10.89 Arcane Lance Energy Trail: adds a short pulsing blue additive trail behind the live projectile. No gameplay values changed. -->
-<!-- V22.10.87 Arcane Lance Rune Shards: adds eight capped cyan/violet arcane fragments that orbit and tumble around the live projectile. No gameplay values changed. -->
-<!-- V22.10.86 Arcane Lance Spiral Ribbon: verified the live Arcane Lance creation/update path and added one rotating cyan spiral energy ribbon around the projectile. No gameplay values changed. -->
-<!-- V22.10.84 Arcane Lance Dual Rings: adds a second smaller inner rune ring rotating in the opposite direction. No gameplay values changed. -->
-<!-- V22.10.83 Arcane Lance Rune Ring: adds one visible cyan additive rune ring to the Arcane Lance and rotates it during flight. Damage, cooldown, speed, piercing, collision, and other abilities are unchanged. -->
-<!-- V22.10.82 Arcane Lance Core Pass: adds a bright white-blue additive core directly inside the Arcane Lance projectile. Damage, cooldown, speed, piercing, collision, and other abilities are unchanged. -->
-<!-- V22.10.81 Arcane Lance Size Pass: increases only the Arcane Lance projectile visual scale from 1.7×1.7×5.2 to 2.0×2.0×6.0. Damage, cooldown, speed, piercing, collision, and all other abilities are unchanged. -->
-<!-- V22.10.80 Giant Fireball Map-Persistence + Active Cap: Mage Giant Fireballs repeat every no cooldown while Secondary is held, remain independently active after hitting enemies, and are removed only after fully passing beyond the playable arena boundary. A maximum of 10 may exist at once; held firing resumes automatically when the count drops below 10. No-touch input never fires. -->
+<!-- V23.47.00 Fox Crimson Mirror + Spirit Gate Stampede: replaces Arcane Laser in-place with a 10-second reality-warping Crimson Mirror Dimension Ultimate, adds Spirit Gate Stampede as a third Fox Secondary scaling from 3 to 9 spectral fox spirits by Round 30, preserves hold-to-repeat and existing Fox tail/locomotion authority. -->
+<!-- V23.46.00 Fox Blizzard Rebuild + Ninefold Astral Bloom + Ultimate Duration Floor: Blizzard now hard-executes every non-boss that enters its storm/impact zone, rapidly drags all enemies from inside and outside the arena toward map center with round-scaled gravity/storm speed, and uses simplified low-poly ice masses for mobile performance. Rapid Fire & Ice gets a real 0.18s cast-cycle lock even during zero-cooldown testing. Arcane Lance is replaced in-place by Ninefold Astral Bloom, a nine-comet homing secondary with an active cast lock and hold-to-repeat. Duration-based Ultimate effects are normalized to at least 10 seconds where applicable, and Fox Arcane Laser's full charge now supports a 10-second continuous channel. -->
+<!-- V23.45.00 Safe Code Trim + Fox Hold Autofire: fixes Fox Arcane Lance/Giant Fireball hold-repeat by separating pending release locks from development cooldowns, so held Primary/Secondary/Ultimate controls reliably recast when their current release/active state is ready. Adds a mobile-capped Fox-specific cast language across Fire & Ice, Rapid Fire & Ice, Arcane Lance, Giant Fireball, Blizzard, Arcane Laser, Super Meteor and Arcane Echoes: nine-tail foxfire point fans, layered rune/element halos, stronger launch crowns and ultimate activation sigils, while reusing the global FX ceiling/stress throttling. Existing fox guard/run/tail animation authority is unchanged. -->
 <!DOCTYPE html>
 <!-- V22.10.78 Secondary Hold Pointer Reliability: keeps the Secondary held state active for the full matching touch/pointer contact instead of clearing it on Safari pointer-capture loss. Tap still casts once; hold repeats through the move cooldown; release/cancel/focus loss stops immediately. -->
 <!-- V22.10.77 Primary Hold Scope Crash Fix: moves primaryInputHeld into shared runtime scope so update() can read it without throwing. This restores normal world rendering and movement while running; pause remains fully frozen. -->
@@ -1719,7 +1452,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.44.00 - Fox Hold Autofire + Nine-Tail VFX Overhaul';
+const GAME_VERSION='23.47.00 - Fox Crimson Mirror + Spirit Gate';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3553,7 +3286,7 @@ function avatarLevel(){ return round; }
 // its actual ability behavior without changing progression rules again.
 const LEVEL_UNLOCKS = [
   {level:2, id:'between_round_growth', name:'Between-Round Growth', desc:'Stat growth is available after every cleared round.'},
-  {level:7, id:'arcane_lance_milestone', name:'Arcane Lance Milestone', desc:'Mage progression has reached the Arcane Lance tier.'},
+  {level:7, id:'arcane_lance_milestone', name:'Astral Bloom Milestone', desc:'Mage progression has reached the Ninefold Astral Bloom tier.'},
   {level:10, id:'arcane_echoes', name:'Arcane Echoes', desc:'Summon five fragile copies of your current Mage avatar to distract and knock back enemies.', avatar:'mage'},
   {level:15, id:'arcane_mastery', name:'Arcane Mastery Tier', desc:'Advanced Mage upgrades can begin unlocking from this level.', avatar:'mage'},
   {level:5,  id:'knight_royal_vanguard', name:'Royal Vanguard Combo', desc:'The Knight unlocks an upgraded Primary chain combining Guarded Thrust, Cleaving Guard, and Shield Bash.', avatar:'knight'},
@@ -3826,12 +3559,14 @@ const CHARACTER_COMBAT = {
     weapons:{
       elemental:{name:'Fire & Ice', price:0, slot:'primary', kind:'elemental', cooldown:0.34, damage:1, auto:true,
         desc:'Alternates fireballs and ice bolts.'},
-      rapid_elemental:{name:'Rapid Fire & Ice', price:210, slot:'primary', kind:'elemental', cooldown:0.075, damage:0.72, auto:true,
-        desc:'Hold FIRE for Uzi-speed alternating fire and ice.'},
-      arcane_lance:{name:'Arcane Lance', price:390, slot:'secondary', kind:'arcane_lance', cooldown:0.58, damage:2.15, pierce:2, auto:true,
-        desc:'A large elemental spear that pierces up to three enemies in a straight line.'},
+      rapid_elemental:{name:'Rapid Fire & Ice', price:210, slot:'primary', kind:'elemental', cooldown:0.18, damage:0.72, auto:true,
+        desc:'Hold FIRE for a rapid but controlled alternating fire-and-ice stream. The 0.18s cast cycle remains authoritative even during zero-cooldown development testing.'},
+      arcane_lance:{name:'Ninefold Astral Bloom', price:390, slot:'secondary', kind:'fox_arcane_bloom', cooldown:0, damage:2.15, pierce:0, auto:true,
+        desc:'Summon nine rotating arcane foxfire stars, then release them as homing magical comets toward separate enemies. Each impact detonates a compact rune burst and staggers survivors. Hold Secondary to repeat the full nine-star cast as soon as the current Bloom finishes.'},
       giant_fireball:{name:'Giant Fireball', price:560, slot:'secondary', kind:'giant_fireball', cooldown:.8, damage:999, splash:5.4, splashDamage:4.5, directInstakill:true, auto:true,
-        desc:'A Phoenix-scale molten fireball with a slower firing cadence. Direct hits execute any non-boss and the impact damages a wide surrounding area.'}
+        desc:'A Phoenix-scale molten fireball with a slower firing cadence. Direct hits execute any non-boss and the impact damages a wide surrounding area.'},
+      spirit_gate:{name:'Spirit Gate Stampede', price:620, slot:'secondary', kind:'fox_spirit_gate', cooldown:0, damage:2.4, radius:1.35, range:22, auto:true,
+        desc:'Open a radiant spirit gate and unleash spectral foxes that hunt separate enemies or lanes. The stampede scales from 3 spirits at early rounds to 9 by Round 30. Each impact deals strong Secondary-tier damage, staggers survivors, and bursts into foxfire runes. Hold Secondary to repeat after the current stampede finishes.'}
     }
   }
 };
@@ -4043,19 +3778,19 @@ const WEAPONS = {
 // Mage abilities purchased and equipped through Pause → Abilities.
 // Stats (HP, Power, Speed) remain exclusively in the between-round shop.
 const BLIZZARD_STORM = {id:'blizzard_storm', name:'Blizzard Storm', price:640,
-  desc:'Ultimate-tier battlefield control. For 10 seconds, many giant semi-transparent ice masses rain inside a radius equal to 45% of the playable map radius. Impacts stay inside the real map boundary. Moderate damage; normal enemies freeze for 3 seconds and resistant enemies are heavily slowed. No blinding white screen.'};
+  desc:'10-second Ultimate gravity blizzard. All enemies inside or outside the arena are dragged rapidly toward map center, with pull and icefall speed increasing by round. Any non-boss entering the storm or taking an ice impact is instantly defeated; bosses remain protected and take repeated chip damage/slow. Ice masses use intentionally simple low-poly visuals for mobile performance.'};
 // Boss Killer: hold to channel a piercing beam of massive sustained
 // damage at the nearest well-aligned target (falling back to wherever
 // you're facing). Drains a charge meter while firing and regenerates
 // when idle — weak against crowds, built to melt one tough target.
-const ARCANE_LASER = {id:'arcane_laser', name:'Arcane Laser', price:760,
-  desc:'Hold to channel a piercing beam of massive sustained damage into whatever you\'re aimed at — the dedicated way to burn down a Brute or Boss. Pierces the crowd behind your target for lighter damage. Drains a charge meter that refills when you let go.'};
+const ARCANE_LASER = {id:'arcane_laser', name:'Crimson Mirror Dimension', price:760,
+  desc:'10-second reality-warping Ultimate. Crimson-violet mirror shards orbit the arena while a new dimensional slice crosses the battlefield every second. Normal enemies caught by a slice are erased; tougher enemies are stunned and damaged; bosses take protected damage. Center gravity pulses and a final mirror-collapse implosion finish the spell.'};
 
 const SUPER_METEOR = {id:'super_meteor', name:'Super Meteor', price:900,
   desc:'Calls down one enormous slow meteor. The impact heavily damages nearby enemies, stuns survivors for 3 seconds, burns them for 5 seconds, and deals 20% max HP to bosses.'};
 
 const SKYFALL_BARRAGE = {id:'skyfall_barrage', name:'Skyfall Barrage', price:780,
-  desc:'Ultimate-tier damage. For 7 seconds, giant translucent arrows rain onto enemy clusters with clear landing markers and strong area damage. Boss damage is capped at 25% per cast. No cooldown during development testing.'};
+  desc:'Ultimate-tier damage. For 10 seconds, giant translucent arrows rain onto enemy clusters with clear landing markers and strong area damage. Boss damage is capped at 25% per cast. No cooldown during development testing.'};
 const KNIGHT_DEFENSIVE_WHIRLWIND = {id:'knight_whirlwind', name:'Defensive Whirlwind', price:420, avatar:'knight', unlockLevel:6,
   desc:'A controlled sword-and-shield rotation that lets you move slowly, deflects weak enemy projectiles, and repeatedly damages and pushes enemies outward. Duration starts at 3.8 seconds and grows by round, becoming permanent from Round 25. Cooldown scales from 8 seconds to 0 by Round 21.'};
 const KNIGHT_GUARDIAN_QUAKE = {id:'knight_guardian_quake', name:'Guardian Titan', price:760, avatar:'knight', unlockLevel:12,
@@ -14888,7 +14623,7 @@ function renderShopList(){
       : (w.kind==='mirror_volley' ? '#b987ff'
       : (w.kind==='chain_lightning_javelin' ? '#8ee8ff'
       : (w.kind==='cyclone_snare_arrow' ? '#63ffd1'
-      : (w.kind.includes('element') || w.kind==='arcane_lance' ? '#78d8ff'
+      : (w.kind.includes('element') || w.kind==='arcane_lance' || w.kind==='fox_arcane_bloom' ? '#78d8ff'
       : (w.kind.includes('arrow') ? '#d9b36c'
       : (w.kind.indexOf('knight_')===0 ? '#ffd35a' : '#b88cff')))))));
     const info = document.createElement('div');
@@ -15362,7 +15097,7 @@ function setupControls(){
   dashBtnEl.addEventListener('touchstart',e=>{e.preventDefault();doDash();});
   const abilityBtnEl=document.getElementById('abilityBtn');
   const activateEquippedAbilityNow=()=>{
-    if(equippedAbilityId==='arcane_laser') startArcaneLaser();
+    if(equippedAbilityId==='arcane_laser') triggerCrimsonMirrorDimension();
     else if(equippedAbilityId==='blizzard_storm') triggerBlizzardStorm();
     else if(equippedAbilityId==='super_meteor') triggerSuperMeteor();
     else if(equippedAbilityId==='skyfall_barrage') triggerSkyfallBarrage();
@@ -15379,7 +15114,6 @@ function setupControls(){
     abilityInputHeld=false;
     abilityPointerId=null;
     knightGuardianQuakeHeld=false;
-    if(equippedAbilityId==='arcane_laser') stopArcaneLaser();
   };
   const beginEquippedAbility=e=>{
     if(e){e.preventDefault();e.stopPropagation();}
@@ -15719,7 +15453,7 @@ let chopperBroadsideSummonEpoch=0;
 function chopperBroadsideCloneConfig(){
   const r=Math.max(1,Number(round)||1);
   if(r<10)return {count:0,duration:0,cooldown:0};
-  if(r<=15)return {count:2,duration:8,cooldown:10};
+  if(r<=15)return {count:2,duration:10,cooldown:10};
   if(r<=20)return {count:5,duration:15,cooldown:5};
   return {count:10,duration:30,cooldown:.8};
 }
@@ -16966,11 +16700,15 @@ function updateHoodedHud(){
   if(abilityBtn){
     const supportsAbility = isHooded || isChopper || isMage || isArcher || isKnight || isBarbarian;
     const equipped = supportsAbility && equippedAbilityId && ownedAbilities[equippedAbilityId];
-    const laserMode = equippedAbilityId==='arcane_laser';
+    const laserMode = false;
     abilityBtn.classList.toggle('hidden', !equipped);
     abilityBtn.classList.toggle('laserMode', !!equipped && laserMode);
     if(equipped){
-      if(laserMode){
+      if(equippedAbilityId==='arcane_laser'){
+        abilityBtn.textContent=crimsonMirrorActive>0?`MIRROR ${crimsonMirrorActive.toFixed(1)}`:'MIRROR';
+        abilityBtn.classList.toggle('active',crimsonMirrorActive>0);
+        abilityBtn.classList.remove('cooling');
+      }else if(laserMode){
         abilityBtn.textContent='LASER';
       }else if(equippedAbilityId==='skyfall_barrage'){
         abilityBtn.textContent=skyfallActiveTimer>0
@@ -17030,7 +16768,7 @@ function updateHoodedHud(){
       }
       if(!laserMode){
         abilityBtn.style.removeProperty('--charge');
-        if(equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='supernova_piercer'&&equippedAbilityId!=='super_meteor'&&!isHooded&&!isChopper&&!isKnight&&!isBarbarian){
+        if(equippedAbilityId!=='arcane_laser'&&equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='supernova_piercer'&&equippedAbilityId!=='super_meteor'&&!isHooded&&!isChopper&&!isKnight&&!isBarbarian){
           abilityBtn.classList.remove('empty','active','cooling');
         }
       }
@@ -17705,7 +17443,7 @@ let knightRoyalCloneSummonEpoch=0;
 function knightRoyalCloneConfig(){
   const r=Math.max(1,Number(round)||1);
   if(r<10) return {count:0,duration:0,cooldown:0};
-  if(r<=15) return {count:2,duration:8,cooldown:10};
+  if(r<=15) return {count:2,duration:10,cooldown:10};
   if(r<=20) return {count:5,duration:15,cooldown:5};
   return {count:10,duration:30,cooldown:.8};
 }
@@ -28144,7 +27882,7 @@ function updateSupernovaPiercer(dt){
 // ground markers. Effects remain local and never cover the whole screen.
 // ---------------------------------------------------------------------
 const SKYFALL_COOLDOWN=0;
-const SKYFALL_DURATION=7;
+const SKYFALL_DURATION=10;
 const SKYFALL_IMPACT_RADIUS=2.65;
 const SKYFALL_BOSS_CAP=.25;
 let skyfallCooldownTimer=0;
@@ -28547,69 +28285,28 @@ function abilityButtonCooldown(seconds){
   const btn=document.getElementById('abilityBtn');
   if(btn){btn.classList.add('cooling');setTimeout(()=>btn.classList.remove('cooling'),seconds*1000);}
 }
+function blizzardRoundProgress(){ return THREE.MathUtils.clamp((Math.max(1,Number(round)||1)-1)/29,0,1); }
+function blizzardGravitySpeed(z){
+  const t=blizzardRoundProgress();
+  const normal=Math.max(2.6,Number(z&&z.userData&&(z.userData.baseSpeed||z.userData.speed))||3.2);
+  return Math.max(7.5+7.5*t,normal*(1.8+1.7*t));
+}
+function blizzardSpawnInterval(){ return THREE.MathUtils.lerp(.34,.17,blizzardRoundProgress()); }
+function blizzardFallSpeed(){ return THREE.MathUtils.lerp(13.5,24.0,blizzardRoundProgress()); }
 function makeIceBallMesh(radius=1.05){
-  const group=new THREE.Group();
-
-  const core=new THREE.Mesh(
-    new THREE.IcosahedronGeometry(radius*.82,1),
-    new THREE.MeshStandardMaterial({
-      color:0xc8f7ff,
-      emissive:0x2379aa,
-      emissiveIntensity:.8,
-      roughness:.24,
-      metalness:.12,
-      transparent:true,
-      opacity:.92,
-      depthWrite:true
-    })
-  );
-  core.castShadow=true;
-  group.add(core);
-
-  const shell=new THREE.Mesh(
-    new THREE.IcosahedronGeometry(radius,1),
-    new THREE.MeshStandardMaterial({
-      color:0x66dfff,
-      emissive:0x123f66,
-      emissiveIntensity:.5,
-      roughness:.18,
-      metalness:.18,
-      transparent:true,
-      opacity:.38,
-      depthWrite:false,
+  // V23.46: deliberately simple one-mesh low-poly ice mass. The old ball used
+  // multiple transparent shells plus five cone spikes per projectile; during a
+  // dense Blizzard those extra meshes were the main avoidable mobile cost.
+  const mesh=new THREE.Mesh(
+    new THREE.IcosahedronGeometry(radius,0),
+    new THREE.MeshBasicMaterial({
+      color:0x8eeaff,transparent:true,opacity:.82,depthWrite:false,
       blending:THREE.AdditiveBlending
     })
   );
-  shell.scale.set(1.08,.94,1.03);
-  group.add(shell);
-
-  const spikeMat=new THREE.MeshStandardMaterial({
-    color:0x9eeeff,
-    emissive:0x1d6f9c,
-    emissiveIntensity:.65,
-    roughness:.28,
-    transparent:true,
-    opacity:.82
-  });
-  for(let i=0;i<5;i++){
-    const angle=(i/5)*Math.PI*2;
-    const spike=new THREE.Mesh(
-      new THREE.ConeGeometry(radius*.18,radius*.72,5),
-      spikeMat.clone()
-    );
-    spike.position.set(
-      Math.cos(angle)*radius*.72,
-      (i%2===0?1:-1)*radius*.18,
-      Math.sin(angle)*radius*.72
-    );
-    spike.rotation.z=Math.PI/2;
-    spike.rotation.y=-angle;
-    group.add(spike);
-  }
-
-  group.userData.iceCore=core;
-  group.userData.iceShell=shell;
-  return group;
+  mesh.castShadow=false;
+  mesh.userData.iceCore=null;mesh.userData.iceShell=null;
+  return mesh;
 }
 function spawnFallingIce(){
   const stormR=Math.min(blizzardRadius(),arenaSize-2.4);
@@ -28621,12 +28318,12 @@ function spawnFallingIce(){
   const boundedR=Math.hypot(x,z);
   const clamp=boundedR>arenaSize-2.2?(arenaSize-2.2)/boundedR:1;
   const bx=x*clamp,bz=z*clamp;
-  const mesh=makeIceBallMesh(1.25+Math.random()*.75);
+  const mesh=makeIceBallMesh(1.05+Math.random()*.55);
   mesh.position.set(bx,11+Math.random()*5,bz); mesh.rotation.set(Math.random()*2,Math.random()*2,Math.random()*2);
   mesh.renderOrder=18; scene.add(mesh);
   const ring=new THREE.Mesh(new THREE.RingGeometry(BLIZZARD_IMPACT_RADIUS*.72,BLIZZARD_IMPACT_RADIUS,32),new THREE.MeshBasicMaterial({color:0x62d9ff,transparent:true,opacity:.62,side:THREE.DoubleSide,depthWrite:false}));
   ring.rotation.x=-Math.PI/2; ring.position.set(bx,.035,bz);scene.add(ring);
-  fallingIce.push({mesh,ring,x:bx,z:bz,vy:13+Math.random()*4,life:1.15});
+  fallingIce.push({mesh,ring,x:bx,z:bz,vy:blizzardFallSpeed()*(.88+Math.random()*.24),life:1.15});
 }
 function impactIce(m){
   const stressed=mageStressVisualLoad();
@@ -28767,14 +28464,17 @@ function impactIce(m){
     if(z.userData.dead)continue;
     if(Math.hypot(z.position.x-m.x,z.position.z-m.z)>BLIZZARD_IMPACT_RADIUS)continue;
     const type=z.userData.archetype||'walker';
-    applyBulletDamage(z,1.75*playerStats.power);
-    if(z.userData.dead)continue;
-    if(type==='boss'||type==='brute'){
+    if(type!=='boss'){
+      // Blizzard is Ultimate-tier: any direct ice impact hard-executes every
+      // non-boss class, including Brutes. No damage scaling or per-hit cap.
+      z.userData.hp=0;killZombie(z);continue;
+    }
+    const maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
+    applyBulletDamage(z,Math.min(maxHp*.025,Math.max(.01,(z.userData.hp||maxHp)-.01)));
+    if(!z.userData.dead){
       z.userData.slowTimer=Math.max(z.userData.slowTimer||0,BLIZZARD_FREEZE);
       z.userData.slowMult=Math.min(z.userData.slowMult||1,.18);
-    }else{
-      z.userData.hitStun=Math.max(z.userData.hitStun||0,BLIZZARD_FREEZE);
-      z.userData.knockbackX=0;z.userData.knockbackZ=0;
+      z.userData.hitStun=Math.max(z.userData.hitStun||0,.35);
     }
   }
 }
@@ -28813,7 +28513,7 @@ function triggerBlizzardStorm(){
   foxMageAbilityPose('blizzard',360);
   foxMageWowUltimateFx('blizzard',2.8);
   blizzardCooldownTimer=BLIZZARD_COOLDOWN; abilityButtonCooldown(BLIZZARD_COOLDOWN);
-  blizzardActiveTimer=BLIZZARD_DURATION; blizzardSpawnTimer=0; blizzardDamageTimer=0; blizzardCenter.copy(player.position);
+  blizzardActiveTimer=Math.max(10,BLIZZARD_DURATION); blizzardSpawnTimer=0; blizzardDamageTimer=0; blizzardCenter.set(0,0,0);
   blizzardLastPlayerPos.copy(player.position);
   blizzardMoveDir.set(0,0,0);
 
@@ -29644,6 +29344,10 @@ function clearSuperMeteor(resetCooldown=true){
 }
 
 function clearMageRoundSpecials(resetCooldowns=true,preserveMirrorCooldowns=false){
+  clearFoxArcaneBloom();
+  clearFoxSpiritGate();
+  clearCrimsonMirror();
+  foxRapidPrimaryCadence=0;
   clearPhoenixFireball(false);
   clearPhoenixAfterEffects();
   clearSupernovaPiercer(resetCooldowns);
@@ -29675,6 +29379,9 @@ function clearMageRoundSpecials(resetCooldowns=true,preserveMirrorCooldowns=fals
   if(resetCooldowns){blizzardCooldownTimer=0;}
 }
 function updateMageUltimates(dt){
+  updateFoxArcaneBloom(dt);
+  updateFoxSpiritGate(dt);
+  updateCrimsonMirror(dt);
   if(superMeteorCooldownTimer>0)superMeteorCooldownTimer=Math.max(0,superMeteorCooldownTimer-dt);
 
   // Apocalypse atmosphere. Runs every frame so the 0.75s restore after
@@ -29744,17 +29451,23 @@ function updateMageUltimates(dt){
   if(blizzardCooldownTimer>0)blizzardCooldownTimer=Math.max(0,blizzardCooldownTimer-dt);
   if(blizzardActiveTimer>0){
     blizzardActiveTimer=Math.max(0,blizzardActiveTimer-dt);
-    if(player){
-      const moveDelta=new THREE.Vector3().subVectors(player.position,blizzardLastPlayerPos);
-      moveDelta.y=0;
-      if(moveDelta.lengthSq()>.000001){
-        moveDelta.normalize();
-        blizzardMoveDir.lerp(moveDelta,.18);
-      }else{
-        blizzardMoveDir.multiplyScalar(.92);
+    // V23.46: Blizzard is a map-center gravity storm, not a player-following
+    // aura. Every enemy, including enemies still outside the arena boundary,
+    // is pulled straight toward (0,0) at a round-scaled fast speed.
+    blizzardCenter.set(0,0,0);
+    const stormR=blizzardRadius();
+    for(const z of [...zombies]){
+      if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+      const dx=-z.position.x,dz=-z.position.z,dist=Math.hypot(dx,dz);
+      if(dist>.001){
+        const step=Math.min(dist,blizzardGravitySpeed(z)*dt);
+        z.position.x+=(dx/dist)*step;z.position.z+=(dz/dist)*step;
       }
-      blizzardLastPlayerPos.copy(player.position);
-      blizzardCenter.copy(player.position);
+      // Entering the visible storm radius is itself a single Ultimate hit.
+      // Every non-boss is removed immediately; bosses stay protected.
+      if(dist<=stormR && (z.userData.archetype||'walker')!=='boss'){
+        z.userData.hp=0;killZombie(z);
+      }
     }
 
     if(blizzardFollowBoundary){
@@ -29769,8 +29482,8 @@ function updateMageUltimates(dt){
     // stacked at once, lower only the decorative falling-object concurrency.
     if(blizzardSpawnTimer<=0){
       const stressed=mageStressVisualLoad();
-      blizzardSpawnTimer=stressed?.34:.24;
-      const iceCap=stressed?11:18;
+      blizzardSpawnTimer=blizzardSpawnInterval()*(stressed?1.35:1);
+      const iceCap=stressed?7:11;
       if(fallingIce.length<iceCap)spawnFallingIce();
     }
     if(blizzardDamageTimer<=0){
@@ -29779,11 +29492,13 @@ function updateMageUltimates(dt){
       for(const z of [...zombies]){
         if(z.userData.dead)continue;
         if(Math.hypot(z.position.x-blizzardCenter.x,z.position.z-blizzardCenter.z)>br)continue;
-        affected++;const type=z.userData.archetype||'walker';const wasDead=!!z.userData.dead;
-        applyBulletDamage(z,.62*playerStats.power);
-        if(!wasDead&&z.userData.dead){defeated++;continue;}
-        if(type==='boss'||type==='brute'){z.userData.slowTimer=Math.max(z.userData.slowTimer||0,BLIZZARD_FREEZE);z.userData.slowMult=Math.min(z.userData.slowMult||1,.18);}
-        else z.userData.hitStun=Math.max(z.userData.hitStun||0,BLIZZARD_FREEZE);
+        affected++;const type=z.userData.archetype||'walker';
+        if(type!=='boss'){
+          z.userData.hp=0;killZombie(z);defeated++;continue;
+        }
+        const maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);
+        applyBulletDamage(z,Math.min(maxHp*.02,Math.max(.01,(z.userData.hp||maxHp)-.01)));
+        if(!z.userData.dead){z.userData.slowTimer=Math.max(z.userData.slowTimer||0,BLIZZARD_FREEZE);z.userData.slowMult=Math.min(z.userData.slowMult||1,.18);}
       }
       if(affected&&blizzardActiveTimer>BLIZZARD_DURATION-1.0)toast(`BLIZZARD · ${affected} AFFECTED${defeated?` · ${defeated} DEFEATED`:''}`);
     }
@@ -29840,7 +29555,7 @@ function updateMageAbilityEffects(dt){updateMageUltimates(dt);}
 // short precise bursts on a tough target over spamming it.
 // ---------------------------------------------------------------------
 const LASER_RANGE = 22, LASER_WIDTH = 1.15, LASER_DPS_PRIMARY = 15, LASER_DPS_PIERCE = 5,
-  LASER_MAX_CHARGE = 100, LASER_DRAIN_RATE = 26, LASER_REGEN_RATE = 13, LASER_REGEN_DELAY = 0.6;
+  LASER_MAX_CHARGE = 100, LASER_DRAIN_RATE = 10, LASER_REGEN_RATE = 13, LASER_REGEN_DELAY = 0.6;
 let laserActive = false, laserCharge = LASER_MAX_CHARGE, laserRegenDelayTimer = 0, laserBeamMesh = null, laserHum = 0;
 function laserAvailable(){
   return mageGameplayActive() && equippedAbilityId==='arcane_laser' && !!ownedAbilities.arcane_laser;
@@ -29870,6 +29585,9 @@ function stopArcaneLaser(){
   if(laserBeamMesh){ scene.remove(laserBeamMesh); laserBeamMesh.geometry.dispose(); laserBeamMesh.material.dispose(); laserBeamMesh = null; }
 }
 function updateArcaneLaser(dt){
+  // V23.47: Arcane Laser was retired in-place; arcane_laser is now Crimson Mirror Dimension.
+  // Keep the old helper inert for save/code compatibility so it cannot overwrite the Mirror HUD.
+  if(equippedAbilityId==='arcane_laser'){ if(laserActive)stopArcaneLaser(); return; }
   const btn = document.getElementById('abilityBtn');
   if(btn && equippedAbilityId==='arcane_laser'){
     btn.classList.toggle('hidden', !laserAvailable());
@@ -29966,7 +29684,7 @@ function triggerShadowEclipse(){
   if(hoodedUltimateCharge<99.5){ toast('Eclipse is still charging'); return; }
 
   markUltimateUsed();
-  hoodedUltimateCharge=0;hoodedUltimateActive=3.2;hoodedUltimatePulse=0;updateHoodedHud();document.body.style.filter='brightness(.58) saturate(1.35)';
+  hoodedUltimateCharge=0;hoodedUltimateActive=10;hoodedUltimatePulse=0;updateHoodedHud();document.body.style.filter='brightness(.58) saturate(1.35)';
   spawnShadowSmoke(player.position.x,player.position.y+.7,player.position.z,48);triggerCombatShake(15,420);navigator.vibrate&&navigator.vibrate([80,40,160]);toast('SHADOW ECLIPSE!');
 }
 function updateShadowEclipse(dt){
@@ -30354,6 +30072,7 @@ function cloneAttack(w){
 }
 
 let foxMageQueuedCastSerial=0;
+let foxRapidPrimaryCadence=0;
 const foxMagePendingRelease={arcane_lance:false,giant_fireball:false};
 function foxMageProjectileReleaseDelay(w,moving=false){
   if(!w)return 0;
@@ -30387,6 +30106,95 @@ function fireFoxMageProjectileTimed(w){
       mageStressVisualLoad()?3:(key==='giant_fireball'?8:6),FX_MAT_SPARK,key==='giant_fireball'?2.8:2.0);
   },delay);
   return true;
+}
+
+
+// ---------------------------------------------------------------------
+// FOX SECONDARY — NINEFOLD ASTRAL BLOOM
+// Nine low-poly foxfire stars share one cast state. They gather as a crown,
+// then home toward separate targets. A held Secondary can only begin the next
+// Bloom after this state fully disposes, so zero-cooldown testing never causes
+// per-frame allocation spam.
+// ---------------------------------------------------------------------
+let foxArcaneBloom=null;
+function clearFoxArcaneBloom(){
+  if(!foxArcaneBloom)return;
+  if(foxArcaneBloom.group&&foxArcaneBloom.group.parent){scene.remove(foxArcaneBloom.group);disposeGroup(foxArcaneBloom.group);}
+  foxArcaneBloom=null;
+}
+function triggerFoxArcaneBloom(w){
+  if(!gameRunning||state.avatarType!=='mage'||!mageGameplayActive()||!player||foxArcaneBloom)return false;
+  foxMageAbilityPose('laser',340);
+  foxMageWowCastFx('fox_arcane_bloom',2.15,false);
+  const group=new THREE.Group();group.position.copy(player.position);group.position.y+=.25;
+  const orbs=[];
+  const mat=new THREE.MeshBasicMaterial({color:0xc68cff,transparent:true,opacity:.88,depthWrite:false,blending:THREE.AdditiveBlending});
+  const geom=new THREE.IcosahedronGeometry(.24,0);
+  for(let i=0;i<9;i++){
+    const a=i/9*Math.PI*2;
+    const orb=new THREE.Mesh(geom,mat.clone());
+    orb.position.set(Math.sin(a)*1.65,.85+Math.sin(a*2)*.22,Math.cos(a)*1.65);
+    orb.userData={angle:a,launched:false,hit:false,target:null,dir:new THREE.Vector3()};
+    group.add(orb);orbs.push(orb);
+  }
+  const ringMat=new THREE.MeshBasicMaterial({color:0x79eaff,transparent:true,opacity:.48,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.72,.045,6,40),ringMat);ring.rotation.x=Math.PI/2;ring.position.y=.82;group.add(ring);
+  scene.add(group);
+  foxArcaneBloom={group,orbs,ring,t:0,duration:1.55,releaseAt:.34,damage:(w&&w.damage)||2.15,enemyHits:new Map()};
+  spawnArcaneSigil(player.position.x,.035,player.position.z,2.4);
+  spawnBurst(player.position.x,player.position.y+.72,player.position.z,mageStressVisualLoad()?7:14,FX_MAT_SPARK,4.0);
+  return true;
+}
+function foxArcaneBloomImpact(rt,orb,pos){
+  if(!rt||!orb||orb.userData.hit)return;orb.userData.hit=true;orb.visible=false;
+  spawnArcaneSigil(pos.x,.04,pos.z,1.75);spawnBurst(pos.x,pos.y,pos.z,mageStressVisualLoad()?5:11,FX_MAT_SPARK,3.3);
+  for(const z of [...zombies]){
+    if(!z||!z.userData||z.userData.dead||Math.hypot(z.position.x-pos.x,z.position.z-pos.z)>2.25)continue;
+    const prior=rt.enemyHits.get(z)||0;if(prior>=2)continue;rt.enemyHits.set(z,prior+1);
+    const type=z.userData.archetype||'walker';
+    if(type==='boss'){
+      const maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);applyBulletDamage(z,Math.min(maxHp*.035,rt.damage*playerStats.power));
+    }else applyBulletDamage(z,rt.damage*playerStats.power);
+    if(!z.userData.dead)z.userData.hitStun=Math.max(z.userData.hitStun||0,type==='boss'?.22:.55);
+  }
+}
+function updateFoxArcaneBloom(dt){
+  const rt=foxArcaneBloom;if(!rt)return;
+  if(!gameRunning||state.avatarType!=='mage'||!player){clearFoxArcaneBloom();return;}
+  rt.t+=dt;rt.group.rotation.y+=dt*(rt.t<rt.releaseAt?3.8:1.2);rt.ring.rotation.z+=dt*2.6;
+  if(rt.t<rt.releaseAt){
+    const p=rt.t/rt.releaseAt;rt.group.scale.setScalar(.72+p*.28);return;
+  }
+  // Assign targets once, spreading stars across the current living roster.
+  if(!rt.assigned){
+    rt.assigned=true;
+    const living=zombies.filter(z=>z&&z.userData&&!z.userData.dead&&!z.userData.spawnPending);
+    living.sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position));
+    rt.orbs.forEach((orb,i)=>{
+      const target=living.length?living[i%living.length]:null;orb.userData.target=target;orb.userData.launched=true;
+      const world=orb.getWorldPosition(new THREE.Vector3());
+      const aim=target?target.position.clone().add(new THREE.Vector3(0,.65,0)):
+        world.clone().add(new THREE.Vector3(Math.sin(orb.userData.angle)*12,0,Math.cos(orb.userData.angle)*12));
+      orb.userData.dir.subVectors(aim,world).normalize();
+    });
+  }
+  for(const orb of rt.orbs){
+    if(!orb.visible||!orb.userData.launched)continue;
+    const target=orb.userData.target;
+    if(target&&target.parent&&!target.userData.dead){
+      const world=orb.getWorldPosition(new THREE.Vector3()),aim=target.position.clone().add(new THREE.Vector3(0,.65,0));
+      const desired=aim.sub(world).normalize();orb.userData.dir.lerp(desired,Math.min(1,dt*5.5)).normalize();
+    }
+    orb.position.addScaledVector(orb.userData.dir,dt*12.5);
+    const wp=orb.getWorldPosition(new THREE.Vector3());
+    let hit=null;
+    for(const z of zombies){if(z&&z.userData&&!z.userData.dead&&Math.hypot(z.position.x-wp.x,z.position.z-wp.z)<=.95){hit=z;break;}}
+    if(hit)foxArcaneBloomImpact(rt,orb,wp);
+  }
+  if(rt.t>=rt.duration){
+    for(const orb of rt.orbs)if(orb.visible)foxArcaneBloomImpact(rt,orb,orb.getWorldPosition(new THREE.Vector3()));
+    clearFoxArcaneBloom();
+  }
 }
 
 /* ============================================================ WOLVERINE
@@ -30674,7 +30482,7 @@ function wolverineUpdate(dt){
    same rate-limited execution used by Royal Onslaught, so a full arena
    cannot stall the frame. */
 const WOLV_FRENZY_STRIKES=18;
-const WOLV_FRENZY_MAX_TIME=9;
+const WOLV_FRENZY_MAX_TIME=10;
 
 function wolverineFrenzyCooldownForRound(){ return 0; }
 function triggerWolverineFrenzy(){
@@ -30931,7 +30739,7 @@ let wolverineCloneEpoch=0;
 function wolverineCloneConfig(){
   const r=Math.max(1,Number(round)||1);
   if(r<10) return {count:0,duration:0,cooldown:0};
-  if(r<=15) return {count:5,duration:8,cooldown:0};
+  if(r<=15) return {count:5,duration:10,cooldown:0};
   if(r<=20) return {count:5,duration:15,cooldown:0};
   return {count:5,duration:30,cooldown:0};
 }
@@ -31078,7 +30886,7 @@ function updateWolverineClones(dt){
    pattern as Knights of the Round and the Savage Shadow Pack. */
 function barbarianKinConfig(){
   const r=Math.max(1,Number(round)||1);
-  if(r<=15) return {count:2,duration:8,cooldown:10};
+  if(r<=15) return {count:2,duration:10,cooldown:10};
   if(r<=20) return {count:3,duration:15,cooldown:5};
   return {count:4,duration:30,cooldown:.8};
 }
@@ -31364,7 +31172,7 @@ class VelocityWeaver {
     this._startCooldown('tachyonDome');
     const geom=new THREE.SphereGeometry(1,12,8),mat=new THREE.MeshBasicMaterial({color:0x55eaff,wireframe:true,transparent:true,opacity:.28,depthWrite:false});
     const mesh=new THREE.Mesh(geom,mat);mesh.position.copy(this.player.position);mesh.scale.setScalar(.05);this.scene.add(mesh);
-    this.dome={elapsed:0,duration:4.4,expand:.4,radius:Math.max(18,(typeof arenaSize!=='undefined'&&arenaSize)||30),mesh,geom,mat,ghostTimer:0};return true;
+    this.dome={elapsed:0,duration:10,expand:.4,radius:Math.max(18,(typeof arenaSize!=='undefined'&&arenaSize)||30),mesh,geom,mat,ghostTimer:0};return true;
   }
   speedforceCataclysm(){
     if(this.cataclysm||!this._ready('speedforceCataclysm'))return false;
@@ -31372,12 +31180,12 @@ class VelocityWeaver {
     if(chopperIsActive()){
       // Monster Point is deliberately geometry-free: enlarge the existing
       // skinned model and reuse the shared shockwave primitive pool.
-      this.cataclysm={elapsed:0,duration:6,ringFrame:0,chopperMonster:true,scale:2.65};this._catFrame=0;
+      this.cataclysm={elapsed:0,duration:10,ringFrame:0,chopperMonster:true,scale:2.65};this._catFrame=0;
       this._spawnShockwave(this.player.position);this._cameraJitter(.32,4);return true;
     }
     this._ambientSaved=[];this.scene.traverse(o=>{if(o.isAmbientLight){this._ambientSaved.push({o,intensity:o.intensity});o.intensity=0;}});
     this._catMaterials=[];this.player.traverse(o=>{if(o.isMesh&&o.material){this._catMaterials.push({o,material:o.material});o.material=new THREE.MeshBasicMaterial({color:0x20bfff,wireframe:true});}});
-    this.cataclysm={elapsed:0,duration:4,ringFrame:0};this._catFrame=0;return true;
+    this.cataclysm={elapsed:0,duration:10,ringFrame:0};this._catFrame=0;return true;
   }
   update(dt){
     this.time+=dt;
@@ -32680,7 +32488,8 @@ function triggerHoodedEquippedAbility(){
 let foxMageWowNextAt=0;
 function foxMageWowPalette(kind){
   if(kind==='giant_fireball'||kind==='fire')return [0xff8a32,0xffe5a0,0xff4f2e];
-  if(kind==='arcane_lance'||kind==='laser')return [0x72e8ff,0xd7a2ff,0xffffff];
+  if(kind==='arcane_lance'||kind==='fox_arcane_bloom'||kind==='fox_spirit_gate')return [0x72e8ff,0xd7a2ff,0xffffff];
+  if(kind==='mirror'||kind==='laser')return [0xff477e,0xc879ff,0x76eaff];
   if(kind==='blizzard')return [0x83edff,0xa779ff,0xeaffff];
   if(kind==='meteor')return [0xffb13b,0xfff0b5,0xc970ff];
   if(kind==='echo')return [0x8ef4ff,0xcf8cff,0xffffff];
@@ -32737,9 +32546,136 @@ function foxMageWowUltimateFx(kind,scale=2.6){
   spawnBurst(p.x,p.y+.68,p.z,stressed?8:18,FX_MAT_SPARK,3.2*scale);
 }
 
+
+// ---------------------------------------------------------------------
+// Fox Spirit Gate Stampede — third Secondary.
+// One gate group + capped spirit meshes. No timers; all motion runs in the
+// main game update loop so hold-to-repeat cannot stack background work.
+// ---------------------------------------------------------------------
+let foxSpiritGateActive=false, foxSpiritGateTime=0;
+const foxSpiritGateSpirits=[];
+let foxSpiritGateGroup=null;
+function foxSpiritGateCount(){ return Math.max(3,Math.min(9,3+Math.floor(((Math.max(1,Number(round)||1)-1)/29)*6+1e-6))); }
+function clearFoxSpiritGate(){
+  foxSpiritGateActive=false;foxSpiritGateTime=0;
+  while(foxSpiritGateSpirits.length){const q=foxSpiritGateSpirits.pop();if(q.mesh&&q.mesh.parent){scene.remove(q.mesh);disposeGroup(q.mesh);}}
+  if(foxSpiritGateGroup){if(foxSpiritGateGroup.parent)scene.remove(foxSpiritGateGroup);disposeGroup(foxSpiritGateGroup);foxSpiritGateGroup=null;}
+}
+function makeFoxSpiritMesh(i){
+  const g=new THREE.Group();
+  const mat=new THREE.MeshBasicMaterial({color:i%2?0xc88cff:0x79ecff,transparent:true,opacity:.78,depthWrite:false,blending:THREE.AdditiveBlending});
+  const core=new THREE.Mesh(new THREE.ConeGeometry(.24,.78,5),mat);core.rotation.x=Math.PI/2;g.add(core);
+  const head=new THREE.Mesh(new THREE.OctahedronGeometry(.20,0),mat.clone());head.position.z=.42;g.add(head);
+  const tail=new THREE.Mesh(new THREE.ConeGeometry(.12,.75,5),mat.clone());tail.rotation.x=-Math.PI/2;tail.position.z=-.58;g.add(tail);
+  const ear1=new THREE.Mesh(new THREE.ConeGeometry(.07,.20,4),mat.clone());ear1.position.set(.10,.18,.40);g.add(ear1);
+  const ear2=ear1.clone();ear2.position.x=-.10;g.add(ear2);
+  g.scale.setScalar(1.35);return g;
+}
+function triggerFoxSpiritGate(w){
+  if(!gameRunning||state.avatarType!=='mage'||!player||foxSpiritGateActive)return false;
+  foxSpiritGateActive=true;foxSpiritGateTime=0;
+  foxMageWowCastFx('fox_spirit_gate',2.15,false);
+  if(player.userData.playKayClip)player.userData.playKayClip('magic giant cast',true,true,.34);
+  const yaw=player.rotation.y,fx=Math.sin(yaw),fz=Math.cos(yaw);
+  foxSpiritGateGroup=new THREE.Group();
+  const gm=new THREE.MeshBasicMaterial({color:0xb36cff,transparent:true,opacity:.48,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const gate=new THREE.Mesh(new THREE.TorusGeometry(1.75,.10,8,48),gm);gate.rotation.y=Math.PI/2;foxSpiritGateGroup.add(gate);
+  const inner=new THREE.Mesh(new THREE.RingGeometry(.72,1.58,48),new THREE.MeshBasicMaterial({color:0x63eaff,transparent:true,opacity:.20,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));inner.rotation.y=Math.PI/2;foxSpiritGateGroup.add(inner);
+  foxSpiritGateGroup.position.set(player.position.x-fx*1.2,player.position.y+1.05,player.position.z-fz*1.2);foxSpiritGateGroup.rotation.y=yaw;scene.add(foxSpiritGateGroup);
+  const living=zombies.filter(z=>z&&!z.userData.dead&&!z.userData.spawnPending);
+  const count=foxSpiritGateCount();
+  for(let i=0;i<count;i++){
+    const mesh=makeFoxSpiritMesh(i);mesh.position.copy(foxSpiritGateGroup.position);scene.add(mesh);
+    let target=living.length?living[i%living.length]:null;
+    const a=yaw+(i-(count-1)/2)*Math.min(.42,2.2/Math.max(1,count-1));
+    foxSpiritGateSpirits.push({mesh,target,dir:new THREE.Vector3(Math.sin(a),0,Math.cos(a)),life:2.4,hit:new Set(),speed:12.5+i*.25,damage:(w.damage||2.4)});
+  }
+  return true;
+}
+function updateFoxSpiritGate(dt){
+  if(!foxSpiritGateActive)return;
+  if(!gameRunning||state.avatarType!=='mage'||!player){clearFoxSpiritGate();return;}
+  foxSpiritGateTime+=dt;
+  if(foxSpiritGateGroup){foxSpiritGateGroup.rotation.z+=dt*1.8;const p=1+Math.sin(foxSpiritGateTime*8)*.05;foxSpiritGateGroup.scale.setScalar(p);}
+  for(let i=foxSpiritGateSpirits.length-1;i>=0;i--){
+    const q=foxSpiritGateSpirits[i];q.life-=dt;
+    if(q.target&&(!q.target.userData.dead)&&q.target.parent){
+      const d=new THREE.Vector3().subVectors(q.target.position,q.mesh.position);d.y=0;const len=d.length();if(len>.001){d.multiplyScalar(1/len);q.dir.lerp(d,Math.min(1,dt*3.8)).normalize();}
+    }
+    q.mesh.position.addScaledVector(q.dir,q.speed*dt);q.mesh.position.y=player.position.y+.72+Math.sin((foxSpiritGateTime+i)*8)*.10;
+    q.mesh.rotation.y=Math.atan2(q.dir.x,q.dir.z);q.mesh.rotation.z+=dt*9;
+    for(const z of [...zombies]){
+      if(!z||z.userData.dead||q.hit.has(z))continue;
+      if(Math.hypot(z.position.x-q.mesh.position.x,z.position.z-q.mesh.position.z)>1.35)continue;
+      q.hit.add(z);applyBulletDamage(z,q.damage*playerStats.power);z.userData.hitStun=Math.max(z.userData.hitStun||0,.55);
+      spawnArcaneSigil(z.position.x,.03,z.position.z,1.15);spawnBurst(z.position.x,z.position.y+.55,z.position.z,mageStressVisualLoad()?5:10,FX_MAT_SPARK,2.5);
+      if(z.userData.hp<=0)killZombie(z);
+      q.life=Math.min(q.life,.10);
+    }
+    if(q.life<=0||Math.hypot(q.mesh.position.x,q.mesh.position.z)>arenaSize+8){if(q.mesh.parent){scene.remove(q.mesh);disposeGroup(q.mesh);}foxSpiritGateSpirits.splice(i,1);}
+  }
+  if(foxSpiritGateTime>.62&&foxSpiritGateGroup){if(foxSpiritGateGroup.parent)scene.remove(foxSpiritGateGroup);disposeGroup(foxSpiritGateGroup);foxSpiritGateGroup=null;}
+  if(!foxSpiritGateSpirits.length&&foxSpiritGateTime>.7){foxSpiritGateActive=false;foxSpiritGateTime=0;}
+}
+
+// ---------------------------------------------------------------------
+// Crimson Mirror Dimension — replaces Arcane Laser in-place (same save ID).
+// Ten seconds, six reusable mirror panels, one slice per second, center pull,
+// periodic gravity lift, and a final collapse. No screen-blinding filter.
+// ---------------------------------------------------------------------
+let crimsonMirrorActive=0,crimsonMirrorSliceTimer=0,crimsonMirrorGravityTimer=0,crimsonMirrorGroup=null,crimsonMirrorSliceIndex=0;
+function crimsonMirrorAvailable(){return mageGameplayActive()&&equippedAbilityId==='arcane_laser'&&!!ownedAbilities.arcane_laser;}
+function clearCrimsonMirror(){
+  crimsonMirrorActive=0;crimsonMirrorSliceTimer=0;crimsonMirrorGravityTimer=0;crimsonMirrorSliceIndex=0;
+  if(crimsonMirrorGroup){if(crimsonMirrorGroup.parent)scene.remove(crimsonMirrorGroup);disposeGroup(crimsonMirrorGroup);crimsonMirrorGroup=null;}
+  if(player&&player.userData)player.userData.invincibleUntil=0;
+  const b=document.getElementById('abilityBtn');if(b)b.classList.remove('active');
+}
+function triggerCrimsonMirrorDimension(){
+  if(!gameRunning||!crimsonMirrorAvailable()||crimsonMirrorActive>0)return false;
+  markUltimateUsed();crimsonMirrorActive=10;crimsonMirrorSliceTimer=.35;crimsonMirrorGravityTimer=2.5;crimsonMirrorSliceIndex=0;
+  player.userData.invincibleUntil=Math.max(player.userData.invincibleUntil||0,performance.now()+10050);
+  foxMageAbilityPose('laser',420);foxMageWowUltimateFx('mirror',3.5);
+  crimsonMirrorGroup=new THREE.Group();crimsonMirrorGroup.position.set(0,.08,0);
+  const shardMat=new THREE.MeshBasicMaterial({color:0xcf67ff,transparent:true,opacity:.24,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  for(let i=0;i<6;i++){
+    const a=i/6*Math.PI*2;const sh=new THREE.Mesh(new THREE.PlaneGeometry(4.2,7.0),shardMat.clone());sh.position.set(Math.cos(a)*11,3.7,Math.sin(a)*11);sh.rotation.y=-a+Math.PI/2;sh.rotation.z=(i%2?.18:-.18);sh.userData.baseA=a;crimsonMirrorGroup.add(sh);
+  }
+  const crown=new THREE.Mesh(new THREE.TorusGeometry(4.6,.10,8,64),new THREE.MeshBasicMaterial({color:0xff477e,transparent:true,opacity:.48,depthWrite:false,blending:THREE.AdditiveBlending}));crown.rotation.x=Math.PI/2;crown.position.y=2.4;crimsonMirrorGroup.add(crown);
+  scene.add(crimsonMirrorGroup);spawnArcaneSigil(0,.035,0,6.0);toast('CRIMSON MIRROR DIMENSION');return true;
+}
+function crimsonMirrorSlice(){
+  const a=(crimsonMirrorSliceIndex++*0.87)%Math.PI;const nx=Math.cos(a),nz=Math.sin(a),half=arenaSize+5,width=2.2;
+  const g=new THREE.Group();const mat=new THREE.MeshBasicMaterial({color:crimsonMirrorSliceIndex%2?0xff4f86:0x8b72ff,transparent:true,opacity:.52,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const plane=new THREE.Mesh(new THREE.PlaneGeometry(half*2,width),mat);plane.rotation.x=-Math.PI/2;plane.rotation.z=-a;plane.position.y=.20;g.add(plane);scene.add(g);fx.push({kind:'knightFx',mesh:g,life:.42,maxLife:.42,grow:.12,from:.94,dispose:true});
+  for(const z of [...zombies]){
+    if(!z||z.userData.dead)continue;const along=z.position.x*nx+z.position.z*nz;if(Math.abs(along)>half)continue;const perp=Math.abs(-z.position.x*nz+z.position.z*nx);if(perp>width*.62)continue;
+    const boss=!!z.userData.isBoss;const large=boss||z.userData.archetype==='brute';
+    if(!large){z.userData.hp=0;killZombie(z);}
+    else{applyBulletDamage(z,boss?Math.max(1,z.userData.maxHp*.035):3.6*playerStats.power);z.userData.hitStun=Math.max(z.userData.hitStun||0,1.15);}
+  }
+  triggerCombatShake(3.5,85);
+}
+function updateCrimsonMirror(dt){
+  if(crimsonMirrorActive<=0)return;
+  if(!gameRunning||!crimsonMirrorAvailable()){clearCrimsonMirror();return;}
+  crimsonMirrorActive=Math.max(0,crimsonMirrorActive-dt);crimsonMirrorSliceTimer-=dt;crimsonMirrorGravityTimer-=dt;
+  if(crimsonMirrorGroup){crimsonMirrorGroup.rotation.y+=dt*.22;for(const sh of crimsonMirrorGroup.children){if(sh.userData&&sh.userData.baseA!==undefined)sh.position.y=3.7+Math.sin(performance.now()*.0018+sh.userData.baseA)*.45;}}
+  // Gentle continuous reality gravity plus a stronger lift pulse every ~2.5 sec.
+  for(const z of zombies){if(!z||z.userData.dead)continue;const dx=-z.position.x,dz=-z.position.z,dist=Math.hypot(dx,dz);if(dist>.1){const step=Math.min(dist,(4.0+Math.min(8,round*.12))*dt);z.position.x+=dx/dist*step;z.position.z+=dz/dist*step;}}
+  if(crimsonMirrorSliceTimer<=0){crimsonMirrorSliceTimer=1.0;crimsonMirrorSlice();}
+  if(crimsonMirrorGravityTimer<=0){crimsonMirrorGravityTimer=2.5;spawnArcaneSigil(0,.04,0,7.2);for(const z of zombies){if(!z||z.userData.dead)continue;z.userData.hitStun=Math.max(z.userData.hitStun||0,.65);}spawnBurst(0,.5,0,mageStressVisualLoad()?10:22,FX_MAT_SPARK,5.4);}
+  if(crimsonMirrorActive<=0){
+    // finale implosion
+    spawnArcaneSigil(0,.04,0,9.5);spawnBurst(0,.7,0,mageStressVisualLoad()?18:42,FX_MAT_SPARK,7.0);triggerCombatShake(7,180);
+    for(const z of [...zombies]){if(!z||z.userData.dead)continue;const boss=!!z.userData.isBoss;if(!boss&&Math.hypot(z.position.x,z.position.z)<7.5){z.userData.hp=0;killZombie(z);}else if(boss)applyBulletDamage(z,Math.max(1,z.userData.maxHp*.06));}
+    clearCrimsonMirror();
+  }
+}
+
 function performWeaponAttack(w, countsAsPrimary=true){
   if(!w) return;
-  if(state.avatarType==='mage'&&mageGameplayActive())foxMageWowCastFx(w.kind,w.kind==='giant_fireball'?1.7:(w.kind==='arcane_lance'?1.45:1.0),false);
+  if(state.avatarType==='mage'&&mageGameplayActive())foxMageWowCastFx(w.kind,w.kind==='giant_fireball'?1.7:(w.kind==='fox_arcane_bloom'?1.8:(w.kind==='fox_spirit_gate'?2.05:(w.kind==='arcane_lance'?1.45:1.0))),false);
   // V23.12.05: Chopper's Secondary moves own their gameplay inside the
   // standalone ChopperPirateKit. Previously these kinds fell through to the
   // generic ranged branch below, which called shootFromPosition() and produced
@@ -32751,6 +32687,10 @@ function performWeaponAttack(w, countsAsPrimary=true){
     triggerChopperSecondary(w);
   } else if(w.kind==='velocity_sonic_piston'||w.kind==='velocity_arc_sweep'){
     triggerShadowStalkerPrimary(w);
+  } else if(w.kind==='fox_arcane_bloom'){
+    triggerFoxArcaneBloom(w);
+  } else if(w.kind==='fox_spirit_gate'){
+    triggerFoxSpiritGate(w);
   } else if(isWolverineWeaponKind(w.kind)){
     doWolverineAttack(w);
   } else if(isRhinoWeaponKind(w.kind)){
@@ -32832,6 +32772,11 @@ function doShoot(){
 
   const w=weaponForAvatar();
 
+  // Zero cooldown means no post-cast waiting; it does not mean one projectile
+  // every rendered frame. Rapid Fire keeps a real cast-cycle cadence so held
+  // FIRE remains rapid without becoming invincibility-level DPS.
+  if(state.avatarType==='mage'&&w&&w.name==='Rapid Fire & Ice'&&foxRapidPrimaryCadence>0)return;
+
   if(player.userData.attackCooldown>0){
     // Royal Vanguard Combo is a true hold-to-chain Primary. The main update
     // loop retries while FIRE remains held, so no buffered strike is stored.
@@ -32844,6 +32789,7 @@ function doShoot(){
   }
 
   player.userData.attackCooldown=attackCooldownFor(w);
+  if(state.avatarType==='mage'&&w&&w.name==='Rapid Fire & Ice')foxRapidPrimaryCadence=.18;
   try{ performWeaponAttack(w,true); }
   catch(err){ vwOnce('performWeaponAttack THREW: '+err.message); console.error(err); }
 }
@@ -35304,6 +35250,7 @@ function update(dt){
   }
 
   if(player.userData.attackCooldown>0) player.userData.attackCooldown -= dt;
+  if(foxRapidPrimaryCadence>0)foxRapidPrimaryCadence=Math.max(0,foxRapidPrimaryCadence-dt);
   // Tap casts once in beginPrimaryFire(); while FIRE remains held, retry here
   // and let the equipped primary's own cooldown decide when another shot fires.
   if(primaryInputHeld && gameRunning) doShoot();
@@ -35335,7 +35282,7 @@ function update(dt){
   }
   // Ultimate/Ability and Signature now follow the same hold-to-auto rule as
   // Primary/Secondary. Their own cooldown/charge gates remain authoritative.
-  if(abilityInputHeld && gameRunning && equippedAbilityId!=='arcane_laser'){
+  if(abilityInputHeld && gameRunning){
     activateEquippedAbilityNow();
   }
   if(signatureInputHeld && gameRunning){
