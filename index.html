@@ -1,3 +1,4 @@
+<!-- V23.43.00 Ranger/Aesir Ultimate Swap + Ranger Size Match: visually increases Green Rhino Ranger from the too-small V23.42 Archer-height estimate to a larger Archer-matched presentation in both selection preview and gameplay. Swaps Ultimate ownership without rewriting their behavior: Aesir's former Storm-Step slot now runs World-Breaker Crashing Bolt, while Ranger's former Crashing Bolt slot runs the full 10-second Storm-Step gravity/auto-Blitz sequence. Ranger uses a giant center boomerang as the fixed gravity-core weapon instead of Aesir's axe. -->
 <!-- V23.42.00 Ranger Titan Rig + Preview Size Repair: Titan mode now exclusively owns the Green Rhino Ranger player scale so Gamma Leap and other secondaries cannot cache/reapply giant transforms or fight the Titan state. The native fit wrapper is restored to its authored baseline outside active Whirlwind, preventing residual move rotations/tilts. Ranger avatar-selection preview now uses the same ~1.3024 visible height as the Archer preview instead of the old 2.28 tall reference. All V23.41 Whirlwind boomerang-burst behavior remains intact. -->
 <!-- V23.41.00 Ranger Whirlwind 5-Hit Boomerang Burst: every fifth actual Green Rhino Ranger Defensive Whirlwind enemy hit launches a round-scaled radial burst of giant boomerangs, starting at 4 and reaching 8 evenly spaced projectiles at Round 30. The burst boomerangs fly beyond the arena, hard-execute normal enemies on contact, and stun all non-normal enemies including bosses instead of executing them. Stormbreaker Giant Boomerangs and prior Ranger fixes remain intact. -->
 <!-- V23.40.00 Ranger Stormbreaker Giant Boomerangs: Stormbreaker Overdrive no longer creates an axe. It now launches round-scaled oversized independent boomerangs simultaneously in evenly spaced directions: 1 at early rounds, scaling to 4 at Round 30. Their gameplay collision radius exactly follows their visible radius. Normal enemies are hard-executed on first contact; Brutes/other large non-boss enemies are strongly slowed on first Stormbreaker contact and hard-executed on the second; bosses are never executed and instead take protected damage. Ranger Archer-size match, Twin Boomerang fix, and hold-only Whirlwind remain intact. -->
@@ -1717,7 +1718,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.42.00 - Ranger Titan Rig + Preview Size Repair';
+const GAME_VERSION='23.43.00 - Ranger/Aesir Ultimate Swap + Size Match';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -2110,7 +2111,7 @@ const HERO_ROSTER_INFO = {
   barbarian:{title:'Aesir Barbarian',role:'SLOW • AREA BRUISER',desc:'A storm-forged warrior whose axe is a living bolt that hunts beside her, lightning and raw ground power. She is by far the SLOWEST avatar in the roster and cannot chase anything down - instead every single blow she lands throws a shockwave out of the impact point, so she is never fighting one enemy at a time. Two Primaries, three Secondaries, three selectable Ultimates, and a Berserker Kin clone special.'},
   
   cloud:{title:'Cloud',role:'MELEE • KNIGHT CLASS',desc:'Cloud is now the primary avatar for the Knight combat class. He uses his native 43-joint skeleton and Walk animation while running the complete Knight combat system. Future cosmetic skins can reuse this same Knight-class moveset without changing the combat logic.'},
-  rhino:{title:'Green Rhino Ranger',role:'WORLD-BREAKER • THUNDER GOD',desc:'A mobile Hulk-Thor style Ranger built around one giant axe and procedural power moves. Twin Boomerang remains the Primary. Secondaries are Stormbreaker Boomerang Overdrive, Gamma Leap and Defensive Whirlwind. Ultimates are World-Breaker Crashing Bolt, Titan Rampage and Armageddon. His signature summons an invincible Green Ranger clone squad that follows the same round-scaled count, duration, cooldown, aggro and 10%-damage rules as the Knight\'s Knights of the Round.'}
+  rhino:{title:'Green Rhino Ranger',role:'WORLD-BREAKER • THUNDER GOD',desc:'A mobile boomerang-focused Ranger with Twin Boomerang Primary and giant detached boomerang specials. Secondaries are Stormbreaker Boomerang Overdrive, Gamma Leap and Defensive Whirlwind. Ultimates are Storm-Step Overdrive, Titan Rampage and Armageddon. His signature summons an invincible Green Ranger clone squad that follows the same round-scaled count, duration, cooldown, aggro and 10%-damage rules as the Knight\'s Knights of the Round.'}
 };
 
 // Data-driven hero passives. This object had accidentally been merged into
@@ -2878,12 +2879,13 @@ async function updateAvatarPreview(characterId){
       fit.add(root);
 
       // V23.42.00: selection preview matches the Archer's actual preview
-      // height, not Aesir's old 2.28 reference. Archer preview uses 1.48 times
-      // AVATAR_SCALE.rogue (0.88), which is ~1.3024 visible units.
+      // height using the live visual comparison pass. V23.42's 1.3024 estimate
+      // made the Ranger visibly smaller than Archer because Rhino's proportions/weapons
+      // occupy its imported bounds differently. 1.82 gives the intended card match.
       root.updateMatrixWorld(true);
       const rbox=importedVisibleMeshBounds(root,THREEAsset);
       const rsize=rbox.getSize(new THREEAsset.Vector3());
-      const rangerPreviewHeight=1.48*(AVATAR_SCALE.rogue||0.88);
+      const rangerPreviewHeight=1.82;
       fit.scale.setScalar(rangerPreviewHeight/Math.max(.001,rsize.y));
 
       fit.updateMatrixWorld(true);
@@ -13138,11 +13140,11 @@ function buildGreenRhinoPlayer(options={}){
     const rawBox  = importedVisibleMeshBounds(root, THREEAsset);
     const rawSize = rawBox.getSize(new THREEAsset.Vector3());
     // V23.39.00: Green Rhino Ranger matches the Archer's visible gameplay
-    // height. The Archer root is fitted to 1.48 and then receives AVATAR_SCALE
-    // rogue 0.88, producing ~1.3024 world units. Fit Rhino to that same final
-    // world height while preserving Rhino's own wrapper/titan scale pipeline.
+    // height. V23.42's raw numeric match produced a visibly undersized Ranger,
+    // so V23.43 uses the visual-match target 1.82 while preserving Rhino's
+    // wrapper/Titan scale pipeline.
     const parentScale = AVATAR_SCALE.rhino || 1;
-    const archerWorldHeight = 1.48 * (AVATAR_SCALE.rogue || 0.88);
+    const archerWorldHeight = 1.82;
     const targetHeight = archerWorldHeight / parentScale;
     fit.scale.setScalar(targetHeight / Math.max(.001, rawSize.y));
 
@@ -14946,11 +14948,11 @@ const BARBARIAN_WORLD_BREAKER = {id:'barbarian_world_breaker', name:'Mjolnir Sup
   desc:'Command the floating axe into a giant spinning supernova. Plasma rings, wind and thunder expand across the arena, clearing normal enemies and hammering tougher targets with repeated protected damage.'};
 const BARBARIAN_RAGNAROK_WAVE = {id:'barbarian_ragnarok_wave', name:'Titan Ascension', price:900, avatar:'barbarian', unlockLevel:18,
   desc:'TITAN TRANSFORMATION. Uses the same Guardian Titan rules: grow to 5x size for 15 seconds, gain 5x Primary/Secondary damage and 2.6x combat reach, move at 85% speed, keep Primary and the equipped Secondary available, and lock other specials until the transformation ends. Cooldown is 0 during development testing.'};
-const BARBARIAN_STORM_STEP_OVERDRIVE = {id:'barbarian_storm_step_overdrive', name:'Storm-Step Overdrive', price:950, avatar:'barbarian', unlockLevel:20,
-  desc:'Blitz-dash to arena center and leave the floating axe there at 3x size for 10 seconds. The axe emits a new expanding ring every second and pulls every enemy, even outside the arena, toward map center at normal speed while Aesir auto-Blitzes across random points and executes non-boss enemies on contact.'};
+const BARBARIAN_STORM_STEP_OVERDRIVE = {id:'barbarian_storm_step_overdrive', name:'World-Breaker Crashing Bolt', price:950, avatar:'barbarian', unlockLevel:20,
+  desc:'Dash to arena center, then perform four complete leap-and-crash cycles. Every crash launches one numbered circular kill wave; each wave travels to the playable edge before the next leap begins. This is the former Ranger World-Breaker move, transferred intact to Aesir.'};
 
-const RHINO_CRASHING_BOLT = {id:'rhino_crashing_bolt', name:'World-Breaker Crashing Bolt', price:640, avatar:'rhino', unlockLevel:5,
-  desc:'Dash to arena center, then perform four complete leap-and-crash cycles. Every crash launches one numbered circular kill wave; each wave takes about 3 seconds to reach the playable edge, and the next leap does not begin until the previous wave is completely finished.'};
+const RHINO_CRASHING_BOLT = {id:'rhino_crashing_bolt', name:'Storm-Step Overdrive', price:640, avatar:'rhino', unlockLevel:5,
+  desc:'Blitz to arena center, lock a giant boomerang gravity core above center, pull enemies rapidly inward, and auto-Blitz across random points for 10 seconds. Non-boss enemies entering the inner-half kill zone are instantly eliminated. This is Aesir\'s former Storm-Step Ultimate transferred to Ranger.'};
 const RHINO_SHATTERED_DOMAIN = {id:'rhino_shattered_domain', name:'Titan Rampage', price:760, avatar:'rhino', unlockLevel:14,
   desc:'TRANSFORMATION. Grow to the exact same 5x size as Knight Guardian Titan for the same 15-second duration and use the same cooldown curve. Primary remains available. Secondary keeps using only the move you actually equipped before the match. Giant attacks use Knight Titan-scaled power and combat reach.'};
 const RHINO_SKY_FATHER = {id:'rhino_sky_father', name:'Armageddon', price:900, avatar:'rhino', unlockLevel:18,
@@ -15913,6 +15915,7 @@ let barbarianRuntime = {
 };
 function barbarianResetRuntime(){
   rhinoResetRuntime();
+  try{if(barbarianRuntime&&barbarianRuntime.stormStepCenterWeapon){rhinoWBDispose(barbarianRuntime.stormStepCenterWeapon);barbarianRuntime.stormStepCenterWeapon=null;}}catch(_err){}
   try{if(aesirAxe&&aesirAxe.unpin)aesirAxe.unpin();}catch(_err){}
   try{if(typeof aesirResetSecondaries==='function')aesirResetSecondaries();}catch(_err){}
   try{barbarianClearWhirlVisual();}catch(_err){}
@@ -23637,7 +23640,7 @@ function knightAbilityCooldownInfo(){
       return {label:active?'OLYMPUS '+Math.max(0,barbarianRuntime.olympusSupernovaActive||0).toFixed(1):'OLYMPUS',cd:0,active,activeTime:active?barbarianRuntime.olympusSupernovaActive:undefined};
     }
     case 'rhino_crashing_bolt': {
-      const active=!!rhinoRuntime.crashing;return {label:active?'CRASHING':'CRASH BOLT',cd:rhinoRuntime.crashingCooldown||0,active,activeTime:active?rhinoRuntime.crashing.t:undefined};
+      const active=(barbarianRuntime.stormStepActive||0)>0;return {label:active?'STORM-STEP':'STORM-STEP',cd:0,active,activeTime:active?barbarianRuntime.stormStepActive:undefined};
     }
     case 'rhino_shattered_domain': {
       const active=rhinoTitanActive();
@@ -23662,8 +23665,8 @@ function knightAbilityCooldownInfo(){
       return {label:active?'TITAN '+Math.max(0,barbarianRuntime.twilightActive||0).toFixed(1):'TITAN',cd:0,active,activeTime:active?barbarianRuntime.twilightActive:undefined};
     }
     case 'barbarian_storm_step_overdrive': {
-      const active=(barbarianRuntime.stormStepActive||0)>0;
-      return {label:active?'STORM-STEP':'STORM-STEP',cd:0,active,activeTime:active?barbarianRuntime.stormStepActive:undefined};
+      const active=!!rhinoRuntime.crashing;
+      return {label:active?'CRASHING':'CRASH BOLT',cd:0,active,activeTime:active?rhinoRuntime.crashing.t:undefined};
     }
     default: return null;
   }
@@ -23679,7 +23682,7 @@ function triggerBarbarianEquippedAbility(){
   // Green Ranger owns a dedicated three-ultimate World-Breaker kit.
   if(rhinoIsActive()){
     if(rhinoTitanActive()&&equippedAbilityId!=='rhino_shattered_domain')return;
-    if(equippedAbilityId==='rhino_crashing_bolt')triggerRhinoCrashingBolt();
+    if(equippedAbilityId==='rhino_crashing_bolt')triggerStormStepOverdrive();
     else if(equippedAbilityId==='rhino_shattered_domain')triggerRhinoTitanRampage();
     else if(equippedAbilityId==='rhino_sky_father')triggerRhinoArmageddon();
     return;
@@ -23690,7 +23693,7 @@ function triggerBarbarianEquippedAbility(){
   else if(equippedAbilityId==='barbarian_world_breaker') triggerPrimalRage();
   else if(equippedAbilityId==='barbarian_thunder_dome') triggerPrimalRage(); // legacy save migration
   else if(equippedAbilityId==='barbarian_ragnarok_wave') triggerRagnarokWave();
-  else if(equippedAbilityId==='barbarian_storm_step_overdrive') triggerStormStepOverdrive();
+  else if(equippedAbilityId==='barbarian_storm_step_overdrive') triggerRhinoCrashingBolt();
 }
 function triggerKnightEquippedAbility(){
   if(!knightIsActive()) return;
@@ -26999,8 +27002,16 @@ function triggerStormStepOverdrive(){
   r.stormStepContactGate=new Map();
   r.stormStepPrevX=player.position.x;r.stormStepPrevZ=player.position.z;
   r.stormStepTargetX=0;r.stormStepTargetZ=0;
-  // The axe is the fixed gravity core: centered, overhead and 3x spirit size.
-  if(aesirAxe&&aesirAxe.pin)aesirAxe.pin({x:0,y:player.position.y+4.2,z:0},3.0);
+  // Fixed center gravity core. Aesir uses her independent axe; Ranger uses
+  // an oversized detached boomerang so the transferred Ultimate keeps Ranger identity.
+  r.stormStepCenterWeapon=null;
+  if(aesirAxe&&aesirAxe.pin){
+    aesirAxe.pin({x:0,y:player.position.y+4.2,z:0},3.0);
+  }else if(rhinoIsActive() && typeof rhinoWBMakeGiantBoomerang==='function'){
+    const core=rhinoWBMakeGiantBoomerang(RHINO_PALE,3.5);
+    core.position.set(0,4.2,0);core.rotation.x=Math.PI*.5;scene.add(core);
+    r.stormStepCenterWeapon=core;
+  }
   aesirChooseStormStepAutoPoint();
   invincibleTimer=Math.max(invincibleTimer||0,10.05);
   markUltimateUsed();toast('STORM-STEP OVERDRIVE');
@@ -27078,8 +27089,12 @@ function updateStormStepOverdrive(dt){
   r.stormStepDashTick=(r.stormStepDashTick||0)-dt;
   r.stormStepRingTick=(r.stormStepRingTick||1)-dt;
   invincibleTimer=Math.max(invincibleTimer||0,.30);
+  if(r.stormStepCenterWeapon){
+    r.stormStepCenterWeapon.position.set(0,4.2,0);
+    r.stormStepCenterWeapon.rotation.z+=dt*9.0;
+  }
 
-  // The fixed center axe emits one fresh expanding electric ring every second.
+  // The fixed center weapon emits one fresh expanding electric ring every second.
   // This is independent of Aesir's hunt position and lasts for the whole move.
   if(r.stormStepRingTick<=0){
     r.stormStepRingTick+=1.0;
@@ -27111,6 +27126,7 @@ function updateStormStepOverdrive(dt){
     r.stormStepActive=0;r.stormStepDashTick=0;r.stormStepRingTick=0;r.stormStepContactGate.clear();
     r.stormStepTargetX=0;r.stormStepTargetZ=0;
     if(aesirAxe&&aesirAxe.unpin)aesirAxe.unpin();
+    if(r.stormStepCenterWeapon){rhinoWBDispose(r.stormStepCenterWeapon);r.stormStepCenterWeapon=null;}
     aesirStormFlash(.12,60);
   }
 }
@@ -34943,6 +34959,7 @@ function update(dt){
       updateWorldBreaker(dt);
       updateRagnarokWave(dt);
       updateStormStepOverdrive(dt);
+      if(!rhinoIsActive() && rhinoRuntime.crashing) updateRhinoCrashingBolt(dt);
       if((barbarianRuntime.roarBuffTimer||0)>0)barbarianRuntime.roarBuffTimer=Math.max(0,barbarianRuntime.roarBuffTimer-dt);
       if(String(equippedAbilityId||'').indexOf('barbarian_')===0 || barbarianKinCooldown>0 || barbarianKinClones.length>0){
         updateHoodedHud();
