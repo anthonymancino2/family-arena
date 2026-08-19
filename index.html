@@ -1,3 +1,4 @@
+<!-- V23.44.00 Fox Hold Autofire + Nine-Tail VFX Overhaul: fixes Fox Arcane Lance/Giant Fireball hold-repeat by separating pending release locks from development cooldowns, so held Primary/Secondary/Ultimate controls reliably recast when their current release/active state is ready. Adds a mobile-capped Fox-specific cast language across Fire & Ice, Rapid Fire & Ice, Arcane Lance, Giant Fireball, Blizzard, Arcane Laser, Super Meteor and Arcane Echoes: nine-tail foxfire point fans, layered rune/element halos, stronger launch crowns and ultimate activation sigils, while reusing the global FX ceiling/stress throttling. Existing fox guard/run/tail animation authority is unchanged. -->
 <!-- V23.43.00 Ranger/Aesir Ultimate Swap + Ranger Size Match: visually increases Green Rhino Ranger from the too-small V23.42 Archer-height estimate to a larger Archer-matched presentation in both selection preview and gameplay. Swaps Ultimate ownership without rewriting their behavior: Aesir's former Storm-Step slot now runs World-Breaker Crashing Bolt, while Ranger's former Crashing Bolt slot runs the full 10-second Storm-Step gravity/auto-Blitz sequence. Ranger uses a giant center boomerang as the fixed gravity-core weapon instead of Aesir's axe. -->
 <!-- V23.42.00 Ranger Titan Rig + Preview Size Repair: Titan mode now exclusively owns the Green Rhino Ranger player scale so Gamma Leap and other secondaries cannot cache/reapply giant transforms or fight the Titan state. The native fit wrapper is restored to its authored baseline outside active Whirlwind, preventing residual move rotations/tilts. Ranger avatar-selection preview now uses the same ~1.3024 visible height as the Archer preview instead of the old 2.28 tall reference. All V23.41 Whirlwind boomerang-burst behavior remains intact. -->
 <!-- V23.41.00 Ranger Whirlwind 5-Hit Boomerang Burst: every fifth actual Green Rhino Ranger Defensive Whirlwind enemy hit launches a round-scaled radial burst of giant boomerangs, starting at 4 and reaching 8 evenly spaced projectiles at Round 30. The burst boomerangs fly beyond the arena, hard-execute normal enemies on contact, and stun all non-normal enemies including bosses instead of executing them. Stormbreaker Giant Boomerangs and prior Ranger fixes remain intact. -->
@@ -1718,7 +1719,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.43.00 - Ranger/Aesir Ultimate Swap + Size Match';
+const GAME_VERSION='23.44.00 - Fox Hold Autofire + Nine-Tail VFX Overhaul';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3823,7 +3824,7 @@ const CHARACTER_COMBAT = {
     defaultId:'elemental',
     baseMoveMult:1,
     weapons:{
-      elemental:{name:'Fire & Ice', price:0, slot:'primary', kind:'elemental', cooldown:0.34, damage:1,
+      elemental:{name:'Fire & Ice', price:0, slot:'primary', kind:'elemental', cooldown:0.34, damage:1, auto:true,
         desc:'Alternates fireballs and ice bolts.'},
       rapid_elemental:{name:'Rapid Fire & Ice', price:210, slot:'primary', kind:'elemental', cooldown:0.075, damage:0.72, auto:true,
         desc:'Hold FIRE for Uzi-speed alternating fire and ice.'},
@@ -13857,7 +13858,7 @@ function spawnPlayer(){
   // Migration-only legacy alias. Ninefox is no longer a selectable/runtime hero.
   if(state.avatarType==='ninefox')state.avatarType='mage';
   if(!AVATAR_TYPES.includes(state.avatarType)) state.avatarType = 'rogue';
-  if(state.avatarType==='mage')foxMageQueuedCastSerial++;
+  if(state.avatarType==='mage')foxMageQueuedCastSerial++;foxMagePendingRelease.arcane_lance=false;foxMagePendingRelease.giant_fireball=false;
   player = buildKayKitPlayer(state.avatarType);
   const avatarScale = AVATAR_SCALE[state.avatarType] || 1;
   player.scale.setScalar(avatarScale);
@@ -15578,7 +15579,7 @@ function rerunCurrentRound(){
   roundTimerFrozenElapsed=null;
   clearZombies();
   clearArcaneEchoes();
-  foxMageQueuedCastSerial++;
+  foxMageQueuedCastSerial++;foxMagePendingRelease.arcane_lance=false;foxMagePendingRelease.giant_fireball=false;
   if(state.avatarType==='mage'&&player){
     dashActive=false;dashTimer=0;dashStartedAt=0;
     nineFoxRepairPresentation(true);
@@ -17084,6 +17085,7 @@ function triggerArcaneEchoes(){
   arcaneEchoesCooldownTimer=arcaneEchoesCycleDuration;
   updateHoodedHud();
   toast('ARCANE ECHOES!');
+  foxMageWowUltimateFx('echo',2.55);
   navigator.vibrate&&navigator.vibrate([30,25,55]);
   const foxEchoMode=echoAvatarType==='mage';
   const echoAssetPromise=foxEchoMode?getNineTailedFoxAssetPromise():getKayKitAssetPromise('mage');
@@ -28806,9 +28808,10 @@ function foxMageAbilityPose(kind,durationMs=320){
 }
 
 function triggerBlizzardStorm(){
-  if(!gameRunning||!mageGameplayActive()||equippedAbilityId!=='blizzard_storm'||!ownedAbilities.blizzard_storm||blizzardCooldownTimer>0)return;
+  if(!gameRunning||!mageGameplayActive()||equippedAbilityId!=='blizzard_storm'||!ownedAbilities.blizzard_storm||blizzardCooldownTimer>0||blizzardActiveTimer>0)return;
   markUltimateUsed();
   foxMageAbilityPose('blizzard',360);
+  foxMageWowUltimateFx('blizzard',2.8);
   blizzardCooldownTimer=BLIZZARD_COOLDOWN; abilityButtonCooldown(BLIZZARD_COOLDOWN);
   blizzardActiveTimer=BLIZZARD_DURATION; blizzardSpawnTimer=0; blizzardDamageTimer=0; blizzardCenter.copy(player.position);
   blizzardLastPlayerPos.copy(player.position);
@@ -29357,6 +29360,7 @@ function triggerSuperMeteor(){
 
   markUltimateUsed();
   foxMageAbilityPose('meteor',520);
+  foxMageWowUltimateFx('meteor',3.25);
   spawnBurst(player.position.x,player.position.y+.66,player.position.z,10,FX_MAT_SPARK,3.4);
   superMeteorSequenceActive=true;
   superMeteorNextQuadrant=1;
@@ -29845,6 +29849,7 @@ function startArcaneLaser(){
   if(!gameRunning || !laserAvailable() || laserActive || laserCharge<=1) return;
   markUltimateUsed();
   foxMageAbilityPose('laser',260);
+  foxMageWowUltimateFx('laser',2.35);
   laserActive = true;
   laserRegenDelayTimer = LASER_REGEN_DELAY;
   spawnArcaneRuneBurst(new THREE.Vector3(player.position.x,player.position.y+.58,player.position.z), 1.25);
@@ -30349,6 +30354,7 @@ function cloneAttack(w){
 }
 
 let foxMageQueuedCastSerial=0;
+const foxMagePendingRelease={arcane_lance:false,giant_fireball:false};
 function foxMageProjectileReleaseDelay(w,moving=false){
   if(!w)return 0;
   if(w.kind==='giant_fireball')return moving?115:155;
@@ -30356,30 +30362,31 @@ function foxMageProjectileReleaseDelay(w,moving=false){
   return 0;
 }
 function fireFoxMageProjectileTimed(w){
-  if(!w||!player||state.avatarType!=='mage'||!gameRunning)return;
+  if(!w||!player||state.avatarType!=='mage'||!gameRunning)return false;
   const delay=foxMageProjectileReleaseDelay(w,dashActive||!!(moveVec.x||moveVec.y));
-  if(delay<=0){
-    shootFromPosition(w,player.position,0);
-    return;
-  }
-
-  const serial=++foxMageQueuedCastSerial;
+  if(delay<=0){shootFromPosition(w,player.position,0);return true;}
+  const key=w.kind;
+  // Development cooldowns may be zero, but an authored cast still needs to reach
+  // its release frame. While held, the main loop retries immediately after this
+  // pending release clears, giving reliable auto-fire without self-canceling.
+  if(foxMagePendingRelease[key])return false;
+  foxMagePendingRelease[key]=true;
+  const generation=foxMageQueuedCastSerial;
   const sourcePlayer=player;
   const avatarAtCast=state.avatarType;
   setTimeout(()=>{
-    if(serial!==foxMageQueuedCastSerial)return;
+    if(generation!==foxMageQueuedCastSerial)return;
+    foxMagePendingRelease[key]=false;
     if(!gameRunning||!player||player!==sourcePlayer||state.avatarType!==avatarAtCast||state.avatarType!=='mage')return;
     shootFromPosition(w,player.position,0);
-
-    // Tiny release accent at body height. No ground flash and no extra persistent FX.
-    if(!mageStressVisualLoad()){
-      const yaw=player.rotation.y,dx=Math.sin(yaw),dz=Math.cos(yaw);
-      const forward=w.kind==='giant_fireball'?1.10:.86;
-      const y=player.position.y+(w.kind==='giant_fireball'?.68:.72);
-      spawnBurst(player.position.x+dx*forward,y,player.position.z+dz*forward,
-        w.kind==='giant_fireball'?3:2,FX_MAT_SPARK,w.kind==='giant_fireball'?1.8:1.25);
-    }
+    foxMageWowCastFx(key,key==='giant_fireball'?2.05:1.75,false);
+    const yaw=player.rotation.y,dx=Math.sin(yaw),dz=Math.cos(yaw);
+    const forward=key==='giant_fireball'?1.10:.86;
+    const y=player.position.y+(key==='giant_fireball'?.68:.72);
+    spawnBurst(player.position.x+dx*forward,y,player.position.z+dz*forward,
+      mageStressVisualLoad()?3:(key==='giant_fireball'?8:6),FX_MAT_SPARK,key==='giant_fireball'?2.8:2.0);
   },delay);
+  return true;
 }
 
 /* ============================================================ WOLVERINE
@@ -32669,8 +32676,70 @@ function triggerHoodedEquippedAbility(){
   return false;
 }
 
+
+let foxMageWowNextAt=0;
+function foxMageWowPalette(kind){
+  if(kind==='giant_fireball'||kind==='fire')return [0xff8a32,0xffe5a0,0xff4f2e];
+  if(kind==='arcane_lance'||kind==='laser')return [0x72e8ff,0xd7a2ff,0xffffff];
+  if(kind==='blizzard')return [0x83edff,0xa779ff,0xeaffff];
+  if(kind==='meteor')return [0xffb13b,0xfff0b5,0xc970ff];
+  if(kind==='echo')return [0x8ef4ff,0xcf8cff,0xffffff];
+  return mageElementToggle?[0x7de9ff,0xe7fbff,0x8b7dff]:[0xff7b39,0xffe6a1,0xff4d79];
+}
+function foxMageWowCastFx(kind='elemental',scale=1,ultimate=false){
+  if(!player||!scene||state.avatarType!=='mage')return;
+  const now=performance.now();
+  const minGap=ultimate?0:(kind==='elemental'?90:145);
+  if(!ultimate&&now<foxMageWowNextAt)return;
+  if(!ultimate)foxMageWowNextAt=now+minGap;
+  const stressed=mageStressVisualLoad();
+  if(stressed&&!ultimate&&fx.length>105)return;
+  const pal=foxMageWowPalette(kind);
+  const g=new THREE.Group();
+  g.position.copy(player.position);g.position.y+=.03;
+  g.rotation.y=player.rotation.y;
+  const addMat=(c,o)=>{
+    const m=new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:o,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+    return m;
+  };
+  const ringCount=stressed&&!ultimate?1:2;
+  for(let i=0;i<ringCount;i++){
+    const r=(.72+i*.28)*scale;
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.025*scale,6,36),addMat(pal[i%2],ultimate?.58:.40));
+    ring.rotation.x=Math.PI/2;ring.position.y=.08+i*.18*scale;ring.userData.baseOpacity=ultimate?.58:.40;g.add(ring);
+  }
+  // One Points draw call represents all nine tails/foxfire wisps.
+  const pos=new Float32Array(9*3);
+  for(let i=0;i<9;i++){
+    const u=i/8-.5, a=u*1.7;
+    pos[i*3]=Math.sin(a)*(1.0+Math.abs(u)*.75)*scale;
+    pos[i*3+1]=(.46+Math.cos(u*Math.PI)*.58+Math.abs(u)*.28)*scale;
+    pos[i*3+2]=(-.28-Math.cos(a)*.74-Math.abs(u)*.38)*scale;
+  }
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const pm=new THREE.PointsMaterial({color:pal[1],size:(ultimate?.22:.13)*scale,transparent:true,opacity:ultimate?.92:.72,depthWrite:false,blending:THREE.AdditiveBlending,sizeAttenuation:true});
+  const tails=new THREE.Points(geo,pm);tails.userData.baseOpacity=ultimate?.92:.72;g.add(tails);
+  if(!stressed||ultimate){
+    const crown=new THREE.Mesh(new THREE.TorusGeometry(.48*scale,.035*scale,6,28),addMat(pal[2],ultimate?.68:.42));
+    crown.rotation.x=Math.PI/2;crown.rotation.z=Math.PI/4;crown.position.y=1.05*scale;crown.userData.baseOpacity=ultimate?.68:.42;g.add(crown);
+  }
+  scene.add(g);
+  const life=ultimate?1.15:(kind==='giant_fireball'||kind==='arcane_lance'?.62:.42);
+  fx.push({kind:'knightFx',mesh:g,life,maxLife:life,spin:ultimate?2.2:5.2,spinZ:ultimate?.7:1.1,grow:ultimate?.85:.38,from:.82,dispose:true});
+}
+function foxMageWowUltimateFx(kind,scale=2.6){
+  foxMageWowCastFx(kind,scale,true);
+  if(!player)return;
+  const stressed=mageStressVisualLoad();
+  const p=player.position;
+  if(typeof spawnArcaneSigil==='function')spawnArcaneSigil(p.x,.035,p.z,Math.min(arenaSize*.28,3.2*scale));
+  if(typeof spawnArcaneRuneBurst==='function'&&!stressed)spawnArcaneRuneBurst(new THREE.Vector3(p.x,p.y+.65,p.z),1.25*scale);
+  spawnBurst(p.x,p.y+.68,p.z,stressed?8:18,FX_MAT_SPARK,3.2*scale);
+}
+
 function performWeaponAttack(w, countsAsPrimary=true){
   if(!w) return;
+  if(state.avatarType==='mage'&&mageGameplayActive())foxMageWowCastFx(w.kind,w.kind==='giant_fireball'?1.7:(w.kind==='arcane_lance'?1.45:1.0),false);
   // V23.12.05: Chopper's Secondary moves own their gameplay inside the
   // standalone ChopperPirateKit. Previously these kinds fell through to the
   // generic ranged branch below, which called shootFromPosition() and produced
@@ -35952,7 +36021,7 @@ function startSurvival(){
   ownedAbilities = {};
   equippedAbilityId = null;
   rerunEndsAfterRound=false;
-  foxMageQueuedCastSerial++;
+  foxMageQueuedCastSerial++;foxMagePendingRelease.arcane_lance=false;foxMagePendingRelease.giant_fireball=false;
   clearArcaneEchoes();
   arcaneEchoesCooldownTimer=0;
   arcaneEchoesCycleDuration=15;
