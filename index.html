@@ -1,3 +1,4 @@
+<!-- V23.35.00 Storm-Step Center Threshold Execute: during Storm-Step Overdrive, every live enemy inside or outside the arena is pulled rapidly toward exact map center. The pull runs at 2.75x each enemy's normal movement speed with a minimum gravity speed so slow units cannot stall. The instant any non-boss crosses into the inner half of the playable-map radius, it is force-executed immediately whether Aesir touched it or not. Bosses are exempt from execution but are still pulled toward center. Existing 10-second auto-Blitz, fixed 3x center axe, one-second rings, and Whirlwind shutdown remain unchanged. -->
 <!-- V23.34.00 Storm-Step Hard Execute: removes normal-enemy damage resolution from Storm-Step entirely. Every non-boss inside any of the three visible jagged dash corridors or the continuous close-contact radius is force-executed through killZombie() immediately, with a slightly wider swept corridor so extreme-speed movement cannot visually pass through enemies without counting. Bosses alone retain protected damage. All V23.33 center-axe gravity, 3x axe, one-second rings, auto-Blitz timing and Whirlwind fixes remain unchanged. -->
 <!-- V23.33.00 Storm-Step Contact Damage Repair: Storm-Step Overdrive now resolves lethal contact against every one of the three actual jagged Blitz segments instead of approximating the whole dash as one straight start-to-end line. The opening Blitz into arena center uses the same execution sweep. Non-boss enemies crossed by any visible segment are instantly defeated; bosses keep protected contact damage. Existing center-axe gravity pull, 3x axe, one-second rings, auto-Blitz timing, Whirlwind shutdown fix and global testing cooldown rules remain unchanged. -->
 <!-- V23.32.00 Aesir Whirlwind Reliable Shutdown: fixes Aesir Whirlwind occasionally remaining active/visually spinning after release or interruption. Releasing Secondary now always ends Aesir Whirlwind, including high-round infinite-duration states; cleanup explicitly clears gameplay timer, pulse, FX, spin visual timer/speed and pose lock. Round/reset/avatar-loss guards also force cleanup. Knight Whirlwind behavior is unchanged. -->
@@ -1709,7 +1710,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.34.00 - Storm-Step Hard Execute';
+const GAME_VERSION='23.35.00 - Storm-Step Center Threshold Execute';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -35221,19 +35222,47 @@ function update(dt){
       z.userData.specialTimer=Math.max(0,(z.userData.specialTimer||0)-enemyDt);
 
       // Storm-Step gravity phase: EVERY live enemy, even outside the arena,
-      // is pulled toward exact MAP CENTER (the fixed giant axe), not toward the
-      // roaming Aesir. Each enemy still travels at its own normal move speed.
+      // is pulled FAST toward exact MAP CENTER (the fixed giant axe). Normal
+      // enemies no longer need to touch Aesir: crossing the halfway-radius
+      // threshold of the playable map is an immediate hard execution.
       if(aesirStormStepAutoActive()){
         const pdx=-z.position.x,pdz=-z.position.z;
         const pDist=Math.hypot(pdx,pdz);
+        const halfMapR=Math.max(2,(arenaSize-1)*0.5);
+
+        // Execute immediately if a normal enemy is already at/inside halfway.
+        // Bosses alone are exempt from this threshold kill.
+        if(!aesirUltimateEnemyIsBoss(z) && pDist<=halfMapR){
+          const ex=z.position.clone();
+          z.userData.hp=0;
+          z.userData.dead=false;
+          killZombie(z);
+          spawnBurst(ex.x,ex.y+.55,ex.z,isMobile?4:7,FX_MAT_SPARK,2.2);
+          return;
+        }
+
         if(pDist>.001){
-          const step=Math.min(pDist,Math.max(0,z.userData.speed||0)*enemyDt);
+          const baseSpeed=Math.max(0,z.userData.speed||0);
+          const gravitySpeed=Math.max(7.5,baseSpeed*2.75);
+          const step=Math.min(pDist,gravitySpeed*enemyDt);
           z.position.x+=pdx/pDist*step;
           z.position.z+=pdz/pDist*step;
           const desiredYaw=Math.atan2(pdx,pdz);
           let yawDelta=((desiredYaw-z.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI;
-          z.rotation.y+=yawDelta*Math.min(1,enemyDt*9);
+          z.rotation.y+=yawDelta*Math.min(1,enemyDt*11);
           setEnemyMoveClip(z,'Running_A');
+
+          // Swept threshold check after movement so fast gravity cannot skip
+          // across the halfway boundary without triggering the execution.
+          const afterDist=Math.hypot(z.position.x,z.position.z);
+          if(!aesirUltimateEnemyIsBoss(z) && afterDist<=halfMapR){
+            const ex=z.position.clone();
+            z.userData.hp=0;
+            z.userData.dead=false;
+            killZombie(z);
+            spawnBurst(ex.x,ex.y+.55,ex.z,isMobile?4:7,FX_MAT_SPARK,2.2);
+            return;
+          }
         }
         return;
       }
