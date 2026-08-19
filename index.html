@@ -1455,7 +1455,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.51.00 - Runtime Recovery + Safe Combat QA';
+const GAME_VERSION='23.52.00 - Fox Glass Cannon Damage Pass';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3564,11 +3564,11 @@ const CHARACTER_COMBAT = {
         desc:'Alternates fireballs and ice bolts.'},
       rapid_elemental:{name:'Rapid Fire & Ice', price:210, slot:'primary', kind:'elemental', cooldown:0.18, damage:0.72, auto:true,
         desc:'Hold FIRE for a rapid but controlled alternating fire-and-ice stream. The 0.18s cast cycle remains authoritative even during zero-cooldown development testing.'},
-      arcane_lance:{name:'Ninefold Spirit Bloom', price:390, slot:'secondary', kind:'fox_arcane_bloom', cooldown:0, damage:2.15, pierce:0, auto:true,
+      arcane_lance:{name:'Ninefold Spirit Bloom', price:390, slot:'secondary', kind:'fox_arcane_bloom', cooldown:0, damage:4.75, pierce:0, auto:true,
         desc:'Open a radiant spirit gate and form nine arcane foxfire stars around it, then release the stars and spectral fox spirits together as one coordinated homing wave. The Fox is invincible for the first 2 seconds of each cast. Hold Secondary to repeat after the current Spirit Bloom finishes.'},
       giant_fireball:{name:'Giant Fireball', price:560, slot:'secondary', kind:'giant_fireball', cooldown:.8, damage:999, splash:5.4, splashDamage:4.5, directInstakill:true, auto:true,
         desc:'A Phoenix-scale molten fireball with a slower firing cadence. Direct hits execute any non-boss and the impact damages a wide surrounding area.'},
-      spirit_gate:{name:'Foxfire Hex Garden', price:620, slot:'secondary', kind:'fox_hex_garden', cooldown:0, damage:2.65, radius:2.25, range:16, auto:true,
+      spirit_gate:{name:'Foxfire Hex Garden', price:620, slot:'secondary', kind:'fox_hex_garden', cooldown:0, damage:7.25, radius:2.25, range:16, auto:true,
         desc:'Plant a round-scaled garden of large foxfire runic seals around nearby enemies and the forward battlefield. After a short telegraph each seal erupts into a vertical magical pillar, dealing strong Secondary-tier damage and heavy stagger. Hold Secondary to plant the next garden as soon as the current eruption finishes.'}
     }
   }
@@ -30168,7 +30168,7 @@ function triggerFoxArcaneBloom(w){
 function foxArcaneBloomImpact(rt,orb,pos,mult=1){
   if(!rt||!orb||orb.userData.hit)return;orb.userData.hit=true;orb.visible=false;
   spawnArcaneSigil(pos.x,.04,pos.z,1.70);spawnBurst(pos.x,pos.y,pos.z,mageStressVisualLoad()?4:9,FX_MAT_SPARK,3.0);
-  for(const z of [...zombies]){if(!z||!z.userData||z.userData.dead||Math.hypot(z.position.x-pos.x,z.position.z-pos.z)>2.20)continue;const prior=rt.enemyHits.get(z)||0;if(prior>=2)continue;rt.enemyHits.set(z,prior+1);const boss=!!z.userData.isBoss;const dmg=rt.damage*mult*playerStats.power;if(boss){const mh=Math.max(1,z.userData.maxHp||z.userData.hp||1);applyBulletDamage(z,Math.min(mh*.035,dmg));}else applyBulletDamage(z,dmg);if(!z.userData.dead)z.userData.hitStun=Math.max(z.userData.hitStun||0,boss?.22:.58);}
+  for(const z of [...zombies]){if(!z||!z.userData||z.userData.dead||Math.hypot(z.position.x-pos.x,z.position.z-pos.z)>2.20)continue;const prior=rt.enemyHits.get(z)||0;if(prior>=2)continue;rt.enemyHits.set(z,prior+1);const boss=!!z.userData.isBoss;const brute=z.userData.archetype==='brute';const mh=Math.max(1,z.userData.maxHp||z.userData.hp||1);const raw=rt.damage*mult*playerStats.power;if(boss){applyBulletDamage(z,Math.min(mh*.04,Math.max(raw,mh*.018)));}else{const floor=mh*(brute?.30:.65);applyBulletDamage(z,Math.max(raw,floor));}if(!z.userData.dead)z.userData.hitStun=Math.max(z.userData.hitStun||0,boss?.28:(brute?.72:.62));}
 }
 function updateFoxArcaneBloom(dt){
   const rt=foxArcaneBloom;if(!rt)return;if(!gameRunning||state.avatarType!=='mage'||!player){clearFoxArcaneBloom();return;}
@@ -30180,7 +30180,7 @@ function updateFoxArcaneBloom(dt){
     const count=foxSpiritBloomCount();for(let i=0;i<count;i++){const mesh=makeFoxSpiritBloomMesh(i);mesh.position.copy(rt.origin);mesh.position.y+=1.0;scene.add(mesh);const target=living.length?living[(i+3)%living.length]:null;const a=rt.yaw+(i-(count-1)/2)*Math.min(.42,2.2/Math.max(1,count-1));rt.spirits.push({mesh,target,dir:new THREE.Vector3(Math.sin(a),0,Math.cos(a)),life:2.2,hit:new Set(),speed:12.8+i*.22});}
   }
   for(const orb of rt.orbs){if(!orb.visible||!orb.userData.launched)continue;const target=orb.userData.target;if(target&&target.parent&&!target.userData.dead){const world=orb.getWorldPosition(new THREE.Vector3()),aim=target.position.clone().add(new THREE.Vector3(0,.65,0));orb.userData.dir.lerp(aim.sub(world).normalize(),Math.min(1,dt*5.5)).normalize();}orb.position.addScaledVector(orb.userData.dir,dt*12.5);const wp=orb.getWorldPosition(new THREE.Vector3());let hit=null;for(const z of zombies){if(z&&z.userData&&!z.userData.dead&&Math.hypot(z.position.x-wp.x,z.position.z-wp.z)<=.95){hit=z;break;}}if(hit)foxArcaneBloomImpact(rt,orb,wp,1);}
-  for(let i=rt.spirits.length-1;i>=0;i--){const q=rt.spirits[i];q.life-=dt;if(q.target&&q.target.parent&&!q.target.userData.dead){const d=new THREE.Vector3().subVectors(q.target.position,q.mesh.position);d.y=0;if(d.lengthSq()>.001)q.dir.lerp(d.normalize(),Math.min(1,dt*4.2)).normalize();}q.mesh.position.addScaledVector(q.dir,q.speed*dt);q.mesh.position.y=rt.origin.y+.76+Math.sin((rt.t+i)*8)*.10;q.mesh.rotation.y=Math.atan2(q.dir.x,q.dir.z);q.mesh.rotation.z+=dt*9;for(const z of [...zombies]){if(!z||z.userData.dead||q.hit.has(z))continue;if(Math.hypot(z.position.x-q.mesh.position.x,z.position.z-q.mesh.position.z)>1.25)continue;q.hit.add(z);const boss=!!z.userData.isBoss;const dmg=rt.damage*.72*playerStats.power;if(boss){const mh=Math.max(1,z.userData.maxHp||z.userData.hp||1);applyBulletDamage(z,Math.min(mh*.025,dmg));}else applyBulletDamage(z,dmg);z.userData.hitStun=Math.max(z.userData.hitStun||0,boss?.22:.62);spawnArcaneSigil(z.position.x,.03,z.position.z,1.05);q.life=Math.min(q.life,.08);}if(q.life<=0||Math.hypot(q.mesh.position.x,q.mesh.position.z)>arenaSize+8){if(q.mesh.parent){scene.remove(q.mesh);disposeGroup(q.mesh);}rt.spirits.splice(i,1);}}
+  for(let i=rt.spirits.length-1;i>=0;i--){const q=rt.spirits[i];q.life-=dt;if(q.target&&q.target.parent&&!q.target.userData.dead){const d=new THREE.Vector3().subVectors(q.target.position,q.mesh.position);d.y=0;if(d.lengthSq()>.001)q.dir.lerp(d.normalize(),Math.min(1,dt*4.2)).normalize();}q.mesh.position.addScaledVector(q.dir,q.speed*dt);q.mesh.position.y=rt.origin.y+.76+Math.sin((rt.t+i)*8)*.10;q.mesh.rotation.y=Math.atan2(q.dir.x,q.dir.z);q.mesh.rotation.z+=dt*9;for(const z of [...zombies]){if(!z||z.userData.dead||q.hit.has(z))continue;if(Math.hypot(z.position.x-q.mesh.position.x,z.position.z-q.mesh.position.z)>1.25)continue;q.hit.add(z);const boss=!!z.userData.isBoss;const brute=z.userData.archetype==='brute';const mh=Math.max(1,z.userData.maxHp||z.userData.hp||1);const raw=rt.damage*.88*playerStats.power;if(boss){applyBulletDamage(z,Math.min(mh*.028,Math.max(raw,mh*.012)));}else{const floor=mh*(brute?.22:.45);applyBulletDamage(z,Math.max(raw,floor));}z.userData.hitStun=Math.max(z.userData.hitStun||0,boss?.26:(brute?.78:.68));spawnArcaneSigil(z.position.x,.03,z.position.z,1.05);q.life=Math.min(q.life,.08);}if(q.life<=0||Math.hypot(q.mesh.position.x,q.mesh.position.z)>arenaSize+8){if(q.mesh.parent){scene.remove(q.mesh);disposeGroup(q.mesh);}rt.spirits.splice(i,1);}}
   if(rt.t>=rt.duration){for(const orb of rt.orbs)if(orb.visible)foxArcaneBloomImpact(rt,orb,orb.getWorldPosition(new THREE.Vector3()),.75);if(!rt.spirits.length)clearFoxArcaneBloom();else if(rt.t>2.5)clearFoxArcaneBloom();}
 }
 
@@ -32557,7 +32557,7 @@ function triggerFoxHexGarden(w){
 }
 function updateFoxHexGarden(dt){
   const rt=foxHexGarden;if(!rt)return;if(!gameRunning||state.avatarType!=='mage'||!player){clearFoxHexGarden();return;}rt.t+=dt;
-  for(let i=0;i<rt.seals.length;i++){const q=rt.seals[i];if(!q.mesh)continue;q.mesh.rotation.y+=dt*(1.2+i*.08);const pulse=.94+Math.sin((rt.t*9)+i)*.08;q.mesh.scale.setScalar(pulse);if(!q.detonated&&rt.t>=rt.burstAt+i*.045){q.detonated=true;const pm=new THREE.MeshBasicMaterial({color:i%2?0xc96cff:0x7cecff,transparent:true,opacity:.52,depthWrite:false,blending:THREE.AdditiveBlending});const pillar=new THREE.Mesh(new THREE.CylinderGeometry(.48,.92,7.5,8,1,true),pm);pillar.position.set(q.x,3.75,q.z);scene.add(pillar);fx.push({kind:'knightFx',mesh:pillar,life:.52,maxLife:.52,grow:.65,from:.42,dispose:true});spawnArcaneSigil(q.x,.035,q.z,rt.radius*1.05);spawnBurst(q.x,.4,q.z,mageStressVisualLoad()?5:12,FX_MAT_SPARK,3.5);for(const z of [...zombies]){if(!z||z.userData.dead||Math.hypot(z.position.x-q.x,z.position.z-q.z)>rt.radius)continue;const boss=!!z.userData.isBoss;const dmg=rt.damage*playerStats.power;if(boss){const mh=Math.max(1,z.userData.maxHp||z.userData.hp||1);applyBulletDamage(z,Math.min(mh*.035,dmg));}else applyBulletDamage(z,dmg);if(!z.userData.dead)z.userData.hitStun=Math.max(z.userData.hitStun||0,boss?.35:1.0);}}}
+  for(let i=0;i<rt.seals.length;i++){const q=rt.seals[i];if(!q.mesh)continue;q.mesh.rotation.y+=dt*(1.2+i*.08);const pulse=.94+Math.sin((rt.t*9)+i)*.08;q.mesh.scale.setScalar(pulse);if(!q.detonated&&rt.t>=rt.burstAt+i*.045){q.detonated=true;const pm=new THREE.MeshBasicMaterial({color:i%2?0xc96cff:0x7cecff,transparent:true,opacity:.52,depthWrite:false,blending:THREE.AdditiveBlending});const pillar=new THREE.Mesh(new THREE.CylinderGeometry(.48,.92,7.5,8,1,true),pm);pillar.position.set(q.x,3.75,q.z);scene.add(pillar);fx.push({kind:'knightFx',mesh:pillar,life:.52,maxLife:.52,grow:.65,from:.42,dispose:true});spawnArcaneSigil(q.x,.035,q.z,rt.radius*1.05);spawnBurst(q.x,.4,q.z,mageStressVisualLoad()?5:12,FX_MAT_SPARK,3.5);for(const z of [...zombies]){if(!z||z.userData.dead||Math.hypot(z.position.x-q.x,z.position.z-q.z)>rt.radius)continue;const boss=!!z.userData.isBoss;const brute=z.userData.archetype==='brute';const mh=Math.max(1,z.userData.maxHp||z.userData.hp||1);const raw=rt.damage*playerStats.power;if(boss){applyBulletDamage(z,Math.min(mh*.055,Math.max(raw,mh*.025)));}else{const floor=mh*(brute?.48:.90);applyBulletDamage(z,Math.max(raw,floor));}if(!z.userData.dead)z.userData.hitStun=Math.max(z.userData.hitStun||0,boss?.50:(brute?1.35:1.15));}}}
   if(rt.t>=rt.duration)clearFoxHexGarden();
 }
 
@@ -32599,7 +32599,7 @@ function crimsonMirrorSlice(){
     if(!z||z.userData.dead)continue;const along=z.position.x*nx+z.position.z*nz;if(Math.abs(along)>half)continue;const perp=Math.abs(-z.position.x*nz+z.position.z*nx);if(perp>width*.62)continue;
     const boss=!!z.userData.isBoss;const large=boss||z.userData.archetype==='brute';
     if(!large){z.userData.hp=0;killZombie(z);}
-    else{applyBulletDamage(z,boss?Math.max(1,z.userData.maxHp*.035):3.6*playerStats.power);z.userData.hitStun=Math.max(z.userData.hitStun||0,1.15);}
+    else{const mh=Math.max(1,z.userData.maxHp||z.userData.hp||1);applyBulletDamage(z,boss?Math.max(1,mh*.05):Math.max(7.5*playerStats.power,mh*.50));z.userData.hitStun=Math.max(z.userData.hitStun||0,boss?1.0:1.35);}
   }
   triggerCombatShake(3.5,85);
 }
@@ -32611,12 +32611,12 @@ function updateCrimsonMirror(dt){
   // Gentle continuous reality gravity plus a stronger lift pulse every ~2.5 sec.
   for(const z of zombies){if(!z||z.userData.dead)continue;const dx=-z.position.x,dz=-z.position.z,dist=Math.hypot(dx,dz);if(dist>.1){const step=Math.min(dist,(4.0+Math.min(8,round*.12))*dt);z.position.x+=dx/dist*step;z.position.z+=dz/dist*step;}}
   if(crimsonMirrorSliceTimer<=0){crimsonMirrorSliceTimer=1.0;crimsonMirrorSlice();}
-  if(crimsonMirrorGravityTimer<=0){crimsonMirrorGravityTimer=2.5;spawnArcaneSigil(0,.04,0,7.2);for(const z of zombies){if(!z||z.userData.dead)continue;z.userData.hitStun=Math.max(z.userData.hitStun||0,.65);}spawnBurst(0,.5,0,mageStressVisualLoad()?10:22,FX_MAT_SPARK,5.4);}
+  if(crimsonMirrorGravityTimer<=0){crimsonMirrorGravityTimer=2.5;spawnArcaneSigil(0,.04,0,7.2);for(const z of zombies){if(!z||z.userData.dead)continue;const mh=Math.max(1,z.userData.maxHp||z.userData.hp||1);if(z.userData.isBoss)applyBulletDamage(z,mh*.025);else if(z.userData.archetype==='brute')applyBulletDamage(z,mh*.18);else applyBulletDamage(z,mh*.32);z.userData.hitStun=Math.max(z.userData.hitStun||0,.80);}spawnBurst(0,.5,0,mageStressVisualLoad()?10:22,FX_MAT_SPARK,5.4);}
   if(crimsonMirrorActive<=0){
     // finale implosion
     spawnArcaneSigil(0,.04,0,9.5);spawnBurst(0,.7,0,mageStressVisualLoad()?18:42,FX_MAT_SPARK,7.0);triggerCombatShake(7,180);
     const _screenV=new THREE.Vector3();
-    for(const z of [...zombies]){if(!z||z.userData.dead)continue;const boss=!!z.userData.isBoss;if(boss){applyBulletDamage(z,Math.max(1,z.userData.maxHp*.06));continue;} _screenV.copy(z.position);_screenV.y+=(z.userData.visualHeight||1)*.5;_screenV.project(camera);const visible=_screenV.z>=-1&&_screenV.z<=1&&Math.abs(_screenV.x)<=1.04&&Math.abs(_screenV.y)<=1.04;if(visible){z.userData.hp=0;killZombie(z);}}
+    for(const z of [...zombies]){if(!z||z.userData.dead)continue;const boss=!!z.userData.isBoss;if(boss){applyBulletDamage(z,Math.max(1,z.userData.maxHp*.12));continue;} _screenV.copy(z.position);_screenV.y+=(z.userData.visualHeight||1)*.5;_screenV.project(camera);const visible=_screenV.z>=-1&&_screenV.z<=1&&Math.abs(_screenV.x)<=1.04&&Math.abs(_screenV.y)<=1.04;if(visible){z.userData.hp=0;killZombie(z);}}
     clearCrimsonMirror();
   }
 }
