@@ -1,3 +1,4 @@
+<!-- V23.55.00 Fox Hex Bloom + Astral Gravity Prison: combines Ninefold Spirit Bloom and Foxfire Hex Garden into one two-stage Secondary with the existing 2-second cast-start invincibility, and repurposes the former Hex Garden save slot into a distinct telekinetic Astral Gravity Prison lift/compress/slam Secondary. Preserves V23.54 global Ultimate I-frames and Fox glass-cannon damage tuning. -->
 <!-- V23.54.00 New Base Ultimate I-Frames: preserves the uploaded Asset Slim base and its Fox glass-cannon damage tuning, while adding one centralized read-only Ultimate runtime check in playerTakeHit so every equipped Ultimate grants full damage immunity only while that Ultimate is actively running. -->
 <!-- V23.51.00 Runtime Recovery: fixes a stale clearFoxSpiritGate() reset call left behind after Spirit Gate was merged/retired in V23.48. That deleted-function call aborted startSurvival before the 3D player/world could finish spawning. Uses clearFoxHexGarden() instead; preserves V23.50 narrow Primary hold-cadence guard and all current Fox V23.48 features. -->
 <!-- V23.50.00 Safe Combat QA Rollback: rolls back the risky V23.49 global execution-lock/frame-loop patch to the known-working V23.48 runtime. Adds a narrow held-Primary cadence guard based on each weapon's authored attack cycle, preventing Cloud and other hold-fire primaries from restarting every rendered frame while keeping development post-move cooldowns at zero. -->
@@ -1456,7 +1457,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.54.00 - Asset Slim + Global Ultimate I-Frames';
+const GAME_VERSION='23.55.00 - Fox Hex Bloom + Gravity Prison';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3560,12 +3561,12 @@ const CHARACTER_COMBAT = {
         desc:'Alternates fireballs and ice bolts.'},
       rapid_elemental:{name:'Rapid Fire & Ice', price:210, slot:'primary', kind:'elemental', cooldown:0.18, damage:0.72, auto:true,
         desc:'Hold FIRE for a rapid but controlled alternating fire-and-ice stream. The 0.18s cast cycle remains authoritative even during zero-cooldown development testing.'},
-      arcane_lance:{name:'Ninefold Spirit Bloom', price:390, slot:'secondary', kind:'fox_arcane_bloom', cooldown:0, damage:4.75, pierce:0, auto:true,
-        desc:'Open a radiant spirit gate and form nine arcane foxfire stars around it, then release the stars and spectral fox spirits together as one coordinated homing wave. The Fox is invincible for the first 2 seconds of each cast. Hold Secondary to repeat after the current Spirit Bloom finishes.'},
+      arcane_lance:{name:'Ninefold Hex Bloom', price:390, slot:'secondary', kind:'fox_arcane_bloom', cooldown:0, damage:4.75, pierce:0, auto:true,
+        desc:'Open the radiant Spirit Gate, release nine arcane stars and a round-scaled spectral fox wave, then convert their convergence points into foxfire runes that erupt as heavy magical pillars. The Fox is invincible for the first 2 seconds of each cast. Hold Secondary to repeat after the complete two-stage spell finishes.'},
       giant_fireball:{name:'Giant Fireball', price:560, slot:'secondary', kind:'giant_fireball', cooldown:.8, damage:999, splash:5.4, splashDamage:4.5, directInstakill:true, auto:true,
         desc:'A Phoenix-scale molten fireball with a slower firing cadence. Direct hits execute any non-boss and the impact damages a wide surrounding area.'},
-      spirit_gate:{name:'Foxfire Hex Garden', price:620, slot:'secondary', kind:'fox_hex_garden', cooldown:0, damage:7.25, radius:2.25, range:16, auto:true,
-        desc:'Plant a round-scaled garden of large foxfire runic seals around nearby enemies and the forward battlefield. After a short telegraph each seal erupts into a vertical magical pillar, dealing strong Secondary-tier damage and heavy stagger. Hold Secondary to plant the next garden as soon as the current eruption finishes.'}
+      spirit_gate:{name:'Astral Gravity Prison', price:620, slot:'secondary', kind:'fox_gravity_prison', cooldown:0, damage:6.4, radius:4.2, range:14, auto:true,
+        desc:'Telekinetically seize a round-scaled cluster of nearby enemies, drag them together and suspend them inside a rotating astral prism, compress the prison, then slam the group into the ground and blast survivors outward. Hold Secondary to repeat after the current prison finishes.'}
     }
   }
 };
@@ -14578,7 +14579,7 @@ function renderShopList(){
       : (w.kind==='mirror_volley' ? '#b987ff'
       : (w.kind==='chain_lightning_javelin' ? '#8ee8ff'
       : (w.kind==='cyclone_snare_arrow' ? '#63ffd1'
-      : (w.kind.includes('element') || w.kind==='arcane_lance' || w.kind==='fox_arcane_bloom' ? '#78d8ff'
+      : (w.kind.includes('element') || w.kind==='arcane_lance' || w.kind==='fox_arcane_bloom' || w.kind==='fox_gravity_prison' ? '#78d8ff'
       : (w.kind.includes('arrow') ? '#d9b36c'
       : (w.kind.indexOf('knight_')===0 ? '#ffd35a' : '#b88cff')))))));
     const info = document.createElement('div');
@@ -28667,7 +28668,7 @@ function clearSuperMeteor(resetCooldown=true){
 
 function clearMageRoundSpecials(resetCooldowns=true,preserveMirrorCooldowns=false){
   clearFoxArcaneBloom();
-  clearFoxHexGarden();
+  clearFoxGravityPrison();
   clearCrimsonMirror();
   foxRapidPrimaryCadence=0;
   clearPhoenixFireball(false);
@@ -28702,7 +28703,7 @@ function clearMageRoundSpecials(resetCooldowns=true,preserveMirrorCooldowns=fals
 }
 function updateMageUltimates(dt){
   updateFoxArcaneBloom(dt);
-  updateFoxHexGarden(dt);
+  updateFoxGravityPrison(dt);
   updateCrimsonMirror(dt);
   if(superMeteorCooldownTimer>0)superMeteorCooldownTimer=Math.max(0,superMeteorCooldownTimer-dt);
 
@@ -29438,6 +29439,7 @@ function clearFoxArcaneBloom(){
   const rt=foxArcaneBloom;if(!rt)return;
   if(rt.group&&rt.group.parent){scene.remove(rt.group);disposeGroup(rt.group);}
   for(const q of rt.spirits||[]){if(q.mesh&&q.mesh.parent){scene.remove(q.mesh);disposeGroup(q.mesh);}}
+  for(const q of rt.hexSeals||[]){if(q.mesh&&q.mesh.parent){scene.remove(q.mesh);disposeGroup(q.mesh);}}
   foxArcaneBloom=null;
 }
 function triggerFoxArcaneBloom(w){
@@ -29455,7 +29457,7 @@ function triggerFoxArcaneBloom(w){
   for(let i=0;i<9;i++){const a=i/9*Math.PI*2;const orb=new THREE.Mesh(geom,mat.clone());orb.position.set(Math.sin(a)*1.70,.90+Math.sin(a*2)*.22,Math.cos(a)*1.70);orb.userData={angle:a,launched:false,hit:false,target:null,dir:new THREE.Vector3()};group.add(orb);orbs.push(orb);}
   const ring=new THREE.Mesh(new THREE.TorusGeometry(1.78,.05,6,40),new THREE.MeshBasicMaterial({color:0x79eaff,transparent:true,opacity:.50,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));ring.rotation.x=Math.PI/2;ring.position.y=.88;group.add(ring);
   scene.add(group);
-  foxArcaneBloom={group,gate,inner,orbs,ring,spirits:[],t:0,duration:1.85,releaseAt:.38,damage:(w&&w.damage)||2.15,enemyHits:new Map(),origin:player.position.clone(),yaw};
+  foxArcaneBloom={group,gate,inner,orbs,ring,spirits:[],hexSeals:[],hexSpawned:false,t:0,duration:2.45,releaseAt:.38,hexAt:1.18,damage:(w&&w.damage)||4.75,hexDamage:7.25,enemyHits:new Map(),origin:player.position.clone(),yaw};
   spawnArcaneSigil(player.position.x,.035,player.position.z,2.7);spawnBurst(player.position.x,player.position.y+.72,player.position.z,mageStressVisualLoad()?8:18,FX_MAT_SPARK,4.4);
   return true;
 }
@@ -29475,7 +29477,12 @@ function updateFoxArcaneBloom(dt){
   }
   for(const orb of rt.orbs){if(!orb.visible||!orb.userData.launched)continue;const target=orb.userData.target;if(target&&target.parent&&!target.userData.dead){const world=orb.getWorldPosition(new THREE.Vector3()),aim=target.position.clone().add(new THREE.Vector3(0,.65,0));orb.userData.dir.lerp(aim.sub(world).normalize(),Math.min(1,dt*5.5)).normalize();}orb.position.addScaledVector(orb.userData.dir,dt*12.5);const wp=orb.getWorldPosition(new THREE.Vector3());let hit=null;for(const z of zombies){if(z&&z.userData&&!z.userData.dead&&Math.hypot(z.position.x-wp.x,z.position.z-wp.z)<=.95){hit=z;break;}}if(hit)foxArcaneBloomImpact(rt,orb,wp,1);}
   for(let i=rt.spirits.length-1;i>=0;i--){const q=rt.spirits[i];q.life-=dt;if(q.target&&q.target.parent&&!q.target.userData.dead){const d=new THREE.Vector3().subVectors(q.target.position,q.mesh.position);d.y=0;if(d.lengthSq()>.001)q.dir.lerp(d.normalize(),Math.min(1,dt*4.2)).normalize();}q.mesh.position.addScaledVector(q.dir,q.speed*dt);q.mesh.position.y=rt.origin.y+.76+Math.sin((rt.t+i)*8)*.10;q.mesh.rotation.y=Math.atan2(q.dir.x,q.dir.z);q.mesh.rotation.z+=dt*9;for(const z of [...zombies]){if(!z||z.userData.dead||q.hit.has(z))continue;if(Math.hypot(z.position.x-q.mesh.position.x,z.position.z-q.mesh.position.z)>1.25)continue;q.hit.add(z);const boss=!!z.userData.isBoss;const brute=z.userData.archetype==='brute';const mh=Math.max(1,z.userData.maxHp||z.userData.hp||1);const raw=rt.damage*.88*playerStats.power;if(boss){applyBulletDamage(z,Math.min(mh*.028,Math.max(raw,mh*.012)));}else{const floor=mh*(brute?.22:.45);applyBulletDamage(z,Math.max(raw,floor));}z.userData.hitStun=Math.max(z.userData.hitStun||0,boss?.26:(brute?.78:.68));spawnArcaneSigil(z.position.x,.03,z.position.z,1.05);q.life=Math.min(q.life,.08);}if(q.life<=0||Math.hypot(q.mesh.position.x,q.mesh.position.z)>arenaSize+8){if(q.mesh.parent){scene.remove(q.mesh);disposeGroup(q.mesh);}rt.spirits.splice(i,1);}}
-  if(rt.t>=rt.duration){for(const orb of rt.orbs)if(orb.visible)foxArcaneBloomImpact(rt,orb,orb.getWorldPosition(new THREE.Vector3()),.75);if(!rt.spirits.length)clearFoxArcaneBloom();else if(rt.t>2.5)clearFoxArcaneBloom();}
+  if(!rt.hexSpawned&&rt.t>=rt.hexAt){
+    rt.hexSpawned=true;const living=zombies.filter(z=>z&&z.userData&&!z.userData.dead&&!z.userData.spawnPending).sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position));const sealCount=Math.max(3,Math.min(7,3+Math.floor(((Math.max(1,Number(round)||1)-1)/29)*4+1e-6)));
+    for(let i=0;i<sealCount;i++){const target=living.length?living[i%living.length]:null;let x,z;if(target){x=target.position.x;z=target.position.z;}else{const a=rt.yaw+(i-(sealCount-1)/2)*.5,r=4.2+(i%2)*1.8;x=rt.origin.x+Math.sin(a)*r;z=rt.origin.z+Math.cos(a)*r;}x=THREE.MathUtils.clamp(x,-arenaSize,arenaSize);z=THREE.MathUtils.clamp(z,-arenaSize,arenaSize);const g=new THREE.Group();g.position.set(x,.045,z);const mat=new THREE.MeshBasicMaterial({color:i%2?0xc65cff:0x68eaff,transparent:true,opacity:.48,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});const ring2=new THREE.Mesh(new THREE.RingGeometry(1.05,1.48,28),mat);ring2.rotation.x=-Math.PI/2;g.add(ring2);const rune=new THREE.Mesh(new THREE.TorusGeometry(.72,.045,6,24),mat.clone());rune.rotation.x=Math.PI/2;rune.rotation.z=i*.72;g.add(rune);scene.add(g);rt.hexSeals.push({mesh:g,x,z,detonated:false,at:rt.t+.18+i*.04});}
+  }
+  for(let i=0;i<rt.hexSeals.length;i++){const q=rt.hexSeals[i];if(!q.mesh)continue;q.mesh.rotation.y+=dt*(1.6+i*.06);const pulse=.94+Math.sin((rt.t*10)+i)*.08;q.mesh.scale.setScalar(pulse);if(!q.detonated&&rt.t>=q.at){q.detonated=true;const pm=new THREE.MeshBasicMaterial({color:i%2?0xc96cff:0x7cecff,transparent:true,opacity:.54,depthWrite:false,blending:THREE.AdditiveBlending});const pillar=new THREE.Mesh(new THREE.CylinderGeometry(.44,.86,7.0,8,1,true),pm);pillar.position.set(q.x,3.5,q.z);scene.add(pillar);fx.push({kind:'knightFx',mesh:pillar,life:.48,maxLife:.48,grow:.62,from:.44,dispose:true});spawnArcaneSigil(q.x,.035,q.z,2.25);spawnBurst(q.x,.38,q.z,mageStressVisualLoad()?4:10,FX_MAT_SPARK,3.2);for(const z of [...zombies]){if(!z||z.userData.dead||Math.hypot(z.position.x-q.x,z.position.z-q.z)>2.25)continue;const boss=!!z.userData.isBoss,brute=z.userData.archetype==='brute',mh=Math.max(1,z.userData.maxHp||z.userData.hp||1),raw=rt.hexDamage*playerStats.power;if(boss)applyBulletDamage(z,Math.min(mh*.055,Math.max(raw,mh*.025)));else applyBulletDamage(z,Math.max(raw,mh*(brute?.48:.90)));if(!z.userData.dead)z.userData.hitStun=Math.max(z.userData.hitStun||0,boss?.50:(brute?1.35:1.15));}}}
+  if(rt.t>=rt.duration){for(const orb of rt.orbs)if(orb.visible)foxArcaneBloomImpact(rt,orb,orb.getWorldPosition(new THREE.Vector3()),.75);clearFoxArcaneBloom();}
 }
 
 /* ============================================================ WOLVERINE
@@ -31755,7 +31762,7 @@ function triggerHoodedEquippedAbility(){
 let foxMageWowNextAt=0;
 function foxMageWowPalette(kind){
   if(kind==='giant_fireball'||kind==='fire')return [0xff8a32,0xffe5a0,0xff4f2e];
-  if(kind==='arcane_lance'||kind==='fox_arcane_bloom'||kind==='fox_hex_garden')return [0x72e8ff,0xd7a2ff,0xffffff];
+  if(kind==='arcane_lance'||kind==='fox_arcane_bloom'||kind==='fox_gravity_prison')return [0x72e8ff,0xd7a2ff,0xffffff];
   if(kind==='mirror'||kind==='laser')return [0xff477e,0xc879ff,0x76eaff];
   if(kind==='blizzard')return [0x83edff,0xa779ff,0xeaffff];
   if(kind==='meteor')return [0xffb13b,0xfff0b5,0xc970ff];
@@ -31815,30 +31822,41 @@ function foxMageWowUltimateFx(kind,scale=2.6){
 
 
 // ---------------------------------------------------------------------
-// FOX SECONDARY — FOXFIRE HEX GARDEN
-// Distinct area-control spell: plants several low-cost runic seals, telegraphs
-// briefly, then erupts each seal into a vertical foxfire pillar. No homing
-// projectile swarm, and the whole cast is owned by one main-loop state.
+// FOX SECONDARY — ASTRAL GRAVITY PRISON
+// Distinct telekinetic crowd-control spell: seize a round-scaled group, suspend
+// them inside one rotating astral prism, compress, then slam and blast outward.
 // ---------------------------------------------------------------------
-let foxHexGarden=null;
-function clearFoxHexGarden(){const rt=foxHexGarden;if(!rt)return;for(const q of rt.seals){if(q.mesh&&q.mesh.parent){scene.remove(q.mesh);disposeGroup(q.mesh);}}foxHexGarden=null;}
-function foxHexGardenCount(){return Math.max(3,Math.min(7,3+Math.floor(((Math.max(1,Number(round)||1)-1)/29)*4+1e-6)));}
-function triggerFoxHexGarden(w){
-  if(!gameRunning||state.avatarType!=='mage'||!player||foxHexGarden)return false;
-  foxMageWowCastFx('fox_hex_garden',2.15,false);if(player.userData.playKayClip)player.userData.playKayClip('magic giant cast',true,true,.34);
-  const living=zombies.filter(z=>z&&!z.userData.dead&&!z.userData.spawnPending).sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position));
-  const count=foxHexGardenCount(),seals=[],yaw=player.rotation.y;
-  for(let i=0;i<count;i++){
-    let x,z;if(living[i]){x=living[i].position.x;z=living[i].position.z;}else{const a=yaw+(i-(count-1)/2)*.55,r=4.0+(i%2)*2.0;x=player.position.x+Math.sin(a)*r;z=player.position.z+Math.cos(a)*r;}
-    x=THREE.MathUtils.clamp(x,-arenaSize,arenaSize);z=THREE.MathUtils.clamp(z,-arenaSize,arenaSize);
-    const g=new THREE.Group();g.position.set(x,.045,z);const m1=new THREE.MeshBasicMaterial({color:i%2?0xc65cff:0x68eaff,transparent:true,opacity:.46,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});const ring=new THREE.Mesh(new THREE.RingGeometry(1.15,1.55,32),m1);ring.rotation.x=-Math.PI/2;g.add(ring);const rune=new THREE.Mesh(new THREE.TorusGeometry(.78,.045,6,28),m1.clone());rune.rotation.x=Math.PI/2;rune.rotation.z=i*.7;g.add(rune);scene.add(g);seals.push({mesh:g,x,z,detonated:false,pillar:null});
-  }
-  foxHexGarden={seals,t:0,duration:1.45,burstAt:.55,damage:(w&&w.damage)||2.65,radius:(w&&w.radius)||2.25};spawnArcaneSigil(player.position.x,.03,player.position.z,2.5);return true;
+let foxGravityPrison=null;
+function foxGravityPrisonCount(){return Math.max(3,Math.min(8,3+Math.floor(((Math.max(1,Number(round)||1)-1)/29)*5+1e-6)));}
+function clearFoxGravityPrison(){
+  const rt=foxGravityPrison;if(!rt)return;
+  for(const q of rt.targets||[]){if(q.enemy&&q.enemy.userData){q.enemy.userData.hitStun=Math.max(q.enemy.userData.hitStun||0,.08);if(!q.enemy.userData.dead&&Number.isFinite(q.baseY))q.enemy.position.y=q.baseY;}}
+  if(rt.group&&rt.group.parent){scene.remove(rt.group);disposeGroup(rt.group);}
+  foxGravityPrison=null;
 }
-function updateFoxHexGarden(dt){
-  const rt=foxHexGarden;if(!rt)return;if(!gameRunning||state.avatarType!=='mage'||!player){clearFoxHexGarden();return;}rt.t+=dt;
-  for(let i=0;i<rt.seals.length;i++){const q=rt.seals[i];if(!q.mesh)continue;q.mesh.rotation.y+=dt*(1.2+i*.08);const pulse=.94+Math.sin((rt.t*9)+i)*.08;q.mesh.scale.setScalar(pulse);if(!q.detonated&&rt.t>=rt.burstAt+i*.045){q.detonated=true;const pm=new THREE.MeshBasicMaterial({color:i%2?0xc96cff:0x7cecff,transparent:true,opacity:.52,depthWrite:false,blending:THREE.AdditiveBlending});const pillar=new THREE.Mesh(new THREE.CylinderGeometry(.48,.92,7.5,8,1,true),pm);pillar.position.set(q.x,3.75,q.z);scene.add(pillar);fx.push({kind:'knightFx',mesh:pillar,life:.52,maxLife:.52,grow:.65,from:.42,dispose:true});spawnArcaneSigil(q.x,.035,q.z,rt.radius*1.05);spawnBurst(q.x,.4,q.z,mageStressVisualLoad()?5:12,FX_MAT_SPARK,3.5);for(const z of [...zombies]){if(!z||z.userData.dead||Math.hypot(z.position.x-q.x,z.position.z-q.z)>rt.radius)continue;const boss=!!z.userData.isBoss;const brute=z.userData.archetype==='brute';const mh=Math.max(1,z.userData.maxHp||z.userData.hp||1);const raw=rt.damage*playerStats.power;if(boss){applyBulletDamage(z,Math.min(mh*.055,Math.max(raw,mh*.025)));}else{const floor=mh*(brute?.48:.90);applyBulletDamage(z,Math.max(raw,floor));}if(!z.userData.dead)z.userData.hitStun=Math.max(z.userData.hitStun||0,boss?.50:(brute?1.35:1.15));}}}
-  if(rt.t>=rt.duration)clearFoxHexGarden();
+function triggerFoxGravityPrison(w){
+  if(!gameRunning||state.avatarType!=='mage'||!mageGameplayActive()||!player||foxGravityPrison)return false;
+  const candidates=zombies.filter(z=>z&&z.userData&&!z.userData.dead&&!z.userData.spawnPending)
+    .sort((a,b)=>(a.userData.isBoss?1:0)-(b.userData.isBoss?1:0)||a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position));
+  if(!candidates.length)return false;
+  const count=Math.min(foxGravityPrisonCount(),candidates.length),targets=[];let cx=0,cz=0;
+  for(let i=0;i<count;i++){const enemy=candidates[i];targets.push({enemy,baseY:enemy.position.y});cx+=enemy.position.x;cz+=enemy.position.z;}
+  cx=THREE.MathUtils.clamp(cx/count,-arenaSize+1.5,arenaSize-1.5);cz=THREE.MathUtils.clamp(cz/count,-arenaSize+1.5,arenaSize-1.5);
+  const group=new THREE.Group();group.position.set(cx,.05,cz);
+  const prism=new THREE.Mesh(new THREE.CylinderGeometry(2.35,2.35,4.8,6,1,true),new THREE.MeshBasicMaterial({color:0x9b66ff,transparent:true,opacity:.42,depthWrite:false,wireframe:true,blending:THREE.AdditiveBlending}));prism.position.y=2.65;group.add(prism);
+  for(let i=0;i<2;i++){const ring=new THREE.Mesh(new THREE.TorusGeometry(2.15-i*.48,.055,6,36),new THREE.MeshBasicMaterial({color:i?0x67eaff:0xe3a4ff,transparent:true,opacity:.52,depthWrite:false,blending:THREE.AdditiveBlending}));ring.rotation.x=Math.PI/2;ring.position.y=1.3+i*2.6;ring.userData.prisonRing=true;group.add(ring);}
+  const core=new THREE.Mesh(new THREE.OctahedronGeometry(.62,0),new THREE.MeshBasicMaterial({color:0xf0d5ff,transparent:true,opacity:.70,depthWrite:false,blending:THREE.AdditiveBlending}));core.position.y=2.65;core.userData.prisonCore=true;group.add(core);scene.add(group);
+  foxGravityPrison={group,targets,cx,cz,t:0,duration:1.85,liftEnd:.55,holdEnd:1.22,slamAt:1.30,slammed:false,damage:(w&&w.damage)||6.4,radius:(w&&w.radius)||4.2};
+  foxMageAbilityPose('laser',340);foxMageWowCastFx('fox_gravity_prison',2.25,false);spawnArcaneSigil(cx,.035,cz,3.2);spawnBurst(cx,.55,cz,mageStressVisualLoad()?7:16,FX_MAT_SPARK,4.1);
+  if(player.userData.playKayClip)player.userData.playKayClip('magic giant cast',true,true,.34);return true;
+}
+function updateFoxGravityPrison(dt){
+  const rt=foxGravityPrison;if(!rt)return;if(!gameRunning||state.avatarType!=='mage'||!player){clearFoxGravityPrison();return;}rt.t+=dt;
+  if(rt.group){rt.group.rotation.y+=dt*(rt.slammed?2.0:4.0);const squeeze=rt.t<rt.holdEnd?1:Math.max(.58,1-(rt.t-rt.holdEnd)*1.8);rt.group.scale.set(squeeze,1,squeeze);for(const c of rt.group.children){if(c.userData&&c.userData.prisonRing)c.rotation.z+=dt*3.2;if(c.userData&&c.userData.prisonCore){c.rotation.x+=dt*3.8;c.rotation.y+=dt*5.2;}}}
+  const pLift=THREE.MathUtils.clamp(rt.t/rt.liftEnd,0,1),pHold=THREE.MathUtils.clamp((rt.t-rt.liftEnd)/Math.max(.01,rt.holdEnd-rt.liftEnd),0,1);
+  for(let i=0;i<rt.targets.length;i++){const q=rt.targets[i],z=q.enemy;if(!z||!z.parent||z.userData.dead)continue;if(!rt.slammed){const a=i/Math.max(1,rt.targets.length)*Math.PI*2+rt.t*1.6,orbitR=.95+Math.min(1.0,rt.targets.length*.08),tx=rt.cx+Math.cos(a)*orbitR,tz=rt.cz+Math.sin(a)*orbitR,pull=THREE.MathUtils.clamp(dt*(5+pHold*4),0,1);z.position.x=THREE.MathUtils.lerp(z.position.x,tx,pull);z.position.z=THREE.MathUtils.lerp(z.position.z,tz,pull);const lift=q.baseY+(z.userData.isBoss?1:2.1)*Math.sin(pLift*Math.PI*.5);z.position.y=THREE.MathUtils.lerp(z.position.y,lift,Math.min(1,dt*10));z.userData.hitStun=Math.max(z.userData.hitStun||0,.18);}}
+  if(!rt.slammed&&rt.t>=rt.slamAt){rt.slammed=true;spawnArcaneSigil(rt.cx,.035,rt.cz,rt.radius*1.15);spawnBurst(rt.cx,.28,rt.cz,mageStressVisualLoad()?9:22,FX_MAT_SPARK,5.2);triggerCombatShake(4.2,105);for(const q of rt.targets){const z=q.enemy;if(!z||!z.parent||z.userData.dead)continue;z.position.y=q.baseY;const boss=!!z.userData.isBoss,brute=z.userData.archetype==='brute',mh=Math.max(1,z.userData.maxHp||z.userData.hp||1),raw=rt.damage*playerStats.power;if(boss)applyBulletDamage(z,Math.min(mh*.055,Math.max(raw,mh*.025)));else applyBulletDamage(z,Math.max(raw,mh*(brute?.45:.78)));if(!z.userData.dead){const dx=z.position.x-rt.cx,dz=z.position.z-rt.cz,d=Math.max(.01,Math.hypot(dx,dz)),push=boss?1:(brute?2.2:3.5);z.position.x+=dx/d*push;z.position.z+=dz/d*push;z.userData.hitStun=Math.max(z.userData.hitStun||0,boss?.65:(brute?1.2:1.5));}}}
+  if(rt.t>=rt.duration)clearFoxGravityPrison();
 }
 
 // ---------------------------------------------------------------------
@@ -31903,7 +31921,7 @@ function updateCrimsonMirror(dt){
 
 function performWeaponAttack(w, countsAsPrimary=true){
   if(!w) return;
-  if(state.avatarType==='mage'&&mageGameplayActive())foxMageWowCastFx(w.kind,w.kind==='giant_fireball'?1.7:(w.kind==='fox_arcane_bloom'?2.05:(w.kind==='fox_hex_garden'?2.0:(w.kind==='arcane_lance'?1.45:1.0))),false);
+  if(state.avatarType==='mage'&&mageGameplayActive())foxMageWowCastFx(w.kind,w.kind==='giant_fireball'?1.7:(w.kind==='fox_arcane_bloom'?2.05:(w.kind==='fox_gravity_prison'?2.1:(w.kind==='arcane_lance'?1.45:1.0))),false);
   // V23.12.05: Chopper's Secondary moves own their gameplay inside the
   // standalone ChopperPirateKit. Previously these kinds fell through to the
   // generic ranged branch below, which called shootFromPosition() and produced
@@ -31917,8 +31935,8 @@ function performWeaponAttack(w, countsAsPrimary=true){
     triggerShadowStalkerPrimary(w);
   } else if(w.kind==='fox_arcane_bloom'){
     triggerFoxArcaneBloom(w);
-  } else if(w.kind==='fox_hex_garden'){
-    triggerFoxHexGarden(w);
+  } else if(w.kind==='fox_gravity_prison'){
+    triggerFoxGravityPrison(w);
   } else if(isWolverineWeaponKind(w.kind)){
     doWolverineAttack(w);
   } else if(isRhinoWeaponKind(w.kind)){
