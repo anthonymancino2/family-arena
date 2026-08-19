@@ -1,3 +1,4 @@
+<!-- V23.36.00 Aesir Titan Replacement: replaces Twilight of the Gods - Ragnarok with a true Titan transformation using the Knight Guardian Titan rules: 5x size, 15-second duration, 5x Primary/Secondary damage, 2.6x combat reach/radius, 0.85 movement speed, Primary and equipped Secondary remain available, other specials/signature are locked, activation is stun-only, and cooldown remains 0 in development testing. -->
 <!-- V23.35.00 Storm-Step Center Threshold Execute: during Storm-Step Overdrive, every live enemy inside or outside the arena is pulled rapidly toward exact map center. The pull runs at 2.75x each enemy's normal movement speed with a minimum gravity speed so slow units cannot stall. The instant any non-boss crosses into the inner half of the playable-map radius, it is force-executed immediately whether Aesir touched it or not. Bosses are exempt from execution but are still pulled toward center. Existing 10-second auto-Blitz, fixed 3x center axe, one-second rings, and Whirlwind shutdown remain unchanged. -->
 <!-- V23.34.00 Storm-Step Hard Execute: removes normal-enemy damage resolution from Storm-Step entirely. Every non-boss inside any of the three visible jagged dash corridors or the continuous close-contact radius is force-executed through killZombie() immediately, with a slightly wider swept corridor so extreme-speed movement cannot visually pass through enemies without counting. Bosses alone retain protected damage. All V23.33 center-axe gravity, 3x axe, one-second rings, auto-Blitz timing and Whirlwind fixes remain unchanged. -->
 <!-- V23.33.00 Storm-Step Contact Damage Repair: Storm-Step Overdrive now resolves lethal contact against every one of the three actual jagged Blitz segments instead of approximating the whole dash as one straight start-to-end line. The opening Blitz into arena center uses the same execution sweep. Non-boss enemies crossed by any visible segment are instantly defeated; bosses keep protected contact damage. Existing center-axe gravity pull, 3x axe, one-second rings, auto-Blitz timing, Whirlwind shutdown fix and global testing cooldown rules remain unchanged. -->
@@ -1710,7 +1711,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.35.00 - Storm-Step Center Threshold Execute';
+const GAME_VERSION='23.36.00 - Aesir Titan Replacement';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -14922,8 +14923,8 @@ const BARBARIAN_THUNDER_DOME = {id:'barbarian_thunder_dome', name:'Mjolnir Super
   desc:'Command the floating axe into a giant spinning supernova. Plasma rings, wind and thunder expand across the arena, clearing normal enemies and hammering tougher targets with repeated protected damage.'};
 const BARBARIAN_WORLD_BREAKER = {id:'barbarian_world_breaker', name:'Mjolnir Supernova', price:800, avatar:'barbarian', unlockLevel:14,
   desc:'Command the floating axe into a giant spinning supernova. Plasma rings, wind and thunder expand across the arena, clearing normal enemies and hammering tougher targets with repeated protected damage.'};
-const BARBARIAN_RAGNAROK_WAVE = {id:'barbarian_ragnarok_wave', name:'Twilight of the Gods - Ragnarok', price:900, avatar:'barbarian', unlockLevel:18,
-  desc:'Ascend beneath a cosmic aurora while meteors and lightning lances rain across the battlefield. Repeated impacts crack the arena, erase normal enemies caught in direct strikes, and batter bosses with protected damage before a final map-wide godstorm.'};
+const BARBARIAN_RAGNAROK_WAVE = {id:'barbarian_ragnarok_wave', name:'Titan Ascension', price:900, avatar:'barbarian', unlockLevel:18,
+  desc:'TITAN TRANSFORMATION. Uses the same Guardian Titan rules: grow to 5x size for 15 seconds, gain 5x Primary/Secondary damage and 2.6x combat reach, move at 85% speed, keep Primary and the equipped Secondary available, and lock other specials until the transformation ends. Cooldown is 0 during development testing.'};
 const BARBARIAN_STORM_STEP_OVERDRIVE = {id:'barbarian_storm_step_overdrive', name:'Storm-Step Overdrive', price:950, avatar:'barbarian', unlockLevel:20,
   desc:'Blitz-dash to arena center and leave the floating axe there at 3x size for 10 seconds. The axe emits a new expanding ring every second and pulls every enemy, even outside the arena, toward map center at normal speed while Aesir auto-Blitzes across random points and executes non-boss enemies on contact.'};
 
@@ -15397,7 +15398,7 @@ function setupControls(){
       triggerKnightRoyalGuardClones();
     }else if(barbarianIsActive()){
       if(rhinoIsActive()){ if(rhinoTitanActive())return; triggerRhinoRoyalClones(); return; }
-      if(barbarianUltimateActive>0)return;
+      if(barbarianUltimateActive>0||(barbarianRuntime.twilightActive||0)>0)return;
       triggerBerserkerKin();
     }
     else if(chopperClassIsActive()) triggerChopperBroadside();
@@ -15892,6 +15893,7 @@ function barbarianResetRuntime(){
   try{barbarianClearWhirlVisual();}catch(_err){}
   try{barbarianClearPrimalRageVisual();}catch(_err){}
   try{barbarianSyncPrimalRageScale(false);}catch(_err){}
+  try{aesirTitanSyncScale(false);}catch(_err){}
   barbarianRuntime = {
     roarSlashStep:0,
     roarBuffTimer:0,
@@ -16034,7 +16036,10 @@ function barbarianMjolnirEcho(){
 }
 function barbarianWhirlPulse(){
   if(!player)return;
-  const c=BARB_WHIRL,pos={x:player.position.x,y:player.position.y,z:player.position.z};
+  const titan=(barbarianRuntime.twilightActive||0)>0;
+  const titanDamage=titan?((typeof KNIGHT_CFG!=='undefined'&&KNIGHT_CFG.guardianQuakeGiant)?KNIGHT_CFG.guardianQuakeGiant.damageMult:5):1;
+  const titanReach=titan?2.6:1;
+  const c={...BARB_WHIRL,radius:BARB_WHIRL.radius*titanReach,damage:BARB_WHIRL.damage*titanDamage},pos={x:player.position.x,y:player.position.y,z:player.position.z};
   const spin=(performance.now()*0.0046)%(Math.PI*2);
   for(let i=0;i<4;i++)spawnAxeSwingTrail(pos,spin+i*(Math.PI*.5),i%2?1:-1,1.12,i%2?0xdff7ff:0x72dcff);
   knightShockRing(pos,c.radius*.58,0x72dcff,.16);knightShockRing(pos,c.radius,0xeaffff,.25);
@@ -16176,6 +16181,7 @@ function barbarianMoveMultiplier(){
   if(!barbarianIsActive()) return 1;
   let m=1;
   if((barbarianRuntime.whirlTimer||0)>0) m*=BARB_WHIRL.moveMult;
+  if((barbarianRuntime.twilightActive||0)>0) m*=((typeof KNIGHT_CFG!=='undefined'&&KNIGHT_CFG.guardianQuakeGiant)?KNIGHT_CFG.guardianQuakeGiant.moveMult:0.85);
   if(rhinoIsActive()&&rhinoCloudWhirlwindActive()) m*=KNIGHT_CFG.whirlwind.moveMult;
   return Math.max(0,m);
 }
@@ -23628,7 +23634,7 @@ function knightAbilityCooldownInfo(){
     }
     case 'barbarian_ragnarok_wave': {
       const active=(barbarianRuntime.twilightActive||0)>0;
-      return {label:active?'RAGNAROK':'RAGNAROK',cd:0,active,activeTime:active?barbarianRuntime.twilightActive:undefined};
+      return {label:active?'TITAN '+Math.max(0,barbarianRuntime.twilightActive||0).toFixed(1):'TITAN',cd:0,active,activeTime:active?barbarianRuntime.twilightActive:undefined};
     }
     case 'barbarian_storm_step_overdrive': {
       const active=(barbarianRuntime.stormStepActive||0)>0;
@@ -23654,7 +23660,7 @@ function triggerBarbarianEquippedAbility(){
     return;
   }
   // During Primal Rage, only Primary and Secondary combat is allowed.
-  if(barbarianUltimateActive>0||(barbarianRuntime.stormStepActive||0)>0||(barbarianRuntime.olympusSupernovaActive||0)>0)return;
+  if(barbarianUltimateActive>0||(barbarianRuntime.twilightActive||0)>0||(barbarianRuntime.stormStepActive||0)>0||(barbarianRuntime.olympusSupernovaActive||0)>0)return;
   if(equippedAbilityId==='barbarian_primal_rage') triggerPrimalRage();
   else if(equippedAbilityId==='barbarian_world_breaker') triggerPrimalRage();
   else if(equippedAbilityId==='barbarian_thunder_dome') triggerPrimalRage(); // legacy save migration
@@ -26015,6 +26021,15 @@ function aesirLightningTether(w){return triggerAesirLightningTether(w);}
 
 function doBarbarianAttack(w){
   spawnHeroIdentityAura();
+  if((barbarianRuntime.twilightActive||0)>0){
+    const dmg=(typeof KNIGHT_CFG!=='undefined'&&KNIGHT_CFG.guardianQuakeGiant)?KNIGHT_CFG.guardianQuakeGiant.damageMult:5;
+    const reach=2.6;
+    w={...w};
+    if(Number.isFinite(w.damage))w.damage*=dmg;
+    if(Number.isFinite(w.waveDamage))w.waveDamage*=dmg;
+    if(Number.isFinite(w.radius))w.radius*=reach;
+    if(Number.isFinite(w.range))w.range*=reach;
+  }
   if(w.kind==='aesir_thunderbrand_arc')return aesirThunderbrandArc(w);
   if(w.kind==='aesir_celestial_hammer_pulse')return aesirCelestialHammerPulse(w);
   if(w.kind==='aesir_bifrost_singularity')return aesirBifrostSingularity(w);
@@ -26946,105 +26961,64 @@ function updateStormStepOverdrive(dt){
 }
 
 function barbarianRagnarokCooldownForRound(){ return 0; }
-/* A real thrown weapon, not another ring. Primal Axe Wave is the only
-   barbarian ultimate whose damage LEAVES her - it flies, pierces the lane and
-   comes home. That is its whole identity next to Rage and World Breaker. */
-function spawnPrimalAxe(origin,ang,dist,dmg,inbound){
-  if(!player||!scene)return null;
-  const dx=Math.sin(ang), dz=Math.cos(ang);
-  fireBullet(dx,0,dz,origin.x+dx*.9,origin.y+1.0,origin.z+dz*.9,
-    {damage:dmg,kind:'barbarian_slash_wave',mat:new THREE.MeshBasicMaterial({color:0xff7a24})});
-  const b=bullets[bullets.length-1];
-  if(!b)return null;
-  b.kind='barbarian_slash_wave';
-  if(b.mesh.geometry)b.mesh.geometry.dispose();
-  b.mesh.geometry=new THREE.TorusGeometry(1.05,.16,6,18);
-  b.mesh.material=new THREE.MeshBasicMaterial({color:inbound?0xffe0a0:0xff5a18,
-    transparent:true,opacity:.95,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
-  // Twin crossed axe heads inside the spin disc.
-  for(let i=0;i<2;i++){
-    const head=new THREE.Mesh(new THREE.ConeGeometry(.46,1.5,4),
-      new THREE.MeshBasicMaterial({color:i?0xffffff:0xffc45a,transparent:true,opacity:.92,
-        depthWrite:false,blending:THREE.AdditiveBlending}));
-    head.rotation.z=i*Math.PI/2; head.rotation.x=Math.PI/2;
-    b.mesh.add(head);
-  }
-  const halo=new THREE.Mesh(new THREE.RingGeometry(1.25,1.95,28),
-    new THREE.MeshBasicMaterial({color:0xff3a08,transparent:true,opacity:.45,
-      depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));
-  b.mesh.add(halo);
-  b.mesh.scale.set(1.5,1.5,1.5);
-  b.pierces=99;
-  b.hitRadius=2.4;
-  b.speedMult=1;
-  b.life=dist/BARBARIAN_WAVE_SPEED;
-  b.spinSpeed=inbound?-14:14;   // the bullet loop spins on this field
-  return b;
+function aesirTitanSizeMult(){
+  return (typeof KNIGHT_CFG!=='undefined'&&KNIGHT_CFG.guardianQuakeGiant)?KNIGHT_CFG.guardianQuakeGiant.sizeMult:5;
+}
+function aesirTitanDuration(){
+  return (typeof KNIGHT_CFG!=='undefined'&&KNIGHT_CFG.guardianQuakeGiant)?KNIGHT_CFG.guardianQuakeGiant.buffDuration:15;
+}
+function aesirTitanSyncScale(active=(barbarianRuntime.twilightActive||0)>0){
+  if(!player||!barbarianIsActive()||rhinoIsActive())return;
+  const base=player.userData.baseAvatarScale||AVATAR_SCALE[state.avatarType]||1;
+  const mult=active?aesirTitanSizeMult():1;
+  const target=base*mult;
+  player.scale.setScalar(target);
+  player.userData.avatarScale=target;
+  player.userData.currentSizeMult=mult;
+  const inv=mult>1?1/mult:1;
+  if(player.userData.visibilityRing)player.userData.visibilityRing.scale.setScalar(inv);
+  if(player.userData.locator)player.userData.locator.scale.setScalar(inv);
+  if(player.userData.contactShadow)player.userData.contactShadow.scale.setScalar(inv);
 }
 function triggerRagnarokWave(){
-  // TWILIGHT OF THE GODS - RAGNAROK
-  if(!gameRunning||!barbarianIsActive()||!player||!aesirAxe)return false;
+  // V23.36: Ragnarok slot is now a true Guardian-Titan-rules transformation.
+  if(!gameRunning||!barbarianIsActive()||rhinoIsActive()||!player)return false;
   const r=barbarianRuntime;
-  if(r.twilightActive>0)return false;
-  aesirAxe.provoke('ragnarok',{r:arenaSize,d:2.2,s:.8,k:5.0});
-  r.twilightActive=9.5;r.twilightTimer=0;r.twilightMeteorTick=0;r.twilightLanceTick=0;r.twilightFinal=false;
+  if((r.twilightActive||0)>0||(r.stormStepActive||0)>0||(r.olympusSupernovaActive||0)>0||barbarianUltimateActive>0)return false;
   markUltimateUsed();
-  invincibleTimer=Math.max(invincibleTimer||0,9.5);
-  if(player.userData.playKayClip)player.userData.playKayClip('ragnarok',true,true,.55);
-  toast('TWILIGHT OF THE GODS - RAGNAROK');
-  document.body.style.filter='brightness(.62) saturate(1.7) hue-rotate(18deg)';
-  aesirStormFlash(.35,160);triggerCombatShake(20,320);
+  r.twilightActive=aesirTitanDuration();
+  r.twilightTimer=0;
+  aesirTitanSyncScale(true);
+  // Same Titan arrival philosophy: crowd-control only, no free activation nuke.
+  for(const z of zombies){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
+    if(Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z)<=7.5)
+      z.userData.hitStun=Math.max(z.userData.hitStun||0,.8);
+  }
+  knightShockRing(player.position,4.5,0xeaffff,.24);
+  knightShockRing(player.position,7.0,0x72dcff,.42);
+  spawnBurst(player.position.x,.55,player.position.z,isMobile?22:36,FX_MAT_SPARK,6.4);
+  triggerCombatShake(26,420);
+  if(navigator.vibrate)navigator.vibrate([60,25,95]);
+  toast('TITAN ASCENSION');
   return true;
 }
 function updateRagnarokWave(dt){
   const r=barbarianRuntime;
-  if((r.rfCooldown||0)>0)r.rfCooldown=Math.max(0,r.rfCooldown-dt);
   if(!(r.twilightActive>0))return;
-  r.twilightActive-=dt;r.twilightTimer+=dt;r.twilightMeteorTick-=dt;r.twilightLanceTick-=dt;
-  const t=r.twilightTimer;
-  // Aurora ascent: a few huge rings around the player, not particle spam.
-  if(t<1.8&&Math.random()<dt*7){
-    const rr=3.5+t*3.4;
-    knightShockRing({x:player.position.x,y:player.position.y,z:player.position.z},rr,(Math.floor(t*10)%2)?0x82f7ff:0xb98cff,.20);
+  r.twilightActive=Math.max(0,r.twilightActive-dt);
+  r.twilightTimer=(r.twilightTimer||0)+dt;
+  aesirTitanSyncScale(true);
+  // Light Titan foot pressure only; damage comes from Primary/Secondary, matching Titan rules.
+  if(Math.random()<dt*2.4)knightShockRing(player.position,2.1,0x9fe8ff,.12);
+  if(r.twilightActive<=0){
+    r.twilightActive=0;
+    r.twilightTimer=0;
+    aesirTitanSyncScale(false);
+    knightShockRing(player.position,5.0,0xeaffff,.28);
+    triggerCombatShake(12,210);
+    toast('TITAN ASCENSION ENDED');
   }
-  if(t>1.1&&r.twilightMeteorTick<=0){
-    r.twilightMeteorTick=isMobile?.42:.30;
-    const a=Math.random()*Math.PI*2,rad=Math.sqrt(Math.random())*(arenaSize*.82);
-    aesirSpawnRagnarokMeteor(Math.cos(a)*rad,Math.sin(a)*rad,.9+Math.random()*.55);
-  }
-  if(t>1.5&&r.twilightLanceTick<=0){
-    r.twilightLanceTick=.34;
-    let target=null;
-    const live=zombies.filter(z=>z&&z.userData&&!z.userData.dead&&!z.userData.spawnPending);
-    if(live.length)target=live[(Math.random()*live.length)|0];
-    const x=target?target.position.x:(Math.random()-.5)*arenaSize*1.5;
-    const z=target?target.position.z:(Math.random()-.5)*arenaSize*1.5;
-    aesirUltimateGoldenBolt(x,z,.8,20);
-    knightShockRing({x,y:player.position.y,z},1.9,0xcffcff,.34);
-    if(target){
-      if(!aesirUltimateKillNormal(target)){
-        aesirUltimateProtectedHit(target,.018,1.0*playerStats.power);
-        target.userData.hitStun=Math.max(target.userData.hitStun||0,.75);
-      }
-    }
-  }
-  if(!r.twilightFinal&&t>=8.1){
-    r.twilightFinal=true;
-    document.body.style.filter='brightness(1.95) saturate(1.4)';
-    const origin={x:player.position.x,y:player.position.y,z:player.position.z};
-    knightShockRing(origin,arenaSize,0xffffff,.68);
-    knightShockRing(origin,arenaSize*.72,0xb98cff,.50);
-    aesirUltimateGoldenBolt(origin.x,origin.z,2.8,28);
-    for(const e of [...zombies]){
-      if(!e||!e.userData||e.userData.dead)continue;
-      if(!aesirUltimateKillNormal(e)){
-        aesirUltimateProtectedHit(e,.08,4.0*playerStats.power);
-        e.userData.hitStun=Math.max(e.userData.hitStun||0,2.0);
-      }
-    }
-    triggerCombatShake(38,650);navigator.vibrate&&navigator.vibrate([90,25,90,25,140]);
-  }
-  if(r.twilightActive<=0){r.twilightActive=0;document.body.style.filter='';}
 }
 
 function spawnMageBasicCone(elementIsIce){
