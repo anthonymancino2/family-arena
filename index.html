@@ -1,3 +1,4 @@
+<!-- V23.37.00 Aesir Readability + Preview Fix: dramatically reduces Celestial Hammer-Pulse camera shake so zero-cooldown testing no longer leaves the view constantly unsettled, tones down Olympus-Supernova global brightness/flash intensity while preserving its ring/lightning spectacle, and restores Aesir avatar preview to a front-facing initial orientation instead of starting 180 degrees backward. Gameplay damage, ranges, durations, Titan rules and Storm-Step behavior are unchanged. -->
 <!-- V23.36.00 Aesir Titan Replacement: replaces Twilight of the Gods - Ragnarok with a true Titan transformation using the Knight Guardian Titan rules: 5x size, 15-second duration, 5x Primary/Secondary damage, 2.6x combat reach/radius, 0.85 movement speed, Primary and equipped Secondary remain available, other specials/signature are locked, activation is stun-only, and cooldown remains 0 in development testing. -->
 <!-- V23.35.00 Storm-Step Center Threshold Execute: during Storm-Step Overdrive, every live enemy inside or outside the arena is pulled rapidly toward exact map center. The pull runs at 2.75x each enemy's normal movement speed with a minimum gravity speed so slow units cannot stall. The instant any non-boss crosses into the inner half of the playable-map radius, it is force-executed immediately whether Aesir touched it or not. Bosses are exempt from execution but are still pulled toward center. Existing 10-second auto-Blitz, fixed 3x center axe, one-second rings, and Whirlwind shutdown remain unchanged. -->
 <!-- V23.34.00 Storm-Step Hard Execute: removes normal-enemy damage resolution from Storm-Step entirely. Every non-boss inside any of the three visible jagged dash corridors or the continuous close-contact radius is force-executed through killZombie() immediately, with a slightly wider swept corridor so extreme-speed movement cannot visually pass through enemies without counting. Bosses alone retain protected damage. All V23.33 center-axe gravity, 3x axe, one-second rings, auto-Blitz timing and Whirlwind fixes remain unchanged. -->
@@ -1711,7 +1712,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.36.00 - Aesir Titan Replacement';
+const GAME_VERSION='23.37.00 - Aesir Readability + Front Preview';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -2801,7 +2802,8 @@ async function updateAvatarPreview(characterId){
 
       // Rest_Pose is a real authored clip on the new rig, so the card shows her
       // actual idle stance. The axe is no longer part of this mesh at all.
-      fit.rotation.y=Math.PI;
+      // Front-facing initial hero view. The preview's slow auto-rotation can continue from here.
+      fit.rotation.y=0;
       previewMixer=new THREEAsset.AnimationMixer(root);
       const previewPose=(gltf.animations||[]).find(a=>a.name==='Rest_Pose')||null;
       if(previewPose){
@@ -25889,7 +25891,7 @@ function aesirCelestialHammerPulse(w){
   [0,95,190].forEach((ms,i)=>setTimeout(()=>{
     if(!gameRunning||!barbarianIsActive())return;
     knightShockRing(impact,(2.0+i*1.15),i===2?0xffffff:0x8fe6ff,.26+i*.05);
-    if(i===2){spawnBurst(impact.x,impact.y+.25,impact.z,isMobile?8:14,FX_MAT_SPARK,3.4);triggerCombatShake(11,145);}
+    if(i===2){spawnBurst(impact.x,impact.y+.25,impact.z,isMobile?8:14,FX_MAT_SPARK,3.4);triggerCombatShake(1.6,55);}
   },ms));
   return true;
 }
@@ -26603,9 +26605,9 @@ function triggerPrimalRage(){
   aesirOlympusSyncScale(true);
   aesirAxe.provoke('orbit',{r:arenaSize,d:1.0,s:.35,k:3.0});
   if(player.userData.playKayClip)player.userData.playKayClip('cyclone spin',true,true,1.0);
-  document.body.style.filter='brightness(.50) saturate(.82)';
+  document.body.style.filter='brightness(.72) saturate(.88)';
   toast('WRATH OF MOUNT OLYMPUS - SUPERNOVA');
-  aesirStormFlash(.62,220);triggerCombatShake(20,300);
+  aesirStormFlash(.16,90);triggerCombatShake(7,120);
   return true;
 }
 function triggerThunderDome(){
@@ -26643,7 +26645,7 @@ function updatePrimalRage(dt){
     // Wrath opening strike: same golden execution identity, now at arena center.
     if(!r.olympusSupernovaOpening&&r.olympusSupernovaTimer>=.55){
       r.olympusSupernovaOpening=true;
-      document.body.style.filter='brightness(2.05) saturate(.62)';
+      document.body.style.filter='brightness(.96) saturate(.92)';
       aesirUltimateGoldenBolt(origin.x,origin.z,3.6,32);
       aesirUltimateCrater(origin.x,origin.z,7.8,0xffd45f);
       knightShockRing(origin,9.2,0xfff2a8,.64);
@@ -26656,7 +26658,7 @@ function updatePrimalRage(dt){
           e.userData.hitStun=Math.max(e.userData.hitStun||0,2.4);
         }
       }
-      triggerCombatShake(34,520);navigator.vibrate&&navigator.vibrate([80,25,120]);
+      triggerCombatShake(10,170);navigator.vibrate&&navigator.vibrate([45,20,65]);
     }
 
     // Supernova rings NEVER stop during the ten-second state. A repeating
@@ -26665,8 +26667,8 @@ function updatePrimalRage(dt){
       r.olympusSupernovaPulse=.34;
       const cycle=(r.olympusSupernovaTimer%2.4)/2.4;
       const rad=3.2+cycle*Math.max(4,arenaSize-3.2);
-      knightShockRing(origin,rad,0xbfeaff,.38);
-      knightShockRing(origin,Math.max(1.8,rad*.78),0xffd96d,.28);
+      knightShockRing(origin,rad,0xbfeaff,.22);
+      knightShockRing(origin,Math.max(1.8,rad*.78),0xffd96d,.16);
       if(knightFxBudget(1))spawnBurst(origin.x,origin.y+1.0,origin.z,isMobile?5:9,FX_MAT_SPARK,3.6+cycle*3.0);
       for(const e of [...zombies]){
         if(!e||!e.userData||e.userData.dead)continue;
@@ -26677,7 +26679,7 @@ function updatePrimalRage(dt){
           e.userData.hitStun=Math.max(e.userData.hitStun||0,.55);
         }
       }
-      triggerCombatShake(7+Math.floor(cycle*6),115);
+      triggerCombatShake(2.0+cycle*2.2,65);
     }
 
     // Olympus remains present inside the supernova instead of being only a
@@ -26701,9 +26703,9 @@ function updatePrimalRage(dt){
       r.olympusSupernovaActive=0;
       if(!r.olympusSupernovaFinal){
         r.olympusSupernovaFinal=true;
-        knightShockRing(origin,arenaSize,0xffffff,.62);
-        knightShockRing(origin,arenaSize*.72,0xffd86a,.44);
-        aesirStormFlash(.85,260);triggerCombatShake(30,430);
+        knightShockRing(origin,arenaSize,0xffffff,.30);
+        knightShockRing(origin,arenaSize*.72,0xffd86a,.24);
+        aesirStormFlash(.18,110);triggerCombatShake(9,160);
       }
       aesirOlympusSyncScale(false);
       document.body.style.filter='';
