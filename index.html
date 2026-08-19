@@ -1,3 +1,5 @@
+<!-- V23.42.00 Ranger Titan Rig + Preview Size Repair: Titan mode now exclusively owns the Green Rhino Ranger player scale so Gamma Leap and other secondaries cannot cache/reapply giant transforms or fight the Titan state. The native fit wrapper is restored to its authored baseline outside active Whirlwind, preventing residual move rotations/tilts. Ranger avatar-selection preview now uses the same ~1.3024 visible height as the Archer preview instead of the old 2.28 tall reference. All V23.41 Whirlwind boomerang-burst behavior remains intact. -->
+<!-- V23.41.00 Ranger Whirlwind 5-Hit Boomerang Burst: every fifth actual Green Rhino Ranger Defensive Whirlwind enemy hit launches a round-scaled radial burst of giant boomerangs, starting at 4 and reaching 8 evenly spaced projectiles at Round 30. The burst boomerangs fly beyond the arena, hard-execute normal enemies on contact, and stun all non-normal enemies including bosses instead of executing them. Stormbreaker Giant Boomerangs and prior Ranger fixes remain intact. -->
 <!-- V23.40.00 Ranger Stormbreaker Giant Boomerangs: Stormbreaker Overdrive no longer creates an axe. It now launches round-scaled oversized independent boomerangs simultaneously in evenly spaced directions: 1 at early rounds, scaling to 4 at Round 30. Their gameplay collision radius exactly follows their visible radius. Normal enemies are hard-executed on first contact; Brutes/other large non-boss enemies are strongly slowed on first Stormbreaker contact and hard-executed on the second; bosses are never executed and instead take protected damage. Ranger Archer-size match, Twin Boomerang fix, and hold-only Whirlwind remain intact. -->
 <!-- V23.39.00 Ranger Archer-Size Match: Green Rhino Ranger's normal visible gameplay height now matches the Archer's final world height (~1.30 units) instead of Aesir's 2.22-unit height. Ranger Titan Rampage still scales from this new base using the same 5x multiplier. V23.38 Twin Boomerang and hold-only Whirlwind fixes remain intact. -->
 <!-- V23.38.00 Ranger Primary + Hold Whirlwind Fix: Green Rhino Ranger only. Twin Boomerang keeps its original 1.24-second throw-cycle as an active-move lock so global zero-cooldown testing cannot spawn a fresh pair every rendered frame. Defensive Whirlwind is strict hold-to-active: hold Secondary to spin and pulse; release/cancel/blur ends gameplay, FX and model spin immediately. No Ranger Whirlwind infinite-duration state remains. Aesir is unchanged. -->
@@ -1715,7 +1717,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.40.00 - Ranger Stormbreaker Giant Boomerangs';
+const GAME_VERSION='23.42.00 - Ranger Titan Rig + Preview Size Repair';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -2875,11 +2877,14 @@ async function updateAvatarPreview(characterId){
       fit.name='GreenRhino_PreviewFit';
       fit.add(root);
 
-      // Same taller preview reference the Aesir card uses.
+      // V23.42.00: selection preview matches the Archer's actual preview
+      // height, not Aesir's old 2.28 reference. Archer preview uses 1.48 times
+      // AVATAR_SCALE.rogue (0.88), which is ~1.3024 visible units.
       root.updateMatrixWorld(true);
       const rbox=importedVisibleMeshBounds(root,THREEAsset);
       const rsize=rbox.getSize(new THREEAsset.Vector3());
-      fit.scale.setScalar(2.28/Math.max(.001,rsize.y));
+      const rangerPreviewHeight=1.48*(AVATAR_SCALE.rogue||0.88);
+      fit.scale.setScalar(rangerPreviewHeight/Math.max(.001,rsize.y));
 
       fit.updateMatrixWorld(true);
       const rbox2=importedVisibleMeshBounds(fit,THREEAsset);
@@ -13170,6 +13175,7 @@ function buildGreenRhinoPlayer(options={}){
     wrapper.userData.greenRhinoFit = fit;
     wrapper.userData.greenRhinoFitBaseScale = fit.scale.clone();
     wrapper.userData.greenRhinoFitBasePosition = fit.position.clone();
+    wrapper.userData.greenRhinoFitBaseRotation = fit.rotation.clone();
     wrapper.userData.greenRhinoLoaded = true;
 
     const mixer = new THREEAsset.AnimationMixer(root);
@@ -13260,6 +13266,7 @@ function greenRhinoRepairPresentation(resetLean=false){
   const fit = player.userData.greenRhinoFit;
   const baseScale = player.userData.greenRhinoFitBaseScale;
   const basePos = player.userData.greenRhinoFitBasePosition;
+  const baseRot = player.userData.greenRhinoFitBaseRotation;
   if(baseScale && (!Number.isFinite(fit.scale.x) ||
       Math.abs(fit.scale.x-baseScale.x) > .0001 ||
       Math.abs(fit.scale.y-baseScale.y) > .0001 ||
@@ -13270,7 +13277,15 @@ function greenRhinoRepairPresentation(resetLean=false){
       !Number.isFinite(fit.position.y) || !Number.isFinite(fit.position.z))){
     fit.position.copy(basePos);
   }
-  if(resetLean) fit.rotation.x = 0;
+  // Only Whirlwind is allowed to rotate the clean fit wrapper. Every other
+  // Ranger move (especially while Titan is active) must leave the native rig
+  // at its authored baseline so attacks cannot accumulate tilt/yaw artifacts.
+  const whirlActive=(typeof rhinoCloudWhirlwindActive==='function')&&rhinoCloudWhirlwindActive();
+  if(baseRot && !whirlActive){
+    fit.rotation.x=baseRot.x; fit.rotation.y=baseRot.y; fit.rotation.z=baseRot.z;
+  }else if(resetLean && !whirlActive){
+    fit.rotation.x=0; fit.rotation.z=0;
+  }
 }
 
 // Drive baked Run playback from the avatar's real displacement so the loop
@@ -24120,7 +24135,7 @@ let rhinoRuntime = {
   throwSide:0, boomerangLock:0,
   overdrive:null, overdriveCooldown:0,
   gamma:null, gammaCooldown:0,
-  cloudWhirlTimer:0, cloudWhirlPulse:0,
+  cloudWhirlTimer:0, cloudWhirlPulse:0, cloudWhirlHitCounter:0,
   crashing:null, crashingCooldown:0,
   titanTimer:0, titanCooldown:0, titanFx:null,
   armageddon:null, armageddonCooldown:0,
@@ -24131,15 +24146,17 @@ let rhinoRoyalCloneCycleDuration=0;
 let rhinoRoyalCloneSummonEpoch=0;
 
 
+var rhinoWhirlBurstBoomerangs=[];
 function rhinoResetRuntime(){
   try{rhinoWorldBreakerCleanup(true);}catch(_e){}
+  for(const b of rhinoWhirlBurstBoomerangs){try{rhinoWBDispose(b.mesh);}catch(_e){}}rhinoWhirlBurstBoomerangs=[];
   try{clearRhinoRoyalClones();}catch(_e){}
   rhinoRoyalCloneCooldown=0;rhinoRoyalCloneCycleDuration=0;
   rhinoRuntime = {
     throwSide:0,
     overdrive:null, overdriveCooldown:0,
     gamma:null, gammaCooldown:0,
-    cloudWhirlTimer:0, cloudWhirlPulse:0,
+    cloudWhirlTimer:0, cloudWhirlPulse:0, cloudWhirlHitCounter:0,
     crashing:null, crashingCooldown:0,
     titanTimer:0, titanCooldown:0, titanFx:null,
     armageddon:null, armageddonCooldown:0,
@@ -24497,7 +24514,7 @@ function triggerRhinoGammaLeap(w){
   const start=player.position.clone(),dir=rhinoWBForward();let dist=Math.min(w.range||10,10);const target=findNearestEnemy(14);let end;
   if(target){const dv=new THREE.Vector3(target.position.x-start.x,0,target.position.z-start.z);if(dv.length()>.001)dv.normalize();dist=Math.min(dist,Math.max(4,Math.hypot(target.position.x-start.x,target.position.z-start.z)));end=start.clone().addScaledVector(dv,dist);}else end=start.clone().addScaledVector(dir,dist);
   end.y=player.position.y;const control=start.clone().lerp(end,.5);control.y=start.y+5.25;
-  r.gamma={t:0,dur:1.30,start,control,end,baseScale:player.scale.clone(),damage:w.damage||2.4,radius:w.radius||6};
+  r.gamma={t:0,dur:1.30,start,control,end,damage:w.damage||2.4,radius:w.radius||6};
   invincibleTimer=Math.max(invincibleTimer||0,1.42);if(player.userData.playKayClip)player.userData.playKayClip('leap',true,false,1.30);toast('GAMMA LEAP');return true;
 }
 function rhinoWBShatteredGround(center,radius){
@@ -24508,15 +24525,12 @@ function rhinoWBShatteredGround(center,radius){
 function updateRhinoGammaLeap(dt){
   const r=rhinoRuntime;if(r.gammaCooldown>0)r.gammaCooldown=Math.max(0,r.gammaCooldown-dt);const s=r.gamma;if(!s)return;s.t+=dt;const u=Math.min(1,s.t/s.dur),v=1-u;
   player.position.set(v*v*s.start.x+2*v*u*s.control.x+u*u*s.end.x,v*v*s.start.y+2*v*u*s.control.y+u*u*s.end.y,v*v*s.start.z+2*v*u*s.control.z+u*u*s.end.z);
-  // Keep the imported Ranger visually solid in the air. The jump itself is
-  // entirely the physical Bezier translation; no squash/stretch or warp tilt.
-  // Never restore the cached launch scale blindly: if Titan expired in
-  // midair, s.baseScale may still be the old giant scale.
-  if(rhinoTitanActive())player.scale.copy(s.baseScale);
-  else player.scale.setScalar(rhinoNormalScale());
+  // V23.42.00: Gamma owns translation only. Titan/normal presentation is the
+  // sole authority for player scale; the leap must never cache or reapply it.
+  rhinoApplyCurrentTransformScale();
   player.rotation.x=0;
   if(u>=1){
-    player.position.copy(s.end);if(rhinoTitanActive())player.scale.copy(s.baseScale);else player.scale.setScalar(rhinoNormalScale());player.rotation.x=0;
+    player.position.copy(s.end);rhinoApplyCurrentTransformScale();player.rotation.x=0;
     const hits=rhinoWBRadial(s.end,s.radius,s.damage,10);
     rhinoWBShatteredGround(s.end,s.radius);
     // Layered tectonic finish: tight white impact, main green wave, then a
@@ -24545,6 +24559,69 @@ function rhinoWBFlash(frames=2){
 
 
 
+function rhinoWhirlBurstBoomerangCount(){
+  const r=Math.max(1,Math.min(30,Number(round)||1));
+  return Math.min(8,4+Math.floor(((r-1)*4)/29));
+}
+function spawnRhinoWhirlBurstBoomerangs(){
+  if(!player||!scene)return;
+  const count=rhinoWhirlBurstBoomerangCount();
+  const titanReach=rhinoTitanActive()?rhinoTitanCombatScale():1;
+  const visualRadius=1.85*titanReach;
+  const origin=player.position.clone();origin.y+=1.0;
+  const baseYaw=player.rotation.y;
+  const travel=Math.max((arenaSize||18)*2.25,38)*titanReach;
+  for(let i=0;i<count;i++){
+    const ang=baseYaw+i*(Math.PI*2/count);
+    const mesh=rhinoWBMakeGiantBoomerang(RHINO_PALE,visualRadius);
+    mesh.position.copy(origin);scene.add(mesh);
+    rhinoWhirlBurstBoomerangs.push({
+      mesh,ang,speed:28*titanReach,travel:0,maxTravel:travel,
+      radius:visualRadius,hit:new Set()
+    });
+  }
+  rhinoWBShock(player.position,2.2*titanReach,RHINO_PALE,.20);
+  spawnBurst(player.position.x,player.position.y+.7,player.position.z,isMobile?8:14,FX_MAT_SPARK,3.0);
+  if(navigator.vibrate)navigator.vibrate(18);
+}
+function rhinoWhirlBurstHitEnemy(z,b){
+  if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)return;
+  const archetype=z.userData.archetype||'walker';
+  const isBoss=archetype==='boss'||z.userData.isBoss;
+  const isNonNormal=isBoss||archetype==='brute'||z.userData.largeEnemy||z.userData.isLarge;
+  if(!isNonNormal){
+    z.userData.hp=0;
+    if(typeof killZombie==='function')killZombie(z);
+    else z.userData.dead=true;
+  }else{
+    // Burst is control-only against tougher targets: stun, never execute.
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,2.0);
+    z.userData.stunTimer=Math.max(z.userData.stunTimer||0,2.0);
+  }
+  if(z.position){
+    rhinoWBShock(z.position,Math.max(1.2,b.radius*.68),RHINO_WHITE,.16);
+    spawnBurst(z.position.x,z.position.y+.55,z.position.z,isMobile?5:9,FX_MAT_SPARK,2.7);
+  }
+}
+function updateRhinoWhirlBurstBoomerangs(dt){
+  for(let i=rhinoWhirlBurstBoomerangs.length-1;i>=0;i--){
+    const b=rhinoWhirlBurstBoomerangs[i],m=b.mesh;
+    if(!m||!m.parent){rhinoWhirlBurstBoomerangs.splice(i,1);continue;}
+    const step=Math.min(b.speed*dt,b.maxTravel-b.travel);
+    b.travel+=step;
+    m.position.x+=Math.sin(b.ang)*step;
+    m.position.z+=Math.cos(b.ang)*step;
+    m.rotation.y+=dt*24;m.rotation.z+=dt*34;
+    if(knightFxBudget(1)&&Math.random()<dt*(isMobile?14:22))
+      spawnBurst(m.position.x,m.position.y,m.position.z,1,FX_MAT_SPARK,1.35);
+    for(const z of [...zombies]){
+      if(!z||!z.userData||z.userData.dead||z.userData.spawnPending||!z.position||b.hit.has(z.uuid))continue;
+      if(Math.hypot(z.position.x-m.position.x,z.position.z-m.position.z)>b.radius)continue;
+      b.hit.add(z.uuid);rhinoWhirlBurstHitEnemy(z,b);
+    }
+    if(b.travel>=b.maxTravel-.001){rhinoWBDispose(m);rhinoWhirlBurstBoomerangs.splice(i,1);}
+  }
+}
 function rhinoCloudWhirlwindActive(){
   return rhinoIsActive() && (rhinoRuntime.cloudWhirlTimer||0)>0;
 }
@@ -24565,6 +24642,7 @@ function triggerRhinoCloudWhirlwind(){
   // an ACTIVE flag while the Secondary control is physically held.
   r.cloudWhirlTimer=1;
   r.cloudWhirlPulse=0;
+  r.cloudWhirlHitCounter=0;
   if(player.userData.playKayClip)player.userData.playKayClip('spin',true,true,.32);
   player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,.18);
   player.userData.spinVisualSpeed=KNIGHT_CFG.whirlwind.spinSpeed;
@@ -24624,6 +24702,9 @@ function rhinoCloudWhirlwindPulse(){
     const dist=Math.hypot(dx,dz);
     if(dist>radius)continue;
     const cls=z.userData.archetype==='boss'?'boss':(z.userData.archetype==='brute'?'brute':'normal');
+    const rr=rhinoRuntime;
+    rr.cloudWhirlHitCounter=(rr.cloudWhirlHitCounter||0)+1;
+    if(rr.cloudWhirlHitCounter%5===0)spawnRhinoWhirlBurstBoomerangs();
     let dmg=c.damage*playerStats.power*damageScale;
     if(cls==='boss')dmg*=c.bossMult;
     else if(cls==='brute')dmg*=c.bruteMult;
@@ -24646,6 +24727,7 @@ function endRhinoCloudWhirlwind(){
   if(!(r.cloudWhirlTimer>0)&&r.cloudWhirlTimer!==Infinity)return;
   r.cloudWhirlTimer=0;
   r.cloudWhirlPulse=0;
+  r.cloudWhirlHitCounter=0;
   if(player){
     knightWhirlwindEndFx('ability');
     spawnKnightGuardBurst(player.position,2.1*rhinoCloudWhirlwindCombatScale(),KNIGHT_STEEL);
@@ -25102,6 +25184,7 @@ function triggerRhinoTitanRampage(){
   r.titanTimer=rhinoTitanDuration();
     r.titanFx=rhinoTitanBuildFx();
   rhinoTitanSyncScale(true);
+  greenRhinoRepairPresentation(true);
 
   // Transformation arrival is deliberately stun-only; combat power comes from
   // the giant Primary/equipped Secondary rather than a free activation nuke.
@@ -25134,6 +25217,7 @@ function endRhinoTitanRampage(){
   // Force normal scale now. Gamma/Whirlwind updates also consult current
   // Titan state, so no active move can restore an expired giant scale.
   rhinoTitanSyncScale(false);
+  greenRhinoRepairPresentation(true);
 
   if(wasActive){
     r.titanCooldown=rhinoTitanCooldownDuration();
@@ -25159,9 +25243,9 @@ function updateRhinoTitanRampage(dt){
     r.titanFx.scale.setScalar(p);
   }
 
-  // Keep the giant scale authoritative while active. Gamma Leap now also
-  // checks Titan state itself, so both systems agree on the same scale.
-  if(!r.gamma)rhinoTitanSyncScale(true);
+  // Titan is the sole scale authority. Keep it synchronized every frame,
+  // including during Gamma Leap and all other Secondary animations.
+  rhinoTitanSyncScale(true);
 
   if(r.titanTimer<=0)endRhinoTitanRampage();
 }
@@ -25814,6 +25898,7 @@ function updateRhinoCombat(dt){
     updateRhinoOverdrive(dt);
     updateRhinoGammaLeap(dt);
     updateRhinoCloudWhirlwind(dt);
+    updateRhinoWhirlBurstBoomerangs(dt);
     updateRhinoCrashingBolt(dt);
     updateRhinoTitanRampage(dt);
     updateRhinoArmageddon(dt);
