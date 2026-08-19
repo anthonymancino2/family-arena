@@ -1,3 +1,4 @@
+<!-- V23.40.00 Ranger Stormbreaker Giant Boomerangs: Stormbreaker Overdrive no longer creates an axe. It now launches round-scaled oversized independent boomerangs simultaneously in evenly spaced directions: 1 at early rounds, scaling to 4 at Round 30. Their gameplay collision radius exactly follows their visible radius. Normal enemies are hard-executed on first contact; Brutes/other large non-boss enemies are strongly slowed on first Stormbreaker contact and hard-executed on the second; bosses are never executed and instead take protected damage. Ranger Archer-size match, Twin Boomerang fix, and hold-only Whirlwind remain intact. -->
 <!-- V23.39.00 Ranger Archer-Size Match: Green Rhino Ranger's normal visible gameplay height now matches the Archer's final world height (~1.30 units) instead of Aesir's 2.22-unit height. Ranger Titan Rampage still scales from this new base using the same 5x multiplier. V23.38 Twin Boomerang and hold-only Whirlwind fixes remain intact. -->
 <!-- V23.38.00 Ranger Primary + Hold Whirlwind Fix: Green Rhino Ranger only. Twin Boomerang keeps its original 1.24-second throw-cycle as an active-move lock so global zero-cooldown testing cannot spawn a fresh pair every rendered frame. Defensive Whirlwind is strict hold-to-active: hold Secondary to spin and pulse; release/cancel/blur ends gameplay, FX and model spin immediately. No Ranger Whirlwind infinite-duration state remains. Aesir is unchanged. -->
 <!-- V23.37.00 Aesir Readability + Preview Fix: dramatically reduces Celestial Hammer-Pulse camera shake so zero-cooldown testing no longer leaves the view constantly unsettled, tones down Olympus-Supernova global brightness/flash intensity while preserving its ring/lightning spectacle, and restores Aesir avatar preview to a front-facing initial orientation instead of starting 180 degrees backward. Gameplay damage, ranges, durations, Titan rules and Storm-Step behavior are unchanged. -->
@@ -1714,7 +1715,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.39.00 - Ranger Archer-Size Match';
+const GAME_VERSION='23.40.00 - Ranger Stormbreaker Giant Boomerangs';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -2107,7 +2108,7 @@ const HERO_ROSTER_INFO = {
   barbarian:{title:'Aesir Barbarian',role:'SLOW • AREA BRUISER',desc:'A storm-forged warrior whose axe is a living bolt that hunts beside her, lightning and raw ground power. She is by far the SLOWEST avatar in the roster and cannot chase anything down - instead every single blow she lands throws a shockwave out of the impact point, so she is never fighting one enemy at a time. Two Primaries, three Secondaries, three selectable Ultimates, and a Berserker Kin clone special.'},
   
   cloud:{title:'Cloud',role:'MELEE • KNIGHT CLASS',desc:'Cloud is now the primary avatar for the Knight combat class. He uses his native 43-joint skeleton and Walk animation while running the complete Knight combat system. Future cosmetic skins can reuse this same Knight-class moveset without changing the combat logic.'},
-  rhino:{title:'Green Rhino Ranger',role:'WORLD-BREAKER • THUNDER GOD',desc:'A mobile Hulk-Thor style Ranger built around one giant axe and procedural power moves. Twin Boomerang remains the Primary. Secondaries are Stormbreaker Overdrive, Gamma Leap and Defensive Whirlwind. Ultimates are World-Breaker Crashing Bolt, Titan Rampage and Armageddon. His signature summons an invincible Green Ranger clone squad that follows the same round-scaled count, duration, cooldown, aggro and 10%-damage rules as the Knight\'s Knights of the Round.'}
+  rhino:{title:'Green Rhino Ranger',role:'WORLD-BREAKER • THUNDER GOD',desc:'A mobile Hulk-Thor style Ranger built around one giant axe and procedural power moves. Twin Boomerang remains the Primary. Secondaries are Stormbreaker Boomerang Overdrive, Gamma Leap and Defensive Whirlwind. Ultimates are World-Breaker Crashing Bolt, Titan Rampage and Armageddon. His signature summons an invincible Green Ranger clone squad that follows the same round-scaled count, duration, cooldown, aggro and 10%-damage rules as the Knight\'s Knights of the Round.'}
 };
 
 // Data-driven hero passives. This object had accidentally been merged into
@@ -3784,7 +3785,7 @@ const CHARACTER_COMBAT = {
     weapons:{
       twin_boomerang:{name:'Twin Boomerang', price:0, slot:'primary', kind:'rhino_boomerang', cooldown:1.24, damage:1.4, radius:2.6, range:16, auto:true,
         desc:'Throw both Ranger blades in a shallow V. They curve out, pierce their lanes and sweep back home.'},
-      stormbreaker_overdrive:{name:'Stormbreaker Overdrive', price:260, slot:'secondary', kind:'rhino_overdrive', cooldown:0, damage:2.0, radius:1.25, range:18,
+      stormbreaker_overdrive:{name:'Stormbreaker Boomerang Overdrive', price:260, slot:'secondary', kind:'rhino_overdrive', cooldown:0, damage:2.0, radius:1.25, range:18,
         desc:'Detach one giant axe, violently spin it through the three nearest enemies in sequence using live vector steering, then pull it back to your hand.'},
       gamma_leap:{name:'Gamma Leap', price:340, slot:'secondary', kind:'rhino_gamma_leap', cooldown:0, damage:2.4, radius:6.0, range:10,
         desc:'Tectonic vault along a true quadratic Bezier arc. The Ranger compresses in mid-air and lands with a distance-scaled radial shove and shattered-ground burst.'},
@@ -24341,106 +24342,153 @@ function rhinoWBNearest5(){
     .sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position))
     .slice(0,5);
 }
+function rhinoStormbreakerBoomerangCount(){
+  // Smooth milestone scaling to four simultaneous weapons by Round 30.
+  const r=Math.max(1,Math.min(30,Number(round)||1));
+  if(r>=30)return 4;
+  if(r>=20)return 3;
+  if(r>=10)return 2;
+  return 1;
+}
+function rhinoWBMakeGiantBoomerang(color=RHINO_PALE,visualRadius=2.65){
+  const g=new THREE.Group();
+  const mat=new THREE.MeshStandardMaterial({color,emissive:RHINO_GREEN,emissiveIntensity:.55,roughness:.28,metalness:.42});
+  const edgeMat=new THREE.MeshBasicMaterial({color:RHINO_WHITE,transparent:true,opacity:.88,depthWrite:false,blending:THREE.AdditiveBlending});
+  // Two long arms form a very readable V silhouette. Geometry dimensions are
+  // derived from visualRadius so gameplay can use that exact same radius.
+  const armLen=visualRadius*1.62,armW=visualRadius*.34;
+  for(const s of [-1,1]){
+    const arm=new THREE.Mesh(new THREE.BoxGeometry(armW,.22,armLen),mat.clone());
+    arm.position.set(s*visualRadius*.53,0,visualRadius*.32);
+    arm.rotation.y=s*.70;
+    g.add(arm);
+    const edge=new THREE.Mesh(new THREE.BoxGeometry(armW*.34,.08,armLen*1.03),edgeMat.clone());
+    edge.position.copy(arm.position);edge.position.y=.15;edge.rotation.y=arm.rotation.y;g.add(edge);
+  }
+  const hub=new THREE.Mesh(new THREE.CylinderGeometry(visualRadius*.24,visualRadius*.24,.28,10),mat.clone());
+  hub.rotation.x=Math.PI/2;g.add(hub);
+  const halo=new THREE.Mesh(new THREE.RingGeometry(visualRadius*.72,visualRadius,32),new THREE.MeshBasicMaterial({color:RHINO_GREEN,transparent:true,opacity:.22,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));
+  halo.rotation.x=-Math.PI/2;g.add(halo);
+  g.userData.visualRadius=visualRadius;
+  return g;
+}
 function triggerRhinoOverdrive(w){
   const r=rhinoRuntime;
   if(r.overdrive||r.overdriveCooldown>0)return false;
-  const targets=rhinoWBNearest5();
-  if(!targets.length)return false;
-
-  const axe=rhinoWBMakeAxe(RHINO_PALE);
-  axe.position.copy(player.position);
-  axe.position.y+=1.15;
-  axe.scale.setScalar(rhinoTitanActive()?1.55:1.28);
-  scene.add(axe);
-
+  const count=rhinoStormbreakerBoomerangCount();
+  const titanReach=rhinoTitanActive()?rhinoTitanCombatScale():1;
+  const baseVisualRadius=2.65*titanReach;
+  const origin=player.position.clone();origin.y+=1.05;
+  const baseYaw=player.rotation.y;
+  const boomerangs=[];
+  for(let i=0;i<count;i++){
+    // Even spacing around the player. With one boomerang it launches forward;
+    // with four they are exactly 90 degrees apart.
+    const ang=count===1?baseYaw:(baseYaw+i*(Math.PI*2/count));
+    const mesh=rhinoWBMakeGiantBoomerang(RHINO_PALE,baseVisualRadius);
+    mesh.position.copy(origin);scene.add(mesh);
+    boomerangs.push({
+      mesh,ang,phase:'out',travel:0,maxTravel:Math.max(11,Math.min((w.range||18),18))*titanReach,
+      speed:18*titanReach,returnSpeed:22*titanReach,
+      radius:baseVisualRadius,hitOut:new Set(),hitBack:new Set()
+    });
+  }
   r.overdrive={
-    axe,targets,index:0,phase:'targets',
-    speed:32,returnSpeed:52,
-    hit:new Set(),damage:w.damage||2.0,hitCount:0
+    boomerangs,t:0,damage:w.damage||2.0,
+    // One shared map makes two different boomerangs count toward the same
+    // large-enemy two-hit rule during this activation.
+    largeHits:new Map(),count
   };
-
   if(player.userData.playKayClip)player.userData.playKayClip('attack',true,true,.30);
-  rhinoWBShock(player.position,2.2*(rhinoTitanActive()?rhinoTitanCombatScale():1),RHINO_PALE,.20);
+  rhinoWBShock(player.position,2.2*titanReach,RHINO_PALE,.20);
   spawnBurst(player.position.x,player.position.y+.8,player.position.z,isMobile?8:13,FX_MAT_SPARK,2.8);
-  triggerCombatShake(8,105);
-  toast('STORMBREAKER OVERDRIVE · 0/5');
+  triggerCombatShake(5,80);
+  toast(`STORMBREAKER BOOMERANG · ${count}`);
   return true;
+}
+function rhinoStormbreakerHitEnemy(z,s,b){
+  if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)return;
+  const archetype=z.userData.archetype||'walker';
+  const isBoss=archetype==='boss'||z.userData.isBoss;
+  const isLarge=!isBoss&&(archetype==='brute'||z.userData.largeEnemy||z.userData.isLarge);
+  if(isBoss){
+    // Bosses stay on the protected damage path and can never be hard-executed.
+    applyBulletDamage(z,s.damage*playerStats.power*.55);
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,.18);
+  }else if(isLarge){
+    const prev=s.largeHits.get(z.uuid)||0;
+    const next=prev+1;s.largeHits.set(z.uuid,next);
+    if(next>=2){
+      z.userData.hp=0;
+      if(typeof killZombie==='function')killZombie(z);
+      else z.userData.dead=true;
+    }else{
+      // First hit: heavy slow, not a fake knockback. Existing enemy movement
+      // reads slowTimer/slowMult in the main update path.
+      z.userData.slowTimer=Math.max(z.userData.slowTimer||0,3.5);
+      z.userData.slowMult=Math.min(z.userData.slowMult||1,.38);
+      z.userData.hitStun=Math.max(z.userData.hitStun||0,.24);
+    }
+  }else{
+    z.userData.hp=0;
+    if(typeof killZombie==='function')killZombie(z);
+    else z.userData.dead=true;
+  }
+  if(z.position){
+    rhinoWBShock(z.position,Math.max(1.4,b.radius*.72),RHINO_WHITE,.18);
+    spawnBurst(z.position.x,z.position.y+.55,z.position.z,isMobile?7:12,FX_MAT_SPARK,3.2);
+  }
 }
 function updateRhinoOverdrive(dt){
   const r=rhinoRuntime;
   if(r.overdriveCooldown>0)r.overdriveCooldown=Math.max(0,r.overdriveCooldown-dt);
   const s=r.overdrive;if(!s)return;
-
-  const axe=s.axe;
-  if(!axe||!axe.parent){r.overdrive=null;return;}
-
-  axe.rotation.z+=dt*52;
-  axe.rotation.y+=dt*28;
-  axe.rotation.x+=dt*14;
-
-  let goal=null;
-  if(s.phase==='targets'){
-    while(s.index<s.targets.length&&(!s.targets[s.index]||s.targets[s.index].userData.dead||!s.targets[s.index].parent))s.index++;
-    if(s.index>=s.targets.length)s.phase='return';
-    else goal=s.targets[s.index].position;
-  }
-  if(s.phase==='return')goal=player.position;
-  if(!goal)return;
-
-  const gy=s.phase==='return'?player.position.y+1.05:goal.y+.90;
-  const v=new THREE.Vector3(goal.x-axe.position.x,gy-axe.position.y,goal.z-axe.position.z);
-  const d=v.length();
-  if(d>.001)v.multiplyScalar(1/d);
-  axe.position.addScaledVector(v,Math.min(d,(s.phase==='return'?s.returnSpeed:s.speed)*dt));
-
-  if(knightFxBudget(1)&&Math.random()<dt*(isMobile?34:46))
-    spawnBurst(axe.position.x,axe.position.y,axe.position.z,1,FX_MAT_SPARK,1.8);
-
-  if(d<.82){
-    if(s.phase==='targets'){
-      const z=s.targets[s.index];
-      if(z&&!s.hit.has(z)){
-        s.hit.add(z);
-        s.hitCount++;
-
-        const titanReach=rhinoTitanActive()?rhinoTitanCombatScale():1;
-        const f=rhinoWBForward();
-        applyBulletDamage(z,s.damage*playerStats.power);
-        z.userData.knockbackX=f.x*5.8*titanReach;
-        z.userData.knockbackZ=f.z*5.8*titanReach;
-        z.userData.hitStun=Math.max(z.userData.hitStun||0,.24);
-
-        const finalHit=s.hitCount>=5||s.index>=s.targets.length-1;
-
-        rhinoWBShock(z.position,(finalHit?2.9:1.55)*titanReach,RHINO_WHITE,finalHit?.27:.15);
-        rhinoWBShock(z.position,(finalHit?4.8:2.35)*titanReach,finalHit?RHINO_GREEN:RHINO_PALE,finalHit?.42:.23);
-        spawnBurst(z.position.x,z.position.y+.55,z.position.z,finalHit?(isMobile?18:30):(isMobile?8:13),FX_MAT_SPARK,finalHit?5.8:2.8);
-        triggerCombatShake(finalHit?18:7,finalHit?230:80);
-
-        if(finalHit){
-          knightRuntime.hitStop=Math.max(knightRuntime.hitStop||0,.065);
-          if(navigator.vibrate)navigator.vibrate([35,18,55]);
-        }
-        toast(`STORMBREAKER OVERDRIVE · ${s.hitCount}/5`);
-      }
-
-      s.index++;
-      if(s.hitCount>=5||s.index>=s.targets.length)s.phase='return';
+  s.t+=dt;
+  let alive=0;
+  for(const b of s.boomerangs){
+    const m=b.mesh;if(!m||!m.parent)continue;
+    alive++;
+    m.rotation.y+=dt*21;m.rotation.z+=dt*31;
+    const speed=b.phase==='out'?b.speed:b.returnSpeed;
+    if(b.phase==='out'){
+      const step=Math.min(speed*dt,b.maxTravel-b.travel);
+      b.travel+=step;
+      m.position.x+=Math.sin(b.ang)*step;
+      m.position.z+=Math.cos(b.ang)*step;
+      if(b.travel>=b.maxTravel-.001)b.phase='return';
     }else{
-      const catchPos=player.position.clone();catchPos.y=.12;
-      rhinoWBDispose(axe);
-
-      const titanReach=rhinoTitanActive()?rhinoTitanCombatScale():1;
-      rhinoWBShock(catchPos,2.7*titanReach,RHINO_WHITE,.18);
-      rhinoWBShock(catchPos,4.4*titanReach,RHINO_PALE,.30);
-      spawnBurst(catchPos.x,.62,catchPos.z,isMobile?15:24,FX_MAT_SPARK,4.8);
-      barbarianKnockbackRing(catchPos,3.6*titanReach,5.2*titanReach,.18);
-      triggerCombatShake(15,185);
-      if(navigator.vibrate)navigator.vibrate(34);
-
-      r.overdrive=null;
-      r.overdriveCooldown=0;
+      const goal=player.position;
+      const dx=goal.x-m.position.x,dz=goal.z-m.position.z;
+      const d=Math.hypot(dx,dz);
+      if(d<Math.max(.55,b.radius*.28)){
+        rhinoWBShock(m.position,Math.max(1.6,b.radius*.80),RHINO_PALE,.20);
+        rhinoWBDispose(m);continue;
+      }
+      const step=Math.min(d,speed*dt);
+      m.position.x+=dx/d*step;m.position.z+=dz/d*step;
+      m.position.y=player.position.y+1.05;
     }
+    if(knightFxBudget(1)&&Math.random()<dt*(isMobile?18:28))
+      spawnBurst(m.position.x,m.position.y,m.position.z,1,FX_MAT_SPARK,1.5);
+
+    // Gameplay radius is literally the boomerang's declared visual radius.
+    const hitSet=b.phase==='out'?b.hitOut:b.hitBack;
+    for(const z of [...zombies]){
+      if(!z||!z.userData||z.userData.dead||z.userData.spawnPending||!z.position)continue;
+      if(hitSet.has(z.uuid))continue;
+      const d=Math.hypot(z.position.x-m.position.x,z.position.z-m.position.z);
+      if(d>b.radius)continue;
+      hitSet.add(z.uuid);
+      rhinoStormbreakerHitEnemy(z,s,b);
+    }
+  }
+  // Dispose only after all simultaneous boomerangs have returned.
+  const still=s.boomerangs.some(b=>b.mesh&&b.mesh.parent);
+  if(!still){
+    const catchPos=player.position.clone();catchPos.y=.12;
+    rhinoWBShock(catchPos,2.4*(rhinoTitanActive()?rhinoTitanCombatScale():1),RHINO_PALE,.24);
+    spawnBurst(catchPos.x,.62,catchPos.z,isMobile?10:18,FX_MAT_SPARK,3.8);
+    r.overdrive=null;r.overdriveCooldown=0;
   }
 }
 function triggerRhinoGammaLeap(w){
