@@ -1,4 +1,4 @@
-<!-- V23.49.00 Global Combat Cycle QA: fixes Cloud and other held moves rapid-restarting under development zero-cooldown mode by separating execution/cast-cycle locks from post-move cooldowns. Primaries, Secondaries, equipped Ultimates and signatures now preserve their authored swing/throw/cast/channel cadence while still re-arming immediately after the active cycle finishes. No avatar loses hold-to-auto behavior. -->
+<!-- V23.50.00 Safe Combat QA Rollback: rolls back the risky V23.49 global execution-lock/frame-loop patch to the known-working V23.48 runtime. Adds a narrow held-Primary cadence guard based on each weapon's authored attack cycle, preventing Cloud and other hold-fire primaries from restarting every rendered frame while keeping development post-move cooldowns at zero. -->
 <!-- V23.48.00 Fox Spirit Bloom + Hex Garden + Mirror Gravity Core: merges Ninefold Astral Bloom and Spirit Gate Stampede into one hold-repeat Secondary with 2 seconds of cast-start invincibility, repurposes the former Spirit Gate slot into Foxfire Hex Garden area-control magic, and upgrades Crimson Mirror Dimension with center teleport, full-duration invincibility, a visible black-hole gravity core, and an on-screen non-boss execution finale. -->
 <!-- V23.47.00 Fox Crimson Mirror + Spirit Gate Stampede: replaces Arcane Laser in-place with a 10-second reality-warping Crimson Mirror Dimension Ultimate, adds Spirit Gate Stampede as a third Fox Secondary scaling from 3 to 9 spectral fox spirits by Round 30, preserves hold-to-repeat and existing Fox tail/locomotion authority. -->
 <!-- V23.46.00 Fox Blizzard Rebuild + Ninefold Astral Bloom + Ultimate Duration Floor: Blizzard now hard-executes every non-boss that enters its storm/impact zone, rapidly drags all enemies from inside and outside the arena toward map center with round-scaled gravity/storm speed, and uses simplified low-poly ice masses for mobile performance. Rapid Fire & Ice gets a real 0.18s cast-cycle lock even during zero-cooldown testing. Arcane Lance is replaced in-place by Ninefold Astral Bloom, a nine-comet homing secondary with an active cast lock and hold-to-repeat. Duration-based Ultimate effects are normalized to at least 10 seconds where applicable, and Fox Arcane Laser's full charge now supports a 10-second continuous channel. -->
@@ -1454,7 +1454,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.49.00 - Global Combat Cycle QA';
+const GAME_VERSION='23.50.00 - Safe Combat QA Rollback';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -14866,40 +14866,16 @@ let lookActive = false, lookLast = {x:0,y:0};
 let secondaryInputHeld = false;
 let primaryInputHeld = false;
 let abilityInputHeld = false;
-// Development QA: no post-move cooldown does NOT mean a held button may
-// restart a move every rendered frame. These locks represent only the move's
-// physical execution/cast cycle and are intentionally separate from cooldowns.
-let primaryExecutionLock=0, secondaryExecutionLock=0, abilityExecutionLock=0, signatureExecutionLock=0;
-function developmentPrimaryCycle(w){
-  if(!w)return .18;
-  const k=String(w.kind||'');
-  if(k==='rhino_boomerang')return 1.24;
-  if(k==='knight_combo')return .20;
-  if(k==='knight_vanguard')return .24;
-  if(k==='elemental')return Math.max(.18,Number(w.cooldown)||.18);
-  if(k==='aesir_celestial_hammer_pulse')return .92;
-  if(k==='aesir_thunderbrand_arc')return .34;
-  if(k==='wolv_claw_combo')return .22;
-  if(k==='wolv_flurry')return .10;
-  if(k==='velocity_sonic_piston'||k==='velocity_arc_sweep')return .18;
-  if(k==='chopper_cutlass_combo'||k==='chopper_cannon_shot')return Math.max(.20,Number(w.cooldown)||.20);
+// Safe hold-repeat guard. This is intentionally NOT decremented from update()/animate().
+// It only prevents a held Primary from restarting faster than that weapon's physical attack cycle.
+let primaryHoldCycleReadyAt = 0;
+function primaryHoldCycleSeconds(w){
+  if(!w) return 0.20;
   const authored=Number(w.cooldown);
-  return Number.isFinite(authored)&&authored>0?Math.max(.10,authored):.20;
-}
-function developmentSecondaryCycle(w){
-  if(!w)return .16;
-  const k=String(w.kind||'');
-  // Hold-duration moves own their own active state; this small gate only keeps
-  // the shared input loop from trying to restart them every frame.
-  if(k==='knight_whirlwind_secondary'||k==='rhino_cloud_whirlwind'||k==='barbarian_whirlwind')return .14;
-  if(k==='giant_fireball')return .80;
-  if(k==='cloud_great_sword_slash')return .50;
-  if(k==='fox_arcane_bloom')return .28;
-  if(k==='fox_hex_garden')return .24;
-  if(k==='rhino_gamma_leap')return .22;
-  if(k==='rhino_overdrive')return .24;
-  const authored=Number(w.cooldown);
-  return Number.isFinite(authored)&&authored>0?Math.max(.12,Math.min(authored,1.0)):.18;
+  // Primary weapon cooldown values in the combat table also describe their authored
+  // swing/throw/cast cadence. Preserve that cadence even when QA post-move cooldowns are disabled.
+  if(Number.isFinite(authored) && authored>0) return Math.max(0.08, authored);
+  return 0.20;
 }
 let abilityPointerId = null;
 let signatureInputHeld = false;
@@ -15134,10 +15110,6 @@ function setupControls(){
   dashBtnEl.addEventListener('touchstart',e=>{e.preventDefault();doDash();});
   const abilityBtnEl=document.getElementById('abilityBtn');
   const activateEquippedAbilityNow=()=>{
-    if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS){
-      if(abilityExecutionLock>0)return;
-      abilityExecutionLock=.16;
-    }
     if(equippedAbilityId==='arcane_laser') triggerCrimsonMirrorDimension();
     else if(equippedAbilityId==='blizzard_storm') triggerBlizzardStorm();
     else if(equippedAbilityId==='super_meteor') triggerSuperMeteor();
@@ -15193,10 +15165,6 @@ function setupControls(){
   laserBtnEl.classList.add('hidden');
   const ultimateBtnEl=document.getElementById('ultimateBtn');
   const activateUltimate=()=>{
-    if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS){
-      if(signatureExecutionLock>0)return;
-      signatureExecutionLock=.16;
-    }
     if(state.avatarType==='cloud') resetCloudCrossbreakerChain();
     if(mageGameplayActive()) triggerArcaneEchoes();
     else if(archerIsActive()) triggerArcherMirrorClones();
@@ -32745,12 +32713,17 @@ function performWeaponAttack(w, countsAsPrimary=true){
 }
 function doShoot(){
   if(!gameRunning) return;
-  if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS&&primaryExecutionLock>0)return;
   // The Knight is deliberate: attacks never fire while charging, slamming or
   // casting the ultimate.
   if(typeof knightMovementLocked==='function' && knightMovementLocked()) return;
 
   const w=weaponForAvatar();
+
+  // Holding FIRE may auto-repeat, but never faster than the equipped Primary's
+  // authored physical swing/throw/cast cycle. This guard is independent of the
+  // development no-post-move-cooldown switch and does not touch the frame loop.
+  const primaryNow=performance.now();
+  if(primaryInputHeld && primaryNow < primaryHoldCycleReadyAt) return;
 
   // Zero cooldown means no post-cast waiting; it does not mean one projectile
   // every rendered frame. Rapid Fire keeps a real cast-cycle cadence so held
@@ -32769,7 +32742,7 @@ function doShoot(){
   }
 
   player.userData.attackCooldown=attackCooldownFor(w);
-  if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)primaryExecutionLock=developmentPrimaryCycle(w);
+  if(primaryInputHeld) primaryHoldCycleReadyAt=primaryNow + primaryHoldCycleSeconds(w)*1000;
   if(state.avatarType==='mage'&&w&&w.name==='Rapid Fire & Ice')foxRapidPrimaryCadence=.18;
   try{ performWeaponAttack(w,true); }
   catch(err){ vwOnce('performWeaponAttack THREW: '+err.message); console.error(err); }
@@ -33266,14 +33239,12 @@ function clearCloudSkybreaker(){
 }
 function doSecondaryShoot(){
   if(!gameRunning)return;
-  if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS&&secondaryExecutionLock>0)return;
 
   // Titan Rampage keeps the player's actual equipped Secondary.
   if(rhinoTitanActive()){
     if(rhinoTitanSecondaryBusy())return;
     const titanEquipped=secondaryWeaponForAvatar();
     if(!titanEquipped)return;
-    if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)secondaryExecutionLock=developmentSecondaryCycle(titanEquipped);
     markSecondaryUsed();
     doRhinoAttack(titanEquipped);
     if(player&&player.userData)player.userData.secondaryAttackCooldown=0;
@@ -33282,7 +33253,6 @@ function doSecondaryShoot(){
 
   const w=secondaryWeaponForAvatar();
   if(!w)return;
-  if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)secondaryExecutionLock=developmentSecondaryCycle(w);
   if(state.avatarType==='cloud'&&w.kind!=='cloud_great_sword_slash') resetCloudCrossbreakerChain();
   if(w.kind==='velocity_quantum_slingshot'||w.kind==='velocity_arc_sweep'||w.kind==='velocity_phasing_resonance'||w.kind==='velocity_synaptic_snare'){
     // Shadow Stalker Secondaries are gated by the move's own cooldown inside the
@@ -35234,10 +35204,6 @@ function update(dt){
   }
 
   if(player.userData.attackCooldown>0) player.userData.attackCooldown -= dt;
-  primaryExecutionLock=Math.max(0,primaryExecutionLock-dt);
-  secondaryExecutionLock=Math.max(0,secondaryExecutionLock-dt);
-  abilityExecutionLock=Math.max(0,abilityExecutionLock-dt);
-  signatureExecutionLock=Math.max(0,signatureExecutionLock-dt);
   if(foxRapidPrimaryCadence>0)foxRapidPrimaryCadence=Math.max(0,foxRapidPrimaryCadence-dt);
   // Tap casts once in beginPrimaryFire(); while FIRE remains held, retry here
   // and let the equipped primary's own cooldown decide when another shot fires.
@@ -35246,8 +35212,6 @@ function update(dt){
     player.userData.secondaryAttackCooldown=Math.max(0,player.userData.secondaryAttackCooldown-dt);
   }
   if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS){
-    // Keep true post-move cooldowns at zero, but never erase the separate
-    // execution locks above. Those are cast/swing/throw duration, not cooldown.
     player.userData.attackCooldown=0;player.userData.secondaryAttackCooldown=0;
     if(typeof knightRuntime!=='undefined'&&knightRuntime){
       knightRuntime.whirlwindCooldown=0;knightRuntime.shatterCooldown=0;knightRuntime.chargeCooldown=0;
