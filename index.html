@@ -1,3 +1,5 @@
+<!-- V23.39.00 Ranger Archer-Size Match: Green Rhino Ranger's normal visible gameplay height now matches the Archer's final world height (~1.30 units) instead of Aesir's 2.22-unit height. Ranger Titan Rampage still scales from this new base using the same 5x multiplier. V23.38 Twin Boomerang and hold-only Whirlwind fixes remain intact. -->
+<!-- V23.38.00 Ranger Primary + Hold Whirlwind Fix: Green Rhino Ranger only. Twin Boomerang keeps its original 1.24-second throw-cycle as an active-move lock so global zero-cooldown testing cannot spawn a fresh pair every rendered frame. Defensive Whirlwind is strict hold-to-active: hold Secondary to spin and pulse; release/cancel/blur ends gameplay, FX and model spin immediately. No Ranger Whirlwind infinite-duration state remains. Aesir is unchanged. -->
 <!-- V23.37.00 Aesir Readability + Preview Fix: dramatically reduces Celestial Hammer-Pulse camera shake so zero-cooldown testing no longer leaves the view constantly unsettled, tones down Olympus-Supernova global brightness/flash intensity while preserving its ring/lightning spectacle, and restores Aesir avatar preview to a front-facing initial orientation instead of starting 180 degrees backward. Gameplay damage, ranges, durations, Titan rules and Storm-Step behavior are unchanged. -->
 <!-- V23.36.00 Aesir Titan Replacement: replaces Twilight of the Gods - Ragnarok with a true Titan transformation using the Knight Guardian Titan rules: 5x size, 15-second duration, 5x Primary/Secondary damage, 2.6x combat reach/radius, 0.85 movement speed, Primary and equipped Secondary remain available, other specials/signature are locked, activation is stun-only, and cooldown remains 0 in development testing. -->
 <!-- V23.35.00 Storm-Step Center Threshold Execute: during Storm-Step Overdrive, every live enemy inside or outside the arena is pulled rapidly toward exact map center. The pull runs at 2.75x each enemy's normal movement speed with a minimum gravity speed so slow units cannot stall. The instant any non-boss crosses into the inner half of the playable-map radius, it is force-executed immediately whether Aesir touched it or not. Bosses are exempt from execution but are still pulled toward center. Existing 10-second auto-Blitz, fixed 3x center axe, one-second rings, and Whirlwind shutdown remain unchanged. -->
@@ -1712,7 +1714,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.37.00 - Aesir Readability + Front Preview';
+const GAME_VERSION='23.39.00 - Ranger Archer-Size Match';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3787,7 +3789,7 @@ const CHARACTER_COMBAT = {
       gamma_leap:{name:'Gamma Leap', price:340, slot:'secondary', kind:'rhino_gamma_leap', cooldown:0, damage:2.4, radius:6.0, range:10,
         desc:'Tectonic vault along a true quadratic Bezier arc. The Ranger compresses in mid-air and lands with a distance-scaled radial shove and shattered-ground burst.'},
       freight_train:{name:'Defensive Whirlwind', price:420, slot:'secondary', kind:'rhino_cloud_whirlwind', cooldown:0, damage:0, radius:3.25,
-        desc:'Cloud-style moving Defensive Whirlwind. Repeatedly damages and pushes enemies outward, deflects weak projectiles and uses the same round-scaled duration as Cloud. Green Ranger has no post-use cooldown, so holding Secondary can immediately restart it when the current spin ends.'}
+        desc:'Hold Secondary to maintain the moving Defensive Whirlwind. It repeatedly damages and pushes enemies outward and deflects weak projectiles; releasing Secondary ends it immediately. Development testing uses no post-use cooldown.'}
     }
   },
   barbarian: {
@@ -13129,13 +13131,13 @@ function buildGreenRhinoPlayer(options={}){
     root.updateMatrixWorld(true);
     const rawBox  = importedVisibleMeshBounds(root, THREEAsset);
     const rawSize = rawBox.getSize(new THREEAsset.Vector3());
-    // Match the Aesir exactly: fitAesirRoot() targets 2.22 world units at
-    // AVATAR_SCALE.barbarian 1.5, so fit the local root to 2.22/1.5 = 1.48
-    // and let the shared wrapper scale do the rest. Keeping both numbers the
-    // same means Primal Rage's x3, the contact shadow and the locator ring
-    // all behave identically across the two skins.
+    // V23.39.00: Green Rhino Ranger matches the Archer's visible gameplay
+    // height. The Archer root is fitted to 1.48 and then receives AVATAR_SCALE
+    // rogue 0.88, producing ~1.3024 world units. Fit Rhino to that same final
+    // world height while preserving Rhino's own wrapper/titan scale pipeline.
     const parentScale = AVATAR_SCALE.rhino || 1;
-    const targetHeight = 2.22 / parentScale;
+    const archerWorldHeight = 1.48 * (AVATAR_SCALE.rogue || 0.88);
+    const targetHeight = archerWorldHeight / parentScale;
     fit.scale.setScalar(targetHeight / Math.max(.001, rawSize.y));
 
     fit.updateMatrixWorld(true);
@@ -14714,7 +14716,8 @@ function updateSecondaryButton(){
     const wTimer=(w.kind==='barbarian_whirlwind')
       ? barbarianRuntime.whirlTimer
       : (w.kind==='rhino_cloud_whirlwind'?rhinoRuntime.cloudWhirlTimer:knightRuntime.whirlwindTimer);
-    const remaining=(w.kind==='barbarian_whirlwind'&&!Number.isFinite(wTimer)) ? 'HOLD' : (Number.isFinite(wTimer) ? `${wTimer.toFixed(1)}s` : '∞');
+    const remaining=(w.kind==='barbarian_whirlwind'&&!Number.isFinite(wTimer)) ? 'HOLD'
+      : (w.kind==='rhino_cloud_whirlwind' ? 'HOLD' : (Number.isFinite(wTimer) ? `${wTimer.toFixed(1)}s` : '∞'));
     btn.innerHTML=`<span class="secondaryIcon">${icon}</span><span class="secondaryLabel">WHIRLWIND ACTIVE</span><span class="secondaryTimer">${remaining}</span>`;
     return;
   }
@@ -15270,6 +15273,10 @@ function setupControls(){
     // leaving the body/FX spinning forever. Knight Whirlwind is untouched.
     if(typeof barbarianWhirlActive==='function' && barbarianWhirlActive()){
       barbarianEndWhirlwind(true);
+    }
+    // Green Rhino Ranger uses strict hold-to-active Defensive Whirlwind.
+    if(typeof rhinoCloudWhirlwindActive==='function' && rhinoCloudWhirlwindActive()){
+      endRhinoCloudWhirlwind();
     }
   };
   const beginSecondaryFire=e=>{
@@ -24109,7 +24116,7 @@ const RHINO_PALE  = 0xbdf5d8;
 const RHINO_WHITE = 0xf2fffa;
 
 let rhinoRuntime = {
-  throwSide:0,
+  throwSide:0, boomerangLock:0,
   overdrive:null, overdriveCooldown:0,
   gamma:null, gammaCooldown:0,
   cloudWhirlTimer:0, cloudWhirlPulse:0,
@@ -24257,6 +24264,11 @@ function rhinoBoomerangImpact(z,b){
    single-target.
    --------------------------------------------------------------------- */
 function doRhinoBoomerangThrow(w){
+  // V23.38 Ranger-only move lifecycle gate. Global test mode removes cooldowns,
+  // but Twin Boomerang still needs its authored throw cycle so one held FIRE
+  // touch cannot spawn a fresh pair every rendered frame.
+  if((rhinoRuntime.boomerangLock||0)>0)return false;
+  rhinoRuntime.boomerangLock=1.24;
   const origin={x:player.position.x,y:player.position.y,z:player.position.z};
   const yaw=player.rotation.y;
   const reach=w.range||16;
@@ -24290,6 +24302,7 @@ function doRhinoBoomerangThrow(w){
                               player.position.z+Math.cos(yaw)*.10,
                               player.position.y);
   player.position.x=step.x;player.position.z=step.z;
+  return true;
 }
 
 
@@ -24500,11 +24513,12 @@ function triggerRhinoCloudWhirlwind(){
   const r=rhinoRuntime;
   if(!gameRunning||!rhinoIsActive()||!player)return false;
   if((r.cloudWhirlTimer||0)>0)return false;
-  const duration=rhinoCloudWhirlwindDuration();
-  r.cloudWhirlTimer=duration;
+  // Ranger Whirlwind has no autonomous/infinite duration. This field is only
+  // an ACTIVE flag while the Secondary control is physically held.
+  r.cloudWhirlTimer=1;
   r.cloudWhirlPulse=0;
   if(player.userData.playKayClip)player.userData.playKayClip('spin',true,true,.32);
-  player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,Number.isFinite(duration)?duration:9999);
+  player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,.18);
   player.userData.spinVisualSpeed=KNIGHT_CFG.whirlwind.spinSpeed;
   knightWhirlwindStartFx('ability');
   spawnKnightGuardBurst(player.position,KNIGHT_CFG.whirlwind.radius*rhinoCloudWhirlwindCombatScale(),KNIGHT_STEEL);
@@ -24600,7 +24614,13 @@ function endRhinoCloudWhirlwind(){
 function updateRhinoCloudWhirlwind(dt){
   const r=rhinoRuntime;
   if(!(r.cloudWhirlTimer>0))return;
-  if(Number.isFinite(r.cloudWhirlTimer))r.cloudWhirlTimer=Math.max(0,r.cloudWhirlTimer-dt);
+  // Strict hold-to-spin for Green Rhino Ranger. Any release/cancel/blur ends
+  // the move immediately instead of inheriting Knight's round-duration timer.
+  if(typeof secondaryInputHeld!=='undefined'&&!secondaryInputHeld){
+    endRhinoCloudWhirlwind();
+    return;
+  }
+  r.cloudWhirlTimer=1; // active flag only; never an infinite-duration timer
   r.cloudWhirlPulse-=dt;
   if(r.cloudWhirlPulse<=0){
     r.cloudWhirlPulse=KNIGHT_CFG.whirlwind.pulse;
@@ -24608,7 +24628,6 @@ function updateRhinoCloudWhirlwind(dt){
   }
   player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,.14);
   player.userData.spinVisualSpeed=KNIGHT_CFG.whirlwind.spinSpeed;
-  if(Number.isFinite(r.cloudWhirlTimer)&&r.cloudWhirlTimer<=0)endRhinoCloudWhirlwind();
 }
 
 function rhinoArenaCenter(out=new THREE.Vector3()){
@@ -25743,6 +25762,7 @@ function isRhinoWeaponKind(kind){
 function updateRhinoCombat(dt){
   if(!rhinoIsActive())return;
   try{
+    rhinoRuntime.boomerangLock=Math.max(0,(rhinoRuntime.boomerangLock||0)-dt);
     updateRhinoOverdrive(dt);
     updateRhinoGammaLeap(dt);
     updateRhinoCloudWhirlwind(dt);
