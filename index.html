@@ -1,3 +1,4 @@
+<!-- V23.48.00 Fox Spirit Bloom + Hex Garden + Mirror Gravity Core: merges Ninefold Astral Bloom and Spirit Gate Stampede into one hold-repeat Secondary with 2 seconds of cast-start invincibility, repurposes the former Spirit Gate slot into Foxfire Hex Garden area-control magic, and upgrades Crimson Mirror Dimension with center teleport, full-duration invincibility, a visible black-hole gravity core, and an on-screen non-boss execution finale. -->
 <!-- V23.47.00 Fox Crimson Mirror + Spirit Gate Stampede: replaces Arcane Laser in-place with a 10-second reality-warping Crimson Mirror Dimension Ultimate, adds Spirit Gate Stampede as a third Fox Secondary scaling from 3 to 9 spectral fox spirits by Round 30, preserves hold-to-repeat and existing Fox tail/locomotion authority. -->
 <!-- V23.46.00 Fox Blizzard Rebuild + Ninefold Astral Bloom + Ultimate Duration Floor: Blizzard now hard-executes every non-boss that enters its storm/impact zone, rapidly drags all enemies from inside and outside the arena toward map center with round-scaled gravity/storm speed, and uses simplified low-poly ice masses for mobile performance. Rapid Fire & Ice gets a real 0.18s cast-cycle lock even during zero-cooldown testing. Arcane Lance is replaced in-place by Ninefold Astral Bloom, a nine-comet homing secondary with an active cast lock and hold-to-repeat. Duration-based Ultimate effects are normalized to at least 10 seconds where applicable, and Fox Arcane Laser's full charge now supports a 10-second continuous channel. -->
 <!-- V23.45.00 Safe Code Trim + Fox Hold Autofire: fixes Fox Arcane Lance/Giant Fireball hold-repeat by separating pending release locks from development cooldowns, so held Primary/Secondary/Ultimate controls reliably recast when their current release/active state is ready. Adds a mobile-capped Fox-specific cast language across Fire & Ice, Rapid Fire & Ice, Arcane Lance, Giant Fireball, Blizzard, Arcane Laser, Super Meteor and Arcane Echoes: nine-tail foxfire point fans, layered rune/element halos, stronger launch crowns and ultimate activation sigils, while reusing the global FX ceiling/stress throttling. Existing fox guard/run/tail animation authority is unchanged. -->
@@ -1452,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.47.00 - Fox Crimson Mirror + Spirit Gate';
+const GAME_VERSION='23.48.00 - Fox Spirit Bloom + Mirror Gravity Core';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3561,12 +3562,12 @@ const CHARACTER_COMBAT = {
         desc:'Alternates fireballs and ice bolts.'},
       rapid_elemental:{name:'Rapid Fire & Ice', price:210, slot:'primary', kind:'elemental', cooldown:0.18, damage:0.72, auto:true,
         desc:'Hold FIRE for a rapid but controlled alternating fire-and-ice stream. The 0.18s cast cycle remains authoritative even during zero-cooldown development testing.'},
-      arcane_lance:{name:'Ninefold Astral Bloom', price:390, slot:'secondary', kind:'fox_arcane_bloom', cooldown:0, damage:2.15, pierce:0, auto:true,
-        desc:'Summon nine rotating arcane foxfire stars, then release them as homing magical comets toward separate enemies. Each impact detonates a compact rune burst and staggers survivors. Hold Secondary to repeat the full nine-star cast as soon as the current Bloom finishes.'},
+      arcane_lance:{name:'Ninefold Spirit Bloom', price:390, slot:'secondary', kind:'fox_arcane_bloom', cooldown:0, damage:2.15, pierce:0, auto:true,
+        desc:'Open a radiant spirit gate and form nine arcane foxfire stars around it, then release the stars and spectral fox spirits together as one coordinated homing wave. The Fox is invincible for the first 2 seconds of each cast. Hold Secondary to repeat after the current Spirit Bloom finishes.'},
       giant_fireball:{name:'Giant Fireball', price:560, slot:'secondary', kind:'giant_fireball', cooldown:.8, damage:999, splash:5.4, splashDamage:4.5, directInstakill:true, auto:true,
         desc:'A Phoenix-scale molten fireball with a slower firing cadence. Direct hits execute any non-boss and the impact damages a wide surrounding area.'},
-      spirit_gate:{name:'Spirit Gate Stampede', price:620, slot:'secondary', kind:'fox_spirit_gate', cooldown:0, damage:2.4, radius:1.35, range:22, auto:true,
-        desc:'Open a radiant spirit gate and unleash spectral foxes that hunt separate enemies or lanes. The stampede scales from 3 spirits at early rounds to 9 by Round 30. Each impact deals strong Secondary-tier damage, staggers survivors, and bursts into foxfire runes. Hold Secondary to repeat after the current stampede finishes.'}
+      spirit_gate:{name:'Foxfire Hex Garden', price:620, slot:'secondary', kind:'fox_hex_garden', cooldown:0, damage:2.65, radius:2.25, range:16, auto:true,
+        desc:'Plant a round-scaled garden of large foxfire runic seals around nearby enemies and the forward battlefield. After a short telegraph each seal erupts into a vertical magical pillar, dealing strong Secondary-tier damage and heavy stagger. Hold Secondary to plant the next garden as soon as the current eruption finishes.'}
     }
   }
 };
@@ -3784,7 +3785,7 @@ const BLIZZARD_STORM = {id:'blizzard_storm', name:'Blizzard Storm', price:640,
 // you're facing). Drains a charge meter while firing and regenerates
 // when idle — weak against crowds, built to melt one tough target.
 const ARCANE_LASER = {id:'arcane_laser', name:'Crimson Mirror Dimension', price:760,
-  desc:'10-second reality-warping Ultimate. Crimson-violet mirror shards orbit the arena while a new dimensional slice crosses the battlefield every second. Normal enemies caught by a slice are erased; tougher enemies are stunned and damaged; bosses take protected damage. Center gravity pulses and a final mirror-collapse implosion finish the spell.'};
+  desc:'10-second reality-warping Ultimate. The Fox teleports to map center and remains invincible while a black-hole-like crimson gravity orb pulls enemies inward beneath orbiting mirror shards. A dimensional slice crosses the battlefield every second. The final collapse directly eliminates every non-boss enemy visible on-screen; bosses remain protected.'};
 
 const SUPER_METEOR = {id:'super_meteor', name:'Super Meteor', price:900,
   desc:'Calls down one enormous slow meteor. The impact heavily damages nearby enemies, stuns survivors for 3 seconds, burns them for 5 seconds, and deals 20% max HP to bosses.'};
@@ -29380,7 +29381,7 @@ function clearMageRoundSpecials(resetCooldowns=true,preserveMirrorCooldowns=fals
 }
 function updateMageUltimates(dt){
   updateFoxArcaneBloom(dt);
-  updateFoxSpiritGate(dt);
+  updateFoxHexGarden(dt);
   updateCrimsonMirror(dt);
   if(superMeteorCooldownTimer>0)superMeteorCooldownTimer=Math.max(0,superMeteorCooldownTimer-dt);
 
@@ -30110,91 +30111,64 @@ function fireFoxMageProjectileTimed(w){
 
 
 // ---------------------------------------------------------------------
-// FOX SECONDARY — NINEFOLD ASTRAL BLOOM
-// Nine low-poly foxfire stars share one cast state. They gather as a crown,
-// then home toward separate targets. A held Secondary can only begin the next
-// Bloom after this state fully disposes, so zero-cooldown testing never causes
-// per-frame allocation spam.
+// FOX SECONDARY — NINEFOLD SPIRIT BLOOM
+// Merges the approved Astral Bloom and Spirit Gate ideas into one coordinated
+// cast. One gate, nine low-poly stars, and a round-scaled 3->9 spirit wave.
+// The Fox gets 2 seconds of genuine invincibility at activation. All motion is
+// main-loop driven, so held Secondary repeats safely without timer stacking.
 // ---------------------------------------------------------------------
 let foxArcaneBloom=null;
+function foxSpiritBloomCount(){return Math.max(3,Math.min(9,3+Math.floor(((Math.max(1,Number(round)||1)-1)/29)*6+1e-6)));}
+function makeFoxSpiritBloomMesh(i){
+  const g=new THREE.Group();
+  const mat=new THREE.MeshBasicMaterial({color:i%2?0xc88cff:0x79ecff,transparent:true,opacity:.78,depthWrite:false,blending:THREE.AdditiveBlending});
+  const core=new THREE.Mesh(new THREE.ConeGeometry(.22,.72,5),mat);core.rotation.x=Math.PI/2;g.add(core);
+  const head=new THREE.Mesh(new THREE.OctahedronGeometry(.18,0),mat.clone());head.position.z=.39;g.add(head);
+  const tail=new THREE.Mesh(new THREE.ConeGeometry(.10,.68,5),mat.clone());tail.rotation.x=-Math.PI/2;tail.position.z=-.53;g.add(tail);
+  g.scale.setScalar(1.28);return g;
+}
 function clearFoxArcaneBloom(){
-  if(!foxArcaneBloom)return;
-  if(foxArcaneBloom.group&&foxArcaneBloom.group.parent){scene.remove(foxArcaneBloom.group);disposeGroup(foxArcaneBloom.group);}
+  const rt=foxArcaneBloom;if(!rt)return;
+  if(rt.group&&rt.group.parent){scene.remove(rt.group);disposeGroup(rt.group);}
+  for(const q of rt.spirits||[]){if(q.mesh&&q.mesh.parent){scene.remove(q.mesh);disposeGroup(q.mesh);}}
   foxArcaneBloom=null;
 }
 function triggerFoxArcaneBloom(w){
   if(!gameRunning||state.avatarType!=='mage'||!mageGameplayActive()||!player||foxArcaneBloom)return false;
-  foxMageAbilityPose('laser',340);
-  foxMageWowCastFx('fox_arcane_bloom',2.15,false);
-  const group=new THREE.Group();group.position.copy(player.position);group.position.y+=.25;
-  const orbs=[];
-  const mat=new THREE.MeshBasicMaterial({color:0xc68cff,transparent:true,opacity:.88,depthWrite:false,blending:THREE.AdditiveBlending});
-  const geom=new THREE.IcosahedronGeometry(.24,0);
-  for(let i=0;i<9;i++){
-    const a=i/9*Math.PI*2;
-    const orb=new THREE.Mesh(geom,mat.clone());
-    orb.position.set(Math.sin(a)*1.65,.85+Math.sin(a*2)*.22,Math.cos(a)*1.65);
-    orb.userData={angle:a,launched:false,hit:false,target:null,dir:new THREE.Vector3()};
-    group.add(orb);orbs.push(orb);
-  }
-  const ringMat=new THREE.MeshBasicMaterial({color:0x79eaff,transparent:true,opacity:.48,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.72,.045,6,40),ringMat);ring.rotation.x=Math.PI/2;ring.position.y=.82;group.add(ring);
+  const now=performance.now();
+  player.userData.invincibleUntil=Math.max(player.userData.invincibleUntil||0,now+2000);
+  foxMageAbilityPose('laser',380);foxMageWowCastFx('fox_arcane_bloom',2.35,false);
+  if(player.userData.playKayClip)player.userData.playKayClip('magic giant cast',true,true,.38);
+  const group=new THREE.Group();group.position.copy(player.position);group.position.y+=.20;
+  const yaw=player.rotation.y,fx0=Math.sin(yaw),fz0=Math.cos(yaw);
+  const gateMat=new THREE.MeshBasicMaterial({color:0xb36cff,transparent:true,opacity:.48,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const gate=new THREE.Mesh(new THREE.TorusGeometry(1.82,.10,8,48),gateMat);gate.rotation.y=Math.PI/2;gate.position.set(-fx0*1.20,1.02,-fz0*1.20);group.add(gate);
+  const inner=new THREE.Mesh(new THREE.RingGeometry(.74,1.64,48),new THREE.MeshBasicMaterial({color:0x63eaff,transparent:true,opacity:.20,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));inner.rotation.y=Math.PI/2;inner.position.copy(gate.position);group.add(inner);
+  const orbs=[];const mat=new THREE.MeshBasicMaterial({color:0xc68cff,transparent:true,opacity:.90,depthWrite:false,blending:THREE.AdditiveBlending});const geom=new THREE.IcosahedronGeometry(.24,0);
+  for(let i=0;i<9;i++){const a=i/9*Math.PI*2;const orb=new THREE.Mesh(geom,mat.clone());orb.position.set(Math.sin(a)*1.70,.90+Math.sin(a*2)*.22,Math.cos(a)*1.70);orb.userData={angle:a,launched:false,hit:false,target:null,dir:new THREE.Vector3()};group.add(orb);orbs.push(orb);}
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.78,.05,6,40),new THREE.MeshBasicMaterial({color:0x79eaff,transparent:true,opacity:.50,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));ring.rotation.x=Math.PI/2;ring.position.y=.88;group.add(ring);
   scene.add(group);
-  foxArcaneBloom={group,orbs,ring,t:0,duration:1.55,releaseAt:.34,damage:(w&&w.damage)||2.15,enemyHits:new Map()};
-  spawnArcaneSigil(player.position.x,.035,player.position.z,2.4);
-  spawnBurst(player.position.x,player.position.y+.72,player.position.z,mageStressVisualLoad()?7:14,FX_MAT_SPARK,4.0);
+  foxArcaneBloom={group,gate,inner,orbs,ring,spirits:[],t:0,duration:1.85,releaseAt:.38,damage:(w&&w.damage)||2.15,enemyHits:new Map(),origin:player.position.clone(),yaw};
+  spawnArcaneSigil(player.position.x,.035,player.position.z,2.7);spawnBurst(player.position.x,player.position.y+.72,player.position.z,mageStressVisualLoad()?8:18,FX_MAT_SPARK,4.4);
   return true;
 }
-function foxArcaneBloomImpact(rt,orb,pos){
+function foxArcaneBloomImpact(rt,orb,pos,mult=1){
   if(!rt||!orb||orb.userData.hit)return;orb.userData.hit=true;orb.visible=false;
-  spawnArcaneSigil(pos.x,.04,pos.z,1.75);spawnBurst(pos.x,pos.y,pos.z,mageStressVisualLoad()?5:11,FX_MAT_SPARK,3.3);
-  for(const z of [...zombies]){
-    if(!z||!z.userData||z.userData.dead||Math.hypot(z.position.x-pos.x,z.position.z-pos.z)>2.25)continue;
-    const prior=rt.enemyHits.get(z)||0;if(prior>=2)continue;rt.enemyHits.set(z,prior+1);
-    const type=z.userData.archetype||'walker';
-    if(type==='boss'){
-      const maxHp=Math.max(1,z.userData.maxHp||z.userData.hp||1);applyBulletDamage(z,Math.min(maxHp*.035,rt.damage*playerStats.power));
-    }else applyBulletDamage(z,rt.damage*playerStats.power);
-    if(!z.userData.dead)z.userData.hitStun=Math.max(z.userData.hitStun||0,type==='boss'?.22:.55);
-  }
+  spawnArcaneSigil(pos.x,.04,pos.z,1.70);spawnBurst(pos.x,pos.y,pos.z,mageStressVisualLoad()?4:9,FX_MAT_SPARK,3.0);
+  for(const z of [...zombies]){if(!z||!z.userData||z.userData.dead||Math.hypot(z.position.x-pos.x,z.position.z-pos.z)>2.20)continue;const prior=rt.enemyHits.get(z)||0;if(prior>=2)continue;rt.enemyHits.set(z,prior+1);const boss=!!z.userData.isBoss;const dmg=rt.damage*mult*playerStats.power;if(boss){const mh=Math.max(1,z.userData.maxHp||z.userData.hp||1);applyBulletDamage(z,Math.min(mh*.035,dmg));}else applyBulletDamage(z,dmg);if(!z.userData.dead)z.userData.hitStun=Math.max(z.userData.hitStun||0,boss?.22:.58);}
 }
 function updateFoxArcaneBloom(dt){
-  const rt=foxArcaneBloom;if(!rt)return;
-  if(!gameRunning||state.avatarType!=='mage'||!player){clearFoxArcaneBloom();return;}
-  rt.t+=dt;rt.group.rotation.y+=dt*(rt.t<rt.releaseAt?3.8:1.2);rt.ring.rotation.z+=dt*2.6;
-  if(rt.t<rt.releaseAt){
-    const p=rt.t/rt.releaseAt;rt.group.scale.setScalar(.72+p*.28);return;
-  }
-  // Assign targets once, spreading stars across the current living roster.
+  const rt=foxArcaneBloom;if(!rt)return;if(!gameRunning||state.avatarType!=='mage'||!player){clearFoxArcaneBloom();return;}
+  rt.t+=dt;rt.group.rotation.y+=dt*(rt.t<rt.releaseAt?3.4:.7);rt.ring.rotation.z+=dt*2.8;rt.gate.rotation.z+=dt*1.4;rt.inner.rotation.z-=dt*1.0;
+  if(rt.t<rt.releaseAt){const p=rt.t/rt.releaseAt;rt.group.scale.setScalar(.72+p*.28);return;}
   if(!rt.assigned){
-    rt.assigned=true;
-    const living=zombies.filter(z=>z&&z.userData&&!z.userData.dead&&!z.userData.spawnPending);
-    living.sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position));
-    rt.orbs.forEach((orb,i)=>{
-      const target=living.length?living[i%living.length]:null;orb.userData.target=target;orb.userData.launched=true;
-      const world=orb.getWorldPosition(new THREE.Vector3());
-      const aim=target?target.position.clone().add(new THREE.Vector3(0,.65,0)):
-        world.clone().add(new THREE.Vector3(Math.sin(orb.userData.angle)*12,0,Math.cos(orb.userData.angle)*12));
-      orb.userData.dir.subVectors(aim,world).normalize();
-    });
+    rt.assigned=true;const living=zombies.filter(z=>z&&z.userData&&!z.userData.dead&&!z.userData.spawnPending);living.sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position));
+    rt.orbs.forEach((orb,i)=>{const target=living.length?living[i%living.length]:null;orb.userData.target=target;orb.userData.launched=true;const world=orb.getWorldPosition(new THREE.Vector3());const aim=target?target.position.clone().add(new THREE.Vector3(0,.65,0)):world.clone().add(new THREE.Vector3(Math.sin(orb.userData.angle)*13,0,Math.cos(orb.userData.angle)*13));orb.userData.dir.subVectors(aim,world).normalize();});
+    const count=foxSpiritBloomCount();for(let i=0;i<count;i++){const mesh=makeFoxSpiritBloomMesh(i);mesh.position.copy(rt.origin);mesh.position.y+=1.0;scene.add(mesh);const target=living.length?living[(i+3)%living.length]:null;const a=rt.yaw+(i-(count-1)/2)*Math.min(.42,2.2/Math.max(1,count-1));rt.spirits.push({mesh,target,dir:new THREE.Vector3(Math.sin(a),0,Math.cos(a)),life:2.2,hit:new Set(),speed:12.8+i*.22});}
   }
-  for(const orb of rt.orbs){
-    if(!orb.visible||!orb.userData.launched)continue;
-    const target=orb.userData.target;
-    if(target&&target.parent&&!target.userData.dead){
-      const world=orb.getWorldPosition(new THREE.Vector3()),aim=target.position.clone().add(new THREE.Vector3(0,.65,0));
-      const desired=aim.sub(world).normalize();orb.userData.dir.lerp(desired,Math.min(1,dt*5.5)).normalize();
-    }
-    orb.position.addScaledVector(orb.userData.dir,dt*12.5);
-    const wp=orb.getWorldPosition(new THREE.Vector3());
-    let hit=null;
-    for(const z of zombies){if(z&&z.userData&&!z.userData.dead&&Math.hypot(z.position.x-wp.x,z.position.z-wp.z)<=.95){hit=z;break;}}
-    if(hit)foxArcaneBloomImpact(rt,orb,wp);
-  }
-  if(rt.t>=rt.duration){
-    for(const orb of rt.orbs)if(orb.visible)foxArcaneBloomImpact(rt,orb,orb.getWorldPosition(new THREE.Vector3()));
-    clearFoxArcaneBloom();
-  }
+  for(const orb of rt.orbs){if(!orb.visible||!orb.userData.launched)continue;const target=orb.userData.target;if(target&&target.parent&&!target.userData.dead){const world=orb.getWorldPosition(new THREE.Vector3()),aim=target.position.clone().add(new THREE.Vector3(0,.65,0));orb.userData.dir.lerp(aim.sub(world).normalize(),Math.min(1,dt*5.5)).normalize();}orb.position.addScaledVector(orb.userData.dir,dt*12.5);const wp=orb.getWorldPosition(new THREE.Vector3());let hit=null;for(const z of zombies){if(z&&z.userData&&!z.userData.dead&&Math.hypot(z.position.x-wp.x,z.position.z-wp.z)<=.95){hit=z;break;}}if(hit)foxArcaneBloomImpact(rt,orb,wp,1);}
+  for(let i=rt.spirits.length-1;i>=0;i--){const q=rt.spirits[i];q.life-=dt;if(q.target&&q.target.parent&&!q.target.userData.dead){const d=new THREE.Vector3().subVectors(q.target.position,q.mesh.position);d.y=0;if(d.lengthSq()>.001)q.dir.lerp(d.normalize(),Math.min(1,dt*4.2)).normalize();}q.mesh.position.addScaledVector(q.dir,q.speed*dt);q.mesh.position.y=rt.origin.y+.76+Math.sin((rt.t+i)*8)*.10;q.mesh.rotation.y=Math.atan2(q.dir.x,q.dir.z);q.mesh.rotation.z+=dt*9;for(const z of [...zombies]){if(!z||z.userData.dead||q.hit.has(z))continue;if(Math.hypot(z.position.x-q.mesh.position.x,z.position.z-q.mesh.position.z)>1.25)continue;q.hit.add(z);const boss=!!z.userData.isBoss;const dmg=rt.damage*.72*playerStats.power;if(boss){const mh=Math.max(1,z.userData.maxHp||z.userData.hp||1);applyBulletDamage(z,Math.min(mh*.025,dmg));}else applyBulletDamage(z,dmg);z.userData.hitStun=Math.max(z.userData.hitStun||0,boss?.22:.62);spawnArcaneSigil(z.position.x,.03,z.position.z,1.05);q.life=Math.min(q.life,.08);}if(q.life<=0||Math.hypot(q.mesh.position.x,q.mesh.position.z)>arenaSize+8){if(q.mesh.parent){scene.remove(q.mesh);disposeGroup(q.mesh);}rt.spirits.splice(i,1);}}
+  if(rt.t>=rt.duration){for(const orb of rt.orbs)if(orb.visible)foxArcaneBloomImpact(rt,orb,orb.getWorldPosition(new THREE.Vector3()),.75);if(!rt.spirits.length)clearFoxArcaneBloom();else if(rt.t>2.5)clearFoxArcaneBloom();}
 }
 
 /* ============================================================ WOLVERINE
@@ -32488,7 +32462,7 @@ function triggerHoodedEquippedAbility(){
 let foxMageWowNextAt=0;
 function foxMageWowPalette(kind){
   if(kind==='giant_fireball'||kind==='fire')return [0xff8a32,0xffe5a0,0xff4f2e];
-  if(kind==='arcane_lance'||kind==='fox_arcane_bloom'||kind==='fox_spirit_gate')return [0x72e8ff,0xd7a2ff,0xffffff];
+  if(kind==='arcane_lance'||kind==='fox_arcane_bloom'||kind==='fox_hex_garden')return [0x72e8ff,0xd7a2ff,0xffffff];
   if(kind==='mirror'||kind==='laser')return [0xff477e,0xc879ff,0x76eaff];
   if(kind==='blizzard')return [0x83edff,0xa779ff,0xeaffff];
   if(kind==='meteor')return [0xffb13b,0xfff0b5,0xc970ff];
@@ -32548,74 +32522,30 @@ function foxMageWowUltimateFx(kind,scale=2.6){
 
 
 // ---------------------------------------------------------------------
-// Fox Spirit Gate Stampede — third Secondary.
-// One gate group + capped spirit meshes. No timers; all motion runs in the
-// main game update loop so hold-to-repeat cannot stack background work.
+// FOX SECONDARY — FOXFIRE HEX GARDEN
+// Distinct area-control spell: plants several low-cost runic seals, telegraphs
+// briefly, then erupts each seal into a vertical foxfire pillar. No homing
+// projectile swarm, and the whole cast is owned by one main-loop state.
 // ---------------------------------------------------------------------
-let foxSpiritGateActive=false, foxSpiritGateTime=0;
-const foxSpiritGateSpirits=[];
-let foxSpiritGateGroup=null;
-function foxSpiritGateCount(){ return Math.max(3,Math.min(9,3+Math.floor(((Math.max(1,Number(round)||1)-1)/29)*6+1e-6))); }
-function clearFoxSpiritGate(){
-  foxSpiritGateActive=false;foxSpiritGateTime=0;
-  while(foxSpiritGateSpirits.length){const q=foxSpiritGateSpirits.pop();if(q.mesh&&q.mesh.parent){scene.remove(q.mesh);disposeGroup(q.mesh);}}
-  if(foxSpiritGateGroup){if(foxSpiritGateGroup.parent)scene.remove(foxSpiritGateGroup);disposeGroup(foxSpiritGateGroup);foxSpiritGateGroup=null;}
-}
-function makeFoxSpiritMesh(i){
-  const g=new THREE.Group();
-  const mat=new THREE.MeshBasicMaterial({color:i%2?0xc88cff:0x79ecff,transparent:true,opacity:.78,depthWrite:false,blending:THREE.AdditiveBlending});
-  const core=new THREE.Mesh(new THREE.ConeGeometry(.24,.78,5),mat);core.rotation.x=Math.PI/2;g.add(core);
-  const head=new THREE.Mesh(new THREE.OctahedronGeometry(.20,0),mat.clone());head.position.z=.42;g.add(head);
-  const tail=new THREE.Mesh(new THREE.ConeGeometry(.12,.75,5),mat.clone());tail.rotation.x=-Math.PI/2;tail.position.z=-.58;g.add(tail);
-  const ear1=new THREE.Mesh(new THREE.ConeGeometry(.07,.20,4),mat.clone());ear1.position.set(.10,.18,.40);g.add(ear1);
-  const ear2=ear1.clone();ear2.position.x=-.10;g.add(ear2);
-  g.scale.setScalar(1.35);return g;
-}
-function triggerFoxSpiritGate(w){
-  if(!gameRunning||state.avatarType!=='mage'||!player||foxSpiritGateActive)return false;
-  foxSpiritGateActive=true;foxSpiritGateTime=0;
-  foxMageWowCastFx('fox_spirit_gate',2.15,false);
-  if(player.userData.playKayClip)player.userData.playKayClip('magic giant cast',true,true,.34);
-  const yaw=player.rotation.y,fx=Math.sin(yaw),fz=Math.cos(yaw);
-  foxSpiritGateGroup=new THREE.Group();
-  const gm=new THREE.MeshBasicMaterial({color:0xb36cff,transparent:true,opacity:.48,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
-  const gate=new THREE.Mesh(new THREE.TorusGeometry(1.75,.10,8,48),gm);gate.rotation.y=Math.PI/2;foxSpiritGateGroup.add(gate);
-  const inner=new THREE.Mesh(new THREE.RingGeometry(.72,1.58,48),new THREE.MeshBasicMaterial({color:0x63eaff,transparent:true,opacity:.20,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));inner.rotation.y=Math.PI/2;foxSpiritGateGroup.add(inner);
-  foxSpiritGateGroup.position.set(player.position.x-fx*1.2,player.position.y+1.05,player.position.z-fz*1.2);foxSpiritGateGroup.rotation.y=yaw;scene.add(foxSpiritGateGroup);
-  const living=zombies.filter(z=>z&&!z.userData.dead&&!z.userData.spawnPending);
-  const count=foxSpiritGateCount();
+let foxHexGarden=null;
+function clearFoxHexGarden(){const rt=foxHexGarden;if(!rt)return;for(const q of rt.seals){if(q.mesh&&q.mesh.parent){scene.remove(q.mesh);disposeGroup(q.mesh);}}foxHexGarden=null;}
+function foxHexGardenCount(){return Math.max(3,Math.min(7,3+Math.floor(((Math.max(1,Number(round)||1)-1)/29)*4+1e-6)));}
+function triggerFoxHexGarden(w){
+  if(!gameRunning||state.avatarType!=='mage'||!player||foxHexGarden)return false;
+  foxMageWowCastFx('fox_hex_garden',2.15,false);if(player.userData.playKayClip)player.userData.playKayClip('magic giant cast',true,true,.34);
+  const living=zombies.filter(z=>z&&!z.userData.dead&&!z.userData.spawnPending).sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position));
+  const count=foxHexGardenCount(),seals=[],yaw=player.rotation.y;
   for(let i=0;i<count;i++){
-    const mesh=makeFoxSpiritMesh(i);mesh.position.copy(foxSpiritGateGroup.position);scene.add(mesh);
-    let target=living.length?living[i%living.length]:null;
-    const a=yaw+(i-(count-1)/2)*Math.min(.42,2.2/Math.max(1,count-1));
-    foxSpiritGateSpirits.push({mesh,target,dir:new THREE.Vector3(Math.sin(a),0,Math.cos(a)),life:2.4,hit:new Set(),speed:12.5+i*.25,damage:(w.damage||2.4)});
+    let x,z;if(living[i]){x=living[i].position.x;z=living[i].position.z;}else{const a=yaw+(i-(count-1)/2)*.55,r=4.0+(i%2)*2.0;x=player.position.x+Math.sin(a)*r;z=player.position.z+Math.cos(a)*r;}
+    x=THREE.MathUtils.clamp(x,-arenaSize,arenaSize);z=THREE.MathUtils.clamp(z,-arenaSize,arenaSize);
+    const g=new THREE.Group();g.position.set(x,.045,z);const m1=new THREE.MeshBasicMaterial({color:i%2?0xc65cff:0x68eaff,transparent:true,opacity:.46,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});const ring=new THREE.Mesh(new THREE.RingGeometry(1.15,1.55,32),m1);ring.rotation.x=-Math.PI/2;g.add(ring);const rune=new THREE.Mesh(new THREE.TorusGeometry(.78,.045,6,28),m1.clone());rune.rotation.x=Math.PI/2;rune.rotation.z=i*.7;g.add(rune);scene.add(g);seals.push({mesh:g,x,z,detonated:false,pillar:null});
   }
-  return true;
+  foxHexGarden={seals,t:0,duration:1.45,burstAt:.55,damage:(w&&w.damage)||2.65,radius:(w&&w.radius)||2.25};spawnArcaneSigil(player.position.x,.03,player.position.z,2.5);return true;
 }
-function updateFoxSpiritGate(dt){
-  if(!foxSpiritGateActive)return;
-  if(!gameRunning||state.avatarType!=='mage'||!player){clearFoxSpiritGate();return;}
-  foxSpiritGateTime+=dt;
-  if(foxSpiritGateGroup){foxSpiritGateGroup.rotation.z+=dt*1.8;const p=1+Math.sin(foxSpiritGateTime*8)*.05;foxSpiritGateGroup.scale.setScalar(p);}
-  for(let i=foxSpiritGateSpirits.length-1;i>=0;i--){
-    const q=foxSpiritGateSpirits[i];q.life-=dt;
-    if(q.target&&(!q.target.userData.dead)&&q.target.parent){
-      const d=new THREE.Vector3().subVectors(q.target.position,q.mesh.position);d.y=0;const len=d.length();if(len>.001){d.multiplyScalar(1/len);q.dir.lerp(d,Math.min(1,dt*3.8)).normalize();}
-    }
-    q.mesh.position.addScaledVector(q.dir,q.speed*dt);q.mesh.position.y=player.position.y+.72+Math.sin((foxSpiritGateTime+i)*8)*.10;
-    q.mesh.rotation.y=Math.atan2(q.dir.x,q.dir.z);q.mesh.rotation.z+=dt*9;
-    for(const z of [...zombies]){
-      if(!z||z.userData.dead||q.hit.has(z))continue;
-      if(Math.hypot(z.position.x-q.mesh.position.x,z.position.z-q.mesh.position.z)>1.35)continue;
-      q.hit.add(z);applyBulletDamage(z,q.damage*playerStats.power);z.userData.hitStun=Math.max(z.userData.hitStun||0,.55);
-      spawnArcaneSigil(z.position.x,.03,z.position.z,1.15);spawnBurst(z.position.x,z.position.y+.55,z.position.z,mageStressVisualLoad()?5:10,FX_MAT_SPARK,2.5);
-      if(z.userData.hp<=0)killZombie(z);
-      q.life=Math.min(q.life,.10);
-    }
-    if(q.life<=0||Math.hypot(q.mesh.position.x,q.mesh.position.z)>arenaSize+8){if(q.mesh.parent){scene.remove(q.mesh);disposeGroup(q.mesh);}foxSpiritGateSpirits.splice(i,1);}
-  }
-  if(foxSpiritGateTime>.62&&foxSpiritGateGroup){if(foxSpiritGateGroup.parent)scene.remove(foxSpiritGateGroup);disposeGroup(foxSpiritGateGroup);foxSpiritGateGroup=null;}
-  if(!foxSpiritGateSpirits.length&&foxSpiritGateTime>.7){foxSpiritGateActive=false;foxSpiritGateTime=0;}
+function updateFoxHexGarden(dt){
+  const rt=foxHexGarden;if(!rt)return;if(!gameRunning||state.avatarType!=='mage'||!player){clearFoxHexGarden();return;}rt.t+=dt;
+  for(let i=0;i<rt.seals.length;i++){const q=rt.seals[i];if(!q.mesh)continue;q.mesh.rotation.y+=dt*(1.2+i*.08);const pulse=.94+Math.sin((rt.t*9)+i)*.08;q.mesh.scale.setScalar(pulse);if(!q.detonated&&rt.t>=rt.burstAt+i*.045){q.detonated=true;const pm=new THREE.MeshBasicMaterial({color:i%2?0xc96cff:0x7cecff,transparent:true,opacity:.52,depthWrite:false,blending:THREE.AdditiveBlending});const pillar=new THREE.Mesh(new THREE.CylinderGeometry(.48,.92,7.5,8,1,true),pm);pillar.position.set(q.x,3.75,q.z);scene.add(pillar);fx.push({kind:'knightFx',mesh:pillar,life:.52,maxLife:.52,grow:.65,from:.42,dispose:true});spawnArcaneSigil(q.x,.035,q.z,rt.radius*1.05);spawnBurst(q.x,.4,q.z,mageStressVisualLoad()?5:12,FX_MAT_SPARK,3.5);for(const z of [...zombies]){if(!z||z.userData.dead||Math.hypot(z.position.x-q.x,z.position.z-q.z)>rt.radius)continue;const boss=!!z.userData.isBoss;const dmg=rt.damage*playerStats.power;if(boss){const mh=Math.max(1,z.userData.maxHp||z.userData.hp||1);applyBulletDamage(z,Math.min(mh*.035,dmg));}else applyBulletDamage(z,dmg);if(!z.userData.dead)z.userData.hitStun=Math.max(z.userData.hitStun||0,boss?.35:1.0);}}}
+  if(rt.t>=rt.duration)clearFoxHexGarden();
 }
 
 // ---------------------------------------------------------------------
@@ -32628,12 +32558,13 @@ function crimsonMirrorAvailable(){return mageGameplayActive()&&equippedAbilityId
 function clearCrimsonMirror(){
   crimsonMirrorActive=0;crimsonMirrorSliceTimer=0;crimsonMirrorGravityTimer=0;crimsonMirrorSliceIndex=0;
   if(crimsonMirrorGroup){if(crimsonMirrorGroup.parent)scene.remove(crimsonMirrorGroup);disposeGroup(crimsonMirrorGroup);crimsonMirrorGroup=null;}
-  if(player&&player.userData)player.userData.invincibleUntil=0;
+  if(player&&player.userData&&(player.userData.invincibleUntil||0)<=performance.now()+120)player.userData.invincibleUntil=0;
   const b=document.getElementById('abilityBtn');if(b)b.classList.remove('active');
 }
 function triggerCrimsonMirrorDimension(){
   if(!gameRunning||!crimsonMirrorAvailable()||crimsonMirrorActive>0)return false;
   markUltimateUsed();crimsonMirrorActive=10;crimsonMirrorSliceTimer=.35;crimsonMirrorGravityTimer=2.5;crimsonMirrorSliceIndex=0;
+  player.position.x=0;player.position.z=0;
   player.userData.invincibleUntil=Math.max(player.userData.invincibleUntil||0,performance.now()+10050);
   foxMageAbilityPose('laser',420);foxMageWowUltimateFx('mirror',3.5);
   crimsonMirrorGroup=new THREE.Group();crimsonMirrorGroup.position.set(0,.08,0);
@@ -32642,6 +32573,9 @@ function triggerCrimsonMirrorDimension(){
     const a=i/6*Math.PI*2;const sh=new THREE.Mesh(new THREE.PlaneGeometry(4.2,7.0),shardMat.clone());sh.position.set(Math.cos(a)*11,3.7,Math.sin(a)*11);sh.rotation.y=-a+Math.PI/2;sh.rotation.z=(i%2?.18:-.18);sh.userData.baseA=a;crimsonMirrorGroup.add(sh);
   }
   const crown=new THREE.Mesh(new THREE.TorusGeometry(4.6,.10,8,64),new THREE.MeshBasicMaterial({color:0xff477e,transparent:true,opacity:.48,depthWrite:false,blending:THREE.AdditiveBlending}));crown.rotation.x=Math.PI/2;crown.position.y=2.4;crimsonMirrorGroup.add(crown);
+  const core=new THREE.Mesh(new THREE.IcosahedronGeometry(1.05,1),new THREE.MeshBasicMaterial({color:0x13001f,transparent:true,opacity:.92,depthWrite:false}));core.position.y=2.25;core.userData.mirrorGravityCore=true;crimsonMirrorGroup.add(core);
+  const coreGlow=new THREE.Mesh(new THREE.SphereGeometry(1.38,12,8),new THREE.MeshBasicMaterial({color:0xb936ff,transparent:true,opacity:.20,depthWrite:false,blending:THREE.AdditiveBlending}));coreGlow.position.y=2.25;coreGlow.userData.mirrorGravityGlow=true;crimsonMirrorGroup.add(coreGlow);
+  for(let i=0;i<2;i++){const rr=new THREE.Mesh(new THREE.TorusGeometry(1.72+i*.38,.055,6,36),new THREE.MeshBasicMaterial({color:i?0x6feaff:0xff4c92,transparent:true,opacity:.48,depthWrite:false,blending:THREE.AdditiveBlending}));rr.position.y=2.25;rr.rotation.x=Math.PI/2;rr.rotation.z=i*Math.PI/3;rr.userData.mirrorGravityRing=true;crimsonMirrorGroup.add(rr);}
   scene.add(crimsonMirrorGroup);spawnArcaneSigil(0,.035,0,6.0);toast('CRIMSON MIRROR DIMENSION');return true;
 }
 function crimsonMirrorSlice(){
@@ -32660,7 +32594,7 @@ function updateCrimsonMirror(dt){
   if(crimsonMirrorActive<=0)return;
   if(!gameRunning||!crimsonMirrorAvailable()){clearCrimsonMirror();return;}
   crimsonMirrorActive=Math.max(0,crimsonMirrorActive-dt);crimsonMirrorSliceTimer-=dt;crimsonMirrorGravityTimer-=dt;
-  if(crimsonMirrorGroup){crimsonMirrorGroup.rotation.y+=dt*.22;for(const sh of crimsonMirrorGroup.children){if(sh.userData&&sh.userData.baseA!==undefined)sh.position.y=3.7+Math.sin(performance.now()*.0018+sh.userData.baseA)*.45;}}
+  if(crimsonMirrorGroup){crimsonMirrorGroup.rotation.y+=dt*.22;for(const sh of crimsonMirrorGroup.children){if(sh.userData&&sh.userData.baseA!==undefined)sh.position.y=3.7+Math.sin(performance.now()*.0018+sh.userData.baseA)*.45;if(sh.userData&&sh.userData.mirrorGravityCore){const p=.92+Math.sin(performance.now()*.006)*.10;sh.scale.setScalar(p);sh.rotation.y+=dt*1.8;}if(sh.userData&&sh.userData.mirrorGravityGlow){const p=1.0+Math.sin(performance.now()*.008)*.12;sh.scale.setScalar(p);}if(sh.userData&&sh.userData.mirrorGravityRing){sh.rotation.z+=dt*2.2;}}}
   // Gentle continuous reality gravity plus a stronger lift pulse every ~2.5 sec.
   for(const z of zombies){if(!z||z.userData.dead)continue;const dx=-z.position.x,dz=-z.position.z,dist=Math.hypot(dx,dz);if(dist>.1){const step=Math.min(dist,(4.0+Math.min(8,round*.12))*dt);z.position.x+=dx/dist*step;z.position.z+=dz/dist*step;}}
   if(crimsonMirrorSliceTimer<=0){crimsonMirrorSliceTimer=1.0;crimsonMirrorSlice();}
@@ -32668,14 +32602,15 @@ function updateCrimsonMirror(dt){
   if(crimsonMirrorActive<=0){
     // finale implosion
     spawnArcaneSigil(0,.04,0,9.5);spawnBurst(0,.7,0,mageStressVisualLoad()?18:42,FX_MAT_SPARK,7.0);triggerCombatShake(7,180);
-    for(const z of [...zombies]){if(!z||z.userData.dead)continue;const boss=!!z.userData.isBoss;if(!boss&&Math.hypot(z.position.x,z.position.z)<7.5){z.userData.hp=0;killZombie(z);}else if(boss)applyBulletDamage(z,Math.max(1,z.userData.maxHp*.06));}
+    const _screenV=new THREE.Vector3();
+    for(const z of [...zombies]){if(!z||z.userData.dead)continue;const boss=!!z.userData.isBoss;if(boss){applyBulletDamage(z,Math.max(1,z.userData.maxHp*.06));continue;} _screenV.copy(z.position);_screenV.y+=(z.userData.visualHeight||1)*.5;_screenV.project(camera);const visible=_screenV.z>=-1&&_screenV.z<=1&&Math.abs(_screenV.x)<=1.04&&Math.abs(_screenV.y)<=1.04;if(visible){z.userData.hp=0;killZombie(z);}}
     clearCrimsonMirror();
   }
 }
 
 function performWeaponAttack(w, countsAsPrimary=true){
   if(!w) return;
-  if(state.avatarType==='mage'&&mageGameplayActive())foxMageWowCastFx(w.kind,w.kind==='giant_fireball'?1.7:(w.kind==='fox_arcane_bloom'?1.8:(w.kind==='fox_spirit_gate'?2.05:(w.kind==='arcane_lance'?1.45:1.0))),false);
+  if(state.avatarType==='mage'&&mageGameplayActive())foxMageWowCastFx(w.kind,w.kind==='giant_fireball'?1.7:(w.kind==='fox_arcane_bloom'?2.05:(w.kind==='fox_hex_garden'?2.0:(w.kind==='arcane_lance'?1.45:1.0))),false);
   // V23.12.05: Chopper's Secondary moves own their gameplay inside the
   // standalone ChopperPirateKit. Previously these kinds fell through to the
   // generic ranged branch below, which called shootFromPosition() and produced
@@ -32689,8 +32624,8 @@ function performWeaponAttack(w, countsAsPrimary=true){
     triggerShadowStalkerPrimary(w);
   } else if(w.kind==='fox_arcane_bloom'){
     triggerFoxArcaneBloom(w);
-  } else if(w.kind==='fox_spirit_gate'){
-    triggerFoxSpiritGate(w);
+  } else if(w.kind==='fox_hex_garden'){
+    triggerFoxHexGarden(w);
   } else if(isWolverineWeaponKind(w.kind)){
     doWolverineAttack(w);
   } else if(isRhinoWeaponKind(w.kind)){
