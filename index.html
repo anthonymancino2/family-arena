@@ -1457,7 +1457,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.58.00 - Spider: Size + Ultimate + FX Overhaul';
+const GAME_VERSION='23.59.00 - Spider: Move Rework + FX Surge';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3482,12 +3482,12 @@ const CHARACTER_COMBAT = {
         desc:'A rolling three-hit chain: lead jab, cross, then a committed hook. Every strike trails a web arc off the striking hand, and the hook finisher releases a web-shock ring that drags surrounding enemies a step inward so the chain keeps its reach.'},
       spider_web_snap:{name:'Web Snap', price:0, slot:'primary', kind:'spider_web_snap', cooldown:0.26, damage:1.5, auto:true,
         desc:'Fire a fast web bolt that pierces up to three enemies and wraps every one it touches. Wrapped targets are held in place and take 45% extra damage from all sources, so this is the opener the rest of the kit is built on. Fire-rate cooldown scales to zero by Round 18.'},
-      spider_zip_takedown:{name:'Zip-Line Takedown', price:0, slot:'secondary', kind:'spider_zip_takedown', cooldown:0,
-        desc:'Tether the nearest enemy within 13 units, reel in along a visible web-line, and finish with a three-point landing. Normal enemies in the landing radius are executed, Brutes are wrapped and heavily damaged, and bosses take 5% max HP. You are invulnerable for the flight.'},
-      spider_web_trap:{name:'Web Trap Field', price:0, slot:'secondary', kind:'spider_web_trap', cooldown:0,
-        desc:'Spray a wide cone of webbing. Everything caught is rooted for 2.6 seconds, takes damage every 0.35s, and is marked for the 45% wrapped bonus. This is the setup move: cast it before a Slam or an Ultimate, not after.'},
-      spider_somersault_slam:{name:'Aerial Somersault Slam', price:0, slot:'secondary', kind:'spider_somersault_slam', cooldown:0,
-        desc:'Backflip into a true Bezier arc, twist at apex, then drive straight down. The landing wraps and shoves everything inside 6.2 units and leaves a web crater. You are invulnerable from launch to impact.'}
+      spider_zip_takedown:{name:'Web-Yank Blitz', price:0, slot:'secondary', kind:'spider_zip_takedown', cooldown:0,
+        desc:'Fire twin web-lines into the nearest enemy, slingshot in, then ricochet through a short chain of nearby enemies in a rapid acrobatic assault. Normal enemies are executed, heavies are wrapped and smashed, and bosses take repeated capped chunks.'},
+      spider_web_trap:{name:'Electro Web Blob', price:0, slot:'secondary', kind:'spider_web_trap', cooldown:0,
+        desc:'Auto-target the nearest enemy and launch a giant sticky electro-web blob. On impact it cocoons the target, spreads to nearby enemies, and shocks them over time. Holding the button keeps spitting blobs at a fast Spider-Man pace. Bosses can be trapped and shocked, but the shock cannot finish them.'},
+      spider_somersault_slam:{name:'Somersault Hunt', price:0, slot:'secondary', kind:'spider_somersault_slam', cooldown:0,
+        desc:'Launch into a long somersault leap and crash directly onto a target. Hold the button to immediately chain to another target, and if no enemy is nearby Spider-Man keeps somersaulting around the arena with longer travel than before.'}
     }
   },
   rogue: {
@@ -31562,6 +31562,8 @@ class SpiderKit {
     this.zip=null; this.slam=null; this.trap=null;
     this.maximum=null; this.shadows=null; this.webline=null;
     this.snapshots=[];      // web-snap projectiles
+    this.trapShots=[];      // electro-web blob projectiles
+    this.electroTraps=[];   // active electro cocoon shocks
     this.wrapped=new Map(); // enemy -> remaining web-wrap seconds
   }
 
@@ -31576,6 +31578,15 @@ class SpiderKit {
     for(const e of this._enemies()){
       if(exclude&&exclude.has(e))continue;
       const dx=e.position.x-p.x,dz=e.position.z-p.z,d=dx*dx+dz*dz;
+      if(d<bd){bd=d;best=e;}
+    }
+    return best;
+  }
+  _nearestFrom(point,range,exclude){
+    let best=null,bd=range*range;
+    for(const e of this._enemies()){
+      if(exclude&&exclude.has(e))continue;
+      const dx=e.position.x-point.x,dz=e.position.z-point.z,d=dx*dx+dz*dz;
       if(d<bd){bd=d;best=e;}
     }
     return best;
@@ -31708,131 +31719,215 @@ class SpiderKit {
     return true;
   }
 
-  // ---- SECONDARY 1: Zip-Line Takedown --------------------------------
-  // Tether, reel in along a visible web-line, finish with a three-point
-  // landing. Normals are executed on arrival; Brutes are wrapped and heavily
-  // damaged; bosses take a capped chunk.
+  // ---- SECONDARY 1: Web-Yank Blitz -----------------------------------
+  // Twin web-lines latch, Spider-Man slingshots in, then ricochets through a
+  // short chain of nearby enemies. This is the fast flashy assassin option.
   zipTakedown(){
     if(this._busy()||this.cool.zip>0)return false;
-    const tgt=this._nearest(13); if(!tgt)return false;
-    this.cool.zip=this._roundCooldown(0.9,22);
+    const first=this._nearest(16); if(!first)return false;
+    this.cool.zip=this._roundCooldown(0.65,28);
     dashActive=false; dashTimer=0;
-    this._face(tgt);
-    const start=this.player.position.clone();
-    const end=tgt.position.clone(); end.y=start.y;
-    // Stop just short so the landing reads as an impact, not a merge.
-    const back=_spdA.copy(start).sub(end); back.y=0;
-    if(back.lengthSq()>0.0001) end.add(back.normalize().multiplyScalar(1.05));
-    const control=start.clone().lerp(end,0.5); control.y=start.y+3.6;
-
+    const used=new Set(), order=[];
+    let cur=first;
+    while(cur&&order.length<spiderFX._mobileScale(5)){
+      order.push(cur); used.add(cur);
+      cur=this._nearestFrom(cur.position,6.8,used);
+    }
+    this._face(first);
     spiderHandPos(_spdB,false);
-    spiderFX.strand(_spdB,tgt.position,{life:0.40,thick:0.04,glow:true});
     spiderHandPos(_spdA,true);
-    spiderFX.strand(_spdA,tgt.position,{life:0.38,thick:0.03,glow:true});
-    spiderFX.anchorPuff(tgt.position);
-    spiderFX.ring(tgt.position,1.6,{life:0.16,color:SPIDER_WEB,y:0.55});
-
-    this.zip={t:0,dur:0.36,start,control,end,target:tgt,ghostAt:0};
-    invincibleTimer=Math.max(invincibleTimer||0,0.56);
-    this._clip('Flying_Forward_Super',0.36,false);
+    spiderFX.strand(_spdB,first.position,{life:0.26,thick:0.045,glow:true});
+    spiderFX.strand(_spdA,first.position,{life:0.24,thick:0.034,glow:true});
+    spiderFX.anchorPuff(first.position);
+    spiderFX.ring(first.position,2.2,{life:0.20,color:SPIDER_WEB,y:0.55});
+    this.zip={mode:'blitz',order,i:0,target:null,start:null,control:null,end:null,t:0,dur:0.18,ghostAt:0};
+    this._beginBlitzLeg(order[0]);
+    invincibleTimer=Math.max(invincibleTimer||0,1.0);
+    this._clip('Flying_Forward_Super',0.22,false);
+    toast('WEB-YANK BLITZ');
     return true;
   }
-  _zipLand(s){
-    const at=s.end;
-    this.player.position.copy(at);
-    this._clip('Jump_Land',0.34);
-    spiderFX.impact(at,5.6,{shake:24,color:SPIDER_RED});
-    spiderFX.net(at,4.8,{life:1.0,spin:-0.45});
-    spiderFX.burst(at,4.0,{count:12,life:0.20,thick:0.022});
-    for(const e of [...this._enemies()]){
-      const dx=e.position.x-at.x,dz=e.position.z-at.z;
-      if(dx*dx+dz*dz>3.9*3.9)continue;
-      if(this._isBoss(e)){
-        const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
-        applyBulletDamage(e,maxHp*0.05); this._wrap(e,1.4);
-      } else if(this._isLarge(e)){ this._hurt(e,4.2); this._wrap(e,2.0); }
-      else this._kill(e);
-    }
-    if(navigator.vibrate)navigator.vibrate(28);
-  }
-
-  // ---- SECONDARY 2: Web Trap Field -----------------------------------
-  // Cone of webbing. Roots, ticks, and marks. The mark is the point: this is
-  // the move you lead with, not the one you finish with.
-  webTrap(){
-    if(this._busy()||this.cool.trap>0)return false;
-    this.cool.trap=this._roundCooldown(0.85,26);
-    const yaw=this.player.rotation.y, origin=this.player.position.clone();
-    const range=9.0, arc=Math.PI*0.72;
-    const caught=[];
-    for(const e of this._enemies()){
-      const dx=e.position.x-origin.x,dz=e.position.z-origin.z;
-      if(dx*dx+dz*dz>range*range)continue;
-      const a=Math.atan2(dx,dz),diff=Math.abs(((a-yaw+Math.PI*3)%(Math.PI*2))-Math.PI);
-      if(diff<=arc/2)caught.push(e);
-    }
-    // Fan of strands sells the spray even when nothing is caught.
-    spiderHandPos(_spdA,false);
-    const handStart=_spdA.clone();
-    const strands=spiderFX._mobileScale(12);
-    for(let i=0;i<strands;i++){
-      const a=yaw+(i/(strands-1)-0.5)*arc;
-      _spdB.set(origin.x+Math.sin(a)*range, 0.12, origin.z+Math.cos(a)*range);
-      spiderFX.strand(handStart,_spdB,{life:0.44,thick:0.024,glow:i%2===0});
-    }
-    const capped=caught.slice(0,spiderFX._mobileScale(10));
-    for(const e of capped){
-      this._wrap(e,3.0);
-      spiderFX.net(e.position,1.35,{life:2.8,spin:0.28});
-      spiderFX.ring(e.position,1.2,{life:0.2,color:SPIDER_WEB,y:0.45});
-      this._hurt(e,1.0);
-    }
-    spiderFX.net(origin.clone().addScaledVector(this._fwd(),3.1),4.4,{life:0.52,spin:0.22});
-    this.trap={t:0,d:3.3,tick:0,victims:capped};
-    this._clip('Two-hand_Blast',0.3);
-    triggerCombatShake(caught.length?9:4,130);
-    if(caught.length)toast('WEB TRAP · '+caught.length+' WRAPPED');
-    return true;
-  }
-
-  // ---- SECONDARY 3: Aerial Somersault Slam ---------------------------
-  // Backflip up, hang, then drive down. Gymnastic on the way up, heavy on
-  // the way down. Invulnerable for the airborne half.
-  somersaultSlam(){
-    if(this._busy()||this.cool.slam>0)return false;
-    this.cool.slam=this._roundCooldown(1.1,24);
-    dashActive=false; dashTimer=0;
+  _beginBlitzLeg(target){
+    if(!this.zip||!target)return;
     const start=this.player.position.clone();
-    const tgt=this._nearest(9);
-    let end;
-    if(tgt){ end=tgt.position.clone(); end.y=start.y; }
-    else end=start.clone().addScaledVector(this._fwd(),3.4);
-    const control=start.clone().lerp(end,0.5); control.y=start.y+6.4;
-    spiderFX.ring(start,1.4,{life:0.18,color:SPIDER_BLUE,y:0.55});
-    spiderFX.anchorPuff(start);
-    this.slam={t:0,dur:0.95,start,control,end,phase:0};
-    invincibleTimer=Math.max(invincibleTimer||0,1.06);
-    this._clip('Backflip',0.42,false);
-    return true;
+    const end=target.position.clone(); end.y=start.y;
+    const back=_spdA.copy(start).sub(end); back.y=0;
+    if(back.lengthSq()>0.0001) end.add(back.normalize().multiplyScalar(0.78));
+    const dist=Math.max(1,start.distanceTo(end));
+    const control=start.clone().lerp(end,0.5); control.y=start.y+Math.min(4.6,2.2+dist*0.34);
+    this.zip.target=target;
+    this.zip.start=start; this.zip.end=end; this.zip.control=control;
+    this.zip.t=0; this.zip.dur=Math.max(0.14,Math.min(0.22,0.10+dist*0.02)); this.zip.ghostAt=0;
+    spiderFX.strand(start.clone().setY(1.0),target.position.clone().setY(1.0),{life:0.22,thick:0.036,glow:true});
   }
-  _slamLand(s){
-    const at=s.end;
+  _blitzHit(s){
+    const at=s.end.clone();
     this.player.position.copy(at); this.player.position.y=s.start.y;
-    this._clip('Attack_Ground_Pound',0.4);
-    spiderFX.impact(at,8.2,{shake:30,color:SPIDER_BLUE});
-    spiderFX.net(at,8.2,{life:1.35,spin:-0.6});
-    spiderFX.burst(at,5.8,{count:16,life:0.24,thick:0.022});
-    const hits=this._radial(at,8.2,4.3);
+    this._clip(s.i%2===0?'Melee_Hook':'Sword_Attack_Air_Vertical',0.14,false);
+    spiderFX.impact(at,4.8,{shake:20,color:SPIDER_RED});
+    spiderFX.net(at,3.3,{life:0.72,spin:0.75});
+    spiderFX.burst(at,3.6,{count:14,life:0.22,thick:0.02});
+    const tgt=s.target;
+    if(tgt&&tgt.parent&&!(tgt.userData&&tgt.userData.dead)){
+      if(this._isBoss(tgt)){
+        const maxHp=Math.max(1,Number(tgt.userData.maxHp)||Number(tgt.userData.hp)||1);
+        applyBulletDamage(tgt,maxHp*0.055);
+        this._wrap(tgt,1.8);
+      }else if(this._isLarge(tgt)){
+        this._hurt(tgt,5.0);
+        this._wrap(tgt,2.4);
+      }else this._kill(tgt);
+    }
     for(const e of this._enemies()){
+      if(e===tgt)continue;
       const dx=e.position.x-at.x,dz=e.position.z-at.z;
-      if(dx*dx+dz*dz<=8.2*8.2){
-        this._wrap(e,2.1);
-        const d=Math.hypot(dx,dz)||1;
-        e.position.x+=dx/d*1.8; e.position.z+=dz/d*1.8;   // shove outward
+      if(dx*dx+dz*dz<=3.1*3.1){
+        if(this._isBoss(e)){
+          const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
+          applyBulletDamage(e,maxHp*0.012);
+        }else this._hurt(e,1.6);
+        this._wrap(e,1.2);
       }
     }
-    triggerCombatShake(hits?26:16,340);
-    if(navigator.vibrate)navigator.vibrate(45);
+    triggerCombatShake(14,180);
+    s.i++;
+    const next=s.order[s.i];
+    if(next&&next.parent&&!(next.userData&&next.userData.dead)){
+      this._face(next);
+      this._beginBlitzLeg(next);
+    }else{
+      this._clip('Jump_Land',0.18);
+      if(navigator.vibrate)navigator.vibrate(26);
+      this.zip=null;
+    }
+  }
+
+  // ---- SECONDARY 2: Electro Web Blob ---------------------------------
+  // Fires a giant sticky homing blob that cocoons enemies and repeatedly
+  // shocks them. Hold-to-repeat is driven by the shared Secondary input loop.
+  webTrap(){
+    if(this._busy()||this.cool.trap>0)return false;
+    this.cool.trap=this._roundCooldown(0.42,30);
+    const target=(typeof findAutoAimTarget==='function'?findAutoAimTarget(16):null)||this._nearest(16);
+    const origin=spiderHandPos(_spdA,false), start=_spdA.clone();
+    const end=target?target.position.clone():this.player.position.clone().addScaledVector(this._fwd(),10);
+    end.y=Math.max(0.6,start.y);
+    spiderFX._init();
+    const mesh=new THREE.Mesh(spiderFX.beadGeo, spiderFX.matGlow.clone());
+    if(mesh.material&&mesh.material.color)mesh.material.color.setHex(0xb8f8ff);
+    if(mesh.material&&'emissive' in mesh.material&&mesh.material.emissive)mesh.material.emissive.setHex(0x5fd4ff);
+    mesh.scale.setScalar(0.30);
+    mesh.position.copy(start);
+    scene.add(mesh);
+    spiderFX.net(start,0.8,{life:0.16,spin:0.28});
+    spiderFX.strand(start,start.clone().lerp(end,0.25),{life:0.16,thick:0.032,glow:true});
+    this.trapShots.push({mesh,start:start.clone(),end:end.clone(),target,life:0,dur:0.28,last:start.clone(),trail:0});
+    this._clip('Two-hand_Blast',0.18,false);
+    triggerCombatShake(5,90);
+    return true;
+  }
+  _electroTrapBurst(center,target){
+    spiderFX.impact(center,4.8,{shake:18,color:SPIDER_BLUE});
+    spiderFX.net(center,4.0,{life:0.90,spin:0.32});
+    spiderFX.ring(center,4.2,{life:0.30,color:SPIDER_WEB,y:0.25});
+    const victims=[];
+    for(const e of this._enemies()){
+      const dx=e.position.x-center.x,dz=e.position.z-center.z;
+      if(e===target||dx*dx+dz*dz<=3.8*3.8)victims.push(e);
+    }
+    victims.sort((a,b)=>((a.position.x-center.x)**2+(a.position.z-center.z)**2)-((b.position.x-center.x)**2+(b.position.z-center.z)**2));
+    const capped=victims.slice(0,spiderFX._mobileScale(8));
+    let source={x:center.x,y:center.y,z:center.z};
+    capped.forEach((e,idx)=>{
+      this._wrap(e,idx===0?3.0:2.4);
+      e.userData.hitStun=Math.max(e.userData.hitStun||0,idx===0?1.0:0.6);
+      this.electroTraps.push({enemy:e,center:center.clone(),t:0,d:this._isBoss(e)?2.6:2.2,tick:0,primary:idx===0});
+      createChainLightningArc(source,e.position,idx);
+      source=e.position;
+    });
+    if(capped.length)toast('ELECTRO WEB x'+capped.length);
+  }
+
+  // ---- SECONDARY 3: Somersault Hunt ----------------------------------
+  // Long acrobatic hunting leap. Hold to keep chaining from target to target;
+  // if no target is near, Spider-Man keeps cartwheeling around the arena.
+  somersaultSlam(){
+    if(this.maximum||this.shadows||this.webline||this.zip)return false;
+    if(this.slam)return true;
+    if(this.cool.slam>0)return false;
+    this.cool.slam=this._roundCooldown(0.62,30);
+    dashActive=false; dashTimer=0;
+    this.slam={visited:new Set(),chainCount:0,roamCount:0,target:null,start:null,control:null,end:null,t:0,dur:0.45,phase:0,ghostAt:0};
+    this._beginSomersaultLeg(this._nearest(12));
+    invincibleTimer=Math.max(invincibleTimer||0,0.85);
+    toast('SOMERSAULT HUNT');
+    return true;
+  }
+  _beginSomersaultLeg(target){
+    if(!this.slam)return;
+    const s=this.slam;
+    const start=this.player.position.clone();
+    let end, tracked=null;
+    if(target&&target.parent&&!(target.userData&&target.userData.dead)){
+      tracked=target;
+      s.visited.add(target);
+      end=target.position.clone(); end.y=start.y;
+      const back=_spdA.copy(start).sub(end); back.y=0;
+      if(back.lengthSq()>0.0001) end.add(back.normalize().multiplyScalar(0.68));
+    }else{
+      const angle=(s.roamCount%2===0?0.42:-0.42);
+      const dir=this._fwd().clone().applyAxisAngle(new THREE.Vector3(0,1,0),angle);
+      end=start.clone().addScaledVector(dir,6.8+Math.min(2.6,s.chainCount*0.14));
+      end.y=start.y;
+      s.roamCount++;
+    }
+    const dist=Math.max(1,start.distanceTo(end));
+    const control=start.clone().lerp(end,0.5);
+    control.y=start.y+Math.min(8.8,Math.max(5.4,3.8+dist*0.52));
+    s.target=tracked; s.start=start; s.control=control; s.end=end; s.t=0; s.phase=0; s.ghostAt=0;
+    s.dur=Math.min(0.60,Math.max(0.40,0.22+dist*0.032));
+    spiderFX.ring(start,1.4,{life:0.18,color:tracked?SPIDER_BLUE:SPIDER_WEB,y:0.55});
+    spiderFX.anchorPuff(start);
+    this._clip('Backflip',0.24,false);
+  }
+  _slamLand(s){
+    const at=s.end.clone();
+    this.player.position.copy(at); this.player.position.y=s.start.y;
+    const direct=!!(s.target&&s.target.parent&&!(s.target.userData&&s.target.userData.dead));
+    this._clip(direct?'Attack_Ground_Pound':'Jump_Land',0.24,false);
+    spiderFX.impact(at,direct?6.0:4.5,{shake:direct?22:15,color:SPIDER_BLUE});
+    spiderFX.net(at,direct?4.6:3.3,{life:direct?0.9:0.55,spin:-0.58});
+    spiderFX.burst(at,direct?4.8:3.2,{count:direct?14:10,life:0.20,thick:0.02});
+    let hits=0;
+    if(direct){
+      const e=s.target;
+      hits++;
+      if(this._isBoss(e)){
+        const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
+        applyBulletDamage(e,maxHp*0.045);
+        this._wrap(e,1.8);
+      }else if(this._isLarge(e)){
+        this._hurt(e,5.2);
+        this._wrap(e,2.4);
+      }else this._kill(e);
+    }
+    const splash=direct?4.2:3.0;
+    for(const e of this._enemies()){
+      const dx=e.position.x-at.x,dz=e.position.z-at.z;
+      if(dx*dx+dz*dz>splash*splash)continue;
+      if(e!==s.target){
+        if(this._isBoss(e)){
+          const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
+          applyBulletDamage(e,maxHp*0.012);
+        }else this._hurt(e,direct?1.8:1.2);
+        this._wrap(e,1.2);
+      }
+      const d=Math.hypot(dx,dz)||1;
+      e.position.x+=dx/d*(direct?1.8:1.0); e.position.z+=dz/d*(direct?1.8:1.0);
+      hits++;
+    }
+    triggerCombatShake(hits?28:18,direct?270:180);
+    if(navigator.vibrate)navigator.vibrate(direct?32:18);
   }
 
   // ---- ULTIMATE 1: Maximum Spider ------------------------------------
@@ -32004,7 +32099,57 @@ class SpiderKit {
       }
     }
 
-    // ---- zip takedown
+    // ---- electro web blob projectiles
+    for(let i=this.trapShots.length-1;i>=0;i--){
+      const b=this.trapShots[i]; b.life+=dt;
+      b.last.copy(b.mesh.position);
+      const liveTarget=b.target&&b.target.parent&&!(b.target.userData&&b.target.userData.dead)?b.target:null;
+      const dest=(liveTarget?liveTarget.position:b.end).clone();
+      dest.y=Math.max(0.85,b.start.y);
+      const u=Math.min(1,b.life/b.dur);
+      b.mesh.position.lerpVectors(b.start,dest,u);
+      b.mesh.position.y+=Math.sin(u*Math.PI)*1.35;
+      b.mesh.rotation.x+=dt*14; b.mesh.rotation.y+=dt*18;
+      b.trail+=dt;
+      if(b.trail>=0.03){
+        b.trail=0;
+        spiderFX.strand(b.last,b.mesh.position,{life:0.16,thick:0.026,glow:true});
+        spiderFX.ring(b.mesh.position,0.7,{life:0.10,color:SPIDER_BLUE,y:0.08});
+      }
+      const done=u>=1 || (typeof bulletBlockedAt==='function'&&bulletBlockedAt(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z));
+      if(done){
+        this._electroTrapBurst(b.mesh.position.clone(),liveTarget);
+        if(b.mesh.parent)b.mesh.parent.remove(b.mesh);
+        if(b.mesh.material&&b.mesh.material.dispose)b.mesh.material.dispose();
+        this.trapShots.splice(i,1);
+      }
+    }
+
+    // ---- active electro cocoon shocks
+    for(let i=this.electroTraps.length-1;i>=0;i--){
+      const s=this.electroTraps[i];
+      const e=s.enemy;
+      if(!e||!e.parent||(e.userData&&e.userData.dead)){ this.electroTraps.splice(i,1); continue; }
+      s.t+=dt; s.tick+=dt;
+      this._wrap(e,0.35);
+      e.userData.hitStun=Math.max(e.userData.hitStun||0,0.22);
+      if(s.tick>=0.22){
+        s.tick=0;
+        const top={x:e.position.x,y:1.6,z:e.position.z};
+        createChainLightningArc(top,e.position,s.primary?0:1);
+        spiderFX.ring(e.position,s.primary?1.45:1.10,{life:0.18,color:SPIDER_BLUE,y:0.45});
+        spiderFX.net(e.position,s.primary?1.25:0.95,{life:0.24,spin:0.28});
+        if(this._isBoss(e)){
+          const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
+          applyBulletDamage(e,maxHp*(s.primary?0.010:0.006));
+          if(Number(e.userData.hp)<=0){ e.userData.hp=Math.max(1,maxHp*0.02); e.userData.dead=false; }
+        }else if(this._isLarge(e)) this._hurt(e,s.primary?1.9:1.2);
+        else this._hurt(e,s.primary?1.55:1.0);
+      }
+      if(s.t>=s.d)this.electroTraps.splice(i,1);
+    }
+
+    // ---- web-yank blitz
     if(this.zip){
       const s=this.zip; s.t+=dt;
       const u=Math.min(1,s.t/s.dur), v=1-u;
@@ -32012,13 +32157,16 @@ class SpiderKit {
         v*v*s.start.x+2*v*u*s.control.x+u*u*s.end.x,
         v*v*s.start.y+2*v*u*s.control.y+u*u*s.end.y,
         v*v*s.start.z+2*v*u*s.control.z+u*u*s.end.z);
+      const vx=2*v*(s.control.x-s.start.x)+2*u*(s.end.x-s.control.x);
+      const vz=2*v*(s.control.z-s.start.z)+2*u*(s.end.z-s.control.z);
+      if(vx*vx+vz*vz>0.0001)this.player.rotation.y=Math.atan2(vx,vz);
       this.player.rotation.x=0;
       s.ghostAt+=dt;
-      if(s.ghostAt>=0.04){ s.ghostAt=0; spiderFX.ghost(this.player.position,1.0); }
-      if(u>=1){ this._zipLand(s); this.zip=null; }
+      if(s.ghostAt>=0.035){ s.ghostAt=0; spiderFX.ghost(this.player.position,1.06); }
+      if(u>=1) this._blitzHit(s);
     }
 
-    // ---- somersault slam
+    // ---- somersault hunt
     if(this.slam){
       const s=this.slam; s.t+=dt;
       const u=Math.min(1,s.t/s.dur), v=1-u;
@@ -32027,24 +32175,20 @@ class SpiderKit {
         v*v*s.start.y+2*v*u*s.control.y+u*u*s.end.y,
         v*v*s.start.z+2*v*u*s.control.z+u*u*s.end.z);
       this.player.rotation.x=0;
-      // Switch from the flip to the descending strike at apex.
-      if(s.phase===0 && u>=0.5){ s.phase=1; this._clip('Sword_Attack_Air_Vertical',0.42,false); }
-      if(u>=1){ this._slamLand(s); this.slam=null; }
-    }
-
-    // ---- web trap ticking
-    if(this.trap){
-      const s=this.trap; s.t+=dt; s.tick+=dt;
-      if(s.tick>=0.30){
-        s.tick=0;
-        for(const e of s.victims){
-          if(!e||!e.parent||(e.userData&&e.userData.dead))continue;
-          this._hurt(e,0.6);
-          spiderFX.ring(e.position,1.05,{life:0.18,y:0.35});
-          spiderFX.strand(e.position.clone().setY(1.35), e.position.clone().setY(0.18), {life:0.14,thick:0.015,glow:true});
-        }
+      s.ghostAt+=dt;
+      if(s.ghostAt>=0.045){ s.ghostAt=0; spiderFX.ghost(this.player.position,1.05); }
+      if(s.phase===0 && u>=0.42){ s.phase=1; this._clip('Sword_Attack_Air_Vertical',0.18,false); }
+      if(u>=1){
+        this._slamLand(s);
+        const held=secondaryInputHeld&&secondaryWeaponForAvatar()&&secondaryWeaponForAvatar().kind==='spider_somersault_slam';
+        if(held && s.chainCount<18){
+          s.chainCount++;
+          let next=this._nearestFrom(this.player.position,13,s.visited);
+          if(!next&&s.target)next=this._nearestFrom(s.target.position,13,s.visited);
+          invincibleTimer=Math.max(invincibleTimer||0,0.30);
+          this._beginSomersaultLeg(next||null);
+        }else this.slam=null;
       }
-      if(s.t>=s.d)this.trap=null;
     }
 
     // ---- maximum spider
@@ -32136,7 +32280,13 @@ class SpiderKit {
       if(b.mesh&&b.mesh.parent)b.mesh.parent.remove(b.mesh);
       if(b.mesh&&b.mesh.material&&b.mesh.material.dispose)b.mesh.material.dispose();
     }
+    for(const b of this.trapShots){
+      if(b.mesh&&b.mesh.parent)b.mesh.parent.remove(b.mesh);
+      if(b.mesh&&b.mesh.material&&b.mesh.material.dispose)b.mesh.material.dispose();
+    }
     this.snapshots.length=0;
+    this.trapShots.length=0;
+    this.electroTraps.length=0;
     this.wrapped.clear();
     this.zip=this.slam=this.trap=this.maximum=this.shadows=this.webline=null;
   }
