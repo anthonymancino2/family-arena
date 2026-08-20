@@ -1457,7 +1457,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.57.01 - Spider: Chopper-Size Fix';
+const GAME_VERSION='23.58.00 - Spider: Size + Ultimate + FX Overhaul';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -13531,7 +13531,7 @@ function normalizeImportedPlayableRoot(root,characterId,THREEAsset){
   // Wolverine gets a slightly shorter visible fit so the claws/head stay in frame.
   const desiredWorldHeight=characterId==='carrot'
     ? 1.48
-    : (characterId==='wolverine'?1.48:1.42);
+    : (characterId==='wolverine'?1.48:(characterId==='spider'?1.18:1.42));
 
   const desiredRootHeight=desiredWorldHeight/Math.max(.001,parentScale);
 
@@ -13545,6 +13545,13 @@ function normalizeImportedPlayableRoot(root,characterId,THREEAsset){
     root.scale.x*=.90;
     root.scale.z*=.92;
     root.scale.y*=1.06;
+  }
+  if(characterId==='spider'){
+    // Match Chopper's footprint more closely so Spider no longer reads titan-sized
+    // in gameplay or in the avatar preview card.
+    root.scale.x*=0.88;
+    root.scale.z*=0.88;
+    root.scale.y*=0.96;
   }
 
   root.updateMatrixWorld(true);
@@ -13625,7 +13632,7 @@ function buildKayKitPlayer(characterId, options={}){
 
     // Imported custom avatars use visible mesh geometry only. This avoids
     // Wolverine's remote Mixamo helper bones and gives Cat a Cloud-height fit.
-    if(characterId==='carrot'||characterId==='wolverine'){
+    if(characterId==='carrot'||characterId==='wolverine'||characterId==='spider'){
       normalizeImportedPlayableRoot(root,characterId,THREEAsset);
     }else{
       const rawBox=new THREEAsset.Box3().setFromObject(root);
@@ -13779,6 +13786,7 @@ function spawnPlayer(){
   if(state.avatarType==='ninefox')state.avatarType='mage';
   if(!AVATAR_TYPES.includes(state.avatarType)) state.avatarType = 'rogue';
   if(state.avatarType==='mage')foxMageQueuedCastSerial++;foxMagePendingRelease.arcane_lance=false;foxMagePendingRelease.giant_fireball=false;
+  if(state.avatarType==='spider' && (!equippedAbilityId || String(equippedAbilityId).indexOf('spider_')!==0 || !ownedAbilities[equippedAbilityId])) equippedAbilityId='spider_maximum';
   player = buildKayKitPlayer(state.avatarType);
   const avatarScale = AVATAR_SCALE[state.avatarType] || 1;
   player.scale.setScalar(avatarScale);
@@ -15276,9 +15284,24 @@ function setupControls(){
     if(document.hidden) releaseSecondaryInput();
   });
   const jumpBtnEl = document.getElementById('jumpBtn');
-  jumpBtnEl.addEventListener('touchstart', e=>{ e.preventDefault(); doJump(); });
-  document.getElementById('lookFwdBtn').addEventListener('touchstart', e=>{
-    e.preventDefault();
+  const lookFwdBtnEl = document.getElementById('lookFwdBtn');
+  const camInBtnEl = document.getElementById('camInBtn');
+  const camOutBtnEl = document.getElementById('camOutBtn');
+  const dashBtnEl=document.getElementById('dashBtn');
+
+  const bindInstantButton=(el,handler)=>{
+    if(!el)return;
+    el.style.touchAction='none';
+    el.style.webkitTapHighlightColor='transparent';
+    if(window.PointerEvent){
+      el.addEventListener('pointerdown',e=>{ e.preventDefault(); handler(e); },{passive:false});
+    }else{
+      el.addEventListener('touchstart',e=>{ e.preventDefault(); handler(e); },{passive:false});
+    }
+  };
+
+  bindInstantButton(jumpBtnEl,()=>doJump());
+  bindInstantButton(lookFwdBtnEl,()=>{
     camYaw = player.rotation.y;
     camPitch = 0.56;
   });
@@ -15286,15 +15309,11 @@ function setupControls(){
   // step fires immediately in its own direction, no waiting on a hold
   // timer to go back the way you came. Both wrap: past bird's eye (9)
   // continues on to POV (1) and back.
-  document.getElementById('camInBtn').addEventListener('touchstart', e=>{
-    e.preventDefault(); cycleCamera(-1);
-  }, {passive:false});
-  document.getElementById('camOutBtn').addEventListener('touchstart', e=>{
-    e.preventDefault(); cycleCamera(1);
-  }, {passive:false});
-  const dashBtnEl=document.getElementById('dashBtn');
-  dashBtnEl.addEventListener('touchstart',e=>{e.preventDefault();doDash();});
+  bindInstantButton(camInBtnEl,()=>cycleCamera(-1));
+  bindInstantButton(camOutBtnEl,()=>cycleCamera(1));
+  bindInstantButton(dashBtnEl,()=>doDash());
   const abilityBtnEl=document.getElementById('abilityBtn');
+  if(abilityBtnEl){ abilityBtnEl.style.touchAction='none'; abilityBtnEl.style.webkitTapHighlightColor='transparent'; }
   const activateEquippedAbilityNow=()=>{
     if(equippedAbilityId==='arcane_laser') triggerCrimsonMirrorDimension();
     else if(equippedAbilityId==='blizzard_storm') triggerBlizzardStorm();
@@ -16797,7 +16816,7 @@ function spawnShadowSmoke(x,y,z,count=8){
 function updateHoodedHud(){
   const btn=document.getElementById('ultimateBtn'),meter=document.getElementById('soulMeter');
   if(!btn||!meter)return;
-  const isHooded=hoodedIsActive(), isChopper=chopperClassIsActive(), isArcher=archerIsActive(), isMage=mageGameplayActive(), isKnight=knightIsActive(), isBarbarian=barbarianIsActive();
+  const isHooded=hoodedIsActive(), isChopper=chopperClassIsActive(), isSpider=spiderClassIsActive(), isArcher=archerIsActive(), isMage=mageGameplayActive(), isKnight=knightIsActive(), isBarbarian=barbarianIsActive();
   const mageEchoReady=isMage&&arcaneEchoesUnlocked();
   const knightCloneSpecialReady=isKnight&&Math.max(1,Number(round)||1)>=10;
   const chopperCloneSpecialReady=isChopper&&Math.max(1,Number(round)||1)>=10;
@@ -16891,7 +16910,7 @@ function updateHoodedHud(){
   }
   const abilityBtn=document.getElementById('abilityBtn');
   if(abilityBtn){
-    const supportsAbility = isHooded || isChopper || isMage || isArcher || isKnight || isBarbarian;
+    const supportsAbility = isHooded || isChopper || isSpider || isMage || isArcher || isKnight || isBarbarian;
     const equipped = supportsAbility && equippedAbilityId && ownedAbilities[equippedAbilityId];
     const laserMode = false;
     abilityBtn.classList.toggle('hidden', !equipped);
@@ -16923,6 +16942,24 @@ function updateHoodedHud(){
               : (superMeteorCooldownTimer>0 ? `METEOR ${Math.ceil(superMeteorCooldownTimer)}` : 'SUPER METEOR'));
         abilityBtn.classList.toggle('active',!!activeSuperMeteor||superMeteorSequenceActive);
         abilityBtn.classList.toggle('cooling',superMeteorCooldownTimer>0&&!superMeteorSequenceActive);
+      }else if(isSpider){
+        const kit=ensureSpiderKit()||{maximum:null,shadows:null,webline:null,cooldownForAbility:()=>0};
+        const label=equippedAbilityId==='spider_maximum'
+          ? 'MAXIMUM'
+          : (equippedAbilityId==='spider_web_of_shadows'?'SHADOWS':'WEBLINE');
+        const activeObj=equippedAbilityId==='spider_maximum'
+          ? kit.maximum
+          : (equippedAbilityId==='spider_web_of_shadows'?kit.shadows:kit.webline);
+        const active=!!activeObj;
+        const activeTime=activeObj&&Number.isFinite(activeObj.dur)&&Number.isFinite(activeObj.t)
+          ? Math.max(0,activeObj.dur-activeObj.t)
+          : 0;
+        const cd=kit&&kit.cooldownForAbility?kit.cooldownForAbility(equippedAbilityId):0;
+        abilityBtn.textContent=active
+          ? `${label} ${activeTime>0?activeTime.toFixed(1):'!'}`
+          : (cd>0?`${label} ${Math.ceil(cd)}`:label);
+        abilityBtn.classList.toggle('active',active);
+        abilityBtn.classList.toggle('cooling',cd>0&&!active);
       }else if(isHooded||isChopper){
         const kit=isChopper?chopperKit:shadowStalkerMoveset;
         const label=isChopper
@@ -16961,7 +16998,7 @@ function updateHoodedHud(){
       }
       if(!laserMode){
         abilityBtn.style.removeProperty('--charge');
-        if(equippedAbilityId!=='arcane_laser'&&equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='supernova_piercer'&&equippedAbilityId!=='super_meteor'&&!isHooded&&!isChopper&&!isKnight&&!isBarbarian){
+        if(equippedAbilityId!=='arcane_laser'&&equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='supernova_piercer'&&equippedAbilityId!=='super_meteor'&&!isHooded&&!isChopper&&!isSpider&&!isKnight&&!isBarbarian){
           abilityBtn.classList.remove('empty','active','cooling');
         }
       }
@@ -31468,12 +31505,12 @@ const spiderFX = {
   // Impact splat: net + rings + spoke burst. One call for every "landed" beat.
   impact(at,radius,{shake=0,color=SPIDER_WEB}={}){
     this.net(at,radius,{life:0.8,spin:0.5});
-    this.ring(at,radius*1.16,{life:0.38,color});
-    this.ring(at,radius*0.78,{life:0.28,color:SPIDER_WEB,y:0.09});
-    this.ring(at,radius*0.44,{life:0.18,color:SPIDER_BLUE,y:0.13});
-    this.burst(at,radius*0.72,{count:10,life:0.20,thick:0.018,height:0.82,glow:true});
-    spawnBurst(at.x,0.35,at.z,this._mobileScale(14),FX_MAT_DUST,radius*0.95);
-    if(shake) triggerCombatShake(shake,Math.min(340,shake*16));
+    this.ring(at,radius*1.22,{life:0.42,color});
+    this.ring(at,radius*0.88,{life:0.32,color:SPIDER_WEB,y:0.09});
+    this.ring(at,radius*0.58,{life:0.22,color:SPIDER_BLUE,y:0.13});
+    this.burst(at,radius*0.88,{count:14,life:0.24,thick:0.02,height:0.82,glow:true});
+    spawnBurst(at.x,0.35,at.z,this._mobileScale(18),FX_MAT_DUST,radius*1.02);
+    if(shake) triggerCombatShake(shake,Math.min(420,shake*18));
   },
   // Pale silhouette left behind by a zip. Cheap: one low-poly bead cluster,
   // not a skinned clone, so a 12-hop ultimate costs almost nothing.
@@ -31618,17 +31655,18 @@ class SpiderKit {
     const fwd=this._fwd();
     const reach=_spdB.copy(fwd).multiplyScalar(fin?2.85:2.08).add(_spdA);
     spiderFX.strand(_spdA,reach,{life:fin?0.22:0.15,thick:fin?0.052:0.032,glow:true});
-    const sideCount=fin?3:2;
+    const sideCount=fin?5:3;
     for(let i=0;i<sideCount;i++){
       const s=(i-(sideCount-1)*0.5)*(fin?0.28:0.18);
       const branch=new THREE.Vector3(-fwd.z,0,fwd.x).multiplyScalar(s);
       spiderFX.strand(_spdA.clone().add(branch.clone().multiplyScalar(0.2)), reach.clone().add(branch), {life:fin?0.18:0.12, thick:fin?0.024:0.018, glow:fin});
     }
-    spiderFX.ring(this.player.position,fin?2.8:1.8,{life:fin?0.22:0.14,color:fin?SPIDER_RED:SPIDER_WEB,y:0.44});
+    spiderFX.ring(this.player.position,fin?3.4:2.1,{life:fin?0.26:0.16,color:fin?SPIDER_RED:SPIDER_WEB,y:0.44});
 
     if(fin){
-      spiderFX.net(this.player.position,3.7,{life:0.44,spin:0.55});
-      spiderFX.impact(this.player.position,3.7,{color:SPIDER_RED});
+      spiderFX.net(this.player.position,4.4,{life:0.56,spin:0.72});
+      spiderFX.impact(this.player.position,4.8,{shake:12,color:SPIDER_RED});
+      spiderFX.burst(this.player.position,3.4,{count:12,life:0.18,thick:0.018});
       for(const e of this._enemies()){
         const dx=this.player.position.x-e.position.x, dz=this.player.position.z-e.position.z;
         const d=Math.hypot(dx,dz);
@@ -31636,7 +31674,7 @@ class SpiderKit {
       }
     }
     this._clip(fin?'Melee_Hook':(step===0?'Punch_Jab':'Punch_Cross'), fin?0.24:0.16);
-    triggerCombatShake(hits?(fin?13:6):2, hits?(fin?190:95):50);
+    triggerCombatShake(hits?(fin?18:8):3, hits?(fin?240:120):60);
     this.swing={t:0,d:fin?0.24:0.16};
     return true;
   }
@@ -31660,11 +31698,11 @@ class SpiderKit {
     const start=_spdB.clone();
     spiderFX._init();
     const mesh=new THREE.Mesh(spiderFX.beadGeo, spiderFX.matGlow.clone());
-    mesh.scale.setScalar(0.16);
+    mesh.scale.setScalar(0.20);
     mesh.position.copy(start);
     scene.add(mesh);
     spiderFX.strand(start,start.clone().addScaledVector(dir,0.82),{life:0.12,thick:0.026,glow:true});
-    this.snapshots.push({mesh,dir,life:0,maxLife:1.04,speed:28,hit:new Set(),last:start.clone(),trail:0});
+    this.snapshots.push({mesh,dir,life:0,maxLife:1.12,speed:31,hit:new Set(),last:start.clone(),trail:0});
     this._clip('Spell_Simple_Shoot',0.13);
     triggerCombatShake(3,60);
     return true;
@@ -31703,9 +31741,9 @@ class SpiderKit {
     const at=s.end;
     this.player.position.copy(at);
     this._clip('Jump_Land',0.34);
-    spiderFX.impact(at,4.6,{shake:20,color:SPIDER_RED});
-    spiderFX.net(at,4.0,{life:0.9,spin:-0.4});
-    spiderFX.burst(at,3.2,{count:9,life:0.18,thick:0.02});
+    spiderFX.impact(at,5.6,{shake:24,color:SPIDER_RED});
+    spiderFX.net(at,4.8,{life:1.0,spin:-0.45});
+    spiderFX.burst(at,4.0,{count:12,life:0.20,thick:0.022});
     for(const e of [...this._enemies()]){
       const dx=e.position.x-at.x,dz=e.position.z-at.z;
       if(dx*dx+dz*dz>3.9*3.9)continue;
@@ -31725,7 +31763,7 @@ class SpiderKit {
     if(this._busy()||this.cool.trap>0)return false;
     this.cool.trap=this._roundCooldown(0.85,26);
     const yaw=this.player.rotation.y, origin=this.player.position.clone();
-    const range=8.3, arc=Math.PI*0.68;
+    const range=9.0, arc=Math.PI*0.72;
     const caught=[];
     for(const e of this._enemies()){
       const dx=e.position.x-origin.x,dz=e.position.z-origin.z;
@@ -31736,7 +31774,7 @@ class SpiderKit {
     // Fan of strands sells the spray even when nothing is caught.
     spiderHandPos(_spdA,false);
     const handStart=_spdA.clone();
-    const strands=spiderFX._mobileScale(10);
+    const strands=spiderFX._mobileScale(12);
     for(let i=0;i<strands;i++){
       const a=yaw+(i/(strands-1)-0.5)*arc;
       _spdB.set(origin.x+Math.sin(a)*range, 0.12, origin.z+Math.cos(a)*range);
@@ -31750,7 +31788,7 @@ class SpiderKit {
       this._hurt(e,1.0);
     }
     spiderFX.net(origin.clone().addScaledVector(this._fwd(),3.1),4.4,{life:0.52,spin:0.22});
-    this.trap={t:0,d:3.0,tick:0,victims:capped};
+    this.trap={t:0,d:3.3,tick:0,victims:capped};
     this._clip('Two-hand_Blast',0.3);
     triggerCombatShake(caught.length?9:4,130);
     if(caught.length)toast('WEB TRAP · '+caught.length+' WRAPPED');
@@ -31781,13 +31819,13 @@ class SpiderKit {
     const at=s.end;
     this.player.position.copy(at); this.player.position.y=s.start.y;
     this._clip('Attack_Ground_Pound',0.4);
-    spiderFX.impact(at,7.0,{shake:26,color:SPIDER_BLUE});
-    spiderFX.net(at,7.0,{life:1.25,spin:-0.55});
-    spiderFX.burst(at,4.6,{count:12,life:0.22,thick:0.02});
-    const hits=this._radial(at,7.0,3.9);
+    spiderFX.impact(at,8.2,{shake:30,color:SPIDER_BLUE});
+    spiderFX.net(at,8.2,{life:1.35,spin:-0.6});
+    spiderFX.burst(at,5.8,{count:16,life:0.24,thick:0.022});
+    const hits=this._radial(at,8.2,4.3);
     for(const e of this._enemies()){
       const dx=e.position.x-at.x,dz=e.position.z-at.z;
-      if(dx*dx+dz*dz<=7.0*7.0){
+      if(dx*dx+dz*dz<=8.2*8.2){
         this._wrap(e,2.1);
         const d=Math.hypot(dx,dz)||1;
         e.position.x+=dx/d*1.8; e.position.z+=dz/d*1.8;   // shove outward
@@ -31808,9 +31846,9 @@ class SpiderKit {
     const order=list
       .map(e=>({e,d:(e.position.x-p.x)**2+(e.position.z-p.z)**2}))
       .sort((a,b)=>a.d-b.d).map(x=>x.e)
-      .slice(0, spiderFX._mobileScale(14));
-    this.maximum={i:0,t:0,hop:0.11,order,origin:p.clone(),done:false};
-    invincibleTimer=Math.max(invincibleTimer||0,order.length*0.11+1.28);
+      .slice(0, spiderFX._mobileScale(18));
+    this.maximum={i:0,t:0,hop:0.09,order,origin:p.clone(),done:false};
+    invincibleTimer=Math.max(invincibleTimer||0,order.length*0.09+1.5);
     spiderFX.net(p,4.2,{life:0.5,spin:0.9});
     spiderFX.ring(p,4.8,{life:0.26,color:SPIDER_RED,y:0.5});
     this._clip('Power_Up',0.2);
@@ -31832,7 +31870,7 @@ class SpiderKit {
       this._clip(s.i%3===0?'Melee_Hook':(s.i%3===1?'Punch_Cross':'Fighting_Left_Jab'),0.12);
       if(this._isBoss(e)){
         const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
-        applyBulletDamage(e,maxHp*0.045);
+        applyBulletDamage(e,maxHp*0.06);
         this._wrap(e,0.9);
       } else this._kill(e);
       spiderFX.ring(to,2.1,{life:0.24,color:SPIDER_RED,y:0.5});
@@ -31846,15 +31884,15 @@ class SpiderKit {
     // 'Land_Three_Point' is renamed to 'Jump_Land' at load time. Asking for the
     // source name here silently fell back to Idle and killed the finisher pose.
     this._clip('Jump_Land',0.42);
-    spiderFX.impact(at,10.6,{shake:34,color:SPIDER_RED});
-    spiderFX.net(at,10.6,{life:1.4,spin:0.9});
-    spiderFX.burst(at,7.2,{count:14,life:0.24,thick:0.022});
+    spiderFX.impact(at,12.5,{shake:42,color:SPIDER_RED});
+    spiderFX.net(at,12.5,{life:1.55,spin:1.0});
+    spiderFX.burst(at,8.8,{count:20,life:0.26,thick:0.024});
     for(const e of [...this._enemies()]){
       const dx=e.position.x-at.x,dz=e.position.z-at.z;
-      if(dx*dx+dz*dz>10.6*10.6)continue;
+      if(dx*dx+dz*dz>12.5*12.5)continue;
       if(this._isBoss(e)){
         const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
-        applyBulletDamage(e,maxHp*0.10);
+        applyBulletDamage(e,maxHp*0.14);
       } else this._kill(e);
     }
     if(navigator.vibrate)navigator.vibrate(60);
@@ -31868,13 +31906,13 @@ class SpiderKit {
   webOfShadows(){
     if(this._busy())return false;
     const at=this.player.position.clone();
-    this.shadows={t:0,dur:2.8,at,tick:0,phase:0};
-    invincibleTimer=Math.max(invincibleTimer||0,3.0);
+    this.shadows={t:0,dur:3.6,at,tick:0,phase:0};
+    invincibleTimer=Math.max(invincibleTimer||0,3.8);
     this._clip('Power_Up',0.5,false);
     // Dome ribs: strands from the rim up to an apex above centre.
     const R=Math.min(13,Math.max(8,arenaSize*0.42));
-    const ribs=spiderFX._mobileScale(15);
-    const apex=at.clone(); apex.y+=7.5;
+    const ribs=spiderFX._mobileScale(18);
+    const apex=at.clone(); apex.y+=8.4;
     for(let i=0;i<ribs;i++){
       const a=i/ribs*Math.PI*2;
       _spdA.set(at.x+Math.cos(a)*R,0.1,at.z+Math.sin(a)*R);
@@ -31894,17 +31932,17 @@ class SpiderKit {
   cityWebline(){
     if(this._busy())return false;
     const half=Math.max(8,arenaSize*0.5);
-    const lines=[], count=spiderFX._mobileScale(11);
+    const lines=[], count=spiderFX._mobileScale(13);
     for(let i=0;i<count;i++){
       const a=(i/count)*Math.PI + this.player.rotation.y*0.25;
       const dx=Math.cos(a)*half, dz=Math.sin(a)*half;
       const A=new THREE.Vector3(-dx,0.55,-dz), B=new THREE.Vector3(dx,0.55,dz);
       lines.push({a:A,b:B});
-      spiderFX.strand(A,B,{life:3.4,thick:0.042,glow:true});
+      spiderFX.strand(A,B,{life:3.6,thick:0.05,glow:true});
       const off=new THREE.Vector3(-dz,0,dx).normalize().multiplyScalar(0.7);
       const A2=A.clone().add(off), B2=B.clone().add(off);
       lines.push({a:A2,b:B2});
-      spiderFX.strand(A2,B2,{life:3.1,thick:0.02,glow:i%2===0});
+      spiderFX.strand(A2,B2,{life:3.3,thick:0.024,glow:true});
     }
     spiderFX.net(this.player.position,half*0.72,{life:0.45,spin:0.45});
     this.webline={t:0,dur:3.4,tick:0,lines};
@@ -32036,22 +32074,23 @@ class SpiderKit {
         }
         if(s.tick>=0.3){
           s.tick=0;
-          spiderFX.ring(s.at,R*(1-s.t/2.5),{life:0.34,color:SPIDER_BLUE});
-          spiderFX.net(s.at,R*(0.55+0.18*Math.sin(s.t*4.5)),{life:0.26,spin:0.22,color:SPIDER_WEB});
-          this._radial(s.at,R,0.82);
+          spiderFX.ring(s.at,R*(1-s.t/3.0),{life:0.36,color:SPIDER_BLUE});
+          spiderFX.net(s.at,R*(0.62+0.22*Math.sin(s.t*5.2)),{life:0.30,spin:0.24,color:SPIDER_WEB});
+          spiderFX.burst(s.at,R*0.58,{count:10,life:0.16,thick:0.016});
+          this._radial(s.at,R,0.96);
         }
       } else if(s.phase===0){
         // Phase 2: the collapse.
         s.phase=1;
         this._clip('Two-hand_Blast',0.4);
-        spiderFX.impact(s.at,R*1.04,{shake:34,color:SPIDER_RED});
-        spiderFX.burst(s.at,R*0.72,{count:18,life:0.24,thick:0.02});
+        spiderFX.impact(s.at,R*1.12,{shake:40,color:SPIDER_RED});
+        spiderFX.burst(s.at,R*0.84,{count:24,life:0.26,thick:0.022});
         for(const e of [...this._enemies()]){
           const dx=e.position.x-s.at.x,dz=e.position.z-s.at.z;
           if(dx*dx+dz*dz>R*R)continue;
           if(this._isBoss(e)){
             const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
-            applyBulletDamage(e,maxHp*0.14);
+            applyBulletDamage(e,maxHp*0.18);
           } else this._kill(e);
         }
         if(navigator.vibrate)navigator.vibrate(70);
@@ -32062,7 +32101,7 @@ class SpiderKit {
     // ---- city-wide webline
     if(this.webline){
       const s=this.webline; s.t+=dt; s.tick+=dt;
-      if(s.tick>=0.24){
+      if(s.tick>=0.18){
         s.tick=0;
         for(const e of [...this._enemies()]){
           // Point-to-segment distance against each strand.
@@ -32080,8 +32119,8 @@ class SpiderKit {
           this._wrap(e,0.6);
           if(this._isBoss(e)){
             const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
-            applyBulletDamage(e,maxHp*0.014);
-          } else if(this._isLarge(e)) this._hurt(e,2.3);
+            applyBulletDamage(e,maxHp*0.018);
+          } else if(this._isLarge(e)) this._hurt(e,2.8);
           else this._kill(e);
           spiderFX.ring(e.position,1.3,{life:0.2,y:0.55,color:SPIDER_RED});
           spiderFX.ring(e.position,0.85,{life:0.12,y:0.78,color:SPIDER_WEB});
