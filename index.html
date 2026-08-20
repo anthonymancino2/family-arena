@@ -1,3 +1,4 @@
+<!-- V23.61.00 Spider Cinematic Kit: merges the three old Spider ultimates into one three-act MAXIMUM SPIDER, adds FULL STOP ANCHOR (rooted tether/heave ultimate) and SKYLINE DIVE (airborne dive-bomb ultimate), rebuilds Electro Web with a hard cast beat + real detonation + lingering tesla field, gives Web-Yank Blitz a free web-swing when no enemy is in range, and introduces a zero-mesh spiderCinema DOM layer (letterbox, vignette, speedlines, splash cards, hitstop) so the big beats read like film without spending any of the 180-object FX budget. -->
 <!-- V23.55.00 Fox Hex Bloom + Astral Gravity Prison: combines Ninefold Spirit Bloom and Foxfire Hex Garden into one two-stage Secondary with the existing 2-second cast-start invincibility, and repurposes the former Hex Garden save slot into a distinct telekinetic Astral Gravity Prison lift/compress/slam Secondary. Preserves V23.54 global Ultimate I-frames and Fox glass-cannon damage tuning. -->
 <!-- V23.54.00 New Base Ultimate I-Frames: preserves the uploaded Asset Slim base and its Fox glass-cannon damage tuning, while adding one centralized read-only Ultimate runtime check in playerTakeHit so every equipped Ultimate grants full damage immunity only while that Ultimate is actively running. -->
 <!-- V23.51.00 Runtime Recovery: fixes a stale clearFoxSpiritGate() reset call left behind after Spirit Gate was merged/retired in V23.48. That deleted-function call aborted startSurvival before the 3D player/world could finish spawning. Uses clearFoxHexGarden() instead; preserves V23.50 narrow Primary hold-cadence guard and all current Fox V23.48 features. -->
@@ -1457,7 +1458,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.60.00 - Spider: Ultimate Overhaul';
+const GAME_VERSION='23.61.00 - Spider: Cinematic Kit';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -1843,7 +1844,7 @@ const AVATAR_TYPE_LABELS = {
   spider:'🕷️ Spider',
 };
 const HERO_ROSTER_INFO = {
-  spider:{title:'Spider',role:'MELEE • ACROBAT',desc:'A wall-crawling acrobat built on 25 hand-authored clips. Quick and evasive without being a blur: he closes distance with web-lines and Bezier vaults rather than raw speed. The kit is a setup-and-payoff loop — Web Snap and Web Trap wrap targets, and everything wrapped takes 45% extra damage from every source, including his own three ultimates.'},
+  spider:{title:'Spider',role:'MELEE • ACROBAT',desc:'A wall-crawling acrobat built on 25 hand-authored clips. Quick and evasive without being a blur: he closes distance with web-lines and Bezier vaults rather than raw speed. The kit is a setup-and-payoff loop — Web Snap and Web Trap wrap targets, and everything wrapped takes 45% extra damage from every source, including all three of his ultimates.'},
   rogue:{title:'Tempest Archer',role:'RANGED • EASY',desc:'The speed-focused ranged avatar: fast movement, long-lived piercing arrows, and precise crowd control. Every fifth defeat triggers Tailwind for a short burst of movement and firing speed.'},
   chopper:{title:'Chopper',role:'MELEE • PIRATE',desc:'A cutlass-swinging pirate built on 15 hand-authored animations. Every move — combos, rolls, guards, throws, shots and a full three-phase jump — plays a real take, so nothing ever snaps to a frozen pose.'},
   hooded:{title:'Shadow Rogue',role:'MELEE • HARD',desc:'A speedster kit: infinite-speed jabs, kinetic sweeps, a tethered slingshot warp, phase-through vibration and an electric snare field.'},
@@ -3491,9 +3492,9 @@ const CHARACTER_COMBAT = {
       spider_web_snap:{name:'Web Snap', price:0, slot:'primary', kind:'spider_web_snap', cooldown:0.26, damage:1.5, auto:true,
         desc:'Fire a fast web bolt that pierces up to three enemies and wraps every one it touches. Wrapped targets are held in place and take 45% extra damage from all sources, so this is the opener the rest of the kit is built on. Fire-rate cooldown scales to zero by Round 18.'},
       spider_zip_takedown:{name:'Web-Yank Blitz', price:0, slot:'secondary', kind:'spider_zip_takedown', cooldown:0,
-        desc:'Fire twin web-lines into the nearest enemy, slingshot in, then ricochet through a short chain of nearby enemies in a rapid acrobatic assault. Normal enemies are executed, heavies are wrapped and smashed, and bosses take repeated capped chunks.'},
+        desc:'Fire twin web-lines into the nearest enemy, slingshot in, then ricochet through a short chain of nearby enemies in a rapid acrobatic assault. Normal enemies are executed, heavies are wrapped and smashed, and bosses take repeated capped chunks. With nothing in range it no longer stalls: he takes a web-line and swings 13 units in the direction he is facing, staying inside the arena, and converts into the full takedown chain the instant anything comes within reach mid-arc.'},
       spider_web_trap:{name:'Electro Web Blob', price:0, slot:'secondary', kind:'spider_web_trap', cooldown:0,
-        desc:'Auto-target the nearest enemy and launch a giant sticky electro-web blob. On impact it cocoons the target, spreads to nearby enemies, and shocks them over time. Holding the button keeps spitting blobs at a fast Spider-Man pace. Bosses can be trapped and shocked, but the shock cannot finish them.'},
+        desc:'Auto-target within 18 units and launch a giant sticky electro-web blob with a live current crawling over it. On impact it detonates in a 6.2-unit chain: normal enemies caught in the 2.7-unit core are destroyed outright, everything else is cocooned and shocked, and a crackling tesla pool is left behind for 2.6 seconds to catch whatever walks in next. Holding the button fires roughly three blobs a second, capped at three in flight. Bosses can be trapped and shocked, but the shock cannot finish them.'},
       spider_somersault_slam:{name:'Somersault Hunt', price:0, slot:'secondary', kind:'spider_somersault_slam', cooldown:0,
         desc:'Launch into a long somersault leap and crash directly onto a target. Hold the button to immediately chain to another target, and if no enemy is nearby Spider-Man keeps somersaulting around the arena with longer travel than before.'}
     }
@@ -14895,11 +14896,11 @@ const CHOPPER_MONSTER_POINT = {id:'hooded_twilight_execution', name:'Kraken Risi
   desc:'TITAN TRANSFORMATION. Follow the Knight Guardian Titan rules: grow to 5x size for 15 seconds, gain 5x attack damage and 2.6x combat reach, move at 85% speed, keep Primary/Secondary attacks, and lock other specials until the transformation ends. Cooldown begins afterward on the Knight Titan curve.'};
 
 const SPIDER_MAXIMUM = {id:'spider_maximum', name:'Maximum Spider', price:0, avatar:'spider', unlockLevel:1,
-  desc:'Open with a full-map web lattice that reaches the arena edge, instantly erasing every non-boss enemy anywhere in the arena and pinning every boss, then erupt into Maximum Spider: a rapid chain assault through the survivors followed by a colossal web-crater finisher. Fully invulnerable for the whole sequence.'};
-const SPIDER_WEB_OF_SHADOWS = {id:'spider_web_of_shadows', name:'Web of Shadows', price:0, avatar:'spider', unlockLevel:1,
-  desc:'Snap a ribbed dome of webbing over the arena. For 1.7 seconds every enemy inside is dragged toward the centre and pinned while the strands tick damage, then the dome collapses: normal enemies caught in the implosion are erased and bosses lose 12% max HP. The pull runs first so the payoff always lands on a stack, never a spread.'};
-const SPIDER_CITY_WEBLINE = {id:'spider_city_webline', name:'Spider-Verse Overdrive', price:0, avatar:'spider', unlockLevel:1,
-  desc:'Rip open a Spider-Verse breach over the arena. Spectral spider-heroes web-sling in from above, dive-bombing enemies in repeated radiant impact waves. Normal enemies are erased on contact while bosses are repeatedly wrapped, stunned, and chunked by the barrage before a final arena-wide detonation.'};
+  desc:'THREE-ACT SET PIECE, ~5.5s, invulnerable throughout. ACT I: a ribbed web dome slams over the arena and drags every enemy to the centre, pinning and shocking them. ACT II: the chain assault - up to 22 rapid web-hops, erasing normal enemies and chunking bosses 6% per hit. ACT III: a colossal web-crater plus a rim-to-rim lattice that clears everything left standing and takes 22% max HP off bosses.'};
+const SPIDER_WEB_OF_SHADOWS = {id:'spider_web_of_shadows', name:'Full Stop Anchor', price:0, avatar:'spider', unlockLevel:1,
+  desc:'ROOTED CONTROL ULTIMATE, 7.6s, invulnerable throughout. He anchors to the arena rim and cannot move. Every enemy on the board is tethered and reeled steadily inward, and every 1.15s a HEAVE yanks the fourteen furthest targets up to 8 units toward him at once - anything crushed into the pile-up at his feet is erased, anything still on the line takes drag-scaled damage, bosses lose 3.5% each heave. Ends with FULL STOP: the lines snap and the whole pile detonates for 26% boss max HP.'};
+const SPIDER_CITY_WEBLINE = {id:'spider_city_webline', name:'Skyline Dive', price:0, avatar:'spider', unlockLevel:1,
+  desc:'AIRBORNE ULTIMATE, 8.4s, invulnerable throughout. He web-lines straight up out of frame, marks the densest cluster on the board with a ground reticle, then dive-bombs it - roughly nine crashes, each erasing normal enemies within 5.6 units and taking 4.5% off bosses, recoiling back up the line between dives. The last dive is the big one: a 13-unit touchdown crater worth 24% boss max HP.'};
 
 const HERO_ABILITIES = { spider:[SPIDER_MAXIMUM,SPIDER_WEB_OF_SHADOWS,SPIDER_CITY_WEBLINE], rhino:[RHINO_CRASHING_BOLT,RHINO_SHATTERED_DOMAIN,RHINO_SKY_FATHER], chopper:[CHOPPER_STAMPEDE,CHOPPER_GUARD_DOME,CHOPPER_MONSTER_POINT], hooded:[HOODED_THOUSAND_CUTS,HOODED_DANCING_STEEL,HOODED_TWILIGHT_EXECUTION], mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
   knight:[KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER, KNIGHT_JUDGMENT_ULTIMATE],
@@ -16954,7 +16955,7 @@ function updateHoodedHud(){
         const kit=ensureSpiderKit()||{maximum:null,shadows:null,webline:null,cooldownForAbility:()=>0};
         const label=equippedAbilityId==='spider_maximum'
           ? 'MAXIMUM'
-          : (equippedAbilityId==='spider_web_of_shadows'?'SHADOWS':'SPIDER-VERSE');
+          : (equippedAbilityId==='spider_web_of_shadows'?'FULL STOP':'SKY DIVE');
         const activeObj=equippedAbilityId==='spider_maximum'
           ? kit.maximum
           : (equippedAbilityId==='spider_web_of_shadows'?kit.shadows:kit.webline);
@@ -31539,6 +31540,137 @@ const spiderFX = {
   }
 };
 
+// =====================================================================
+// spiderCinema - the "big budget" layer.
+//
+// Every mesh-based effect in this game competes for one shared 180-object
+// fx[] ceiling, so piling more geometry onto an ultimate makes it look
+// WORSE: the oldest strands get culled mid-cast. Film language is cheap
+// instead. Letterbox bars, a vignette, a colour wash, radial speed lines
+// and a splash card are four DOM nodes that cost zero FX budget and zero
+// draw calls, and they are what actually sells "this is the big moment".
+//
+// Hitstop is the other half. Freezing the board for 60-90ms on an impact
+// reads as weight far more convincingly than a bigger explosion does.
+// =====================================================================
+const spiderCinema = {
+  _root:null,_bars:null,_vig:null,_card:null,_lines:null,_barTimer:0,_lineTimer:0,_vigTimer:0,
+  _ensure(){
+    if(this._root||typeof document==='undefined')return;
+    const r=document.createElement('div');
+    r.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:58;overflow:hidden;';
+    const bar=(top)=>{
+      const b=document.createElement('div');
+      b.style.cssText='position:absolute;left:0;right:0;height:6.5%;background:#000;'
+        +'transition:transform .20s cubic-bezier(.2,.85,.25,1);'
+        +(top?'top:0;transform:translateY(-101%);':'bottom:0;transform:translateY(101%);');
+      r.appendChild(b);return b;
+    };
+    this._bars=[bar(true),bar(false)];
+    const v=document.createElement('div');
+    v.style.cssText='position:absolute;inset:0;opacity:0;transition:opacity .26s ease;'
+      +'background:radial-gradient(ellipse at 50% 56%,rgba(0,0,0,0) 46%,rgba(0,0,0,.55) 100%);';
+    r.appendChild(v);this._vig=v;
+    // Radial speed lines. One repeating-conic-gradient, masked to a donut so
+    // the middle of the screen - where the player and the enemies are - stays
+    // completely clear. Visibility rule holds.
+    const l=document.createElement('div');
+    l.style.cssText='position:absolute;inset:-25%;opacity:0;transition:opacity .18s ease;'
+      +'background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.34) 0deg,rgba(255,255,255,0) 1.1deg,rgba(255,255,255,0) 4deg);'
+      +'-webkit-mask-image:radial-gradient(circle at 50% 50%,transparent 30%,#000 62%);'
+      +'mask-image:radial-gradient(circle at 50% 50%,transparent 30%,#000 62%);';
+    r.appendChild(l);this._lines=l;
+    const c=document.createElement('div');
+    c.style.cssText='position:absolute;left:0;right:0;top:15%;text-align:center;opacity:0;'
+      +'font-family:inherit;font-weight:1000;line-height:.96;letter-spacing:2px;'
+      +'transition:opacity .10s ease-out,transform .40s cubic-bezier(.15,1,.3,1);';
+    r.appendChild(c);this._card=c;
+    document.body.appendChild(r);
+  },
+  // Slim bars. 6.5% a side on a 13-pro-max viewport is ~55px - enough to
+  // register as film framing, not enough to hide anything you have to dodge.
+  letterbox(seconds){
+    this._ensure();if(!this._bars)return;
+    this._barTimer=Math.max(this._barTimer,seconds||1);
+    this._bars[0].style.transform='translateY(0)';
+    this._bars[1].style.transform='translateY(0)';
+  },
+  vignette(seconds){
+    this._ensure();if(!this._vig)return;
+    this._vigTimer=Math.max(this._vigTimer,seconds||1);
+    this._vig.style.opacity='1';
+  },
+  speedlines(seconds,strength){
+    this._ensure();if(!this._lines)return;
+    this._lineTimer=Math.max(this._lineTimer,seconds||0.4);
+    this._lines.style.opacity=String(Math.min(0.85,strength||0.5));
+  },
+  // Comic splash panel. Punches in oversized and settles - the classic
+  // move-name beat. Sits high so it never covers the fight.
+  card(text,sub,color){
+    this._ensure();if(!this._card)return;
+    const c=this._card;
+    c.innerHTML='<div style="font-size:min(13vw,58px);color:'+(color||'#fff')
+      +';text-shadow:0 0 22px '+(color||'#fff')+',0 4px 0 #000,0 8px 26px #000;">'+text+'</div>'
+      +(sub?'<div style="margin-top:6px;font-size:min(4.2vw,19px);letter-spacing:5px;color:#fff;opacity:.9;text-shadow:0 2px 8px #000;">'+sub+'</div>':'');
+    c.style.transition='none';
+    c.style.transform='scale(1.55) rotate(-4deg)';
+    c.style.opacity='0';
+    // Force layout so the punch-in actually animates instead of snapping.
+    void c.offsetWidth;
+    c.style.transition='opacity .10s ease-out,transform .40s cubic-bezier(.15,1,.3,1)';
+    c.style.transform='scale(1) rotate(0deg)';
+    c.style.opacity='1';
+    clearTimeout(this._cardT);
+    this._cardT=setTimeout(()=>{
+      c.style.transition='opacity .34s ease-out,transform .34s ease-out';
+      c.style.transform='scale(1.12)';c.style.opacity='0';
+    },820);
+  },
+  flash(css,alpha,ms){
+    try{ if(typeof chopperFX!=='undefined'&&chopperFX&&chopperFX.screenFlash) chopperFX.screenFlash(css,alpha,ms); }catch(_e){}
+  },
+  // Freeze the board briefly. Rides the existing hitStun field, so it needs no
+  // new update hook and cannot desync anything.
+  hitstop(seconds){
+    const s=Math.max(0,Number(seconds)||0); if(!s)return;
+    const list=(typeof zombies!=='undefined'&&zombies)?zombies:[];
+    for(const e of list){
+      if(!e||!e.userData||e.userData.dead)continue;
+      e.userData.hitStun=Math.max(e.userData.hitStun||0,s);
+    }
+  },
+  shake(strength,ms){ try{ triggerCombatShake(strength,ms); }catch(_e){} },
+  buzz(pattern){ try{ if(navigator.vibrate)navigator.vibrate(pattern); }catch(_e){} },
+  // One call for "a thing just landed hard".
+  punch(colorCss,alpha,shakeStrength,stopSeconds){
+    this.flash(colorCss,alpha||0.3,180);
+    this.shake(shakeStrength||18,Math.min(420,(shakeStrength||18)*16));
+    if(stopSeconds)this.hitstop(stopSeconds);
+  },
+  update(dt){
+    if(!this._root)return;
+    if(this._barTimer>0){
+      this._barTimer-=dt;
+      if(this._barTimer<=0){
+        this._bars[0].style.transform='translateY(-101%)';
+        this._bars[1].style.transform='translateY(101%)';
+      }
+    }
+    if(this._vigTimer>0){ this._vigTimer-=dt; if(this._vigTimer<=0)this._vig.style.opacity='0'; }
+    if(this._lineTimer>0){ this._lineTimer-=dt; if(this._lineTimer<=0)this._lines.style.opacity='0'; }
+  },
+  clear(){
+    if(!this._root)return;
+    this._barTimer=this._vigTimer=this._lineTimer=0;
+    this._bars[0].style.transform='translateY(-101%)';
+    this._bars[1].style.transform='translateY(101%)';
+    this._vig.style.opacity='0';
+    this._lines.style.opacity='0';
+    if(this._card){this._card.style.opacity='0';}
+  }
+};
+
 // Hand bone lookup is cached on the wrapper; the traverse only runs once per
 // spawned body, not per cast.
 function spiderHandPos(out,left=false){
@@ -31565,13 +31697,22 @@ class SpiderKit {
     // Not a cooldown: one physical firing beat, so a held Primary at Round 20+
     // (where the round cooldown has scaled to zero) cannot spawn 60 bolts/sec.
     this.snapCastLock=0;
+    // Same idea for Electro Web. Without this, a held Secondary at Round 20+
+    // (round cooldown scaled to 0) spawned one blob PER FRAME - 60 blobs/sec,
+    // 60 toasts/sec, and enough strands to blow the fx[] ceiling so the rest of
+    // the game's effects got culled. That is what "the electro web is broken"
+    // actually was: not a damage bug, a firing-rate bug.
+    this.trapCastLock=0;
     this.MAX_SNAPSHOTS=12;
+    this.MAX_TRAPSHOTS=3;
+    this.trapToastLock=0;
     this.combo=0; this.comboResetIn=0; this.swing=null;
     this.zip=null; this.slam=null; this.trap=null;
     this.maximum=null; this.shadows=null; this.webline=null;
     this.snapshots=[];      // web-snap projectiles
     this.trapShots=[];      // electro-web blob projectiles
     this.electroTraps=[];   // active electro cocoon shocks
+    this.electroFields=[];  // lingering tesla pools left by a detonation
     this.wrapped=new Map(); // enemy -> remaining web-wrap seconds
   }
 
@@ -31600,6 +31741,30 @@ class SpiderKit {
     return best;
   }
   _isLarge(e){ const t=e&&e.userData&&e.userData.archetype; return t==='brute'||t==='boss'||!!(e&&e.userData&&e.userData.isRoundBoss); }
+  // Radial clamp. The arena is a disc (see bulletBlockedAt), so clamping each
+  // axis separately would still let a swing land in the corner void.
+  _inArena(v,margin=2.2){
+    const lim=Math.max(4,arenaSize-margin);
+    const d=Math.hypot(v.x,v.z);
+    if(d>lim){ v.x=v.x/d*lim; v.z=v.z/d*lim; }
+    return v;
+  }
+  // Densest cluster on the board, used by every ultimate that has to pick a
+  // place to hit. Picking "nearest" makes big moves land on one straggler.
+  _bestCluster(radius=5.2){
+    const list=this._enemies();
+    if(!list.length)return null;
+    let best=null,bestN=-1;
+    for(const a of list){
+      let n=0;
+      for(const b of list){
+        const dx=b.position.x-a.position.x,dz=b.position.z-a.position.z;
+        if(dx*dx+dz*dz<=radius*radius)n++;
+      }
+      if(n>bestN){bestN=n;best=a;}
+    }
+    return best?best.position.clone():null;
+  }
   _isBoss(e){ const t=e&&e.userData&&e.userData.archetype; return t==='boss'||!!(e&&e.userData&&e.userData.isRoundBoss); }
   _busy(){ return !!(this.zip||this.slam||this.maximum||this.shadows||this.webline); }
   // Movement integration runs before updateSpiderKit(), so the airborne Bezier
@@ -31732,7 +31897,13 @@ class SpiderKit {
   // short chain of nearby enemies. This is the fast flashy assassin option.
   zipTakedown(){
     if(this._busy()||this.cool.zip>0)return false;
-    const first=this._nearest(16); if(!first)return false;
+    const first=this._nearest(18);
+    // No target used to mean "return false and stand there", which reads as a
+    // dead button. Spider-Man is never out of things to swing off; with nothing
+    // in range he takes a web-line and covers ground instead, and the swing
+    // itself keeps scanning, so it converts into the takedown chain the moment
+    // anything comes within reach mid-arc.
+    if(!first){ return this._freeSwing(); }
     this.cool.zip=this._roundCooldown(0.65,28);
     dashActive=false; dashTimer=0;
     const used=new Set(), order=[];
@@ -31752,6 +31923,82 @@ class SpiderKit {
     this._beginBlitzLeg(order[0]);
     invincibleTimer=Math.max(invincibleTimer||0,1.0);
     this._clip('Flying_Forward_Super',0.22,false);
+    toast('WEB-YANK BLITZ');
+    return true;
+  }
+  // Traversal swing. Long forward arc, clamped inside the arena disc, with a
+  // live scan every frame so an enemy that wanders into range gets yanked.
+  _freeSwing(){
+    this.cool.zip=this._roundCooldown(0.45,28);
+    dashActive=false; dashTimer=0;
+    const start=this.player.position.clone();
+    const fwd=this._fwd();
+    const end=start.clone().addScaledVector(fwd,13.5);
+    this._inArena(end,2.4);
+    // If forward is into the rim, peel the arc sideways instead of grinding
+    // into the wall - a swing that goes nowhere is the same dead feeling.
+    if(end.distanceTo(start)<5){
+      const side=new THREE.Vector3(-fwd.z,0,fwd.x).multiplyScalar(Math.random()<0.5?1:-1);
+      end.copy(start).addScaledVector(side,10).addScaledVector(fwd,3);
+      this._inArena(end,2.4);
+    }
+    end.y=start.y;
+    const dist=Math.max(1,start.distanceTo(end));
+    const control=start.clone().lerp(end,0.5);
+    control.y=start.y+Math.min(9.0,4.2+dist*0.42);
+    // Anchor line up and forward: the thing he is actually swinging from.
+    spiderHandPos(_spdB,false);
+    const anchor=control.clone(); anchor.y+=2.2;
+    spiderFX.strand(_spdB,anchor,{life:0.42,thick:0.042,glow:true});
+    spiderFX.anchorPuff(anchor);
+    spiderFX.ring(start,2.0,{life:0.20,color:SPIDER_WEB,y:0.5});
+    this.zip={mode:'swing',order:[],i:0,target:null,anchor,
+      start,control,end,t:0,dur:Math.max(0.42,Math.min(0.78,0.24+dist*0.038)),ghostAt:0,lineAt:0};
+    invincibleTimer=Math.max(invincibleTimer||0,0.55);
+    this._clip('Flying_Forward_Super',0.30,false);
+    spiderCinema.speedlines(0.5,0.32);
+    triggerCombatShake(5,90);
+    return true;
+  }
+  // Landing beat for a swing that never found anyone.
+  _swingLand(s){
+    const at=s.end.clone(); at.y=s.start.y;
+    this.player.position.copy(at);
+    this._clip('Jump_Land',0.20);
+    spiderFX.impact(at,4.2,{shake:14,color:SPIDER_BLUE});
+    spiderFX.burst(at,3.0,{count:9,life:0.18,thick:0.018});
+    for(const e of this._enemies()){
+      const dx=e.position.x-at.x,dz=e.position.z-at.z;
+      if(dx*dx+dz*dz>4.2*4.2)continue;
+      this._hurt(e,1.5); this._wrap(e,1.1);
+    }
+    spiderCinema.buzz(16);
+    this.zip=null;
+  }
+  // Mid-air conversion: a swing that finds a target becomes the real blitz.
+  _swingAcquire(s){
+    const from=this.player.position;
+    let best=null,bd=10*10;
+    for(const e of this._enemies()){
+      const dx=e.position.x-from.x,dz=e.position.z-from.z,d=dx*dx+dz*dz;
+      if(d<bd){bd=d;best=e;}
+    }
+    if(!best)return false;
+    const used=new Set(),order=[];
+    let cur=best;
+    while(cur&&order.length<spiderFX._mobileScale(5)){
+      order.push(cur); used.add(cur);
+      cur=this._nearestFrom(cur.position,6.8,used);
+    }
+    this.zip.mode='blitz';
+    this.zip.order=order; this.zip.i=0;
+    spiderHandPos(_spdB,false);
+    spiderFX.strand(_spdB,best.position,{life:0.24,thick:0.045,glow:true});
+    spiderFX.anchorPuff(best.position);
+    spiderCinema.speedlines(0.4,0.45);
+    invincibleTimer=Math.max(invincibleTimer||0,0.9);
+    this._face(best);
+    this._beginBlitzLeg(best);
     toast('WEB-YANK BLITZ');
     return true;
   }
@@ -31798,6 +32045,7 @@ class SpiderKit {
       }
     }
     triggerCombatShake(14,180);
+    spiderCinema.punch(s.i%2?'rgba(214,32,46,.22)':'rgba(120,226,255,.20)',.20,0,0.045);
     s.i++;
     const next=s.order[s.i];
     if(next&&next.parent&&!(next.userData&&next.userData.dead)){
@@ -31814,46 +32062,84 @@ class SpiderKit {
   // Fires a giant sticky homing blob that cocoons enemies and repeatedly
   // shocks them. Hold-to-repeat is driven by the shared Secondary input loop.
   webTrap(){
-    if(this._busy()||this.cool.trap>0)return false;
+    if(this._busy())return false;
+    // Two independent gates. cool.trap is the round-scaled cooldown and is
+    // legitimately 0 during development; trapCastLock is a physical firing
+    // beat that dev mode must NOT be able to switch off, or the hold-to-repeat
+    // loop in the main tick spawns a blob every single frame.
+    if(this.cool.trap>0||this.trapCastLock>0)return false;
+    if(this.trapShots.length>=this.MAX_TRAPSHOTS)return false;
     this.cool.trap=this._roundCooldown(0.42,30);
-    const target=(typeof findAutoAimTarget==='function'?findAutoAimTarget(16):null)||this._nearest(16);
-    const origin=spiderHandPos(_spdA,false), start=_spdA.clone();
-    const end=target?target.position.clone():this.player.position.clone().addScaledVector(this._fwd(),10);
+    this.trapCastLock=0.36;
+    const target=(typeof findAutoAimTarget==='function'?findAutoAimTarget(18):null)||this._nearest(18);
+    spiderHandPos(_spdA,false); const start=_spdA.clone();
+    const end=target?target.position.clone():this.player.position.clone().addScaledVector(this._fwd(),12);
+    this._inArena(end,1.5);
     end.y=Math.max(0.6,start.y);
     spiderFX._init();
     const mesh=new THREE.Mesh(spiderFX.beadGeo, spiderFX.matGlow.clone());
-    if(mesh.material&&mesh.material.color)mesh.material.color.setHex(0xb8f8ff);
-    if(mesh.material&&'emissive' in mesh.material&&mesh.material.emissive)mesh.material.emissive.setHex(0x5fd4ff);
-    mesh.scale.setScalar(0.30);
+    if(mesh.material&&mesh.material.color)mesh.material.color.setHex(0xc8fbff);
+    mesh.scale.setScalar(0.46);
     mesh.position.copy(start);
     scene.add(mesh);
-    spiderFX.net(start,0.8,{life:0.16,spin:0.28});
-    spiderFX.strand(start,start.clone().lerp(end,0.25),{life:0.16,thick:0.032,glow:true});
-    this.trapShots.push({mesh,start:start.clone(),end:end.clone(),target,life:0,dur:0.28,last:start.clone(),trail:0});
+    // Charge beat at the hand: two crossed arcs and a tight net so the cast
+    // has a wind-up instead of a bolt just appearing.
+    createChainLightningArc({x:start.x-0.4,y:start.y,z:start.z},{x:start.x+0.4,y:start.y,z:start.z},0);
+    spiderFX.net(start,1.05,{life:0.18,spin:0.34,color:SPIDER_BLUE});
+    spiderFX.strand(start,start.clone().lerp(end,0.22),{life:0.16,thick:0.038,glow:true});
+    // Flight time now scales with distance, so a far blob visibly travels
+    // instead of teleporting across the arena in a flat 0.28s.
+    const dist=start.distanceTo(end);
+    const dur=Math.max(0.20,Math.min(0.62,0.14+dist*0.026));
+    this.trapShots.push({mesh,start:start.clone(),end:end.clone(),target,life:0,dur,last:start.clone(),trail:0,spark:0});
     this._clip('Two-hand_Blast',0.18,false);
-    triggerCombatShake(5,90);
+    spiderCinema.flash('rgba(120,226,255,.16)',.13,110);
+    triggerCombatShake(6,100);
     return true;
   }
   _electroTrapBurst(center,target){
-    spiderFX.impact(center,4.8,{shake:18,color:SPIDER_BLUE});
-    spiderFX.net(center,4.0,{life:0.90,spin:0.32});
-    spiderFX.ring(center,4.2,{life:0.30,color:SPIDER_WEB,y:0.25});
+    const R=6.2, CORE=2.7;
+    spiderFX.impact(center,R*0.82,{shake:20,color:SPIDER_BLUE});
+    spiderFX.net(center,R,{life:1.35,spin:0.30});
+    spiderFX.ring(center,R*1.1,{life:0.34,color:SPIDER_BLUE,y:0.22});
+    spiderFX.ring(center,R*0.55,{life:0.24,color:SPIDER_WEB,y:0.4});
+    spiderCinema.punch('rgba(120,226,255,.34)',.30,20,0.06);
+    spiderCinema.buzz(24);
     const victims=[];
     for(const e of this._enemies()){
       const dx=e.position.x-center.x,dz=e.position.z-center.z;
-      if(e===target||dx*dx+dz*dz<=3.8*3.8)victims.push(e);
+      if(e===target||dx*dx+dz*dz<=R*R)victims.push(e);
     }
     victims.sort((a,b)=>((a.position.x-center.x)**2+(a.position.z-center.z)**2)-((b.position.x-center.x)**2+(b.position.z-center.z)**2));
-    const capped=victims.slice(0,spiderFX._mobileScale(8));
+    const capped=victims.slice(0,spiderFX._mobileScale(10));
     let source={x:center.x,y:center.y,z:center.z};
+    let executed=0;
     capped.forEach((e,idx)=>{
-      this._wrap(e,idx===0?3.0:2.4);
-      e.userData.hitStun=Math.max(e.userData.hitStun||0,idx===0?1.0:0.6);
-      this.electroTraps.push({enemy:e,center:center.clone(),t:0,d:this._isBoss(e)?2.6:2.2,tick:0,primary:idx===0});
+      const dx=e.position.x-center.x,dz=e.position.z-center.z;
+      const inCore=(dx*dx+dz*dz<=CORE*CORE);
+      // Daisy-chained arcs: every jump starts where the last one ended, so the
+      // lightning reads as one current running through the whole group.
       createChainLightningArc(source,e.position,idx);
       source=e.position;
+      this._wrap(e,idx===0?3.4:2.6);
+      e.userData.hitStun=Math.max(e.userData.hitStun||0,idx===0?1.1:0.65);
+      // The old version only ever applied slow ticks, so a mid-round cast
+      // looked like it did nothing. Anything normal standing in the core of
+      // the blob now dies to the blob, which is the whole point of the move.
+      if(inCore&&!this._isBoss(e)&&!this._isLarge(e)){
+        spiderFX.ring(e.position,1.5,{life:0.20,color:SPIDER_BLUE,y:0.5});
+        this._kill(e); executed++;
+        return;
+      }
+      this.electroTraps.push({enemy:e,center:center.clone(),t:0,d:this._isBoss(e)?3.0:2.6,tick:0,primary:idx===0});
     });
-    if(capped.length)toast('ELECTRO WEB x'+capped.length);
+    // A trap that vanishes on contact is not a trap. The pool keeps arcing at
+    // whatever walks in afterwards, which is what makes this worth pre-placing.
+    this.electroFields.push({at:center.clone(),r:R*0.72,t:0,d:2.6,tick:0,arc:0});
+    if(capped.length&&this.trapToastLock<=0){
+      this.trapToastLock=0.75;
+      toast(executed?('ELECTRO WEB x'+capped.length+' \u2022 '+executed+' DOWN'):('ELECTRO WEB x'+capped.length));
+    }
   }
 
   // ---- SECONDARY 3: Somersault Hunt ----------------------------------
@@ -31939,57 +32225,46 @@ class SpiderKit {
       hits++;
     }
     triggerCombatShake(hits?28:18,direct?270:180);
+    if(direct){
+      spiderCinema.punch('rgba(120,226,255,.26)',.24,0,0.055);
+      spiderCinema.speedlines(0.26,0.28);
+    }
     if(navigator.vibrate)navigator.vibrate(direct?32:18);
   }
 
   // ---- ULTIMATE 1: Maximum Spider ------------------------------------
-  // Opens with a full-map execution lattice, then flows straight into the
-  // classic Maximum Spider chain assault against whatever survives.
+  // The old Web of Shadows (snare), Maximum Spider (chain) and Spider-Verse
+  // Overdrive (wipe) were three separate buttons that each solved the board on
+  // their own, so picking one just meant picking a colour. Fused, they become
+  // one three-act set piece: the dome traps, the chain executes, the crater
+  // finishes. Same total power, one story instead of three.
   maximumSpider(){
     if(this._busy())return false;
-    const list=this._enemies();
-    if(!list.length){ toast('NO TARGETS'); return false; }
-    const p=this.player.position.clone();
-    const half=Math.max(12,arenaSize*0.72);
-    const count=spiderFX._mobileScale(18);
-    for(let i=0;i<count;i++){
-      const a=(i/count)*Math.PI + this.player.rotation.y*0.18;
-      const dx=Math.cos(a)*half, dz=Math.sin(a)*half;
-      const A=new THREE.Vector3(-dx,0.6,-dz), B=new THREE.Vector3(dx,0.6,dz);
-      spiderFX.strand(A,B,{life:0.95,thick:0.06,glow:true});
-      const off=new THREE.Vector3(-dz,0,dx).normalize().multiplyScalar(1.15);
-      spiderFX.strand(A.clone().add(off),B.clone().add(off),{life:0.82,thick:0.026,glow:true});
+    if(!this._enemies().length){ toast('NO TARGETS'); return false; }
+    const at=this.player.position.clone();
+    const R=Math.min(14,Math.max(9,arenaSize*0.46));
+    spiderFX._init();
+
+    // ACT I opening: ribbed dome slams shut over the arena.
+    const ribs=spiderFX._mobileScale(16);
+    const apex=at.clone(); apex.y+=9.2;
+    for(let i=0;i<ribs;i++){
+      const a=i/ribs*Math.PI*2;
+      _spdA.set(at.x+Math.cos(a)*R,0.1,at.z+Math.sin(a)*R);
+      spiderFX.strand(_spdA,apex,{life:2.0,thick:0.032,glow:true});
     }
-    spiderFX.net(p,half*0.84,{life:0.9,spin:0.65});
-    spiderFX.ring(p,half*0.92,{life:0.36,color:SPIDER_RED,y:0.28});
-    spiderFX.burst(p,half*0.52,{count:20,life:0.24,thick:0.02,height:1.05,glow:true});
+    spiderFX.net(at,R,{life:2.1,spin:0.34});
+    spiderFX.ring(at,R*1.06,{life:0.42,color:SPIDER_BLUE,y:0.26});
 
-    // First strike: every non-boss enemy, including ones off-screen, is erased instantly.
-    for(const e of [...list]){
-      if(this._isBoss(e)){
-        const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
-        applyBulletDamage(e,maxHp*0.18);
-        this._wrap(e,2.2);
-        e.userData.hitStun=Math.max(e.userData.hitStun||0,0.9);
-        spiderFX.ring(e.position,1.8,{life:0.22,color:SPIDER_WEB,y:0.48});
-      }else{
-        spiderFX.impact(e.position,2.8,{shake:10,color:SPIDER_RED});
-        this._kill(e);
-      }
-    }
-
-    const survivors=this._enemies();
-    const order=survivors
-      .map(e=>({e,d:(e.position.x-p.x)**2+(e.position.z-p.z)**2}))
-      .sort((a,b)=>a.d-b.d).map(x=>x.e)
-      .slice(0, spiderFX._mobileScale(18));
-
-    this.maximum={i:0,t:0,hop:0.085,order,origin:p.clone(),done:false,prelude:0.34};
-    invincibleTimer=Math.max(invincibleTimer||0,0.34+order.length*0.085+1.65);
-    this._clip('Power_Up',0.28,false);
+    this.maximum={act:0,t:0,actT:0,tick:0,at,R,order:[],i:0,hop:0.085,dur:5.6};
+    invincibleTimer=Math.max(invincibleTimer||0,6.2);
+    this._clip('Power_Up',0.5,false);
+    spiderCinema.letterbox(5.8);
+    spiderCinema.vignette(5.8);
+    spiderCinema.card('MAXIMUM SPIDER','ACT I \u2014 SNARE','#7fd9ff');
+    spiderCinema.punch('rgba(120,226,255,.44)',.36,26,0.12);
+    spiderCinema.buzz([20,40,20]);
     toast('MAXIMUM SPIDER');
-    triggerCombatShake(24,340);
-    if(navigator.vibrate)navigator.vibrate([20,30,20]);
     return true;
   }
   _maximumHop(s){
@@ -32002,7 +32277,6 @@ class SpiderKit {
       spiderFX.burst(to,1.45,{count:6,life:0.14,thick:0.014,height:0.95});
       this.player.position.copy(to);
       this._face(e);
-      // Alternate the strike so a 14-hop chain never looks like one loop.
       this._clip(s.i%3===0?'Melee_Hook':(s.i%3===1?'Punch_Cross':'Fighting_Left_Jab'),0.12);
       if(this._isBoss(e)){
         const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
@@ -32012,94 +32286,186 @@ class SpiderKit {
       spiderFX.ring(to,2.1,{life:0.24,color:SPIDER_RED,y:0.5});
       spiderFX.ring(to,1.2,{life:0.16,color:SPIDER_WEB,y:0.72});
       triggerCombatShake(8,86);
+      // Micro-hitstop on every third hop. Enough to make a 20-hop chain read
+      // as individual impacts instead of one continuous smear.
+      if(s.i%3===0) spiderCinema.punch('rgba(214,32,46,.16)',.16,0,0.035);
     }
     s.i++;
   }
   _maximumFinish(s){
     const at=this.player.position.clone();
-    // 'Land_Three_Point' is renamed to 'Jump_Land' at load time. Asking for the
-    // source name here silently fell back to Idle and killed the finisher pose.
     this._clip('Jump_Land',0.42);
+    spiderCinema.card('MAXIMUM SPIDER','ACT III \u2014 CRATER','#ffd76a');
+    spiderCinema.punch('rgba(255,255,255,.60)',.50,48,0.16);
+    spiderCinema.speedlines(0.75,0.72);
     spiderFX.impact(at,12.5,{shake:42,color:SPIDER_RED});
     spiderFX.net(at,12.5,{life:1.55,spin:1.0});
     spiderFX.burst(at,8.8,{count:20,life:0.26,thick:0.024});
+    // Closing lattice out to the rim: the arena-wide beat the old Spider-Verse
+    // finisher owned, kept here as the payoff instead of a separate ultimate.
+    const half=Math.max(12,arenaSize*0.72), lines=spiderFX._mobileScale(10);
+    for(let i=0;i<lines;i++){
+      const a=(i/lines)*Math.PI+this.player.rotation.y*0.2;
+      const dx=Math.cos(a)*half,dz=Math.sin(a)*half;
+      spiderFX.strand(new THREE.Vector3(-dx,0.6,-dz),new THREE.Vector3(dx,0.6,dz),{life:0.85,thick:0.055,glow:true});
+    }
     for(const e of [...this._enemies()]){
-      const dx=e.position.x-at.x,dz=e.position.z-at.z;
-      if(dx*dx+dz*dz>12.5*12.5)continue;
       if(this._isBoss(e)){
         const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
-        applyBulletDamage(e,maxHp*0.14);
+        applyBulletDamage(e,maxHp*0.22);
+        this._wrap(e,2.4);
       } else this._kill(e);
     }
-    if(navigator.vibrate)navigator.vibrate(60);
+    spiderCinema.buzz([40,50,70]);
     this.cool.maximum=0;
   }
 
-  // ---- ULTIMATE 2: Web of Shadows ------------------------------------
-  // A dome of webbing snaps shut over the arena, pins everything to the
-  // strands, contracts, then detonates. Enemies are dragged to centre first,
-  // so the payoff hits a stack rather than a spread.
-  webOfShadows(){
+  // ---- ULTIMATE 2: Full Stop Anchor ----------------------------------
+  // The set-piece where he plants his feet and refuses to let go. He is rooted
+  // and untouchable for the duration; every enemy on the board is tethered and
+  // reeled in, and each HEAVE yanks the whole map inward at once. Positional
+  // opposite of Skyline Dive - this one makes the fight come to you.
+  fullStopAnchor(){
     if(this._busy())return false;
     const at=this.player.position.clone();
-    this.shadows={t:0,dur:3.6,at,tick:0,phase:0};
-    invincibleTimer=Math.max(invincibleTimer||0,3.8);
+    this.shadows={mode:'anchor',t:0,dur:7.6,at,tick:0,heave:0.75,heaves:0};
+    invincibleTimer=Math.max(invincibleTimer||0,8.0);
     this._clip('Power_Up',0.5,false);
-    // Dome ribs: strands from the rim up to an apex above centre.
-    const R=Math.min(13,Math.max(8,arenaSize*0.42));
-    const ribs=spiderFX._mobileScale(18);
-    const apex=at.clone(); apex.y+=8.4;
-    for(let i=0;i<ribs;i++){
-      const a=i/ribs*Math.PI*2;
-      _spdA.set(at.x+Math.cos(a)*R,0.1,at.z+Math.sin(a)*R);
-      spiderFX.strand(_spdA,apex,{life:2.5,thick:0.03,glow:true});
+    spiderFX._init();
+    // Anchor lines fired out to the rim. Purely visual, but they are what sell
+    // "braced against the whole arena" rather than "standing in a circle".
+    const spokes=spiderFX._mobileScale(14), rim=Math.max(10,arenaSize*0.82);
+    spiderHandPos(_spdB,false);
+    for(let i=0;i<spokes;i++){
+      const a=i/spokes*Math.PI*2;
+      _spdA.set(at.x+Math.cos(a)*rim,0.5,at.z+Math.sin(a)*rim);
+      this._inArena(_spdA,1.2);
+      spiderFX.strand(_spdB,_spdA,{life:0.7,thick:0.030,glow:true});
     }
-    spiderFX.net(at,R,{life:2.8,spin:0.35});
-    spiderFX.ring(at,R*1.05,{life:0.34,color:SPIDER_BLUE,y:0.3});
-    toast('WEB OF SHADOWS');
-    triggerCombatShake(16,260);
+    spiderFX.net(at,rim*0.5,{life:1.2,spin:0.4});
+    spiderFX.ring(at,rim*0.6,{life:0.44,color:SPIDER_WEB,y:0.22});
+    spiderCinema.letterbox(7.9);
+    spiderCinema.vignette(7.9);
+    spiderCinema.card('FULL STOP','HOLD THE LINE','#f2f7ff');
+    spiderCinema.punch('rgba(242,247,255,.42)',.34,24,0.10);
+    spiderCinema.buzz([18,30,18,30]);
+    toast('FULL STOP ANCHOR');
     return true;
   }
+  _anchorHeave(s){
+    this._clip('Two-hand_Blast',0.22,false);
+    spiderCinema.punch('rgba(242,247,255,.34)',.30,28,0.095);
+    spiderCinema.speedlines(0.36,0.52);
+    spiderFX.ring(s.at,7.6,{life:0.32,color:SPIDER_WEB,y:0.2});
+    spiderFX.net(s.at,6.2,{life:0.55,spin:0.55});
+    spiderHandPos(_spdB,false);
+    const pool=this._enemies()
+      .map(e=>({e,d:(e.position.x-s.at.x)**2+(e.position.z-s.at.z)**2}))
+      .sort((a,b)=>b.d-a.d).map(x=>x.e)
+      .slice(0,spiderFX._mobileScale(14));
+    let n=0;
+    for(const e of pool){
+      const dx=s.at.x-e.position.x,dz=s.at.z-e.position.z;
+      const d=Math.hypot(dx,dz)||1;
+      const yank=Math.max(0,Math.min(d-1.0,8.0));
+      if(yank>0){ e.position.x+=dx/d*yank; e.position.z+=dz/d*yank; }
+      spiderFX.strand(_spdB,e.position,{life:0.22,thick:0.032,glow:true});
+      this._wrap(e,2.0);
+      e.userData.hitStun=Math.max(e.userData.hitStun||0,0.85);
+      if(this._isBoss(e)){
+        const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
+        applyBulletDamage(e,maxHp*0.035);
+      }else{
+        const near=Math.hypot(e.position.x-s.at.x,e.position.z-s.at.z);
+        // Anything dragged into the pile-up at his feet is crushed; anything
+        // still out on the line takes damage proportional to the drag.
+        if(near<=4.2&&!this._isLarge(e)) this._kill(e);
+        else this._hurt(e,3.2+yank*0.55);
+      }
+      n++;
+    }
+    if(n){ triggerCombatShake(22,250); spiderCinema.buzz(30); }
+    s.heaves++;
+    if(s.heaves===1)toast('HEAVE');
+  }
+  _anchorFinish(s){
+    const R=Math.max(12,arenaSize*0.62);
+    this._clip('Attack_Ground_Pound',0.45,false);
+    spiderCinema.card('FULL STOP','\u2014 EVERYTHING HOLDS \u2014','#ffd76a');
+    spiderCinema.punch('rgba(255,255,255,.62)',.50,46,0.17);
+    spiderCinema.speedlines(0.7,0.72);
+    spiderFX.impact(s.at,R*0.8,{shake:44,color:SPIDER_RED});
+    spiderFX.net(s.at,R,{life:1.5,spin:1.0});
+    spiderFX.burst(s.at,R*0.6,{count:20,life:0.28,thick:0.024});
+    for(const e of [...this._enemies()]){
+      const dx=e.position.x-s.at.x,dz=e.position.z-s.at.z;
+      if(dx*dx+dz*dz>R*R)continue;
+      if(this._isBoss(e)){
+        const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
+        applyBulletDamage(e,maxHp*0.26);
+        this._wrap(e,2.4);
+      } else this._kill(e);
+    }
+    spiderCinema.buzz([40,50,70]);
+  }
 
-  // ---- ULTIMATE 3: City-Wide Webline ---------------------------------
-  // A lattice of taut lines strung corner to corner. Everything touching a
-  // line is cut repeatedly for the duration, so it rewards standing still and
-  // letting the board walk into it.
-  cityWebline(){
+  // ---- ULTIMATE 3: Skyline Dive --------------------------------------
+  // The airborne one. He leaves the frame entirely, marks the thickest part of
+  // the crowd, and comes down on it - over and over for the duration, then once
+  // more with the whole arena underneath. The camera already tracks player.y,
+  // so the ascent tilts the view up on its own and the dive drops it back down.
+  skylineDive(){
     if(this._busy())return false;
-    const half=Math.max(8,arenaSize*0.5);
-    const lines=[], count=spiderFX._mobileScale(13);
-    for(let i=0;i<count;i++){
-      const a=(i/count)*Math.PI + this.player.rotation.y*0.25;
-      const dx=Math.cos(a)*half, dz=Math.sin(a)*half;
-      const A=new THREE.Vector3(-dx,0.55,-dz), B=new THREE.Vector3(dx,0.55,dz);
-      lines.push({a:A,b:B});
-      spiderFX.strand(A,B,{life:3.6,thick:0.05,glow:true});
-      const off=new THREE.Vector3(-dz,0,dx).normalize().multiplyScalar(0.7);
-      const A2=A.clone().add(off), B2=B.clone().add(off);
-      lines.push({a:A2,b:B2});
-      spiderFX.strand(A2,B2,{life:3.3,thick:0.024,glow:true});
-    }
-    spiderFX.net(this.player.position,half*0.72,{life:0.45,spin:0.45});
-    const at=this.player.position.clone();
-    const R=Math.max(10,arenaSize*0.58);
-    const ribs=spiderFX._mobileScale(16);
-    const apex=at.clone(); apex.y+=10.8;
-    for(let i=0;i<ribs;i++){
-      const a=i/ribs*Math.PI*2;
-      _spdA.set(at.x+Math.cos(a)*R,0.18,at.z+Math.sin(a)*R);
-      spiderFX.strand(_spdA,apex,{life:0.9,thick:0.03,glow:true});
-    }
-    spiderFX.net(at,R*0.75,{life:0.9,spin:0.7});
-    spiderFX.ring(at,R*0.84,{life:0.36,color:SPIDER_BLUE,y:0.3});
-    spiderFX.burst(at,R*0.46,{count:18,life:0.22,thick:0.018,height:1.0,glow:true});
-    this.webline={mode:'verse',t:0,dur:3.6,tick:0,at};
-    invincibleTimer=Math.max(invincibleTimer||0,3.9);
-    this._clip('Power_Up',0.45,false);
-    toast('SPIDER-VERSE OVERDRIVE');
-    triggerCombatShake(20,300);
-    if(navigator.vibrate)navigator.vibrate([18,24,18,24,18]);
+    const ground=this.player.position.y;
+    this.webline={mode:'dive',t:0,dur:8.4,phase:0,pt:0,dives:0,ground,
+      apexY:9.4,mark:null,from:null,final:false};
+    invincibleTimer=Math.max(invincibleTimer||0,9.0);
+    this._clip('Flying_Forward_Super',0.34,false);
+    spiderFX._init();
+    spiderHandPos(_spdB,false);
+    const up=this.player.position.clone(); up.y+=10.5;
+    spiderFX.strand(_spdB,up,{life:0.6,thick:0.05,glow:true});
+    spiderFX.anchorPuff(up);
+    spiderFX.ring(this.player.position,3.4,{life:0.3,color:SPIDER_RED,y:0.4});
+    spiderCinema.letterbox(8.7);
+    spiderCinema.vignette(8.7);
+    spiderCinema.card('SKYLINE DIVE','GOING UP','#ff5566');
+    spiderCinema.punch('rgba(214,32,46,.40)',.34,22,0.09);
+    spiderCinema.buzz([16,26,16]);
+    toast('SKYLINE DIVE');
     return true;
+  }
+  // Reticle drawn on the ground under the marked cluster, so the hit is
+  // telegraphed a beat before it lands instead of arriving out of nowhere.
+  _diveMark(at,big){
+    spiderFX.ring(at,big?9.0:5.0,{life:0.30,color:SPIDER_RED,y:0.1});
+    spiderFX.ring(at,big?5.6:3.0,{life:0.26,color:SPIDER_WEB,y:0.14});
+    spiderFX.net(at,big?6.4:3.6,{life:0.34,spin:1.1,color:SPIDER_RED});
+  }
+  _diveImpact(s,big){
+    const at=this.player.position.clone(); at.y=s.ground;
+    this.player.position.y=s.ground;
+    this._clip('Attack_Ground_Pound',big?0.42:0.20,false);
+    const R=big?13.0:5.6;
+    spiderFX.impact(at,R*0.86,{shake:big?46:24,color:SPIDER_RED});
+    spiderFX.net(at,R,{life:big?1.5:0.8,spin:big?1.0:0.6});
+    spiderFX.burst(at,R*0.66,{count:big?20:11,life:0.24,thick:0.022});
+    spiderCinema.punch(big?'rgba(255,255,255,.62)':'rgba(214,32,46,.30)',big?.50:.28,0,big?0.17:0.075);
+    spiderCinema.speedlines(big?0.7:0.22,big?0.72:0.34);
+    if(big)spiderCinema.card('SKYLINE DIVE','\u2014 TOUCHDOWN \u2014','#ffd76a');
+    for(const e of [...this._enemies()]){
+      const dx=e.position.x-at.x,dz=e.position.z-at.z;
+      if(dx*dx+dz*dz>R*R)continue;
+      if(this._isBoss(e)){
+        const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
+        applyBulletDamage(e,maxHp*(big?0.24:0.045));
+        this._wrap(e,big?2.4:1.4);
+      } else this._kill(e);
+      const d=Math.hypot(dx,dz)||1;
+      e.position.x+=dx/d*(big?2.4:1.2); e.position.z+=dz/d*(big?2.4:1.2);
+    }
+    spiderCinema.buzz(big?[40,50,70]:28);
+    s.dives++;
   }
 
   // ---- update --------------------------------------------------------
@@ -32107,6 +32473,9 @@ class SpiderKit {
     if(!this.player||!this.player.parent)return;
     for(const k in this.cool) if(this.cool[k]>0) this.cool[k]=Math.max(0,this.cool[k]-dt);
     this.snapCastLock=Math.max(0,(this.snapCastLock||0)-dt);
+    this.trapCastLock=Math.max(0,(this.trapCastLock||0)-dt);
+    this.trapToastLock=Math.max(0,(this.trapToastLock||0)-dt);
+    spiderCinema.update(dt);
     if(this.comboResetIn>0){ this.comboResetIn=Math.max(0,this.comboResetIn-dt); if(this.comboResetIn===0)this.combo=0; }
     if(this.swing){ this.swing.t+=dt; if(this.swing.t>=this.swing.d)this.swing=null; }
 
@@ -32163,13 +32532,24 @@ class SpiderKit {
       dest.y=Math.max(0.85,b.start.y);
       const u=Math.min(1,b.life/b.dur);
       b.mesh.position.lerpVectors(b.start,dest,u);
-      b.mesh.position.y+=Math.sin(u*Math.PI)*1.35;
-      b.mesh.rotation.x+=dt*14; b.mesh.rotation.y+=dt*18;
-      b.trail+=dt;
+      b.mesh.position.y+=Math.sin(u*Math.PI)*(1.35+b.start.distanceTo(dest)*0.06);
+      b.mesh.rotation.x+=dt*16; b.mesh.rotation.y+=dt*22;
+      // Blob swells as it flies so the payload reads as "charging up".
+      b.mesh.scale.setScalar(0.46+u*0.42);
+      b.trail+=dt; b.spark=(b.spark||0)+dt;
       if(b.trail>=0.03){
         b.trail=0;
-        spiderFX.strand(b.last,b.mesh.position,{life:0.16,thick:0.026,glow:true});
-        spiderFX.ring(b.mesh.position,0.7,{life:0.10,color:SPIDER_BLUE,y:0.08});
+        spiderFX.strand(b.last,b.mesh.position,{life:0.18,thick:0.034,glow:true});
+        spiderFX.ring(b.mesh.position,0.8,{life:0.10,color:SPIDER_BLUE,y:0.08});
+      }
+      // Live current crawling over the blob mid-flight - one cheap arc every
+      // 0.08s rather than a per-frame spray.
+      if(b.spark>=0.08){
+        b.spark=0;
+        const j=()=>(Math.random()-0.5)*0.9;
+        createChainLightningArc(
+          {x:b.mesh.position.x+j(),y:b.mesh.position.y-0.4,z:b.mesh.position.z+j()},
+          {x:b.mesh.position.x+j(),y:b.mesh.position.y-0.4,z:b.mesh.position.z+j()},1);
       }
       const done=u>=1 || (typeof bulletBlockedAt==='function'&&bulletBlockedAt(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z));
       if(done){
@@ -32178,6 +32558,34 @@ class SpiderKit {
         if(b.mesh.material&&b.mesh.material.dispose)b.mesh.material.dispose();
         this.trapShots.splice(i,1);
       }
+    }
+
+    // ---- lingering tesla pools
+    for(let i=this.electroFields.length-1;i>=0;i--){
+      const f=this.electroFields[i];
+      f.t+=dt; f.tick+=dt; f.arc+=dt;
+      if(f.arc>=0.12){
+        f.arc=0;
+        const a=Math.random()*Math.PI*2, a2=a+1.6+Math.random();
+        createChainLightningArc(
+          {x:f.at.x+Math.cos(a)*f.r*0.9,y:0.1,z:f.at.z+Math.sin(a)*f.r*0.9},
+          {x:f.at.x+Math.cos(a2)*f.r*0.9,y:0.1,z:f.at.z+Math.sin(a2)*f.r*0.9},1);
+      }
+      if(f.tick>=0.30){
+        f.tick=0;
+        spiderFX.ring(f.at,f.r*(0.75+0.25*Math.sin(f.t*6)),{life:0.24,color:SPIDER_BLUE,y:0.12});
+        for(const e of this._enemies()){
+          const dx=e.position.x-f.at.x,dz=e.position.z-f.at.z;
+          if(dx*dx+dz*dz>f.r*f.r)continue;
+          this._wrap(e,0.9);
+          e.userData.hitStun=Math.max(e.userData.hitStun||0,0.3);
+          if(this._isBoss(e)){
+            const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
+            applyBulletDamage(e,maxHp*0.006);
+          }else this._hurt(e,this._isLarge(e)?1.5:1.15);
+        }
+      }
+      if(f.t>=f.d)this.electroFields.splice(i,1);
     }
 
     // ---- active electro cocoon shocks
@@ -32198,8 +32606,8 @@ class SpiderKit {
           const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
           applyBulletDamage(e,maxHp*(s.primary?0.010:0.006));
           if(Number(e.userData.hp)<=0){ e.userData.hp=Math.max(1,maxHp*0.02); e.userData.dead=false; }
-        }else if(this._isLarge(e)) this._hurt(e,s.primary?1.9:1.2);
-        else this._hurt(e,s.primary?1.55:1.0);
+        }else if(this._isLarge(e)) this._hurt(e,s.primary?2.6:1.8);
+        else this._hurt(e,s.primary?2.4:1.7);
       }
       if(s.t>=s.d)this.electroTraps.splice(i,1);
     }
@@ -32218,7 +32626,19 @@ class SpiderKit {
       this.player.rotation.x=0;
       s.ghostAt+=dt;
       if(s.ghostAt>=0.035){ s.ghostAt=0; spiderFX.ghost(this.player.position,1.06); }
-      if(u>=1) this._blitzHit(s);
+      if(s.mode==='swing'){
+        // Keep the web-line drawn from hand to anchor for the whole arc.
+        s.lineAt=(s.lineAt||0)+dt;
+        if(s.lineAt>=0.05){
+          s.lineAt=0;
+          spiderHandPos(_spdB,false);
+          spiderFX.strand(_spdB,s.anchor,{life:0.10,thick:0.030,glow:true});
+        }
+        // Scan from ~25% into the arc so he does not instantly re-grab
+        // something he just launched away from.
+        if(u>0.25&&u<0.92&&this._swingAcquire(s))return;
+        if(u>=1){ this._swingLand(s); return; }
+      }else if(u>=1) this._blitzHit(s);
     }
 
     // ---- somersault hunt
@@ -32252,116 +32672,145 @@ class SpiderKit {
       }
     }
 
-    // ---- maximum spider
+    // ---- maximum spider (three acts)
     if(this.maximum){
       const s=this.maximum;
-      invincibleTimer=Math.max(invincibleTimer||0,0.18);
-      if((s.prelude||0)>0){
-        s.prelude=Math.max(0,s.prelude-dt);
-        if(s.prelude===0) s.t=0;
-      }else{
-        s.t+=dt;
-        while(s.t>=s.hop && s.i<s.order.length){ s.t-=s.hop; this._maximumHop(s); }
-        if(s.i>=s.order.length){
-          if(!s.done){ s.done=true; s.t=0; }
-          else if(s.t>=0.22){ this._maximumFinish(s); this.maximum=null; }
-        }
-      }
-    }
+      s.t+=dt; s.actT+=dt; s.tick+=dt;
+      invincibleTimer=Math.max(invincibleTimer||0,0.25);
 
-    // ---- web of shadows
-    if(this.shadows){
-      const s=this.shadows; s.t+=dt; s.tick+=dt;
-      const R=Math.min(13,Math.max(8,arenaSize*0.42));
-      // Phase 1 (0 -> 1.7s): drag everything to centre and hold it there.
-      if(s.t<1.7){
+      if(s.act===0){
+        // ACT I - the dome drags everything to the middle and pins it.
+        const pull=(6.2+Math.min(6,(Number(round)||1)*0.12))*dt;
         for(const e of this._enemies()){
-          const dx=s.at.x-e.position.x, dz=s.at.z-e.position.z;
+          const dx=s.at.x-e.position.x,dz=s.at.z-e.position.z;
           const d=Math.hypot(dx,dz);
-          if(d>0.6&&d<R*1.2){
-            const pull=Math.min(d, 5.2*dt);
-            e.position.x+=dx/d*pull; e.position.z+=dz/d*pull;
-            e.userData.hitStun=Math.max(e.userData.hitStun||0,0.4);
+          if(d>0.9){ const p=Math.min(d-0.7,pull); e.position.x+=dx/d*p; e.position.z+=dz/d*p; }
+          e.userData.hitStun=Math.max(e.userData.hitStun||0,0.45);
+        }
+        if(s.tick>=0.26){
+          s.tick=0;
+          spiderFX.ring(s.at,s.R*Math.max(0.22,1-s.actT/1.9),{life:0.34,color:SPIDER_BLUE,y:0.16});
+          spiderFX.net(s.at,s.R*(0.58+0.20*Math.sin(s.actT*6.2)),{life:0.28,spin:0.26});
+          this._radial(s.at,s.R,1.35);
+          for(let i=0;i<2;i++){
+            const a=Math.random()*Math.PI*2,a2=a+1.7+Math.random();
+            createChainLightningArc(
+              {x:s.at.x+Math.cos(a)*s.R*0.82,y:0.1,z:s.at.z+Math.sin(a)*s.R*0.82},
+              {x:s.at.x+Math.cos(a2)*s.R*0.82,y:0.1,z:s.at.z+Math.sin(a2)*s.R*0.82},1);
           }
         }
-        if(s.tick>=0.3){
-          s.tick=0;
-          spiderFX.ring(s.at,R*(1-s.t/3.0),{life:0.36,color:SPIDER_BLUE});
-          spiderFX.net(s.at,R*(0.62+0.22*Math.sin(s.t*5.2)),{life:0.30,spin:0.24,color:SPIDER_WEB});
-          spiderFX.burst(s.at,R*0.58,{count:10,life:0.16,thick:0.016});
-          this._radial(s.at,R,0.96);
+        if(s.actT>=1.9){
+          s.act=1; s.actT=0; s.tick=0;
+          const p=this.player.position;
+          s.order=this._enemies()
+            .map(e=>({e,d:(e.position.x-p.x)**2+(e.position.z-p.z)**2}))
+            .sort((a,b)=>a.d-b.d).map(x=>x.e)
+            .slice(0,spiderFX._mobileScale(22));
+          this._clip('Power_Up',0.18,false);
+          spiderCinema.card('MAXIMUM SPIDER','ACT II \u2014 CHAIN','#ff5566');
+          spiderCinema.speedlines(2.6,0.58);
+          spiderCinema.punch('rgba(214,32,46,.40)',.34,24,0.10);
         }
-      } else if(s.phase===0){
-        // Phase 2: the collapse.
-        s.phase=1;
-        this._clip('Two-hand_Blast',0.4);
-        spiderFX.impact(s.at,R*1.12,{shake:40,color:SPIDER_RED});
-        spiderFX.burst(s.at,R*0.84,{count:24,life:0.26,thick:0.022});
-        for(const e of [...this._enemies()]){
-          const dx=e.position.x-s.at.x,dz=e.position.z-s.at.z;
-          if(dx*dx+dz*dz>R*R)continue;
-          if(this._isBoss(e)){
-            const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
-            applyBulletDamage(e,maxHp*0.18);
-          } else this._kill(e);
+      } else if(s.act===1){
+        // ACT II - chain assault through whatever the dome collected.
+        while(s.actT>=s.hop && s.i<s.order.length){ s.actT-=s.hop; this._maximumHop(s); }
+        if(s.i>=s.order.length && s.actT>=0.28){
+          s.act=2; s.actT=0;
+          this._maximumFinish(s);
         }
-        if(navigator.vibrate)navigator.vibrate(70);
+      } else {
+        // ACT III - hold on the crater, then release control.
+        if(s.actT>=0.85){ this.maximum=null; this.cool.maximum=0; }
       }
-      if(s.t>=s.dur){ this.shadows=null; this.cool.shadows=0; }
+      if(this.maximum && s.t>s.dur-0.2) s.dur=s.t+0.2;
     }
 
-    // ---- spider-verse overdrive
-    if(this.webline){
-      const s=this.webline; s.t+=dt; s.tick+=dt;
-      invincibleTimer=Math.max(invincibleTimer||0,0.18);
-      if(s.tick>=0.16){
+    // ---- full stop anchor
+    if(this.shadows){
+      const s=this.shadows; s.t+=dt; s.tick+=dt; s.heave+=dt;
+      invincibleTimer=Math.max(invincibleTimer||0,0.25);
+      // Rooted. He is holding a line; he does not get to walk while doing it.
+      this.player.position.x=s.at.x; this.player.position.z=s.at.z;
+      // Constant reel between heaves so the board is always closing in.
+      const reel=3.4*dt;
+      for(const e of this._enemies()){
+        const dx=s.at.x-e.position.x,dz=s.at.z-e.position.z;
+        const d=Math.hypot(dx,dz);
+        if(d>1.7){ const p=Math.min(d-1.4,reel); e.position.x+=dx/d*p; e.position.z+=dz/d*p; }
+        e.userData.hitStun=Math.max(e.userData.hitStun||0,0.3);
+      }
+      if(s.tick>=0.14){
         s.tick=0;
+        spiderHandPos(_spdB,false); spiderHandPos(_spdC,true);
+        // Draw to the FURTHEST enemies: the long taut lines are the shot.
         const pool=this._enemies()
           .map(e=>({e,d:(e.position.x-s.at.x)**2+(e.position.z-s.at.z)**2}))
-          .sort((a,b)=>a.d-b.d)
-          .map(x=>x.e)
-          .slice(0,spiderFX._mobileScale(5));
-        if(pool.length){
-          pool.forEach((e,idx)=>{
-            const from=new THREE.Vector3(
-              e.position.x+(Math.random()-0.5)*3.2,
-              7.8+Math.random()*2.4,
-              e.position.z+(Math.random()-0.5)*3.2
-            );
-            const to=e.position.clone(); to.y=0.2;
-            spiderFX.ghost(from,1.12);
-            spiderFX.strand(from,to,{life:0.20,thick:0.032,glow:true});
-            spiderFX.net(to,2.4+(idx%2?0.5:0),{life:0.42,spin:0.38});
-            spiderFX.impact(to,3.4,{shake:16,color:idx%2?SPIDER_RED:SPIDER_BLUE});
-            spiderFX.burst(to,2.5,{count:10,life:0.18,thick:0.018,height:1.0,glow:true});
-            if(this._isBoss(e)){
-              const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
-              applyBulletDamage(e,maxHp*0.032);
-              this._wrap(e,1.5);
-              e.userData.hitStun=Math.max(e.userData.hitStun||0,0.45);
-            }else this._kill(e);
-          });
-          triggerCombatShake(10,110);
+          .sort((a,b)=>b.d-a.d).map(x=>x.e)
+          .slice(0,spiderFX._mobileScale(9));
+        pool.forEach((e,i)=>{
+          spiderFX.strand(i%2?_spdB:_spdC,e.position,{life:0.18,thick:0.026,glow:true});
+        });
+        spiderFX.ring(s.at,3.1+0.7*Math.sin(s.t*7),{life:0.20,color:SPIDER_WEB,y:0.1});
+      }
+      if(s.heave>=1.15 && s.t<s.dur-0.5) { s.heave=0; this._anchorHeave(s); }
+      if(s.t>=s.dur){ this._anchorFinish(s); this.shadows=null; this.cool.shadows=0; }
+    }
+
+    // ---- skyline dive
+    if(this.webline){
+      const s=this.webline; s.t+=dt; s.pt+=dt;
+      invincibleTimer=Math.max(invincibleTimer||0,0.25);
+      const P=this.player.position;
+
+      if(s.phase===0){                      // ASCENT
+        const u=Math.min(1,s.pt/0.42);
+        P.y=s.ground+(s.apexY-s.ground)*u;
+        if(s.pt>=0.42){ s.phase=1; s.pt=0; s.from=P.clone();
+          s.mark=this._bestCluster(5.2)||this._inArena(P.clone().addScaledVector(this._fwd(),8),3);
+          s.mark.y=s.ground;
+          s.final=(s.t>=s.dur-1.1);
+          this._diveMark(s.mark,s.final);
+        }
+      } else if(s.phase===1){               // TRACK - glide over the mark
+        const u=Math.min(1,s.pt/0.30);
+        P.x=s.from.x+(s.mark.x-s.from.x)*u;
+        P.z=s.from.z+(s.mark.z-s.from.z)*u;
+        P.y=s.apexY+Math.sin(u*Math.PI)*0.7;
+        this._face({position:s.mark});
+        if(s.pt>=0.30){
+          s.phase=2; s.pt=0;
+          if(s.final){ spiderCinema.speedlines(0.6,0.68); spiderCinema.flash('rgba(255,255,255,.28)',.24,160); }
+        }
+      } else if(s.phase===2){               // DIVE
+        const dur=s.final?0.34:0.24;
+        const u=Math.min(1,s.pt/dur);
+        P.x=s.mark.x; P.z=s.mark.z;
+        P.y=s.apexY+(s.ground-s.apexY)*(u*u);   // accelerating drop
+        this.player.rotation.x=0;
+        spiderFX.ghost(P,s.final?1.35:1.06);
+        if(u>=1){
+          this._diveImpact(s,s.final);
+          if(s.final){ this.webline=null; this.cool.webline=0; }
+          else { s.phase=3; s.pt=0; }
+        }
+      } else {                              // RECOIL back up the line
+        const u=Math.min(1,s.pt/0.24);
+        P.y=s.ground+(s.apexY-s.ground)*u;
+        if(s.pt>=0.05&&s.pt-dt<0.05){
+          spiderHandPos(_spdB,false);
+          const up=P.clone(); up.y+=6.5;
+          spiderFX.strand(_spdB,up,{life:0.26,thick:0.036,glow:true});
+        }
+        if(s.pt>=0.24){ s.phase=1; s.pt=0; s.from=P.clone();
+          s.mark=this._bestCluster(5.2)||this._inArena(P.clone().addScaledVector(this._fwd(),8),3);
+          s.mark.y=s.ground;
+          s.final=(s.t>=s.dur-1.1);
+          this._diveMark(s.mark,s.final);
         }
       }
-      // Ambient arena-scale web pulses keep the move feeling alive between strikes.
-      if(Math.floor(s.t*6)!==Math.floor((s.t-dt)*6)){
-        const R=Math.max(10,arenaSize*0.58);
-        spiderFX.ring(s.at,R*(0.75+0.08*Math.sin(s.t*5.4)),{life:0.22,color:SPIDER_WEB,y:0.22});
-      }
-      if(s.t>=s.dur){
-        const R=Math.max(12,arenaSize*0.7);
-        spiderFX.impact(s.at,R,{shake:44,color:SPIDER_RED});
-        spiderFX.net(s.at,R*0.9,{life:1.2,spin:0.86});
-        spiderFX.burst(s.at,R*0.62,{count:28,life:0.26,thick:0.022,height:1.15,glow:true});
-        for(const e of [...this._enemies()]){
-          if(this._isBoss(e)){
-            const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
-            applyBulletDamage(e,maxHp*0.20);
-            this._wrap(e,2.0);
-          }else this._kill(e);
-        }
-        if(navigator.vibrate)navigator.vibrate(80);
+      // Hard floor: if anything ever leaves this in a bad state, put him down.
+      if(this.webline && s.t>s.dur+2.2){
+        this.player.position.y=s.ground;
         this.webline=null; this.cool.webline=0;
       }
     }
@@ -32379,6 +32828,8 @@ class SpiderKit {
     this.snapshots.length=0;
     this.trapShots.length=0;
     this.electroTraps.length=0;
+    this.electroFields.length=0;
+    try{ spiderCinema.clear(); }catch(_e){}
     this.wrapped.clear();
     this.zip=this.slam=this.trap=this.maximum=this.shadows=this.webline=null;
   }
@@ -32416,8 +32867,8 @@ function triggerSpiderAbility(){
   if(!gameRunning)return false;
   const k=ensureSpiderKit(); if(!k||!equippedAbilityId)return false;
   if(equippedAbilityId==='spider_maximum')return k.maximumSpider();
-  if(equippedAbilityId==='spider_web_of_shadows')return k.webOfShadows();
-  if(equippedAbilityId==='spider_city_webline')return k.cityWebline();
+  if(equippedAbilityId==='spider_web_of_shadows')return k.fullStopAnchor();
+  if(equippedAbilityId==='spider_city_webline')return k.skylineDive();
   return false;
 }
 function isSpiderWeaponKind(kind){
