@@ -9740,6 +9740,7 @@ function orientationAngle(){
 }
 async function requestPortraitOrientationLock(){
   try{
+    if(!isMobile)return;
     if(screen.orientation&&screen.orientation.lock){
       await screen.orientation.lock('portrait');
     }
@@ -9752,7 +9753,10 @@ function applyPortraitPresentation(){
   const app=document.getElementById('app');
   if(!app)return;
   const p=physicalViewportSize();
-  const landscape=p.w>p.h;
+  // Desktop gets to play in whatever orientation its window is — the
+  // portrait counter-rotation is a phone/tablet accommodation only, so
+  // skip it entirely on non-touch devices and let landscape render natively.
+  const landscape=isMobile&&p.w>p.h;
 
   document.documentElement.classList.toggle('portraitLockedLandscape',landscape);
 
@@ -14359,6 +14363,7 @@ function refreshRoundStatShop(){
 }
 function showLevelUp(){
   gameRunning = false;
+  try{ spiderCinema.clear(); }catch(_e){}
   if(roundTimerFrozenElapsed === null) roundTimerFrozenElapsed = Math.max(0,(performance.now()-roundStartTime)/1000);
   updateRoundTimerHud();
   const subtitle=document.getElementById('levelUpSubtitle');
@@ -14896,11 +14901,11 @@ const CHOPPER_MONSTER_POINT = {id:'hooded_twilight_execution', name:'Kraken Risi
   desc:'TITAN TRANSFORMATION. Follow the Knight Guardian Titan rules: grow to 5x size for 15 seconds, gain 5x attack damage and 2.6x combat reach, move at 85% speed, keep Primary/Secondary attacks, and lock other specials until the transformation ends. Cooldown begins afterward on the Knight Titan curve.'};
 
 const SPIDER_MAXIMUM = {id:'spider_maximum', name:'Maximum Spider', price:0, avatar:'spider', unlockLevel:1,
-  desc:'THREE-ACT SET PIECE, ~5.5s, invulnerable throughout. ACT I: a ribbed web dome slams over the arena and drags every enemy to the centre, pinning and shocking them. ACT II: the chain assault - up to 22 rapid web-hops, erasing normal enemies and chunking bosses 6% per hit. ACT III: a colossal web-crater plus a rim-to-rim lattice that clears everything left standing and takes 22% max HP off bosses.'};
+  desc:'THREE-ACT SET PIECE, ~10s, invulnerable throughout. ACT I: a ribbed web dome slams over the arena and drags every enemy to the centre, pinning and shocking them. ACT II: the chain assault - up to 22 rapid web-hops, erasing normal enemies and chunking bosses 6% per hit. ACT III: a colossal web-crater plus a rim-to-rim lattice that clears everything left standing and takes 22% max HP off bosses.'};
 const SPIDER_WEB_OF_SHADOWS = {id:'spider_web_of_shadows', name:'Full Stop Anchor', price:0, avatar:'spider', unlockLevel:1,
-  desc:'ROOTED CONTROL ULTIMATE, 7.6s, invulnerable throughout. He anchors to the arena rim and cannot move. Every enemy on the board is tethered and reeled steadily inward, and every 1.15s a HEAVE yanks the fourteen furthest targets up to 8 units toward him at once - anything crushed into the pile-up at his feet is erased, anything still on the line takes drag-scaled damage, bosses lose 3.5% each heave. Ends with FULL STOP: the lines snap and the whole pile detonates for 26% boss max HP.'};
+  desc:'PLANT YOUR FEET: press once and he roots himself in place for the full 10s and cannot be moved (invulnerable the whole time, so standing still is safe) - there is no target to aim, it hits the entire board automatically. Every enemy is tethered and reeled steadily inward, and every 1.15s a HEAVE yanks the fourteen furthest targets up to 8 units toward him at once - anything crushed into the pile-up at his feet is erased, anything still on the line takes drag-scaled damage, bosses lose 3.5% each heave. Ends with FULL STOP: the lines snap and the whole pile detonates for 26% boss max HP.'};
 const SPIDER_CITY_WEBLINE = {id:'spider_city_webline', name:'Skyline Dive', price:0, avatar:'spider', unlockLevel:1,
-  desc:'AIRBORNE ULTIMATE, 8.4s, invulnerable throughout. He web-lines straight up out of frame, marks the densest cluster on the board with a ground reticle, then dive-bombs it - roughly nine crashes, each erasing normal enemies within 5.6 units and taking 4.5% off bosses, recoiling back up the line between dives. The last dive is the big one: a 13-unit touchdown crater worth 24% boss max HP.'};
+  desc:'AIRBORNE ULTIMATE, ~10s, invulnerable throughout. He web-lines straight up out of frame, marks the densest cluster on the board with a ground reticle, then dive-bombs it - roughly eleven crashes, each erasing normal enemies within 5.6 units and taking 4.5% off bosses, recoiling back up the line between dives. The last dive is the big one: a 13-unit touchdown crater worth 24% boss max HP.'};
 
 const HERO_ABILITIES = { spider:[SPIDER_MAXIMUM,SPIDER_WEB_OF_SHADOWS,SPIDER_CITY_WEBLINE], rhino:[RHINO_CRASHING_BOLT,RHINO_SHATTERED_DOMAIN,RHINO_SKY_FATHER], chopper:[CHOPPER_STAMPEDE,CHOPPER_GUARD_DOME,CHOPPER_MONSTER_POINT], hooded:[HOODED_THOUSAND_CUTS,HOODED_DANCING_STEEL,HOODED_TWILIGHT_EXECUTION], mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
   knight:[KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER, KNIGHT_JUDGMENT_ULTIMATE],
@@ -15467,6 +15472,8 @@ function setupControls(){
     e.preventDefault();
     document.getElementById('pauseOverlay').classList.remove('show');
     gameRunning = false;
+    try{ spiderCinema.clear(); }catch(_e){}
+    try{ disposeSpiderKit(); }catch(_e){}
     refreshCrystalPills();
     show('screenHome');
   });
@@ -16964,8 +16971,12 @@ function updateHoodedHud(){
           ? Math.max(0,activeObj.dur-activeObj.t)
           : 0;
         const cd=kit&&kit.cooldownForAbility?kit.cooldownForAbility(equippedAbilityId):0;
+        // While Full Stop Anchor is actually running, swap the button's own
+        // label to "ROOTED" - a constant on-screen reminder of why movement
+        // is locked, instead of leaving the generic ability name up.
+        const activeLabel=(active&&equippedAbilityId==='spider_web_of_shadows')?'ROOTED':label;
         abilityBtn.textContent=active
-          ? `${label} ${activeTime>0?activeTime.toFixed(1):'!'}`
+          ? `${activeLabel} ${activeTime>0?activeTime.toFixed(1):'!'}`
           : (cd>0?`${label} ${Math.ceil(cd)}`:label);
         abilityBtn.classList.toggle('active',active);
         abilityBtn.classList.toggle('cooling',cd>0&&!active);
@@ -31893,8 +31904,11 @@ class SpiderKit {
   }
 
   // ---- SECONDARY 1: Web-Yank Blitz -----------------------------------
-  // Twin web-lines latch, Spider-Man slingshots in, then ricochets through a
-  // short chain of nearby enemies. This is the fast flashy assassin option.
+  // A full ~10s takedown tour: twin web-lines latch onto the nearest cluster,
+  // Spider-Man kicks his way through every enemy linked into that area, and
+  // the moment that area is empty he web-swings straight to the next nearest
+  // cluster and starts kicking again. Repeats until either the whole board
+  // is clear or the move's 10-second clock runs out, then he lands.
   zipTakedown(){
     if(this._busy()||this.cool.zip>0)return false;
     const first=this._nearest(18);
@@ -31906,12 +31920,6 @@ class SpiderKit {
     if(!first){ return this._freeSwing(); }
     this.cool.zip=this._roundCooldown(0.65,28);
     dashActive=false; dashTimer=0;
-    const used=new Set(), order=[];
-    let cur=first;
-    while(cur&&order.length<spiderFX._mobileScale(5)){
-      order.push(cur); used.add(cur);
-      cur=this._nearestFrom(cur.position,6.8,used);
-    }
     this._face(first);
     spiderHandPos(_spdB,false);
     spiderHandPos(_spdA,true);
@@ -31919,12 +31927,27 @@ class SpiderKit {
     spiderFX.strand(_spdA,first.position,{life:0.24,thick:0.034,glow:true});
     spiderFX.anchorPuff(first.position);
     spiderFX.ring(first.position,2.2,{life:0.20,color:SPIDER_WEB,y:0.55});
-    this.zip={mode:'blitz',order,i:0,target:null,start:null,control:null,end:null,t:0,dur:0.18,ghostAt:0};
+    const order=this._buildArea(first);
+    this.zip={mode:'blitz',order,i:0,target:null,start:null,control:null,end:null,t:0,dur:0.18,ghostAt:0,moveT:0,moveDur:10.0};
     this._beginBlitzLeg(order[0]);
     invincibleTimer=Math.max(invincibleTimer||0,1.0);
+    spiderCinema.letterbox(10.3); spiderCinema.vignette(10.3);
     this._clip('Flying_Forward_Super',0.22,false);
     toast('WEB-YANK BLITZ');
     return true;
+  }
+  // Every enemy chain-linked (within 6.8 units of the previous one) to the
+  // given starting target - "the initial area Spider-Man swung to". Capped
+  // so a pathologically dense mob can't stretch one area past a few seconds.
+  _buildArea(first,cap){
+    const max=spiderFX._mobileScale(cap||24);
+    const used=new Set(), order=[];
+    let cur=first;
+    while(cur&&order.length<max){
+      order.push(cur); used.add(cur);
+      cur=this._nearestFrom(cur.position,6.8,used);
+    }
+    return order;
   }
   // Traversal swing. Long forward arc, clamped inside the arena disc, with a
   // live scan every frame so an enemy that wanders into range gets yanked.
@@ -31953,7 +31976,7 @@ class SpiderKit {
     spiderFX.anchorPuff(anchor);
     spiderFX.ring(start,2.0,{life:0.20,color:SPIDER_WEB,y:0.5});
     this.zip={mode:'swing',order:[],i:0,target:null,anchor,
-      start,control,end,t:0,dur:Math.max(0.42,Math.min(0.78,0.24+dist*0.038)),ghostAt:0,lineAt:0};
+      start,control,end,t:0,dur:Math.max(0.42,Math.min(0.78,0.24+dist*0.038)),ghostAt:0,lineAt:0,moveT:0,moveDur:10.0};
     invincibleTimer=Math.max(invincibleTimer||0,0.55);
     this._clip('Flying_Forward_Super',0.30,false);
     spiderCinema.speedlines(0.5,0.32);
@@ -31984,18 +32007,13 @@ class SpiderKit {
       if(d<bd){bd=d;best=e;}
     }
     if(!best)return false;
-    const used=new Set(),order=[];
-    let cur=best;
-    while(cur&&order.length<spiderFX._mobileScale(5)){
-      order.push(cur); used.add(cur);
-      cur=this._nearestFrom(cur.position,6.8,used);
-    }
     this.zip.mode='blitz';
-    this.zip.order=order; this.zip.i=0;
+    this.zip.order=this._buildArea(best); this.zip.i=0;
     spiderHandPos(_spdB,false);
     spiderFX.strand(_spdB,best.position,{life:0.24,thick:0.045,glow:true});
     spiderFX.anchorPuff(best.position);
     spiderCinema.speedlines(0.4,0.45);
+    spiderCinema.letterbox(10.3); spiderCinema.vignette(10.3);
     invincibleTimer=Math.max(invincibleTimer||0,0.9);
     this._face(best);
     this._beginBlitzLeg(best);
@@ -32054,8 +32072,61 @@ class SpiderKit {
     }else{
       this._clip('Jump_Land',0.18);
       if(navigator.vibrate)navigator.vibrate(26);
-      this.zip=null;
+      this._continueOrEndZip(s);
     }
+  }
+  // The initial area is empty. If there's time left on the move's 10-second
+  // clock and enemies remain anywhere on the board, web-swing to the next
+  // nearest cluster and keep going; otherwise land and end the move.
+  _continueOrEndZip(s){
+    if(!this.zip)return;
+    if((s.moveT||0)<s.moveDur){
+      const next=this._nearest(9999);
+      if(next){ this._beginTravelSwing(next); return; }
+    }
+    this._finishZip();
+  }
+  _beginTravelSwing(target){
+    const s=this.zip;
+    const start=this.player.position.clone();
+    const end=target.position.clone(); end.y=start.y;
+    this._inArena(end,2.4);
+    const dist=Math.max(1,start.distanceTo(end));
+    const control=start.clone().lerp(end,0.5);
+    control.y=start.y+Math.min(9.0,4.2+dist*0.42);
+    spiderHandPos(_spdB,false);
+    const anchor=control.clone(); anchor.y+=2.2;
+    spiderFX.strand(_spdB,anchor,{life:0.42,thick:0.042,glow:true});
+    spiderFX.anchorPuff(anchor);
+    spiderFX.ring(start,2.0,{life:0.20,color:SPIDER_WEB,y:0.5});
+    s.mode='travel';
+    s.start=start; s.control=control; s.end=end;
+    s.t=0; s.dur=Math.max(0.42,Math.min(0.85,0.24+dist*0.038));
+    s.ghostAt=0; s.lineAt=0; s.anchor=anchor; s.pendingTarget=target;
+    spiderCinema.speedlines(0.5,0.34);
+    triggerCombatShake(5,90);
+  }
+  _landTravelSwing(s){
+    const at=s.end.clone(); at.y=s.start.y;
+    this.player.position.copy(at);
+    const target=(s.pendingTarget&&s.pendingTarget.parent&&!(s.pendingTarget.userData&&s.pendingTarget.userData.dead))
+      ? s.pendingTarget : this._nearest(6.8);
+    if(!target){ this._finishZip(); return; }
+    this._clip('Jump_Land',0.18);
+    spiderFX.impact(at,3.6,{shake:12,color:SPIDER_BLUE});
+    s.mode='blitz';
+    s.order=this._buildArea(target); s.i=0;
+    this._face(target);
+    this._beginBlitzLeg(target);
+  }
+  _finishZip(){
+    if(this.zip){
+      const at=this.player.position.clone();
+      this._clip('Jump_Land',0.20);
+      spiderFX.impact(at,3.6,{shake:12,color:SPIDER_BLUE});
+      spiderCinema.buzz(16);
+    }
+    this.zip=null;
   }
 
   // ---- SECONDARY 2: Electro Web Blob ---------------------------------
@@ -32256,11 +32327,11 @@ class SpiderKit {
     spiderFX.net(at,R,{life:2.1,spin:0.34});
     spiderFX.ring(at,R*1.06,{life:0.42,color:SPIDER_BLUE,y:0.26});
 
-    this.maximum={act:0,t:0,actT:0,tick:0,at,R,order:[],i:0,hop:0.085,dur:5.6};
-    invincibleTimer=Math.max(invincibleTimer||0,6.2);
+    this.maximum={act:0,t:0,actT:0,tick:0,at,R,order:[],i:0,hop:0.085,dur:10.0};
+    invincibleTimer=Math.max(invincibleTimer||0,10.6);
     this._clip('Power_Up',0.5,false);
-    spiderCinema.letterbox(5.8);
-    spiderCinema.vignette(5.8);
+    spiderCinema.letterbox(10.3);
+    spiderCinema.vignette(10.3);
     spiderCinema.card('MAXIMUM SPIDER','ACT I \u2014 SNARE','#7fd9ff');
     spiderCinema.punch('rgba(120,226,255,.44)',.36,26,0.12);
     spiderCinema.buzz([20,40,20]);
@@ -32328,8 +32399,8 @@ class SpiderKit {
   fullStopAnchor(){
     if(this._busy())return false;
     const at=this.player.position.clone();
-    this.shadows={mode:'anchor',t:0,dur:7.6,at,tick:0,heave:0.75,heaves:0};
-    invincibleTimer=Math.max(invincibleTimer||0,8.0);
+    this.shadows={mode:'anchor',t:0,dur:10.0,at,tick:0,heave:0.75,heaves:0};
+    invincibleTimer=Math.max(invincibleTimer||0,10.6);
     this._clip('Power_Up',0.5,false);
     spiderFX._init();
     // Anchor lines fired out to the rim. Purely visual, but they are what sell
@@ -32344,12 +32415,15 @@ class SpiderKit {
     }
     spiderFX.net(at,rim*0.5,{life:1.2,spin:0.4});
     spiderFX.ring(at,rim*0.6,{life:0.44,color:SPIDER_WEB,y:0.22});
-    spiderCinema.letterbox(7.9);
-    spiderCinema.vignette(7.9);
+    spiderCinema.letterbox(10.3);
+    spiderCinema.vignette(10.3);
     spiderCinema.card('FULL STOP','HOLD THE LINE','#f2f7ff');
     spiderCinema.punch('rgba(242,247,255,.42)',.34,24,0.10);
     spiderCinema.buzz([18,30,18,30]);
-    toast('FULL STOP ANCHOR');
+    // Clarify up front what this button actually does: unlike the other two
+    // ultimates he does not move at all, and there is nothing to aim - it
+    // just hits the whole board on its own for the full duration.
+    toast('ROOTED! Can’t move for 10s — pulling in every enemy');
     return true;
   }
   _anchorHeave(s){
@@ -32417,18 +32491,27 @@ class SpiderKit {
   skylineDive(){
     if(this._busy())return false;
     const ground=this.player.position.y;
-    this.webline={mode:'dive',t:0,dur:8.4,phase:0,pt:0,dives:0,ground,
-      apexY:9.4,mark:null,from:null,final:false};
-    invincibleTimer=Math.max(invincibleTimer||0,9.0);
+    this.webline={mode:'dive',t:0,dur:10.0,phase:0,pt:0,dives:0,ground,
+      apexY:9.4,mark:null,from:null,final:false,ascentFxAt:0,trailFrom:null};
+    invincibleTimer=Math.max(invincibleTimer||0,10.6);
     this._clip('Flying_Forward_Super',0.34,false);
     spiderFX._init();
     spiderHandPos(_spdB,false);
-    const up=this.player.position.clone(); up.y+=10.5;
-    spiderFX.strand(_spdB,up,{life:0.6,thick:0.05,glow:true});
-    spiderFX.anchorPuff(up);
-    spiderFX.ring(this.player.position,3.4,{life:0.3,color:SPIDER_RED,y:0.4});
-    spiderCinema.letterbox(8.7);
-    spiderCinema.vignette(8.7);
+    // Launch: a fan of web-lines instead of one, plus a ground-scorch ring and
+    // dust burst, so the takeoff itself reads as a real launch, not a hop.
+    const launchAt=this.player.position.clone();
+    for(let i=0;i<5;i++){
+      const a=(i-2)*0.22;
+      const up=launchAt.clone();
+      up.x+=Math.sin(a)*1.4; up.z+=Math.cos(a)*1.4; up.y+=9.6+Math.random()*1.6;
+      spiderFX.strand(_spdB,up,{life:0.65,thick:i===2?0.056:0.036,glow:true});
+    }
+    spiderFX.anchorPuff(launchAt.clone().setY(launchAt.y+10.5));
+    spiderFX.ring(launchAt,3.4,{life:0.3,color:SPIDER_RED,y:0.4});
+    spiderFX.ring(launchAt,2.0,{life:0.4,y:0.1});
+    spiderFX.burst(launchAt,3.0,{count:16,life:0.32,thick:0.026,height:0.3});
+    spiderCinema.letterbox(10.3);
+    spiderCinema.vignette(10.3);
     spiderCinema.card('SKYLINE DIVE','GOING UP','#ff5566');
     spiderCinema.punch('rgba(214,32,46,.40)',.34,22,0.09);
     spiderCinema.buzz([16,26,16]);
@@ -32452,7 +32535,20 @@ class SpiderKit {
     spiderFX.burst(at,R*0.66,{count:big?20:11,life:0.24,thick:0.022});
     spiderCinema.punch(big?'rgba(255,255,255,.62)':'rgba(214,32,46,.30)',big?.50:.28,0,big?0.17:0.075);
     spiderCinema.speedlines(big?0.7:0.22,big?0.72:0.34);
-    if(big)spiderCinema.card('SKYLINE DIVE','\u2014 TOUCHDOWN \u2014','#ffd76a');
+    if(big){
+      spiderCinema.card('SKYLINE DIVE','\u2014 TOUCHDOWN \u2014','#ffd76a');
+      // Capstone crater cracks radiating to the rim - the same scale of payoff
+      // Maximum Spider's finisher gets, so the airborne ultimate closes just
+      // as big as its grounded siblings.
+      const cracks=spiderFX._mobileScale(12), reach=Math.max(12,arenaSize*0.7);
+      for(let i=0;i<cracks;i++){
+        const a=(i/cracks)*Math.PI*2;
+        spiderFX.strand(at.clone().setY(0.55),
+          new THREE.Vector3(at.x+Math.cos(a)*reach,0.55,at.z+Math.sin(a)*reach),
+          {life:0.9,thick:0.05,glow:true});
+      }
+      spiderFX.ring(at,R*1.6,{life:0.6,color:SPIDER_RED,y:0.16});
+    }
     for(const e of [...this._enemies()]){
       const dx=e.position.x-at.x,dz=e.position.z-at.z;
       if(dx*dx+dz*dz>R*R)continue;
@@ -32614,7 +32710,10 @@ class SpiderKit {
 
     // ---- web-yank blitz
     if(this.zip){
-      const s=this.zip; s.t+=dt;
+      const s=this.zip; s.t+=dt; s.moveT=(s.moveT||0)+dt;
+      // Refreshed every frame rather than set once, so invincibility covers
+      // the whole multi-area move instead of lapsing after the first hit.
+      invincibleTimer=Math.max(invincibleTimer||0,0.15);
       const u=Math.min(1,s.t/s.dur), v=1-u;
       this.player.position.set(
         v*v*s.start.x+2*v*u*s.control.x+u*u*s.end.x,
@@ -32638,6 +32737,14 @@ class SpiderKit {
         // something he just launched away from.
         if(u>0.25&&u<0.92&&this._swingAcquire(s))return;
         if(u>=1){ this._swingLand(s); return; }
+      }else if(s.mode==='travel'){
+        s.lineAt=(s.lineAt||0)+dt;
+        if(s.lineAt>=0.05){
+          s.lineAt=0;
+          spiderHandPos(_spdB,false);
+          spiderFX.strand(_spdB,s.anchor,{life:0.10,thick:0.030,glow:true});
+        }
+        if(u>=1){ this._landTravelSwing(s); return; }
       }else if(u>=1) this._blitzHit(s);
     }
 
@@ -32689,7 +32796,7 @@ class SpiderKit {
         }
         if(s.tick>=0.26){
           s.tick=0;
-          spiderFX.ring(s.at,s.R*Math.max(0.22,1-s.actT/1.9),{life:0.34,color:SPIDER_BLUE,y:0.16});
+          spiderFX.ring(s.at,s.R*Math.max(0.22,1-s.actT/2.6),{life:0.34,color:SPIDER_BLUE,y:0.16});
           spiderFX.net(s.at,s.R*(0.58+0.20*Math.sin(s.actT*6.2)),{life:0.28,spin:0.26});
           this._radial(s.at,s.R,1.35);
           for(let i=0;i<2;i++){
@@ -32699,13 +32806,17 @@ class SpiderKit {
               {x:s.at.x+Math.cos(a2)*s.R*0.82,y:0.1,z:s.at.z+Math.sin(a2)*s.R*0.82},1);
           }
         }
-        if(s.actT>=1.9){
+        if(s.actT>=2.6){
           s.act=1; s.actT=0; s.tick=0;
           const p=this.player.position;
           s.order=this._enemies()
             .map(e=>({e,d:(e.position.x-p.x)**2+(e.position.z-p.z)**2}))
             .sort((a,b)=>a.d-b.d).map(x=>x.e)
             .slice(0,spiderFX._mobileScale(22));
+          // Fixed act-length instead of a fixed per-hop time: the chain always
+          // takes ~3.7s whether it's hopping through 2 enemies or 22, so the
+          // move's total runtime stays consistent regardless of board state.
+          s.hop=3.7/Math.max(1,s.order.length);
           this._clip('Power_Up',0.18,false);
           spiderCinema.card('MAXIMUM SPIDER','ACT II \u2014 CHAIN','#ff5566');
           spiderCinema.speedlines(2.6,0.58);
@@ -32714,13 +32825,13 @@ class SpiderKit {
       } else if(s.act===1){
         // ACT II - chain assault through whatever the dome collected.
         while(s.actT>=s.hop && s.i<s.order.length){ s.actT-=s.hop; this._maximumHop(s); }
-        if(s.i>=s.order.length && s.actT>=0.28){
+        if(s.i>=s.order.length && s.actT>=0.3){
           s.act=2; s.actT=0;
           this._maximumFinish(s);
         }
       } else {
         // ACT III - hold on the crater, then release control.
-        if(s.actT>=0.85){ this.maximum=null; this.cool.maximum=0; }
+        if(s.actT>=3.1){ this.maximum=null; this.cool.maximum=0; }
       }
       if(this.maximum && s.t>s.dur-0.2) s.dur=s.t+0.2;
     }
@@ -32765,6 +32876,14 @@ class SpiderKit {
       if(s.phase===0){                      // ASCENT
         const u=Math.min(1,s.pt/0.42);
         P.y=s.ground+(s.apexY-s.ground)*u;
+        // Rocketing-up trail: without this the climb was just a position
+        // lerp with nothing on screen between the launch and the apex.
+        s.ascentFxAt=(s.ascentFxAt||0)+dt;
+        if(s.ascentFxAt>=0.045){
+          s.ascentFxAt=0;
+          spiderFX.ghost(P,0.95);
+          spiderFX.burst(P,0.85,{count:5,life:0.18,thick:0.016,height:0.15});
+        }
         if(s.pt>=0.42){ s.phase=1; s.pt=0; s.from=P.clone();
           s.mark=this._bestCluster(5.2)||this._inArena(P.clone().addScaledVector(this._fwd(),8),3);
           s.mark.y=s.ground;
@@ -32777,9 +32896,12 @@ class SpiderKit {
         P.z=s.from.z+(s.mark.z-s.from.z)*u;
         P.y=s.apexY+Math.sin(u*Math.PI)*0.7;
         this._face({position:s.mark});
+        s.ascentFxAt=(s.ascentFxAt||0)+dt;
+        if(s.ascentFxAt>=0.05){ s.ascentFxAt=0; spiderFX.ghost(P,0.85); }
         if(s.pt>=0.30){
-          s.phase=2; s.pt=0;
-          if(s.final){ spiderCinema.speedlines(0.6,0.68); spiderCinema.flash('rgba(255,255,255,.28)',.24,160); }
+          s.phase=2; s.pt=0; s.trailFrom=P.clone();
+          spiderCinema.speedlines(s.final?0.6:0.26,s.final?0.68:0.34);
+          if(s.final){ spiderCinema.flash('rgba(255,255,255,.28)',.24,160); }
         }
       } else if(s.phase===2){               // DIVE
         const dur=s.final?0.34:0.24;
@@ -32788,8 +32910,15 @@ class SpiderKit {
         P.y=s.apexY+(s.ground-s.apexY)*(u*u);   // accelerating drop
         this.player.rotation.x=0;
         spiderFX.ghost(P,s.final?1.35:1.06);
+        // Comet trail: connects every dive frame to the last, so the fall
+        // reads as one continuous streak instead of a string of afterimages.
+        if(s.trailFrom){
+          spiderFX.strand(s.trailFrom,P,{life:s.final?0.30:0.20,thick:s.final?0.052:0.032,glow:true});
+        }
+        s.trailFrom=P.clone();
         if(u>=1){
           this._diveImpact(s,s.final);
+          s.trailFrom=null;
           if(s.final){ this.webline=null; this.cool.webline=0; }
           else { s.phase=3; s.pt=0; }
         }
@@ -37124,6 +37253,8 @@ function startSurvival(){
 
 function endSurvival(){
   gameRunning = false;
+  try{ spiderCinema.clear(); }catch(_e){}
+  try{ disposeSpiderKit(); }catch(_e){}
   clearArcaneEchoes();
   if(state.avatarType==='mage'&&player){
     dashActive=false;dashTimer=0;dashStartedAt=0;
