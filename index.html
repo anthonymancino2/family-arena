@@ -1,3 +1,4 @@
+<!-- V23.67.00 Mouse & Keyboard: adds a full mouse+keyboard control scheme alongside touch, with a corner toggle button (top-left, 🖱️/🖐️) to switch between them at any time, defaulting to keyboard on non-touch devices and touch on mobile (isMobile), remembered afterward via localStorage. WASD/arrows drive the same moveVec the joystick already used; holding the right mouse button and dragging looks around (matches the touch look-zone's own drag gesture, just gated to the right button so left stays free for firing); left-click fires Primary; Q/E/R hold-trigger Secondary/Ability/Ultimate through the exact same beginX/releaseX functions and InputHeld flags the touch buttons use; Space jumps, Shift dashes, F recenters the camera, mouse wheel cycles zoom, Escape opens/closes pause. All of this lives inside setupControls() itself (not as new top-level functions) specifically so it shares that closure with activateEquippedAbilityNow/activateUltimate and the four begin/release pairs, which are local consts there - calling them from outside that scope was confirmed to be unreachable. In keyboard mode the on-screen joystick and action buttons are hidden entirely (CSS body.kbmMode) and a small hint bar lists every binding; switching modes releases every currently-held input first so nothing gets stuck. -->
 <!-- V23.66.00 True Landscape Render: fixes a real black-screen bug on landscape phones - initEngine()/onResize() were still sizing the WebGL renderer and camera from portraitLogicalViewport() (the swapped, portrait-shaped box used only to make the old CSS counter-rotation math work), which left the canvas's actual drawing buffer narrow-and-tall while its CSS box was the real wide-and-short viewport, rendering into only a slice of the screen and showing the black page background everywhere else. Both now size from physicalViewportSize() directly. Also removes every spiderCinema.speedlines() call across the whole Spider kit (all three ultimates plus Web-Yank's swing beats) - the radial white-ray "border" effect that kept causing lingering-overlay reports; letterbox/vignette/card/punch/shake/buzz on the three ultimates are unchanged. -->
 <!-- V23.65.00 Web-Yank Batches: rebuilds Web-Yank Blitz's activation model around holding the Secondary button instead of a fire-and-forget autonomous sequence. Each activation kicks through a chain-linked batch of enemies - 5 at Round 1, scaling to 10 by Round 30 - then always stops there (cap reached or ran out of linked targets) and waits out a flat 1s cooldown; holding the button through that cooldown auto-fires the next batch via the same shared hold-to-repeat loop every other Spider secondary already uses, releasing it stops the chain immediately mid-batch regardless of progress, and nothing further happens until pressed again. Removes the multi-area autonomous travel-swing system (_continueOrEndZip/_beginTravelSwing/_landTravelSwing) added in V23.61-23.62 along with the letterbox/vignette cinema treatment on this move, since a short held-button flurry doesn't need ultimate-scale framing. -->
 <!-- V23.64.00 Cinema Fade Guarantee: adds spiderCinema.capFade(seconds), which shortens (never extends) the letterbox/vignette/speedlines timers down to at most N seconds from now, and calls it with 3 at every real Spider move end point (Web-Yank's two land paths, Maximum Spider's Act III end, Full Stop Anchor's end, Skyline Dive's final-dive end and hard-floor safety end). letterbox()/vignette()/speedlines() only ever raise their timer via Math.max, so a move whose actual runtime didn't match the duration estimated at cast time (most likely Web-Yank Blitz, whose real length now varies with how many areas it chains through) had no way to pull the countdown back in - this guarantees the border/vignette/speedlines are gone within 3s of the move actually finishing regardless. -->
@@ -282,10 +283,35 @@
   .moveKnobDot{position:absolute;width:32px;height:32px;border-radius:50%;
     background:rgba(255,255,255,0.4);left:28px;top:28px;pointer-events:none;}
   .lookZone{position:absolute;right:0;top:0;bottom:0;width:55%;pointer-events:auto;}
-  .actBtn,.secondaryBtn,.jumpBtn,.dashBtn,.freeBtn,.vertBtn,.camZoomBtn,.camLabelBox,.pauseBtn,.lookFwdBtn{
+  .actBtn,.secondaryBtn,.jumpBtn,.dashBtn,.freeBtn,.vertBtn,.camZoomBtn,.camLabelBox,.pauseBtn,.lookFwdBtn,.controlToggleBtn{
     -webkit-backdrop-filter:blur(8px) saturate(150%);backdrop-filter:blur(8px) saturate(150%);
     box-shadow:0 3px 12px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(0,0,0,0.3);
     text-shadow:0 1px 3px rgba(0,0,0,0.85);}
+  /* Corner toggle between touch controls and mouse+keyboard. Sits above the
+     left info-pill stack (which starts lower, around 58px) so it never
+     collides with either that stack or the top-right camera/pause cluster. */
+  .controlToggleBtn{position:absolute;top:calc(6px + env(safe-area-inset-top));left:calc(10px + env(safe-area-inset-left));
+    width:38px;height:38px;border-radius:10px;background:rgba(20,22,28,0.55);
+    border:2px solid rgba(255,255,255,0.75);font-size:17px;color:#fff;
+    pointer-events:auto;display:flex;align-items:center;justify-content:center;
+    z-index:50;cursor:pointer;user-select:none;-webkit-user-select:none;}
+  .controlToggleBtn:active{background:rgba(60,64,72,0.7);}
+  /* Mouse+keyboard mode: the on-screen joystick/look zones and the touch
+     action buttons are redundant with WASD/mouse/hotkeys and would just
+     sit in the way, so they're hidden entirely. Pause and camera zoom stay
+     visible - both are still perfectly natural to click with a mouse. */
+  body.kbmMode .moveZone,body.kbmMode .lookZone,body.kbmMode .moveKnob,
+  body.kbmMode .actBtn,body.kbmMode .secondaryBtn,body.kbmMode .dashBtn,
+  body.kbmMode .abilityBtn,body.kbmMode .ultimateBtn,body.kbmMode .laserBtn,
+  body.kbmMode .jumpBtn,body.kbmMode .lookFwdBtn,body.kbmMode .vertBtn{
+    display:none!important;
+  }
+  .kbmHintBar{position:absolute;left:50%;bottom:calc(10px + env(safe-area-inset-bottom));
+    transform:translateX(-50%);background:rgba(20,22,28,0.55);border:1.5px solid rgba(255,255,255,0.4);
+    border-radius:10px;padding:5px 12px;font-size:11px;color:#dfe8ee;white-space:normal;
+    max-width:92vw;text-align:center;line-height:1.5;
+    pointer-events:none;display:none;letter-spacing:.2px;}
+  body.kbmMode .kbmHintBar{display:block;}
   .actBtn{position:absolute;bottom:calc(34px + env(safe-area-inset-bottom));right:22px;
     width:72px;height:72px;border-radius:50%;background:rgba(255,80,80,0.62);
     border:2.5px solid rgba(255,255,255,0.75);font-weight:800;font-size:13px;color:#fff;
@@ -1192,6 +1218,8 @@
       <div class="moveKnob" id="moveKnob"><div class="moveKnobDot" id="moveKnobDot"></div></div>
       <div class="lookZone" id="lookZone"></div>
       <div id="hudChrome">
+        <div class="controlToggleBtn" id="controlToggleBtn" title="Switch controls">🖱️</div>
+        <div class="kbmHintBar" id="kbmHintBar">WASD move · Mouse look (hold right-click) · Left-click fire · Q secondary · E ability · R ultimate · Space jump · Shift dash · Scroll zoom · Esc pause</div>
         <div class="hitFlash" id="hitFlash"></div>
         <div class="meteorAtmo" id="meteorAtmo"></div>
         <div class="meteorFlash" id="meteorFlash"></div>
@@ -1352,7 +1380,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.66.00 - True Landscape Render';
+const GAME_VERSION='23.67.00 - Mouse & Keyboard';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -14967,6 +14995,15 @@ let abilityPointerId = null;
 let signatureInputHeld = false;
 let signaturePointerId = null;
 
+// ---- Mouse & keyboard controls (desktop) ----
+// 'touch' or 'keyboard'. Defaults to keyboard on non-touch devices, touch on
+// mobile, but always defers to whatever the player last chose.
+let controlScheme = isMobile ? 'touch' : 'keyboard';
+try{
+  const savedScheme = localStorage.getItem('fa_controlScheme');
+  if(savedScheme === 'touch' || savedScheme === 'keyboard') controlScheme = savedScheme;
+}catch(_e){}
+document.body.classList.toggle('kbmMode', controlScheme==='keyboard');
 
 function updateDisplayModeClass(){
   const installed=window.matchMedia('(display-mode: standalone)').matches ||
@@ -15365,6 +15402,156 @@ function setupControls(){
   document.getElementById('btnCloseShop').addEventListener('touchstart', e=>{ e.preventDefault(); closeShop(); });
   document.getElementById('btnCloseShopIcon').addEventListener('touchstart', e=>{ e.preventDefault(); closeShop(); });
   document.getElementById('btnCloseShopIcon').addEventListener('click', e=>{ e.preventDefault(); closeShop(); });
+
+  // ---- Mouse & keyboard controls ----
+  // Lives here (inside setupControls(), not as top-level functions) purely
+  // so it shares this closure with beginPrimaryFire/beginSecondaryFire/
+  // beginEquippedAbility/beginSignatureInput/activateEquippedAbilityNow/
+  // activateUltimate and their release counterparts above - those are all
+  // local consts, not globals, so anything driving them has to live in this
+  // same scope rather than calling in from the outer update()/animate().
+  const controlToggleBtnEl = document.getElementById('controlToggleBtn');
+  const kbKeys = new Set();
+  function recomputeKeyboardMoveVec(){
+    if(controlScheme!=='keyboard')return;
+    let x=0,y=0;
+    if(kbKeys.has('KeyA')||kbKeys.has('ArrowLeft'))x-=1;
+    if(kbKeys.has('KeyD')||kbKeys.has('ArrowRight'))x+=1;
+    if(kbKeys.has('KeyW')||kbKeys.has('ArrowUp'))y-=1;
+    if(kbKeys.has('KeyS')||kbKeys.has('ArrowDown'))y+=1;
+    moveVec.x=x; moveVec.y=y;
+  }
+  function isTypingTarget(){
+    const a=document.activeElement;
+    return !!(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.isContentEditable));
+  }
+  function updateControlToggleUi(){
+    if(!controlToggleBtnEl)return;
+    controlToggleBtnEl.textContent = controlScheme==='keyboard' ? '🖐️' : '🖱️';
+    controlToggleBtnEl.title = controlScheme==='keyboard' ? 'Switch to touch controls' : 'Switch to mouse & keyboard';
+  }
+  function releaseAllHeldInputs(){
+    kbKeys.clear();
+    moveVec.x=0; moveVec.y=0;
+    lookActive=false; mouseLookActive=false;
+    releasePrimaryInput();
+    releaseSecondaryInput();
+    releaseEquippedAbility();
+    releaseSignatureInput();
+    freeUp=false; freeDown=false;
+  }
+  function setControlScheme(scheme){
+    if(scheme!=='touch'&&scheme!=='keyboard')return;
+    if(controlScheme===scheme)return;
+    releaseAllHeldInputs();
+    controlScheme=scheme;
+    document.body.classList.toggle('kbmMode', controlScheme==='keyboard');
+    updateControlToggleUi();
+    try{ localStorage.setItem('fa_controlScheme', controlScheme); }catch(_e){}
+    toast(controlScheme==='keyboard' ? 'MOUSE & KEYBOARD' : 'TOUCH CONTROLS');
+  }
+  updateControlToggleUi();
+  if(controlToggleBtnEl){
+    controlToggleBtnEl.style.touchAction='none';
+    const onToggleClick=e=>{
+      if(e){e.preventDefault();e.stopPropagation();}
+      setControlScheme(controlScheme==='keyboard'?'touch':'keyboard');
+    };
+    if(window.PointerEvent) controlToggleBtnEl.addEventListener('pointerdown', onToggleClick, {passive:false});
+    else controlToggleBtnEl.addEventListener('touchstart', onToggleClick, {passive:false});
+  }
+
+  window.addEventListener('keydown', e=>{
+    if(controlScheme!=='keyboard'||isTypingTarget())return;
+    const code=e.code;
+    if(code==='KeyW'||code==='KeyA'||code==='KeyS'||code==='KeyD'||
+       code==='ArrowUp'||code==='ArrowLeft'||code==='ArrowDown'||code==='ArrowRight'){
+      e.preventDefault();
+      kbKeys.add(code);
+      recomputeKeyboardMoveVec();
+      return;
+    }
+    if(code==='Escape'){
+      e.preventDefault();
+      const overlay=document.getElementById('pauseOverlay');
+      if(overlay&&overlay.classList.contains('show')) closePauseMenu();
+      else if(gameRunning) openPauseMenu();
+      return;
+    }
+    if(!gameRunning||e.repeat)return;
+    if(code==='Space'){
+      e.preventDefault();
+      if(freeMode) freeUp=true; else doJump();
+    }else if(code==='ShiftLeft'||code==='ShiftRight'){
+      e.preventDefault();
+      doDash();
+    }else if(code==='KeyC'){
+      e.preventDefault();
+      if(freeMode) freeDown=true;
+    }else if(code==='KeyF'){
+      e.preventDefault();
+      camYaw = player.rotation.y;
+      camPitch = 0.56;
+    }else if(code==='KeyQ'){
+      e.preventDefault();
+      beginSecondaryFire();
+    }else if(code==='KeyE'){
+      e.preventDefault();
+      beginEquippedAbility();
+    }else if(code==='KeyR'){
+      e.preventDefault();
+      beginSignatureInput();
+    }
+  });
+  window.addEventListener('keyup', e=>{
+    if(controlScheme!=='keyboard')return;
+    const code=e.code;
+    if(code==='KeyW'||code==='KeyA'||code==='KeyS'||code==='KeyD'||
+       code==='ArrowUp'||code==='ArrowLeft'||code==='ArrowDown'||code==='ArrowRight'){
+      kbKeys.delete(code);
+      recomputeKeyboardMoveVec();
+    }else if(code==='Space'){ freeUp=false; }
+    else if(code==='KeyC'){ freeDown=false; }
+    else if(code==='KeyQ'){ releaseSecondaryInput(); }
+    else if(code==='KeyE'){ releaseEquippedAbility(); }
+    else if(code==='KeyR'){ releaseSignatureInput(); }
+  });
+  // Losing focus/visibility mid-hold must not leave a key permanently "stuck".
+  window.addEventListener('blur', ()=>{ if(controlScheme==='keyboard') releaseAllHeldInputs(); });
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden&&controlScheme==='keyboard') releaseAllHeldInputs(); });
+
+  // Mouse: left-click fires Primary, right-click-drag looks around (matching
+  // the touch look-zone's own drag gesture, just with the right button
+  // reserved so left stays free for firing), wheel cycles camera zoom.
+  const glCanvasEl = document.getElementById('gl');
+  let mouseLookActive=false;
+  if(glCanvasEl){
+    glCanvasEl.addEventListener('contextmenu', e=>{ if(controlScheme==='keyboard') e.preventDefault(); });
+    glCanvasEl.addEventListener('mousedown', e=>{
+      if(controlScheme!=='keyboard'||!gameRunning)return;
+      if(e.button===0){ beginPrimaryFire(); }
+      else if(e.button===2){ e.preventDefault(); mouseLookActive=true; lookActive=true; }
+    });
+    window.addEventListener('mousemove', e=>{
+      if(controlScheme!=='keyboard'||!mouseLookActive)return;
+      camYaw += e.movementX*0.006;
+      camPitch = Math.max(0.1, Math.min(0.9, camPitch + e.movementY*0.004));
+    });
+    window.addEventListener('mouseup', e=>{
+      if(controlScheme!=='keyboard')return;
+      if(e.button===0) releasePrimaryInput();
+      else if(e.button===2){ mouseLookActive=false; lookActive=false; }
+    });
+    let wheelAccum=0;
+    glCanvasEl.addEventListener('wheel', e=>{
+      if(controlScheme!=='keyboard'||!gameRunning)return;
+      e.preventDefault();
+      wheelAccum += e.deltaY;
+      const step=50;
+      while(wheelAccum>=step){ cycleCamera(1); wheelAccum-=step; }
+      while(wheelAccum<=-step){ cycleCamera(-1); wheelAccum+=step; }
+    }, {passive:false});
+  }
 }
 
 // Pausing just stops the animate() loop (it already exits early when
