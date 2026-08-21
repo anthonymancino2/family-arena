@@ -1,3 +1,4 @@
+<!-- V23.65.00 Web-Yank Batches: rebuilds Web-Yank Blitz's activation model around holding the Secondary button instead of a fire-and-forget autonomous sequence. Each activation kicks through a chain-linked batch of enemies - 5 at Round 1, scaling to 10 by Round 30 - then always stops there (cap reached or ran out of linked targets) and waits out a flat 1s cooldown; holding the button through that cooldown auto-fires the next batch via the same shared hold-to-repeat loop every other Spider secondary already uses, releasing it stops the chain immediately mid-batch regardless of progress, and nothing further happens until pressed again. Removes the multi-area autonomous travel-swing system (_continueOrEndZip/_beginTravelSwing/_landTravelSwing) added in V23.61-23.62 along with the letterbox/vignette cinema treatment on this move, since a short held-button flurry doesn't need ultimate-scale framing. -->
 <!-- V23.64.00 Cinema Fade Guarantee: adds spiderCinema.capFade(seconds), which shortens (never extends) the letterbox/vignette/speedlines timers down to at most N seconds from now, and calls it with 3 at every real Spider move end point (Web-Yank's two land paths, Maximum Spider's Act III end, Full Stop Anchor's end, Skyline Dive's final-dive end and hard-floor safety end). letterbox()/vignette()/speedlines() only ever raise their timer via Math.max, so a move whose actual runtime didn't match the duration estimated at cast time (most likely Web-Yank Blitz, whose real length now varies with how many areas it chains through) had no way to pull the countdown back in - this guarantees the border/vignette/speedlines are gone within 3s of the move actually finishing regardless. -->
 <!-- V23.63.00 Anchor Freedom: Full Stop Anchor no longer pins the player to the cast point for the full 10s - the pull/heave effect still operates from that fixed point, but he's free to move and fight anywhere while it runs, matching player feedback that being frozen in place "put them back" whenever they tried to move away. Toast, HUD label ("ANCHORED" instead of "ROOTED"), and shop description updated to match. Also plugs a real gap where restarting or rerunning a round mid-Spider-move (startSurvival/rerunCurrentRound, neither previously touched by the spiderCinema.clear()/disposeSpiderKit() cleanup added in V23.62) left the letterbox/vignette overlay stuck on screen through the transition into the new round - this was very likely the "web border graphic isn't deactivating" bug, since every other exit path (quit, death, round-clear) was already covered. -->
 <!-- V23.62.00 Landscape Everywhere: fixes the Spider cinematic overlay getting stuck on the landing/round-clear screen after a move ends mid-transition; rebuilds Web-Yank Blitz into a ~10s move that swing-kicks through one enemy cluster then auto-swings to the next until the board clears or the clock runs out; unifies Maximum Spider/Full Stop Anchor/Skyline Dive to a 10-second active duration; clarifies Full Stop Anchor's rooted/no-aim behavior in its toast, HUD label, and description; gives Skyline Dive a richer launch, ascent trail, dive comet trail, and capstone finisher; and — the big one — removes the forced portrait counter-rotation entirely (phone, tablet, and desktop alike now render landscape natively) with a single rewritten @media(orientation:landscape) HUD layout that keeps every combat/movement button spaced apart at any width or height, replacing the old dueling "plain" vs "body.browserMode" rule sets that used to leave Secondary sitting on top of Ability and gave Up/Down (climb/swim/fly) no landscape position at all - the same Up/Down collision existed in portrait too and is fixed there as well. -->
@@ -1350,7 +1351,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.64.00 - Cinema Fade Guarantee';
+const GAME_VERSION='23.65.00 - Web-Yank Batches';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3384,7 +3385,7 @@ const CHARACTER_COMBAT = {
       spider_web_snap:{name:'Web Snap', price:0, slot:'primary', kind:'spider_web_snap', cooldown:0.26, damage:1.5, auto:true,
         desc:'Fire a fast web bolt that pierces up to three enemies and wraps every one it touches. Wrapped targets are held in place and take 45% extra damage from all sources, so this is the opener the rest of the kit is built on. Fire-rate cooldown scales to zero by Round 18.'},
       spider_zip_takedown:{name:'Web-Yank Blitz', price:0, slot:'secondary', kind:'spider_zip_takedown', cooldown:0,
-        desc:'Fire twin web-lines into the nearest enemy, slingshot in, then ricochet through a short chain of nearby enemies in a rapid acrobatic assault. Normal enemies are executed, heavies are wrapped and smashed, and bosses take repeated capped chunks. With nothing in range it no longer stalls: he takes a web-line and swings 13 units in the direction he is facing, staying inside the arena, and converts into the full takedown chain the instant anything comes within reach mid-arc.'},
+        desc:'Fire twin web-lines into the nearest enemy, slingshot in, and ricochet through a chain-linked batch of nearby enemies - 5 at Round 1, scaling up to 10 by Round 30. Normal enemies are executed, heavies are wrapped and smashed, and bosses take repeated capped chunks. Hold the button to keep chaining leg to leg; release and he stops right there no matter how many of the batch he’s hit so far. Once a batch ends - either the cap is reached or he runs out of linked targets - there’s a flat 1s cooldown, and he’ll auto-fire straight into the next batch the moment it clears if the button is still held. With nothing in range it no longer stalls: he takes a web-line and swings 13 units in the direction he is facing, staying inside the arena, and converts into the takedown chain the instant anything comes within reach mid-arc.'},
       spider_web_trap:{name:'Electro Web Blob', price:0, slot:'secondary', kind:'spider_web_trap', cooldown:0,
         desc:'Auto-target within 18 units and launch a giant sticky electro-web blob with a live current crawling over it. On impact it detonates in a 6.2-unit chain: normal enemies caught in the 2.7-unit core are destroyed outright, everything else is cocooned and shocked, and a crackling tesla pool is left behind for 2.6 seconds to catch whatever walks in next. Holding the button fires roughly three blobs a second, capped at three in flight. Bosses can be trapped and shocked, but the shock cannot finish them.'},
       spider_somersault_slam:{name:'Somersault Hunt', price:0, slot:'secondary', kind:'spider_somersault_slam', cooldown:0,
@@ -31790,11 +31791,18 @@ class SpiderKit {
   }
 
   // ---- SECONDARY 1: Web-Yank Blitz -----------------------------------
-  // A full ~10s takedown tour: twin web-lines latch onto the nearest cluster,
-  // Spider-Man kicks his way through every enemy linked into that area, and
-  // the moment that area is empty he web-swings straight to the next nearest
-  // cluster and starts kicking again. Repeats until either the whole board
-  // is clear or the move's 10-second clock runs out, then he lands.
+  // A held-button flurry: twin web-lines latch onto the nearest cluster and
+  // Spider-Man kicks his way through it, capped at a batch of enemies (5 at
+  // Round 1, scaling to 10 by Round 30). The batch always ends there - either
+  // it runs out of chain-linked targets or hits the cap - then he lands and
+  // waits out a flat 1s cooldown. If the Secondary control is still held
+  // when that cooldown clears, the shared hold-to-repeat loop fires him
+  // again at whatever's nearest, chaining into a new batch; if it's been
+  // released, nothing else happens until the next press.
+  _yankBatchSize(){
+    const r=Math.max(1,Number(round)||1);
+    return Math.round(5+5*Math.min(1,(r-1)/29));
+  }
   zipTakedown(){
     if(this._busy()||this.cool.zip>0)return false;
     const first=this._nearest(18);
@@ -31804,7 +31812,6 @@ class SpiderKit {
     // itself keeps scanning, so it converts into the takedown chain the moment
     // anything comes within reach mid-arc.
     if(!first){ return this._freeSwing(); }
-    this.cool.zip=this._roundCooldown(0.65,28);
     dashActive=false; dashTimer=0;
     this._face(first);
     spiderHandPos(_spdB,false);
@@ -31813,18 +31820,16 @@ class SpiderKit {
     spiderFX.strand(_spdA,first.position,{life:0.24,thick:0.034,glow:true});
     spiderFX.anchorPuff(first.position);
     spiderFX.ring(first.position,2.2,{life:0.20,color:SPIDER_WEB,y:0.55});
-    const order=this._buildArea(first);
-    this.zip={mode:'blitz',order,i:0,target:null,start:null,control:null,end:null,t:0,dur:0.18,ghostAt:0,moveT:0,moveDur:10.0};
+    const order=this._buildArea(first,this._yankBatchSize());
+    this.zip={mode:'blitz',order,i:0,target:null,start:null,control:null,end:null,t:0,dur:0.18,ghostAt:0};
     this._beginBlitzLeg(order[0]);
     invincibleTimer=Math.max(invincibleTimer||0,1.0);
-    spiderCinema.letterbox(10.3); spiderCinema.vignette(10.3);
     this._clip('Flying_Forward_Super',0.22,false);
     toast('WEB-YANK BLITZ');
     return true;
   }
   // Every enemy chain-linked (within 6.8 units of the previous one) to the
-  // given starting target - "the initial area Spider-Man swung to". Capped
-  // so a pathologically dense mob can't stretch one area past a few seconds.
+  // given starting target, capped at `cap` (the current batch size).
   _buildArea(first,cap){
     const max=spiderFX._mobileScale(cap||24);
     const used=new Set(), order=[];
@@ -31838,7 +31843,7 @@ class SpiderKit {
   // Traversal swing. Long forward arc, clamped inside the arena disc, with a
   // live scan every frame so an enemy that wanders into range gets yanked.
   _freeSwing(){
-    this.cool.zip=this._roundCooldown(0.45,28);
+    this.cool.zip=1.0;
     dashActive=false; dashTimer=0;
     const start=this.player.position.clone();
     const fwd=this._fwd();
@@ -31862,7 +31867,7 @@ class SpiderKit {
     spiderFX.anchorPuff(anchor);
     spiderFX.ring(start,2.0,{life:0.20,color:SPIDER_WEB,y:0.5});
     this.zip={mode:'swing',order:[],i:0,target:null,anchor,
-      start,control,end,t:0,dur:Math.max(0.42,Math.min(0.78,0.24+dist*0.038)),ghostAt:0,lineAt:0,moveT:0,moveDur:10.0};
+      start,control,end,t:0,dur:Math.max(0.42,Math.min(0.78,0.24+dist*0.038)),ghostAt:0,lineAt:0};
     invincibleTimer=Math.max(invincibleTimer||0,0.55);
     this._clip('Flying_Forward_Super',0.30,false);
     spiderCinema.speedlines(0.5,0.32);
@@ -31895,12 +31900,11 @@ class SpiderKit {
     }
     if(!best)return false;
     this.zip.mode='blitz';
-    this.zip.order=this._buildArea(best); this.zip.i=0;
+    this.zip.order=this._buildArea(best,this._yankBatchSize()); this.zip.i=0;
     spiderHandPos(_spdB,false);
     spiderFX.strand(_spdB,best.position,{life:0.24,thick:0.045,glow:true});
     spiderFX.anchorPuff(best.position);
     spiderCinema.speedlines(0.4,0.45);
-    spiderCinema.letterbox(10.3); spiderCinema.vignette(10.3);
     invincibleTimer=Math.max(invincibleTimer||0,0.9);
     this._face(best);
     this._beginBlitzLeg(best);
@@ -31953,58 +31957,17 @@ class SpiderKit {
     spiderCinema.punch(s.i%2?'rgba(214,32,46,.22)':'rgba(120,226,255,.20)',.20,0,0.045);
     s.i++;
     const next=s.order[s.i];
-    if(next&&next.parent&&!(next.userData&&next.userData.dead)){
+    // Holding is required to continue into the next leg of the batch, not
+    // just to start a fresh one - release the button and the flurry stops
+    // exactly where it is, whether or not the batch cap was reached.
+    if(secondaryInputHeld&&next&&next.parent&&!(next.userData&&next.userData.dead)){
       this._face(next);
       this._beginBlitzLeg(next);
     }else{
       this._clip('Jump_Land',0.18);
       if(navigator.vibrate)navigator.vibrate(26);
-      this._continueOrEndZip(s);
+      this._finishZip();
     }
-  }
-  // The initial area is empty. If there's time left on the move's 10-second
-  // clock and enemies remain anywhere on the board, web-swing to the next
-  // nearest cluster and keep going; otherwise land and end the move.
-  _continueOrEndZip(s){
-    if(!this.zip)return;
-    if((s.moveT||0)<s.moveDur){
-      const next=this._nearest(9999);
-      if(next){ this._beginTravelSwing(next); return; }
-    }
-    this._finishZip();
-  }
-  _beginTravelSwing(target){
-    const s=this.zip;
-    const start=this.player.position.clone();
-    const end=target.position.clone(); end.y=start.y;
-    this._inArena(end,2.4);
-    const dist=Math.max(1,start.distanceTo(end));
-    const control=start.clone().lerp(end,0.5);
-    control.y=start.y+Math.min(9.0,4.2+dist*0.42);
-    spiderHandPos(_spdB,false);
-    const anchor=control.clone(); anchor.y+=2.2;
-    spiderFX.strand(_spdB,anchor,{life:0.42,thick:0.042,glow:true});
-    spiderFX.anchorPuff(anchor);
-    spiderFX.ring(start,2.0,{life:0.20,color:SPIDER_WEB,y:0.5});
-    s.mode='travel';
-    s.start=start; s.control=control; s.end=end;
-    s.t=0; s.dur=Math.max(0.42,Math.min(0.85,0.24+dist*0.038));
-    s.ghostAt=0; s.lineAt=0; s.anchor=anchor; s.pendingTarget=target;
-    spiderCinema.speedlines(0.5,0.34);
-    triggerCombatShake(5,90);
-  }
-  _landTravelSwing(s){
-    const at=s.end.clone(); at.y=s.start.y;
-    this.player.position.copy(at);
-    const target=(s.pendingTarget&&s.pendingTarget.parent&&!(s.pendingTarget.userData&&s.pendingTarget.userData.dead))
-      ? s.pendingTarget : this._nearest(6.8);
-    if(!target){ this._finishZip(); return; }
-    this._clip('Jump_Land',0.18);
-    spiderFX.impact(at,3.6,{shake:12,color:SPIDER_BLUE});
-    s.mode='blitz';
-    s.order=this._buildArea(target); s.i=0;
-    this._face(target);
-    this._beginBlitzLeg(target);
   }
   _finishZip(){
     if(this.zip){
@@ -32012,10 +31975,12 @@ class SpiderKit {
       this._clip('Jump_Land',0.20);
       spiderFX.impact(at,3.6,{shake:12,color:SPIDER_BLUE});
       spiderCinema.buzz(16);
-      // The move's real length varies with how many areas it chains through,
-      // so the letterbox/vignette/speedlines set at cast time can't be
-      // trusted to land on the true end - force them out within 3s of now.
       spiderCinema.capFade(3);
+      // 1s cooldown starts once the batch actually ends, not at cast; the
+      // shared hold-to-repeat loop (secondaryInputHeld) retries every frame
+      // and will fire the next batch itself the instant this clears, but
+      // only while the button is still held.
+      this.cool.zip=1.0;
     }
     this.zip=null;
   }
@@ -32601,9 +32566,9 @@ class SpiderKit {
 
     // ---- web-yank blitz
     if(this.zip){
-      const s=this.zip; s.t+=dt; s.moveT=(s.moveT||0)+dt;
+      const s=this.zip; s.t+=dt;
       // Refreshed every frame rather than set once, so invincibility covers
-      // the whole multi-area move instead of lapsing after the first hit.
+      // the whole batch instead of lapsing after the first hit.
       invincibleTimer=Math.max(invincibleTimer||0,0.15);
       const u=Math.min(1,s.t/s.dur), v=1-u;
       this.player.position.set(
@@ -32628,14 +32593,6 @@ class SpiderKit {
         // something he just launched away from.
         if(u>0.25&&u<0.92&&this._swingAcquire(s))return;
         if(u>=1){ this._swingLand(s); return; }
-      }else if(s.mode==='travel'){
-        s.lineAt=(s.lineAt||0)+dt;
-        if(s.lineAt>=0.05){
-          s.lineAt=0;
-          spiderHandPos(_spdB,false);
-          spiderFX.strand(_spdB,s.anchor,{life:0.10,thick:0.030,glow:true});
-        }
-        if(u>=1){ this._landTravelSwing(s); return; }
       }else if(u>=1) this._blitzHit(s);
     }
 
