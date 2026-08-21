@@ -1,3 +1,4 @@
+<!-- V23.69.00 Move Buttons Stay Visible: keyboard mode now only hides the drag-based .moveZone/.lookZone/.moveKnob (WASD fully replaces the joystick, and the look-drag zone would fight right-click-drag camera look) - every actual move button (fire/secondary/dash/ability/ultimate/jump/look-forward/up-down) stays on screen and clickable, since they already work fine with a mouse and players shouldn't have to memorize hotkeys to use their moves. Repositions the kbmHintBar to vertical-center-right (the one spot that's reliably empty in both orientations regardless of how tall the left info-pill stack grows - center-left and bottom-left were both found to collide with real content via empirical getBoundingClientRect checks) and shortens its text to fit the narrower spot. -->
 <!-- V23.68.00 Click Fix + Auto Keyboard: fixes two real bugs found testing V23.67 on a real desktop mouse. First: pauseBtn, btnResume, btnRestart, btnRerun, btnAbilities, btnQuitMid, statBtnPower/Speed/Hp, btnContinueRound, shopPromptBtn, btnCloseShop, and upBtn/downBtn were all wired touchstart-only with no click/pointerdown fallback - a real physical mouse click never fires touchstart on a non-touch desktop, so every one of those was completely dead to a mouse user (this is exactly why "the game doesn't move past to the next round": btnContinueRound could never be clicked). All now bound via a shared bindTapOrClick() helper (touchstart AND click) or matching mousedown/mouseup/mouseleave pairs. Second: WASD/arrows/Space/Shift/C/F/Q/E/R now auto-switch controlScheme to 'keyboard' the instant any of them is pressed, rather than staying dead until the corner toggle is found - keyboard events are never touch-synthesized so this is a safe, unambiguous signal, and it fixes "keyboard not working" for anyone whose device mis-defaulted to touch mode (e.g. a touchscreen laptop reporting a coarse primary pointer). Escape/pause now also works regardless of which mode is active. -->
 <!-- V23.67.00 Mouse & Keyboard: adds a full mouse+keyboard control scheme alongside touch, with a corner toggle button (top-left, 🖱️/🖐️) to switch between them at any time, defaulting to keyboard on non-touch devices and touch on mobile (isMobile), remembered afterward via localStorage. WASD/arrows drive the same moveVec the joystick already used; holding the right mouse button and dragging looks around (matches the touch look-zone's own drag gesture, just gated to the right button so left stays free for firing); left-click fires Primary; Q/E/R hold-trigger Secondary/Ability/Ultimate through the exact same beginX/releaseX functions and InputHeld flags the touch buttons use; Space jumps, Shift dashes, F recenters the camera, mouse wheel cycles zoom, Escape opens/closes pause. All of this lives inside setupControls() itself (not as new top-level functions) specifically so it shares that closure with activateEquippedAbilityNow/activateUltimate and the four begin/release pairs, which are local consts there - calling them from outside that scope was confirmed to be unreachable. In keyboard mode the on-screen joystick and action buttons are hidden entirely (CSS body.kbmMode) and a small hint bar lists every binding; switching modes releases every currently-held input first so nothing gets stuck. -->
 <!-- V23.66.00 True Landscape Render: fixes a real black-screen bug on landscape phones - initEngine()/onResize() were still sizing the WebGL renderer and camera from portraitLogicalViewport() (the swapped, portrait-shaped box used only to make the old CSS counter-rotation math work), which left the canvas's actual drawing buffer narrow-and-tall while its CSS box was the real wide-and-short viewport, rendering into only a slice of the screen and showing the black page background everywhere else. Both now size from physicalViewportSize() directly. Also removes every spiderCinema.speedlines() call across the whole Spider kit (all three ultimates plus Web-Yank's swing beats) - the radial white-ray "border" effect that kept causing lingering-overlay reports; letterbox/vignette/card/punch/shake/buzz on the three ultimates are unchanged. -->
@@ -297,20 +298,26 @@
     pointer-events:auto;display:flex;align-items:center;justify-content:center;
     z-index:50;cursor:pointer;user-select:none;-webkit-user-select:none;}
   .controlToggleBtn:active{background:rgba(60,64,72,0.7);}
-  /* Mouse+keyboard mode: the on-screen joystick/look zones and the touch
-     action buttons are redundant with WASD/mouse/hotkeys and would just
-     sit in the way, so they're hidden entirely. Pause and camera zoom stay
-     visible - both are still perfectly natural to click with a mouse. */
-  body.kbmMode .moveZone,body.kbmMode .lookZone,body.kbmMode .moveKnob,
-  body.kbmMode .actBtn,body.kbmMode .secondaryBtn,body.kbmMode .dashBtn,
-  body.kbmMode .abilityBtn,body.kbmMode .ultimateBtn,body.kbmMode .laserBtn,
-  body.kbmMode .jumpBtn,body.kbmMode .lookFwdBtn,body.kbmMode .vertBtn{
+  /* Mouse+keyboard mode: only the drag-based joystick/look zones are hidden
+     - WASD fully replaces the joystick, and the look-drag zone would
+     actively fight the right-click-drag camera look. The actual move
+     buttons (fire/secondary/dash/ability/ultimate/jump/etc.) stay on
+     screen and clickable, both because they already work fine with a
+     mouse (pointerdown fires for real clicks) and because players
+     shouldn't have to memorize hotkeys to use their moves. */
+  body.kbmMode .moveZone,body.kbmMode .lookZone,body.kbmMode .moveKnob{
     display:none!important;
   }
-  .kbmHintBar{position:absolute;left:50%;bottom:calc(10px + env(safe-area-inset-bottom));
-    transform:translateX(-50%);background:rgba(20,22,28,0.55);border:1.5px solid rgba(255,255,255,0.4);
-    border-radius:10px;padding:5px 12px;font-size:11px;color:#dfe8ee;white-space:normal;
-    max-width:92vw;text-align:center;line-height:1.5;
+  /* Vertical-center-right: the left side has the info-pill stack (whose
+     height varies with round state, so it can't be reliably dodged), but
+     the right side is always clear in the vertical middle in both
+     orientations - the camera/pause rail sits at the top, the combat
+     buttons sit at the bottom, and nothing occupies the gap between them. */
+  .kbmHintBar{position:absolute;top:50%;right:calc(10px + env(safe-area-inset-right));
+    transform:translateY(-50%);
+    background:rgba(20,22,28,0.55);border:1.5px solid rgba(255,255,255,0.4);
+    border-radius:10px;padding:5px 10px;font-size:10px;color:#dfe8ee;white-space:normal;
+    max-width:min(40vw,230px);text-align:right;line-height:1.45;
     pointer-events:none;display:none;letter-spacing:.2px;}
   body.kbmMode .kbmHintBar{display:block;}
   .actBtn{position:absolute;bottom:calc(34px + env(safe-area-inset-bottom));right:22px;
@@ -1220,7 +1227,7 @@
       <div class="lookZone" id="lookZone"></div>
       <div id="hudChrome">
         <div class="controlToggleBtn" id="controlToggleBtn" title="Switch controls">🖱️</div>
-        <div class="kbmHintBar" id="kbmHintBar">WASD move · Mouse look (hold right-click) · Left-click fire · Q secondary · E ability · R ultimate · Space jump · Shift dash · Scroll zoom · Esc pause</div>
+        <div class="kbmHintBar" id="kbmHintBar">WASD move · right-click drag look<br>Q/E/R secondary/ability/ultimate<br>Space jump · Shift dash · Esc pause</div>
         <div class="hitFlash" id="hitFlash"></div>
         <div class="meteorAtmo" id="meteorAtmo"></div>
         <div class="meteorFlash" id="meteorFlash"></div>
@@ -1381,7 +1388,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.68.00 - Click Fix + Auto Keyboard';
+const GAME_VERSION='23.69.00 - Move Buttons Stay Visible';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
