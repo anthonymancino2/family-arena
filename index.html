@@ -1,3 +1,4 @@
+<!-- V23.63.00 Anchor Freedom: Full Stop Anchor no longer pins the player to the cast point for the full 10s - the pull/heave effect still operates from that fixed point, but he's free to move and fight anywhere while it runs, matching player feedback that being frozen in place "put them back" whenever they tried to move away. Toast, HUD label ("ANCHORED" instead of "ROOTED"), and shop description updated to match. Also plugs a real gap where restarting or rerunning a round mid-Spider-move (startSurvival/rerunCurrentRound, neither previously touched by the spiderCinema.clear()/disposeSpiderKit() cleanup added in V23.62) left the letterbox/vignette overlay stuck on screen through the transition into the new round - this was very likely the "web border graphic isn't deactivating" bug, since every other exit path (quit, death, round-clear) was already covered. -->
 <!-- V23.62.00 Landscape Everywhere: fixes the Spider cinematic overlay getting stuck on the landing/round-clear screen after a move ends mid-transition; rebuilds Web-Yank Blitz into a ~10s move that swing-kicks through one enemy cluster then auto-swings to the next until the board clears or the clock runs out; unifies Maximum Spider/Full Stop Anchor/Skyline Dive to a 10-second active duration; clarifies Full Stop Anchor's rooted/no-aim behavior in its toast, HUD label, and description; gives Skyline Dive a richer launch, ascent trail, dive comet trail, and capstone finisher; and — the big one — removes the forced portrait counter-rotation entirely (phone, tablet, and desktop alike now render landscape natively) with a single rewritten @media(orientation:landscape) HUD layout that keeps every combat/movement button spaced apart at any width or height, replacing the old dueling "plain" vs "body.browserMode" rule sets that used to leave Secondary sitting on top of Ability and gave Up/Down (climb/swim/fly) no landscape position at all - the same Up/Down collision existed in portrait too and is fixed there as well. -->
 <!-- V23.61.00 Spider Cinematic Kit: merges the three old Spider ultimates into one three-act MAXIMUM SPIDER, adds FULL STOP ANCHOR (rooted tether/heave ultimate) and SKYLINE DIVE (airborne dive-bomb ultimate), rebuilds Electro Web with a hard cast beat + real detonation + lingering tesla field, gives Web-Yank Blitz a free web-swing when no enemy is in range, and introduces a zero-mesh spiderCinema DOM layer (letterbox, vignette, speedlines, splash cards, hitstop) so the big beats read like film without spending any of the 180-object FX budget. -->
 <!-- V23.55.00 Fox Hex Bloom + Astral Gravity Prison: combines Ninefold Spirit Bloom and Foxfire Hex Garden into one two-stage Secondary with the existing 2-second cast-start invincibility, and repurposes the former Hex Garden save slot into a distinct telekinetic Astral Gravity Prison lift/compress/slam Secondary. Preserves V23.54 global Ultimate I-frames and Fox glass-cannon damage tuning. -->
@@ -1348,7 +1349,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.62.00 - Landscape Everywhere';
+const GAME_VERSION='23.63.00 - Anchor Freedom';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -14771,7 +14772,7 @@ const CHOPPER_MONSTER_POINT = {id:'hooded_twilight_execution', name:'Kraken Risi
 const SPIDER_MAXIMUM = {id:'spider_maximum', name:'Maximum Spider', price:0, avatar:'spider', unlockLevel:1,
   desc:'THREE-ACT SET PIECE, ~10s, invulnerable throughout. ACT I: a ribbed web dome slams over the arena and drags every enemy to the centre, pinning and shocking them. ACT II: the chain assault - up to 22 rapid web-hops, erasing normal enemies and chunking bosses 6% per hit. ACT III: a colossal web-crater plus a rim-to-rim lattice that clears everything left standing and takes 22% max HP off bosses.'};
 const SPIDER_WEB_OF_SHADOWS = {id:'spider_web_of_shadows', name:'Full Stop Anchor', price:0, avatar:'spider', unlockLevel:1,
-  desc:'PLANT YOUR FEET: press once and he roots himself in place for the full 10s and cannot be moved (invulnerable the whole time, so standing still is safe) - there is no target to aim, it hits the entire board automatically. Every enemy is tethered and reeled steadily inward, and every 1.15s a HEAVE yanks the fourteen furthest targets up to 8 units toward him at once - anything crushed into the pile-up at his feet is erased, anything still on the line takes drag-scaled damage, bosses lose 3.5% each heave. Ends with FULL STOP: the lines snap and the whole pile detonates for 26% boss max HP.'};
+  desc:'DROP AN ANCHOR: press once and he plants an anchor point right where he stands for 10s (invulnerable the whole time) - there is no target to aim, it hits the entire board automatically, and he stays free to keep moving and fighting anywhere while it runs. Every enemy is tethered to the anchor point and reeled steadily inward, and every 1.15s a HEAVE yanks the fourteen furthest targets up to 8 units toward it at once - anything crushed into the pile-up there is erased, anything still on the line takes drag-scaled damage, bosses lose 3.5% each heave. Ends with FULL STOP: the lines snap and the whole pile detonates for 26% boss max HP.'};
 const SPIDER_CITY_WEBLINE = {id:'spider_city_webline', name:'Skyline Dive', price:0, avatar:'spider', unlockLevel:1,
   desc:'AIRBORNE ULTIMATE, ~10s, invulnerable throughout. He web-lines straight up out of frame, marks the densest cluster on the board with a ground reticle, then dive-bombs it - roughly eleven crashes, each erasing normal enemies within 5.6 units and taking 4.5% off bosses, recoiling back up the line between dives. The last dive is the big one: a 13-unit touchdown crater worth 24% boss max HP.'};
 
@@ -15414,6 +15415,8 @@ function rerunCurrentRound(){
   roundCompletionPending=false;
   roundCompletionStartedAt=0;
   roundTimerFrozenElapsed=null;
+  try{ spiderCinema.clear(); }catch(_e){}
+  try{ disposeSpiderKit(); }catch(_e){}
   clearZombies();
   clearArcaneEchoes();
   foxMageQueuedCastSerial++;foxMagePendingRelease.arcane_lance=false;foxMagePendingRelease.giant_fireball=false;
@@ -16840,9 +16843,9 @@ function updateHoodedHud(){
           : 0;
         const cd=kit&&kit.cooldownForAbility?kit.cooldownForAbility(equippedAbilityId):0;
         // While Full Stop Anchor is actually running, swap the button's own
-        // label to "ROOTED" - a constant on-screen reminder of why movement
-        // is locked, instead of leaving the generic ability name up.
-        const activeLabel=(active&&equippedAbilityId==='spider_web_of_shadows')?'ROOTED':label;
+        // label to "ANCHORED" - a reminder the pull effect is still active,
+        // even though he's free to move around while it runs.
+        const activeLabel=(active&&equippedAbilityId==='spider_web_of_shadows')?'ANCHORED':label;
         abilityBtn.textContent=active
           ? `${activeLabel} ${activeTime>0?activeTime.toFixed(1):'!'}`
           : (cd>0?`${label} ${Math.ceil(cd)}`:label);
@@ -32288,10 +32291,10 @@ class SpiderKit {
     spiderCinema.card('FULL STOP','HOLD THE LINE','#f2f7ff');
     spiderCinema.punch('rgba(242,247,255,.42)',.34,24,0.10);
     spiderCinema.buzz([18,30,18,30]);
-    // Clarify up front what this button actually does: unlike the other two
-    // ultimates he does not move at all, and there is nothing to aim - it
-    // just hits the whole board on its own for the full duration.
-    toast('ROOTED! Can’t move for 10s — pulling in every enemy');
+    // Clarify up front what this button actually does: there is nothing to
+    // aim, it just hits the whole board on its own for the full duration -
+    // he stays free to move/fight anywhere while it runs.
+    toast('ANCHOR SET! Pulling in every enemy for 10s');
     return true;
   }
   _anchorHeave(s){
@@ -32708,8 +32711,9 @@ class SpiderKit {
     if(this.shadows){
       const s=this.shadows; s.t+=dt; s.tick+=dt; s.heave+=dt;
       invincibleTimer=Math.max(invincibleTimer||0,0.25);
-      // Rooted. He is holding a line; he does not get to walk while doing it.
-      this.player.position.x=s.at.x; this.player.position.z=s.at.z;
+      // No longer pins him to the cast point - the anchor's pull/heave still
+      // operates from s.at, but he's free to move/fight anywhere in the
+      // meantime instead of snapping back to it every frame.
       // Constant reel between heaves so the board is always closing in.
       const reel=3.4*dt;
       for(const e of this._enemies()){
@@ -37012,6 +37016,8 @@ function startSurvival(){
     return;
   }
   fitHudChrome(); // the visible area may have changed since the last run
+  try{ spiderCinema.clear(); }catch(_e){}
+  try{ disposeSpiderKit(); }catch(_e){}
   clearZombies();
   clearCritters();
   bullets.forEach(b=>scene.remove(b.mesh)); // BULLET_GEO/MAT are shared — never dispose
