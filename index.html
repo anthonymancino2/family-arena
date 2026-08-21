@@ -1,3 +1,4 @@
+<!-- V23.66.00 True Landscape Render: fixes a real black-screen bug on landscape phones - initEngine()/onResize() were still sizing the WebGL renderer and camera from portraitLogicalViewport() (the swapped, portrait-shaped box used only to make the old CSS counter-rotation math work), which left the canvas's actual drawing buffer narrow-and-tall while its CSS box was the real wide-and-short viewport, rendering into only a slice of the screen and showing the black page background everywhere else. Both now size from physicalViewportSize() directly. Also removes every spiderCinema.speedlines() call across the whole Spider kit (all three ultimates plus Web-Yank's swing beats) - the radial white-ray "border" effect that kept causing lingering-overlay reports; letterbox/vignette/card/punch/shake/buzz on the three ultimates are unchanged. -->
 <!-- V23.65.00 Web-Yank Batches: rebuilds Web-Yank Blitz's activation model around holding the Secondary button instead of a fire-and-forget autonomous sequence. Each activation kicks through a chain-linked batch of enemies - 5 at Round 1, scaling to 10 by Round 30 - then always stops there (cap reached or ran out of linked targets) and waits out a flat 1s cooldown; holding the button through that cooldown auto-fires the next batch via the same shared hold-to-repeat loop every other Spider secondary already uses, releasing it stops the chain immediately mid-batch regardless of progress, and nothing further happens until pressed again. Removes the multi-area autonomous travel-swing system (_continueOrEndZip/_beginTravelSwing/_landTravelSwing) added in V23.61-23.62 along with the letterbox/vignette cinema treatment on this move, since a short held-button flurry doesn't need ultimate-scale framing. -->
 <!-- V23.64.00 Cinema Fade Guarantee: adds spiderCinema.capFade(seconds), which shortens (never extends) the letterbox/vignette/speedlines timers down to at most N seconds from now, and calls it with 3 at every real Spider move end point (Web-Yank's two land paths, Maximum Spider's Act III end, Full Stop Anchor's end, Skyline Dive's final-dive end and hard-floor safety end). letterbox()/vignette()/speedlines() only ever raise their timer via Math.max, so a move whose actual runtime didn't match the duration estimated at cast time (most likely Web-Yank Blitz, whose real length now varies with how many areas it chains through) had no way to pull the countdown back in - this guarantees the border/vignette/speedlines are gone within 3s of the move actually finishing regardless. -->
 <!-- V23.63.00 Anchor Freedom: Full Stop Anchor no longer pins the player to the cast point for the full 10s - the pull/heave effect still operates from that fixed point, but he's free to move and fight anywhere while it runs, matching player feedback that being frozen in place "put them back" whenever they tried to move away. Toast, HUD label ("ANCHORED" instead of "ROOTED"), and shop description updated to match. Also plugs a real gap where restarting or rerunning a round mid-Spider-move (startSurvival/rerunCurrentRound, neither previously touched by the spiderCinema.clear()/disposeSpiderKit() cleanup added in V23.62) left the letterbox/vignette overlay stuck on screen through the transition into the new round - this was very likely the "web border graphic isn't deactivating" bug, since every other exit path (quit, death, round-clear) was already covered. -->
@@ -1351,7 +1352,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.65.00 - Web-Yank Batches';
+const GAME_VERSION='23.66.00 - True Landscape Render';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -9692,8 +9693,13 @@ function initEngine(){
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.34;
-  const portraitView=portraitLogicalViewport();
-  renderer.setSize(portraitView.w,portraitView.h);
+  // Real physical dimensions, not the swapped "logical portrait" box - that
+  // swap only made sense back when landscape got CSS-rotated into a portrait
+  // frame. Landscape is native now, so the canvas must actually be sized to
+  // the real (wide) viewport or it renders into a narrow leftover strip and
+  // leaves the rest of the screen showing the black page background.
+  const physicalView=physicalViewportSize();
+  renderer.setSize(physicalView.w,physicalView.h);
   // Shadows are the single biggest thing separating our look from the
   // low-poly reference renders — objects need to be grounded. Kept
   // deliberately cheap for mobile: one shadow-casting light, a modest
@@ -9705,7 +9711,7 @@ function initEngine(){
   scene.background = new THREE.Color(0x9fd6ea);
   scene.fog = new THREE.Fog(0x9fd6ea, 20, 55);
 
-  camera = new THREE.PerspectiveCamera(62, portraitView.w/portraitView.h, 0.1, 200);
+  camera = new THREE.PerspectiveCamera(62, physicalView.w/physicalView.h, 0.1, 200);
 
   const hemi = new THREE.HemisphereLight(0xffffff, 0x667b90, 1.72);
   scene.add(hemi);
@@ -9788,7 +9794,8 @@ function initEngine(){
 function onResize(){
   applyPortraitPresentation();
   if(!renderer)return;
-  const v=portraitLogicalViewport();
+  // Real physical dimensions - see initEngine()'s renderer.setSize comment.
+  const v=physicalViewportSize();
   renderer.setSize(v.w,v.h);
   camera.aspect=v.w/v.h;
   camera.updateProjectionMatrix();
@@ -31870,7 +31877,6 @@ class SpiderKit {
       start,control,end,t:0,dur:Math.max(0.42,Math.min(0.78,0.24+dist*0.038)),ghostAt:0,lineAt:0};
     invincibleTimer=Math.max(invincibleTimer||0,0.55);
     this._clip('Flying_Forward_Super',0.30,false);
-    spiderCinema.speedlines(0.5,0.32);
     triggerCombatShake(5,90);
     return true;
   }
@@ -31904,7 +31910,6 @@ class SpiderKit {
     spiderHandPos(_spdB,false);
     spiderFX.strand(_spdB,best.position,{life:0.24,thick:0.045,glow:true});
     spiderFX.anchorPuff(best.position);
-    spiderCinema.speedlines(0.4,0.45);
     invincibleTimer=Math.max(invincibleTimer||0,0.9);
     this._face(best);
     this._beginBlitzLeg(best);
@@ -32154,7 +32159,6 @@ class SpiderKit {
     triggerCombatShake(hits?28:18,direct?270:180);
     if(direct){
       spiderCinema.punch('rgba(120,226,255,.26)',.24,0,0.055);
-      spiderCinema.speedlines(0.26,0.28);
     }
     if(navigator.vibrate)navigator.vibrate(direct?32:18);
   }
@@ -32224,7 +32228,6 @@ class SpiderKit {
     this._clip('Jump_Land',0.42);
     spiderCinema.card('MAXIMUM SPIDER','ACT III \u2014 CRATER','#ffd76a');
     spiderCinema.punch('rgba(255,255,255,.60)',.50,48,0.16);
-    spiderCinema.speedlines(0.75,0.72);
     spiderFX.impact(at,12.5,{shake:42,color:SPIDER_RED});
     spiderFX.net(at,12.5,{life:1.55,spin:1.0});
     spiderFX.burst(at,8.8,{count:20,life:0.26,thick:0.024});
@@ -32285,7 +32288,6 @@ class SpiderKit {
   _anchorHeave(s){
     this._clip('Two-hand_Blast',0.22,false);
     spiderCinema.punch('rgba(242,247,255,.34)',.30,28,0.095);
-    spiderCinema.speedlines(0.36,0.52);
     spiderFX.ring(s.at,7.6,{life:0.32,color:SPIDER_WEB,y:0.2});
     spiderFX.net(s.at,6.2,{life:0.55,spin:0.55});
     spiderHandPos(_spdB,false);
@@ -32323,7 +32325,6 @@ class SpiderKit {
     this._clip('Attack_Ground_Pound',0.45,false);
     spiderCinema.card('FULL STOP','\u2014 EVERYTHING HOLDS \u2014','#ffd76a');
     spiderCinema.punch('rgba(255,255,255,.62)',.50,46,0.17);
-    spiderCinema.speedlines(0.7,0.72);
     spiderFX.impact(s.at,R*0.8,{shake:44,color:SPIDER_RED});
     spiderFX.net(s.at,R,{life:1.5,spin:1.0});
     spiderFX.burst(s.at,R*0.6,{count:20,life:0.28,thick:0.024});
@@ -32390,7 +32391,6 @@ class SpiderKit {
     spiderFX.net(at,R,{life:big?1.5:0.8,spin:big?1.0:0.6});
     spiderFX.burst(at,R*0.66,{count:big?20:11,life:0.24,thick:0.022});
     spiderCinema.punch(big?'rgba(255,255,255,.62)':'rgba(214,32,46,.30)',big?.50:.28,0,big?0.17:0.075);
-    spiderCinema.speedlines(big?0.7:0.22,big?0.72:0.34);
     if(big){
       spiderCinema.card('SKYLINE DIVE','\u2014 TOUCHDOWN \u2014','#ffd76a');
       // Capstone crater cracks radiating to the rim - the same scale of payoff
@@ -32667,7 +32667,6 @@ class SpiderKit {
           s.hop=3.7/Math.max(1,s.order.length);
           this._clip('Power_Up',0.18,false);
           spiderCinema.card('MAXIMUM SPIDER','ACT II \u2014 CHAIN','#ff5566');
-          spiderCinema.speedlines(2.6,0.58);
           spiderCinema.punch('rgba(214,32,46,.40)',.34,24,0.10);
         }
       } else if(s.act===1){
@@ -32749,7 +32748,6 @@ class SpiderKit {
         if(s.ascentFxAt>=0.05){ s.ascentFxAt=0; spiderFX.ghost(P,0.85); }
         if(s.pt>=0.30){
           s.phase=2; s.pt=0; s.trailFrom=P.clone();
-          spiderCinema.speedlines(s.final?0.6:0.26,s.final?0.68:0.34);
           if(s.final){ spiderCinema.flash('rgba(255,255,255,.28)',.24,160); }
         }
       } else if(s.phase===2){               // DIVE
