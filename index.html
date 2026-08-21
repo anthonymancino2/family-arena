@@ -1,3 +1,4 @@
+<!-- V23.64.00 Cinema Fade Guarantee: adds spiderCinema.capFade(seconds), which shortens (never extends) the letterbox/vignette/speedlines timers down to at most N seconds from now, and calls it with 3 at every real Spider move end point (Web-Yank's two land paths, Maximum Spider's Act III end, Full Stop Anchor's end, Skyline Dive's final-dive end and hard-floor safety end). letterbox()/vignette()/speedlines() only ever raise their timer via Math.max, so a move whose actual runtime didn't match the duration estimated at cast time (most likely Web-Yank Blitz, whose real length now varies with how many areas it chains through) had no way to pull the countdown back in - this guarantees the border/vignette/speedlines are gone within 3s of the move actually finishing regardless. -->
 <!-- V23.63.00 Anchor Freedom: Full Stop Anchor no longer pins the player to the cast point for the full 10s - the pull/heave effect still operates from that fixed point, but he's free to move and fight anywhere while it runs, matching player feedback that being frozen in place "put them back" whenever they tried to move away. Toast, HUD label ("ANCHORED" instead of "ROOTED"), and shop description updated to match. Also plugs a real gap where restarting or rerunning a round mid-Spider-move (startSurvival/rerunCurrentRound, neither previously touched by the spiderCinema.clear()/disposeSpiderKit() cleanup added in V23.62) left the letterbox/vignette overlay stuck on screen through the transition into the new round - this was very likely the "web border graphic isn't deactivating" bug, since every other exit path (quit, death, round-clear) was already covered. -->
 <!-- V23.62.00 Landscape Everywhere: fixes the Spider cinematic overlay getting stuck on the landing/round-clear screen after a move ends mid-transition; rebuilds Web-Yank Blitz into a ~10s move that swing-kicks through one enemy cluster then auto-swings to the next until the board clears or the clock runs out; unifies Maximum Spider/Full Stop Anchor/Skyline Dive to a 10-second active duration; clarifies Full Stop Anchor's rooted/no-aim behavior in its toast, HUD label, and description; gives Skyline Dive a richer launch, ascent trail, dive comet trail, and capstone finisher; and — the big one — removes the forced portrait counter-rotation entirely (phone, tablet, and desktop alike now render landscape natively) with a single rewritten @media(orientation:landscape) HUD layout that keeps every combat/movement button spaced apart at any width or height, replacing the old dueling "plain" vs "body.browserMode" rule sets that used to leave Secondary sitting on top of Ability and gave Up/Down (climb/swim/fly) no landscape position at all - the same Up/Down collision existed in portrait too and is fixed there as well. -->
 <!-- V23.61.00 Spider Cinematic Kit: merges the three old Spider ultimates into one three-act MAXIMUM SPIDER, adds FULL STOP ANCHOR (rooted tether/heave ultimate) and SKYLINE DIVE (airborne dive-bomb ultimate), rebuilds Electro Web with a hard cast beat + real detonation + lingering tesla field, gives Web-Yank Blitz a free web-swing when no enemy is in range, and introduces a zero-mesh spiderCinema DOM layer (letterbox, vignette, speedlines, splash cards, hitstop) so the big beats read like film without spending any of the 180-object FX budget. -->
@@ -1349,7 +1350,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.63.00 - Anchor Freedom';
+const GAME_VERSION='23.64.00 - Cinema Fade Guarantee';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -31542,6 +31543,20 @@ const spiderCinema = {
     if(this._vigTimer>0){ this._vigTimer-=dt; if(this._vigTimer<=0)this._vig.style.opacity='0'; }
     if(this._lineTimer>0){ this._lineTimer-=dt; if(this._lineTimer<=0)this._lines.style.opacity='0'; }
   },
+  // Shortens (never extends) every timer down to at most `seconds` from now.
+  // letterbox()/vignette()/speedlines() only ever raise their timer via
+  // Math.max, so a move whose cast-time estimate ran long has no way to pull
+  // the countdown back in on its own - this is the explicit "the move is
+  // actually over now" signal each ultimate's real end point calls so the
+  // whole overlay is guaranteed gone within a few seconds of the move
+  // finishing, however long it actually ran.
+  capFade(seconds){
+    if(!this._root)return;
+    const s=Math.max(0,Number(seconds)||0);
+    this._barTimer=Math.min(this._barTimer,s);
+    this._vigTimer=Math.min(this._vigTimer,s);
+    this._lineTimer=Math.min(this._lineTimer,s);
+  },
   clear(){
     if(!this._root)return;
     this._barTimer=this._vigTimer=this._lineTimer=0;
@@ -31867,6 +31882,7 @@ class SpiderKit {
       this._hurt(e,1.5); this._wrap(e,1.1);
     }
     spiderCinema.buzz(16);
+    spiderCinema.capFade(3);
     this.zip=null;
   }
   // Mid-air conversion: a swing that finds a target becomes the real blitz.
@@ -31996,6 +32012,10 @@ class SpiderKit {
       this._clip('Jump_Land',0.20);
       spiderFX.impact(at,3.6,{shake:12,color:SPIDER_BLUE});
       spiderCinema.buzz(16);
+      // The move's real length varies with how many areas it chains through,
+      // so the letterbox/vignette/speedlines set at cast time can't be
+      // trusted to land on the true end - force them out within 3s of now.
+      spiderCinema.capFade(3);
     }
     this.zip=null;
   }
@@ -32702,7 +32722,7 @@ class SpiderKit {
         }
       } else {
         // ACT III - hold on the crater, then release control.
-        if(s.actT>=3.1){ this.maximum=null; this.cool.maximum=0; }
+        if(s.actT>=3.1){ spiderCinema.capFade(3); this.maximum=null; this.cool.maximum=0; }
       }
       if(this.maximum && s.t>s.dur-0.2) s.dur=s.t+0.2;
     }
@@ -32736,7 +32756,7 @@ class SpiderKit {
         spiderFX.ring(s.at,3.1+0.7*Math.sin(s.t*7),{life:0.20,color:SPIDER_WEB,y:0.1});
       }
       if(s.heave>=1.15 && s.t<s.dur-0.5) { s.heave=0; this._anchorHeave(s); }
-      if(s.t>=s.dur){ this._anchorFinish(s); this.shadows=null; this.cool.shadows=0; }
+      if(s.t>=s.dur){ this._anchorFinish(s); spiderCinema.capFade(3); this.shadows=null; this.cool.shadows=0; }
     }
 
     // ---- skyline dive
@@ -32791,7 +32811,7 @@ class SpiderKit {
         if(u>=1){
           this._diveImpact(s,s.final);
           s.trailFrom=null;
-          if(s.final){ this.webline=null; this.cool.webline=0; }
+          if(s.final){ spiderCinema.capFade(3); this.webline=null; this.cool.webline=0; }
           else { s.phase=3; s.pt=0; }
         }
       } else {                              // RECOIL back up the line
@@ -32812,6 +32832,7 @@ class SpiderKit {
       // Hard floor: if anything ever leaves this in a bad state, put him down.
       if(this.webline && s.t>s.dur+2.2){
         this.player.position.y=s.ground;
+        spiderCinema.capFade(3);
         this.webline=null; this.cool.webline=0;
       }
     }
