@@ -1,3 +1,4 @@
+<!-- V23.68.00 Click Fix + Auto Keyboard: fixes two real bugs found testing V23.67 on a real desktop mouse. First: pauseBtn, btnResume, btnRestart, btnRerun, btnAbilities, btnQuitMid, statBtnPower/Speed/Hp, btnContinueRound, shopPromptBtn, btnCloseShop, and upBtn/downBtn were all wired touchstart-only with no click/pointerdown fallback - a real physical mouse click never fires touchstart on a non-touch desktop, so every one of those was completely dead to a mouse user (this is exactly why "the game doesn't move past to the next round": btnContinueRound could never be clicked). All now bound via a shared bindTapOrClick() helper (touchstart AND click) or matching mousedown/mouseup/mouseleave pairs. Second: WASD/arrows/Space/Shift/C/F/Q/E/R now auto-switch controlScheme to 'keyboard' the instant any of them is pressed, rather than staying dead until the corner toggle is found - keyboard events are never touch-synthesized so this is a safe, unambiguous signal, and it fixes "keyboard not working" for anyone whose device mis-defaulted to touch mode (e.g. a touchscreen laptop reporting a coarse primary pointer). Escape/pause now also works regardless of which mode is active. -->
 <!-- V23.67.00 Mouse & Keyboard: adds a full mouse+keyboard control scheme alongside touch, with a corner toggle button (top-left, 🖱️/🖐️) to switch between them at any time, defaulting to keyboard on non-touch devices and touch on mobile (isMobile), remembered afterward via localStorage. WASD/arrows drive the same moveVec the joystick already used; holding the right mouse button and dragging looks around (matches the touch look-zone's own drag gesture, just gated to the right button so left stays free for firing); left-click fires Primary; Q/E/R hold-trigger Secondary/Ability/Ultimate through the exact same beginX/releaseX functions and InputHeld flags the touch buttons use; Space jumps, Shift dashes, F recenters the camera, mouse wheel cycles zoom, Escape opens/closes pause. All of this lives inside setupControls() itself (not as new top-level functions) specifically so it shares that closure with activateEquippedAbilityNow/activateUltimate and the four begin/release pairs, which are local consts there - calling them from outside that scope was confirmed to be unreachable. In keyboard mode the on-screen joystick and action buttons are hidden entirely (CSS body.kbmMode) and a small hint bar lists every binding; switching modes releases every currently-held input first so nothing gets stuck. -->
 <!-- V23.66.00 True Landscape Render: fixes a real black-screen bug on landscape phones - initEngine()/onResize() were still sizing the WebGL renderer and camera from portraitLogicalViewport() (the swapped, portrait-shaped box used only to make the old CSS counter-rotation math work), which left the canvas's actual drawing buffer narrow-and-tall while its CSS box was the real wide-and-short viewport, rendering into only a slice of the screen and showing the black page background everywhere else. Both now size from physicalViewportSize() directly. Also removes every spiderCinema.speedlines() call across the whole Spider kit (all three ultimates plus Web-Yank's swing beats) - the radial white-ray "border" effect that kept causing lingering-overlay reports; letterbox/vignette/card/punch/shake/buzz on the three ultimates are unchanged. -->
 <!-- V23.65.00 Web-Yank Batches: rebuilds Web-Yank Blitz's activation model around holding the Secondary button instead of a fire-and-forget autonomous sequence. Each activation kicks through a chain-linked batch of enemies - 5 at Round 1, scaling to 10 by Round 30 - then always stops there (cap reached or ran out of linked targets) and waits out a flat 1s cooldown; holding the button through that cooldown auto-fires the next batch via the same shared hold-to-repeat loop every other Spider secondary already uses, releasing it stops the chain immediately mid-batch regardless of progress, and nothing further happens until pressed again. Removes the multi-area autonomous travel-swing system (_continueOrEndZip/_beginTravelSwing/_landTravelSwing) added in V23.61-23.62 along with the letterbox/vignette cinema treatment on this move, since a short held-button flurry doesn't need ultimate-scale framing. -->
@@ -1380,7 +1381,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.67.00 - Mouse & Keyboard';
+const GAME_VERSION='23.68.00 - Click Fix + Auto Keyboard';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -15353,38 +15354,44 @@ function setupControls(){
   ultimateBtnEl.addEventListener('click',e=>e.preventDefault());
   window.addEventListener('blur',()=>releaseSignatureInput());
   document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseSignatureInput();});
+  // Bound to both 'touchstart' (fast, no ~300ms tap delay, for touch users)
+  // and 'click' (the only event a real mouse ever fires - touchstart never
+  // fires for a physical mouse click on a non-touch desktop, so a button
+  // wired touchstart-only is completely dead to a mouse user). Every
+  // interactive control below gets both so nothing is mouse-unclickable.
+  const bindTapOrClick=(el,handler)=>{
+    if(!el)return;
+    el.addEventListener('touchstart', e=>{ e.preventDefault(); handler(e); }, {passive:false});
+    el.addEventListener('click', e=>{ e.preventDefault(); handler(e); });
+  };
   const upBtnEl = document.getElementById('upBtn');
   const downBtnEl = document.getElementById('downBtn');
   upBtnEl.addEventListener('touchstart', e=>{ e.preventDefault(); freeUp = true; });
   upBtnEl.addEventListener('touchend', e=>{ e.preventDefault(); freeUp = false; });
   upBtnEl.addEventListener('touchcancel', ()=>{ freeUp = false; });
+  upBtnEl.addEventListener('mousedown', e=>{ e.preventDefault(); freeUp = true; });
+  upBtnEl.addEventListener('mouseup', e=>{ e.preventDefault(); freeUp = false; });
+  upBtnEl.addEventListener('mouseleave', ()=>{ freeUp = false; });
   downBtnEl.addEventListener('touchstart', e=>{ e.preventDefault(); freeDown = true; });
   downBtnEl.addEventListener('touchend', e=>{ e.preventDefault(); freeDown = false; });
   downBtnEl.addEventListener('touchcancel', ()=>{ freeDown = false; });
-  document.getElementById('pauseBtn').addEventListener('touchstart', e=>{
-    e.preventDefault(); openPauseMenu();
-  });
-  document.getElementById('btnResume').addEventListener('touchstart', e=>{
-    e.preventDefault(); closePauseMenu();
-  });
-  document.getElementById('btnRestart').addEventListener('touchstart', e=>{
-    e.preventDefault();
+  downBtnEl.addEventListener('mousedown', e=>{ e.preventDefault(); freeDown = true; });
+  downBtnEl.addEventListener('mouseup', e=>{ e.preventDefault(); freeDown = false; });
+  downBtnEl.addEventListener('mouseleave', ()=>{ freeDown = false; });
+  bindTapOrClick(document.getElementById('pauseBtn'), ()=>{ openPauseMenu(); });
+  bindTapOrClick(document.getElementById('btnResume'), ()=>{ closePauseMenu(); });
+  bindTapOrClick(document.getElementById('btnRestart'), ()=>{
     document.getElementById('pauseOverlay').classList.remove('show');
     rerunEndsAfterRound=false;
     if(typeof clearKnightRoundSpecials==='function') clearKnightRoundSpecials(true);
     startSurvival();
   });
-  document.getElementById('btnRerun').addEventListener('touchstart', e=>{
-    e.preventDefault();
+  bindTapOrClick(document.getElementById('btnRerun'), ()=>{
     document.getElementById('pauseOverlay').classList.remove('show');
     rerunCurrentRound();
   });
-  document.getElementById('btnAbilities').addEventListener('touchstart', e=>{
-    e.preventDefault();
-    openShop('abilities');
-  });
-  document.getElementById('btnQuitMid').addEventListener('touchstart', e=>{
-    e.preventDefault();
+  bindTapOrClick(document.getElementById('btnAbilities'), ()=>{ openShop('abilities'); });
+  bindTapOrClick(document.getElementById('btnQuitMid'), ()=>{
     document.getElementById('pauseOverlay').classList.remove('show');
     gameRunning = false;
     try{ spiderCinema.clear(); }catch(_e){}
@@ -15393,15 +15400,14 @@ function setupControls(){
     show('screenHome');
   });
 
-  document.getElementById('statBtnPower').addEventListener('touchstart', e=>{ e.preventDefault(); pickStat('power'); });
-  document.getElementById('statBtnSpeed').addEventListener('touchstart', e=>{ e.preventDefault(); pickStat('speed'); });
-  document.getElementById('statBtnHp').addEventListener('touchstart', e=>{ e.preventDefault(); pickStat('hp'); });
-  document.getElementById('btnContinueRound').addEventListener('touchstart', e=>{ e.preventDefault(); continueAfterRoundShop(); });
+  bindTapOrClick(document.getElementById('statBtnPower'), ()=>{ pickStat('power'); });
+  bindTapOrClick(document.getElementById('statBtnSpeed'), ()=>{ pickStat('speed'); });
+  bindTapOrClick(document.getElementById('statBtnHp'), ()=>{ pickStat('hp'); });
+  bindTapOrClick(document.getElementById('btnContinueRound'), ()=>{ continueAfterRoundShop(); });
 
-  document.getElementById('shopPromptBtn').addEventListener('touchstart', e=>{ e.preventDefault(); openShop('weapons'); });
-  document.getElementById('btnCloseShop').addEventListener('touchstart', e=>{ e.preventDefault(); closeShop(); });
-  document.getElementById('btnCloseShopIcon').addEventListener('touchstart', e=>{ e.preventDefault(); closeShop(); });
-  document.getElementById('btnCloseShopIcon').addEventListener('click', e=>{ e.preventDefault(); closeShop(); });
+  bindTapOrClick(document.getElementById('shopPromptBtn'), ()=>{ openShop('weapons'); });
+  bindTapOrClick(document.getElementById('btnCloseShop'), ()=>{ closeShop(); });
+  bindTapOrClick(document.getElementById('btnCloseShopIcon'), ()=>{ closeShop(); });
 
   // ---- Mouse & keyboard controls ----
   // Lives here (inside setupControls(), not as top-level functions) purely
@@ -15461,21 +15467,37 @@ function setupControls(){
     else controlToggleBtnEl.addEventListener('touchstart', onToggleClick, {passive:false});
   }
 
+  // Any of these being pressed is an unambiguous "this is a real keyboard"
+  // signal - unlike mouse/pointer events, browsers never synthesize
+  // KeyboardEvents from a touch tap, so it's safe to auto-switch out of
+  // touch mode on the first one seen rather than requiring the corner
+  // toggle to be found first. controlScheme can default wrong (a
+  // touchscreen laptop reporting a coarse primary pointer, for instance)
+  // without this ever becoming a dead keyboard.
+  const KB_GAME_CODES = new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowLeft','ArrowDown','ArrowRight',
+    'Space','ShiftLeft','ShiftRight','KeyC','KeyF','KeyQ','KeyE','KeyR']);
   window.addEventListener('keydown', e=>{
-    if(controlScheme!=='keyboard'||isTypingTarget())return;
+    if(isTypingTarget())return;
     const code=e.code;
-    if(code==='KeyW'||code==='KeyA'||code==='KeyS'||code==='KeyD'||
-       code==='ArrowUp'||code==='ArrowLeft'||code==='ArrowDown'||code==='ArrowRight'){
-      e.preventDefault();
-      kbKeys.add(code);
-      recomputeKeyboardMoveVec();
-      return;
-    }
+    // Pause works from a keyboard regardless of touch/keyboard mode - it's
+    // never ambiguous with anything touch does, so there's no reason to
+    // require switching modes first just to hit Escape.
     if(code==='Escape'){
       e.preventDefault();
       const overlay=document.getElementById('pauseOverlay');
       if(overlay&&overlay.classList.contains('show')) closePauseMenu();
       else if(gameRunning) openPauseMenu();
+      return;
+    }
+    if(controlScheme!=='keyboard'){
+      if(!KB_GAME_CODES.has(code))return;
+      setControlScheme('keyboard');
+    }
+    if(code==='KeyW'||code==='KeyA'||code==='KeyS'||code==='KeyD'||
+       code==='ArrowUp'||code==='ArrowLeft'||code==='ArrowDown'||code==='ArrowRight'){
+      e.preventDefault();
+      kbKeys.add(code);
+      recomputeKeyboardMoveVec();
       return;
     }
     if(!gameRunning||e.repeat)return;
