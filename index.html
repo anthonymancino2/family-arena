@@ -1,3 +1,4 @@
+<!-- V23.62.00 Landscape Everywhere: fixes the Spider cinematic overlay getting stuck on the landing/round-clear screen after a move ends mid-transition; rebuilds Web-Yank Blitz into a ~10s move that swing-kicks through one enemy cluster then auto-swings to the next until the board clears or the clock runs out; unifies Maximum Spider/Full Stop Anchor/Skyline Dive to a 10-second active duration; clarifies Full Stop Anchor's rooted/no-aim behavior in its toast, HUD label, and description; gives Skyline Dive a richer launch, ascent trail, dive comet trail, and capstone finisher; and — the big one — removes the forced portrait counter-rotation entirely (phone, tablet, and desktop alike now render landscape natively) with a single rewritten @media(orientation:landscape) HUD layout that keeps every combat/movement button spaced apart at any width or height, replacing the old dueling "plain" vs "body.browserMode" rule sets that used to leave Secondary sitting on top of Ability and gave Up/Down (climb/swim/fly) no landscape position at all - the same Up/Down collision existed in portrait too and is fixed there as well. -->
 <!-- V23.61.00 Spider Cinematic Kit: merges the three old Spider ultimates into one three-act MAXIMUM SPIDER, adds FULL STOP ANCHOR (rooted tether/heave ultimate) and SKYLINE DIVE (airborne dive-bomb ultimate), rebuilds Electro Web with a hard cast beat + real detonation + lingering tesla field, gives Web-Yank Blitz a free web-swing when no enemy is in range, and introduces a zero-mesh spiderCinema DOM layer (letterbox, vignette, speedlines, splash cards, hitstop) so the big beats read like film without spending any of the 180-object FX budget. -->
 <!-- V23.55.00 Fox Hex Bloom + Astral Gravity Prison: combines Ninefold Spirit Bloom and Foxfire Hex Garden into one two-stage Secondary with the existing 2-second cast-start invincibility, and repurposes the former Hex Garden save slot into a distinct telekinetic Astral Gravity Prison lift/compress/slam Secondary. Preserves V23.54 global Ultimate I-frames and Fox glass-cannon damage tuning. -->
 <!-- V23.54.00 New Base Ultimate I-Frames: preserves the uploaded Asset Slim base and its Fox glass-cannon damage tuning, while adding one centralized read-only Ultimate runtime check in playerTakeHit so every equipped Ultimate grants full damage immunity only while that Ultimate is actively running. -->
@@ -133,28 +134,6 @@
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; overflow:hidden;
     overscroll-behavior:none;}
   #app{position:fixed;inset:0;height:100dvh;background:#050b12;transform-origin:center center;}
-
-  /* Portrait-only presentation.
-     JS swaps #app to portrait logical dimensions and counter-rotates it when
-     the physical/browser viewport becomes landscape. This deliberately keeps
-     every game screen and HUD in the same portrait composition. */
-  html.portraitLockedLandscape,
-  html.portraitLockedLandscape body{
-    overflow:hidden!important;
-    background:#050b12!important;
-  }
-  html.portraitLockedLandscape #app{
-    inset:auto!important;
-    position:fixed!important;
-    left:50%!important;
-    top:50%!important;
-    width:var(--portrait-lock-w)!important;
-    height:var(--portrait-lock-h)!important;
-    min-width:var(--portrait-lock-w)!important;
-    min-height:var(--portrait-lock-h)!important;
-    max-width:var(--portrait-lock-w)!important;
-    max-height:var(--portrait-lock-h)!important;
-  }
 
   .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
     justify-content:center;padding:24px;padding-top:calc(24px + env(safe-area-inset-top));
@@ -366,7 +345,12 @@
   @keyframes ultimatePulse{from{transform:scale(1)}to{transform:scale(1.09)}}
   .soulMeter{position:absolute;bottom:calc(274px + env(safe-area-inset-bottom));right:22px;z-index:20;color:#e6c7ff;font-size:12px;font-weight:900;text-shadow:0 2px 4px #000;display:none;}
   .soulMeter.on{display:block;}
-  .vertBtn{position:absolute;right:40px;width:56px;height:56px;border-radius:50%;
+  /* left:14, not right:40 - at right:40 this sat directly on top of the
+     right-22 and right-102 combat columns (secondary/dash/ability/ultimate)
+     whenever an avatar with a climb/swim/fly move had it visible. The
+     bottom-left corner is otherwise empty in portrait, so it moves there
+     instead of trying to squeeze into an already-full column. */
+  .vertBtn{position:absolute;left:14px;right:auto;width:56px;height:56px;border-radius:50%;
     background:rgba(20,50,58,0.55);border:2.5px solid rgba(127,224,240,0.9);
     font-weight:800;color:#fff;pointer-events:auto;display:none;
     flex-direction:column;align-items:center;justify-content:center;
@@ -375,8 +359,8 @@
   .vertBtn:active{background:rgba(40,90,100,0.75);}
   .vertBtn .vbIcon{font-size:15px;line-height:1;}
   .vertBtn .vbLabel{font-size:10px;line-height:1;}
-  .upBtn{bottom:calc(150px + env(safe-area-inset-bottom));}
-  .downBtn{bottom:calc(84px + env(safe-area-inset-bottom));}
+  .upBtn{bottom:calc(100px + env(safe-area-inset-bottom));}
+  .downBtn{bottom:calc(34px + env(safe-area-inset-bottom));}
   .jumpBtn.freeHide, .dashBtn.freeHide, .actBtn.freeHide, .secondaryBtn.freeHide, .abilityBtn.freeHide, .laserBtn.freeHide{display:none;}
   .freeBanner{position:absolute;top:calc(60px + env(safe-area-inset-top));left:50%;
     transform:translateX(-50%);background:rgba(127,216,240,0.92);color:#052233;
@@ -779,91 +763,157 @@
   }
 
 
-  /* V22.13.06 Landscape HUD Polish
-     Keeps combat controls in clear thumb zones and prevents Shield/Look Fwd overlap. */
-  @media (orientation:landscape) and (max-height:500px){
-    /* Add extra protection from iPhone edge gestures. */
+  /* V23.63.00 Unified Landscape HUD
+     Replaces the old dueling "plain landscape" / "body.browserMode landscape"
+     rule sets (which disagreed with each other and, in the browserMode tier,
+     literally overlapped SECONDARY on top of ABILITY) with one layout that
+     applies in every landscape context - desktop window, tablet, phone
+     browser tab, or installed/standalone phone app. Real available height
+     (max-height) rather than the browserMode class is what actually predicts
+     crowding, since a browser tab's address bar simply shows up as less
+     viewport height - so one height-driven system covers all of them.
+     Everything bottom-anchored forms two side rows (combat cluster bottom-
+     right, movement cluster bottom-left) with fixed gaps computed to never
+     touch at any realistic landscape width, leaving the whole center of the
+     screen clear for the view. */
+  @media (orientation:landscape){
     .actBtn{
-      right:calc(18px + env(safe-area-inset-right));
+      right:calc(16px + env(safe-area-inset-right));
       bottom:calc(16px + env(safe-area-inset-bottom));
+      width:72px;height:72px;
     }
-
-    /* DASH now forms a natural pair with FIRE instead of floating above it. */
     .dashBtn{
       right:calc(98px + env(safe-area-inset-right));
-      bottom:calc(21px + env(safe-area-inset-bottom));
+      bottom:calc(16px + env(safe-area-inset-bottom));
+      width:62px;height:62px;
     }
-
-    /* The equipped Ability remains directly above FIRE. */
-    .abilityBtn{
-      right:calc(18px + env(safe-area-inset-right));
-      bottom:calc(96px + env(safe-area-inset-bottom));
-    }
-
-    /* SECONDARY / Shield is now a compact rectangular control matching JUMP.
-       It sits in its own middle column and can no longer hide behind LOOK FWD. */
     .secondaryBtn{
-      right:calc(98px + env(safe-area-inset-right));
-      bottom:calc(98px + env(safe-area-inset-bottom));
-      width:52px;
-      height:46px;
+      right:calc(170px + env(safe-area-inset-right));
+      bottom:calc(16px + env(safe-area-inset-bottom));
+      width:66px;height:58px;
       border-radius:12px;
       padding:3px;
       font-size:9px;
     }
-    .secondaryBtn .secondaryIcon{
-      font-size:15px;
-      margin-bottom:1px;
+    .secondaryBtn .secondaryIcon{font-size:16px;margin-bottom:1px;}
+    .secondaryBtn .secondaryLabel{max-width:58px;font-size:7px;}
+    .abilityBtn{
+      right:calc(246px + env(safe-area-inset-right));
+      bottom:calc(16px + env(safe-area-inset-bottom));
+      width:62px;height:62px;
     }
-    .secondaryBtn .secondaryLabel{
-      max-width:46px;
-      font-size:7px;
-    }
-
-    /* Ultimate is slightly larger and occupies its own middle-column tier. */
     .ultimateBtn{
-      right:calc(84px + env(safe-area-inset-right));
-      bottom:calc(158px + env(safe-area-inset-bottom));
-      width:80px;
-      height:80px;
+      right:calc(320px + env(safe-area-inset-right));
+      bottom:calc(16px + env(safe-area-inset-bottom));
+      width:80px;height:80px;
       font-size:12px;
     }
 
-    /* Utility controls are visually secondary to combat controls. */
+    /* Utility rail stays a narrow top-right column, well clear of the
+       combat row below it on every screen tall enough to matter. */
     .camCluster{
-      top:calc(10px + env(safe-area-inset-top));
-      right:calc(18px + env(safe-area-inset-right));
-      gap:4px;
+      top:calc(12px + env(safe-area-inset-top));
+      right:calc(14px + env(safe-area-inset-right));
+      gap:6px;
     }
-    .camZoomBtn{
-      width:44px;
-      height:28px;
-      border-radius:10px;
-      font-size:15px;
+    .camZoomBtn{width:50px;height:30px;border-radius:11px;font-size:16px;}
+    .camLabelBox{width:50px;height:38px;border-radius:11px;font-size:9px;}
+    .camLabelBox span{font-size:14px;}
+    .pauseBtn{width:50px;height:40px;border-radius:11px;font-size:15px;}
+
+    /* JUMP / LOOK FWD move out of the utility rail's flex column (where
+       they'd stack the column too tall for a short landscape screen) and
+       into their own row along the bottom-left, right after the radar. */
+    .jumpBtn,.lookFwdBtn{
+      /* fixed, not absolute: both are DOM children of .camCluster (itself
+         position:absolute), so plain absolute positioning here would be
+         relative to that small top-right box instead of the screen. */
+      position:fixed;
+      bottom:calc(16px + env(safe-area-inset-bottom));
+      width:52px;height:46px;
+      border-radius:12px;
     }
-    .camLabelBox{
-      width:44px;
-      height:34px;
-      border-radius:10px;
-      font-size:8px;
+    .jumpBtn{left:calc(98px + env(safe-area-inset-left));right:auto;font-size:9px;}
+    .lookFwdBtn{left:calc(160px + env(safe-area-inset-left));right:auto;font-size:7px;}
+
+    /* UP/DOWN (climb, swim, fly - avatar-conditional) continue the same
+       bottom-left row past Jump/Look Fwd instead of stacking in the old
+       portrait-only right-edge column, which had no landscape rule at all
+       and would otherwise land directly on top of the combat cluster. */
+    .vertBtn{
+      bottom:auto;
+      width:58px;height:58px;
     }
-    .camLabelBox span{
-      font-size:13px;
+    .upBtn{left:calc(222px + env(safe-area-inset-left));right:auto;bottom:calc(16px + env(safe-area-inset-bottom));}
+    .downBtn{left:calc(290px + env(safe-area-inset-left));right:auto;bottom:calc(16px + env(safe-area-inset-bottom));}
+  }
+
+  /* Short landscape heights - phone browser tabs and installed phone apps
+     both commonly land here (address bar or not, a landscape phone screen
+     itself is only ~320-430px tall) - so every element above shrinks and
+     tightens its gaps together, keeping the same non-overlapping layout. */
+  @media (orientation:landscape) and (max-height:430px){
+    .actBtn{
+      right:calc(14px + env(safe-area-inset-right));
+      bottom:calc(12px + env(safe-area-inset-bottom));
+      width:58px;height:58px;
     }
-    .pauseBtn{
-      width:46px;
-      height:40px;
-      border-radius:11px;
-      font-size:14px;
+    .dashBtn{
+      right:calc(78px + env(safe-area-inset-right));
+      bottom:calc(12px + env(safe-area-inset-bottom));
+      width:50px;height:50px;
     }
-    .jumpBtn,
-    .lookFwdBtn{
-      width:48px;
-      height:42px;
-      border-radius:11px;
+    .secondaryBtn{
+      right:calc(134px + env(safe-area-inset-right));
+      bottom:calc(12px + env(safe-area-inset-bottom));
+      width:50px;height:42px;
     }
-    .jumpBtn{font-size:9px;}
-    .lookFwdBtn{font-size:7px;}
+    .abilityBtn{
+      right:calc(190px + env(safe-area-inset-right));
+      bottom:calc(12px + env(safe-area-inset-bottom));
+      width:50px;height:50px;
+    }
+    .ultimateBtn{
+      right:calc(248px + env(safe-area-inset-right));
+      bottom:calc(12px + env(safe-area-inset-bottom));
+      width:62px;height:62px;
+    }
+    .camCluster{
+      top:calc(6px + env(safe-area-inset-top));
+      right:calc(12px + env(safe-area-inset-right));
+      gap:3px;
+    }
+    .camZoomBtn{width:38px;height:24px;border-radius:9px;font-size:14px;}
+    .camLabelBox{width:38px;height:28px;border-radius:9px;font-size:7px;}
+    .camLabelBox span{font-size:12px;}
+    .pauseBtn{width:38px;height:30px;border-radius:9px;font-size:13px;}
+    .jumpBtn,.lookFwdBtn{
+      bottom:calc(12px + env(safe-area-inset-bottom));
+      width:46px;height:38px;
+    }
+    .jumpBtn{left:calc(88px + env(safe-area-inset-left));font-size:8px;}
+    .lookFwdBtn{left:calc(142px + env(safe-area-inset-left));font-size:6.5px;}
+    .vertBtn{width:50px;height:50px;}
+    .upBtn{left:calc(196px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));}
+    .downBtn{left:calc(254px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));}
+  }
+
+  /* Narrow AND short landscape (older/small phones - the only combination
+     where the two side clusters above can run out of width and meet in the
+     middle, and only once UP/DOWN join Jump/Look Fwd in the left cluster). */
+  @media (orientation:landscape) and (max-height:430px) and (max-width:620px){
+    .actBtn{right:calc(12px + env(safe-area-inset-right));width:50px;height:50px;}
+    .dashBtn{right:calc(66px + env(safe-area-inset-right));width:44px;height:44px;}
+    .secondaryBtn{right:calc(114px + env(safe-area-inset-right));width:44px;height:38px;}
+    .abilityBtn{right:calc(162px + env(safe-area-inset-right));width:44px;height:44px;}
+    .ultimateBtn{right:calc(212px + env(safe-area-inset-right));width:54px;height:54px;}
+    .enemyRadar{width:60px!important;height:60px!important;}
+    .jumpBtn{left:calc(76px + env(safe-area-inset-left));}
+    .lookFwdBtn{left:calc(122px + env(safe-area-inset-left));}
+    .jumpBtn,.lookFwdBtn{width:42px;height:34px;}
+    .vertBtn{width:46px;height:46px;}
+    .upBtn{left:calc(168px + env(safe-area-inset-left));}
+    .downBtn{left:calc(218px + env(safe-area-inset-left));}
   }
 
 
@@ -904,43 +954,6 @@
   }
 
   @media (orientation:landscape) and (max-height:430px){
-    .actBtn{
-      right:calc(18px + env(safe-area-inset-right));
-      bottom:calc(14px + env(safe-area-inset-bottom));
-      width:66px;height:66px;
-    }
-    .dashBtn{
-      right:calc(92px + env(safe-area-inset-right));
-      bottom:calc(18px + env(safe-area-inset-bottom));
-      width:58px;height:58px;
-    }
-    .secondaryBtn{
-      right:calc(94px + env(safe-area-inset-right));
-      bottom:calc(86px + env(safe-area-inset-bottom));
-      width:50px;height:44px;
-    }
-    .abilityBtn{
-      right:calc(18px + env(safe-area-inset-right));
-      bottom:calc(87px + env(safe-area-inset-bottom));
-      width:58px;height:58px;
-    }
-    .ultimateBtn{
-      right:calc(86px + env(safe-area-inset-right));
-      bottom:calc(140px + env(safe-area-inset-bottom));
-      width:76px;height:76px;
-    }
-    .camCluster{
-      top:calc(7px + env(safe-area-inset-top));
-      right:calc(18px + env(safe-area-inset-right));
-      gap:3px;
-    }
-    .camZoomBtn{width:42px;height:25px;font-size:14px;}
-    .camLabelBox{width:42px;height:30px;font-size:7px;}
-    .camLabelBox span{font-size:12px;}
-    .pauseBtn{width:44px;height:34px;font-size:13px;}
-    .jumpBtn{width:46px;height:36px;font-size:8px;}
-    .lookFwdBtn{width:46px;height:36px;font-size:6.5px;}
-
     .levelUpPanel{
       width:min(92vw,600px);
       padding:12px 16px 22px;
@@ -958,129 +971,6 @@
     .statChoiceBtn .scLabel{font-size:14px;}
     .statChoiceBtn .scDesc{font-size:10px;}
     .statChoiceBtn .scLevel{font-size:10px;}
-  }
-
-
-  /* V22.13.08 Safari Browser Landscape Layout V2
-     Applies only when running inside a normal browser tab, not the installed
-     home-screen app. The controls use a clear two-column combat grid. */
-  @media (orientation:landscape){
-    body.browserMode .actBtn{
-      right:calc(20px + env(safe-area-inset-right));
-      bottom:calc(14px + env(safe-area-inset-bottom));
-      width:66px;
-      height:66px;
-    }
-    body.browserMode .dashBtn{
-      right:calc(96px + env(safe-area-inset-right));
-      bottom:calc(18px + env(safe-area-inset-bottom));
-      width:58px;
-      height:58px;
-    }
-    body.browserMode .jumpBtn{
-      position:fixed;
-      right:calc(28px + env(safe-area-inset-right));
-      bottom:calc(91px + env(safe-area-inset-bottom));
-      width:48px;
-      height:42px;
-      border-radius:11px;
-      z-index:39;
-    }
-    body.browserMode .lookFwdBtn{
-      position:fixed;
-      right:calc(102px + env(safe-area-inset-right));
-      bottom:calc(91px + env(safe-area-inset-bottom));
-      width:48px;
-      height:42px;
-      border-radius:11px;
-      z-index:39;
-    }
-    body.browserMode .secondaryBtn{
-      right:calc(63px + env(safe-area-inset-right));
-      bottom:calc(145px + env(safe-area-inset-bottom));
-      width:52px;
-      height:46px;
-      border-radius:12px;
-      z-index:39;
-    }
-    body.browserMode .abilityBtn{
-      right:calc(20px + env(safe-area-inset-right));
-      bottom:calc(145px + env(safe-area-inset-bottom));
-      width:58px;
-      height:58px;
-      z-index:38;
-    }
-    body.browserMode .ultimateBtn{
-      right:calc(108px + env(safe-area-inset-right));
-      bottom:calc(202px + env(safe-area-inset-bottom));
-      width:78px;
-      height:78px;
-      z-index:38;
-    }
-
-    /* Keep camera and pause controls in one narrow utility rail. */
-    body.browserMode .camCluster{
-      top:calc(8px + env(safe-area-inset-top));
-      right:calc(14px + env(safe-area-inset-right));
-      gap:4px;
-      z-index:40;
-    }
-    body.browserMode .camZoomBtn{
-      width:42px;
-      height:26px;
-      border-radius:9px;
-      font-size:14px;
-    }
-    body.browserMode .camLabelBox{
-      width:42px;
-      height:31px;
-      border-radius:9px;
-      font-size:7px;
-    }
-    body.browserMode .camLabelBox span{font-size:12px;}
-    body.browserMode .pauseBtn{
-      width:42px;
-      height:34px;
-      border-radius:9px;
-      font-size:13px;
-    }
-
-    /* The utility versions inside camCluster are not used for Jump/Look Fwd
-       in browser mode because those controls are positioned in the combat grid. */
-    body.browserMode .camCluster .jumpBtn,
-    body.browserMode .camCluster .lookFwdBtn{
-      position:fixed;
-    }
-  }
-
-  /* Extra-tight Safari height: reduce slightly without collapsing the grid. */
-  @media (orientation:landscape) and (max-height:520px){
-    body.browserMode .actBtn{width:62px;height:62px;}
-    body.browserMode .dashBtn{width:54px;height:54px;right:calc(91px + env(safe-area-inset-right));}
-    body.browserMode .jumpBtn{bottom:calc(82px + env(safe-area-inset-bottom));}
-    body.browserMode .lookFwdBtn{bottom:calc(82px + env(safe-area-inset-bottom));right:calc(96px + env(safe-area-inset-right));}
-    body.browserMode .secondaryBtn{bottom:calc(132px + env(safe-area-inset-bottom));}
-    body.browserMode .abilityBtn{bottom:calc(132px + env(safe-area-inset-bottom));}
-    body.browserMode .ultimateBtn{
-      right:calc(102px + env(safe-area-inset-right));
-      bottom:calc(183px + env(safe-area-inset-bottom));
-      width:72px;
-      height:72px;
-    }
-  }
-
-
-  /* V22.13.09 Browser Pause Button Placement
-     Keep Pause at the top of the far-right utility rail so it cannot crowd
-     Jump or the combat grid below. */
-  @media (orientation:landscape){
-    body.browserMode .pauseBtn{
-      order:-1;
-      width:42px;
-      height:34px;
-      flex:0 0 auto;
-      margin-bottom:1px;
-    }
   }
 
 
@@ -1458,7 +1348,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.61.00 - Spider: Cinematic Kit';
+const GAME_VERSION='23.62.00 - Landscape Everywhere';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -9739,49 +9629,27 @@ function orientationAngle(){
   return ((a%360)+360)%360;
 }
 async function requestPortraitOrientationLock(){
-  try{
-    if(!isMobile)return;
-    if(screen.orientation&&screen.orientation.lock){
-      await screen.orientation.lock('portrait');
-    }
-  }catch(_){
-    // Normal iOS Safari does not allow orientation.lock. The CSS/JS
-    // counter-rotation below provides the same portrait game presentation.
-  }
+  // Landscape is now a fully native presentation on every device - phone,
+  // tablet, and desktop alike - so the game no longer asks the OS/browser
+  // to lock rotation to portrait. Left as a no-op function (rather than
+  // deleted) since orientationchange still calls it.
 }
 function applyPortraitPresentation(){
+  // Landscape is native everywhere now - no counter-rotation, on mobile or
+  // desktop. The dedicated @media(orientation:landscape) HUD rules further
+  // down handle keeping the buttons spaced out once the aspect ratio flips.
+  // #app is always reset to its natural (unrotated) state.
   const app=document.getElementById('app');
   if(!app)return;
-  const p=physicalViewportSize();
-  // Desktop gets to play in whatever orientation its window is — the
-  // portrait counter-rotation is a phone/tablet accommodation only, so
-  // skip it entirely on non-touch devices and let landscape render natively.
-  const landscape=isMobile&&p.w>p.h;
-
-  document.documentElement.classList.toggle('portraitLockedLandscape',landscape);
-
-  if(!landscape){
-    portraitLockRotation=0;
-    app.style.removeProperty('--portrait-lock-w');
-    app.style.removeProperty('--portrait-lock-h');
-    app.style.width='';
-    app.style.height='';
-    app.style.left='';
-    app.style.top='';
-    app.style.transform='';
-    return;
-  }
-
-  // Logical portrait viewport: physical height becomes app width; physical
-  // width becomes app height. Counter-rotation prevents any landscape reflow.
-  const logicalW=p.h;
-  const logicalH=p.w;
-  app.style.setProperty('--portrait-lock-w',logicalW+'px');
-  app.style.setProperty('--portrait-lock-h',logicalH+'px');
-
-  const angle=orientationAngle();
-  portraitLockRotation=(angle===270)?-90:90;
-  app.style.transform='translate(-50%,-50%) rotate('+portraitLockRotation+'deg)';
+  document.documentElement.classList.remove('portraitLockedLandscape');
+  portraitLockRotation=0;
+  app.style.removeProperty('--portrait-lock-w');
+  app.style.removeProperty('--portrait-lock-h');
+  app.style.width='';
+  app.style.height='';
+  app.style.left='';
+  app.style.top='';
+  app.style.transform='';
 }
 function portraitClientPoint(t){
   const p=physicalViewportSize();
