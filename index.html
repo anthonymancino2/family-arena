@@ -1,3 +1,4 @@
+<!-- V23.71.00 Roomier HUD: two more kbmMode tweaks from a follow-up screenshot (a Genshin Impact reference showing loosely-spaced semi-transparent buttons, plus a shot of the actual game highlighting how much unused space desktop/tablet landscape has to spare). Widens the gap between kbmMode's move buttons in portrait and the base (roomy) landscape tier from 10-12px to 20px, since desktop/tablet landscape width in particular has plenty to spare and there's no thumb-reach constraint forcing them close together the way touch has; the tight/narrow landscape tiers (real small-phone-landscape heights) are left at their original tighter gap since those genuinely don't have the room. Also drops every kbmMode button's opacity further (roughly 35-40% more transparent again). Re-verified zero overlaps across the full size matrix after both changes. -->
 <!-- V23.70.00 KBM Polish + Landing Fix: three fixes from live desktop feedback. (1) Swaps the mouse buttons - right-click now fires Primary, left-click-drag now looks around - since the player found the original left-fire/right-look mapping backwards. (2) kbmMode's move buttons are now noticeably bigger and more transparent (a mouse cursor doesn't need a large precise target the way a fingertip does, so the size is purely for at-a-glance cooldown reading and the lower opacity keeps them from covering the game world); this required fully recomputing the button grid's spacing in portrait and all three landscape tiers, since the touch-sized gaps were too tight for the bigger buttons - caught and fixed several real overlaps via empirical getBoundingClientRect checks, including one root-cause bug where a 2-class portrait-scoped kbmMode selector was beating the landscape media queries' 1-class selectors on specificity alone and silently overriding their bottom offset regardless of orientation, which needed explicit bottom: overrides added to every landscape tier to fix. (3) Removes a ~400KB base64 JPEG that had been embedded as the #screenHome::before background image - it was a 3D-asset-marketplace character showcase screenshot (poly count, texture size, "HERO 001 HUMAN" tags, animation strip) that had nothing to do with the game, left over from wherever the original template came from. The landing page now shows its intended solid sky-blue background with the existing gradient wash instead. -->
 <!-- V23.69.00 Move Buttons Stay Visible: keyboard mode now only hides the drag-based .moveZone/.lookZone/.moveKnob (WASD fully replaces the joystick, and the look-drag zone would fight right-click-drag camera look) - every actual move button (fire/secondary/dash/ability/ultimate/jump/look-forward/up-down) stays on screen and clickable, since they already work fine with a mouse and players shouldn't have to memorize hotkeys to use their moves. Repositions the kbmHintBar to vertical-center-right (the one spot that's reliably empty in both orientations regardless of how tall the left info-pill stack grows - center-left and bottom-left were both found to collide with real content via empirical getBoundingClientRect checks) and shortens its text to fit the narrower spot. -->
 <!-- V23.68.00 Click Fix + Auto Keyboard: fixes two real bugs found testing V23.67 on a real desktop mouse. First: pauseBtn, btnResume, btnRestart, btnRerun, btnAbilities, btnQuitMid, statBtnPower/Speed/Hp, btnContinueRound, shopPromptBtn, btnCloseShop, and upBtn/downBtn were all wired touchstart-only with no click/pointerdown fallback - a real physical mouse click never fires touchstart on a non-touch desktop, so every one of those was completely dead to a mouse user (this is exactly why "the game doesn't move past to the next round": btnContinueRound could never be clicked). All now bound via a shared bindTapOrClick() helper (touchstart AND click) or matching mousedown/mouseup/mouseleave pairs. Second: WASD/arrows/Space/Shift/C/F/Q/E/R now auto-switch controlScheme to 'keyboard' the instant any of them is pressed, rather than staying dead until the corner toggle is found - keyboard events are never touch-synthesized so this is a safe, unambiguous signal, and it fixes "keyboard not working" for anyone whose device mis-defaulted to touch mode (e.g. a touchscreen laptop reporting a coarse primary pointer). Escape/pause now also works regardless of which mode is active. -->
@@ -313,12 +314,12 @@
   body.kbmMode .moveZone,body.kbmMode .lookZone,body.kbmMode .moveKnob{
     display:none!important;
   }
-  body.kbmMode .actBtn{width:92px;height:92px;background:rgba(255,80,80,0.32);}
-  body.kbmMode .secondaryBtn{width:92px;height:92px;background:rgba(74,47,112,.42);}
-  body.kbmMode .dashBtn{width:80px;height:80px;background:rgba(255,199,54,0.42);}
-  body.kbmMode .abilityBtn{width:80px;height:80px;background:rgba(53,207,255,0.42);}
-  body.kbmMode .ultimateBtn{width:96px;height:96px;background:conic-gradient(#b95cff var(--charge,0%),rgba(33,11,52,.5) 0);}
-  body.kbmMode .jumpBtn,body.kbmMode .lookFwdBtn{width:66px;height:58px;background:rgba(20,22,28,0.28);}
+  body.kbmMode .actBtn{width:92px;height:92px;background:rgba(255,80,80,0.20);}
+  body.kbmMode .secondaryBtn{width:92px;height:92px;background:rgba(74,47,112,.26);}
+  body.kbmMode .dashBtn{width:80px;height:80px;background:rgba(255,199,54,0.26);}
+  body.kbmMode .abilityBtn{width:80px;height:80px;background:rgba(53,207,255,0.26);}
+  body.kbmMode .ultimateBtn{width:96px;height:96px;background:conic-gradient(#b95cff var(--charge,0%),rgba(33,11,52,.30) 0);}
+  body.kbmMode .jumpBtn,body.kbmMode .lookFwdBtn{width:66px;height:58px;background:rgba(20,22,28,0.18);}
   body.kbmMode .secondaryBtn .secondaryIcon{font-size:24px;}
   body.kbmMode .secondaryBtn .secondaryLabel{max-width:80px;font-size:9px;}
   /* Vertical-center-right: the left side has the info-pill stack (whose
@@ -404,10 +405,10 @@
      past 80px wide). Landscape has its own override further down that
      supersedes this. */
   body.kbmMode .actBtn{bottom:calc(34px + env(safe-area-inset-bottom));right:22px;}
-  body.kbmMode .abilityBtn{bottom:calc(34px + env(safe-area-inset-bottom));right:124px;}
-  body.kbmMode .secondaryBtn{bottom:calc(136px + env(safe-area-inset-bottom));right:22px;}
-  body.kbmMode .dashBtn{bottom:calc(136px + env(safe-area-inset-bottom));right:124px;}
-  body.kbmMode .ultimateBtn{bottom:calc(238px + env(safe-area-inset-bottom));right:22px;}
+  body.kbmMode .abilityBtn{bottom:calc(34px + env(safe-area-inset-bottom));right:140px;}
+  body.kbmMode .secondaryBtn{bottom:calc(146px + env(safe-area-inset-bottom));right:22px;}
+  body.kbmMode .dashBtn{bottom:calc(146px + env(safe-area-inset-bottom));right:140px;}
+  body.kbmMode .ultimateBtn{bottom:calc(258px + env(safe-area-inset-bottom));right:22px;}
   /* left:14, not right:40 - at right:40 this sat directly on top of the
      right-22 and right-102 combat columns (secondary/dash/ability/ultimate)
      whenever an avatar with a climb/swim/fly move had it visible. The
@@ -910,18 +911,21 @@
     .upBtn{left:calc(222px + env(safe-area-inset-left));right:auto;bottom:calc(16px + env(safe-area-inset-bottom));}
     .downBtn{left:calc(290px + env(safe-area-inset-left));right:auto;bottom:calc(16px + env(safe-area-inset-bottom));}
 
-    /* kbmMode's buttons are bigger than the touch sizes above, so the same
-       tight gaps would collide - every right:/left: offset here is
-       recomputed for the larger widths, same 10-12px gap rule. */
+    /* kbmMode's buttons are bigger than the touch sizes above AND get a
+       roomier 20px gap instead of touch's tight 10-12px - desktop/tablet
+       landscape has plenty of width to spare, so there's no reason to
+       keep the buttons crowded together the way touch's thumb-reach
+       layout has to. Every right:/left: offset here is recomputed for
+       both the larger widths and the wider gap. */
     body.kbmMode .actBtn{right:calc(16px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));}
-    body.kbmMode .dashBtn{right:calc(118px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));}
-    body.kbmMode .secondaryBtn{right:calc(208px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));width:92px;height:70px;}
-    body.kbmMode .abilityBtn{right:calc(310px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));}
-    body.kbmMode .ultimateBtn{right:calc(402px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));}
-    body.kbmMode .jumpBtn{left:calc(98px + env(safe-area-inset-left));}
-    body.kbmMode .lookFwdBtn{left:calc(174px + env(safe-area-inset-left));}
-    body.kbmMode .upBtn{left:calc(250px + env(safe-area-inset-left));}
-    body.kbmMode .downBtn{left:calc(318px + env(safe-area-inset-left));}
+    body.kbmMode .dashBtn{right:calc(128px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));}
+    body.kbmMode .secondaryBtn{right:calc(228px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));width:92px;height:70px;}
+    body.kbmMode .abilityBtn{right:calc(340px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));}
+    body.kbmMode .ultimateBtn{right:calc(442px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));}
+    body.kbmMode .jumpBtn{left:calc(108px + env(safe-area-inset-left));}
+    body.kbmMode .lookFwdBtn{left:calc(194px + env(safe-area-inset-left));}
+    body.kbmMode .upBtn{left:calc(280px + env(safe-area-inset-left));}
+    body.kbmMode .downBtn{left:calc(358px + env(safe-area-inset-left));}
   }
 
   /* Short landscape heights - phone browser tabs and installed phone apps
@@ -1449,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.70.00 - KBM Polish + Landing Fix';
+const GAME_VERSION='23.71.00 - Roomier HUD';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
