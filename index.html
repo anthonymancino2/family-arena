@@ -1453,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.74.00 - Nyxara Moveset Overhaul';
+const GAME_VERSION='23.74.01 - Global Cooldown Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3662,7 +3662,7 @@ function arcaneEchoesCooldownForLevel(level=avatarLevel()){
 // intentionally independent of the completed Fox Mage integration.
 const UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING = true;
 const TEST_NO_ULTIMATE_COOLDOWNS = true;
-const TEST_NO_MOVE_COOLDOWNS = true; // development: selectable Primaries/Secondaries/Ultimates re-arm immediately
+const TEST_NO_MOVE_COOLDOWNS = false; // was left on in production — forced every character's primary/secondary cooldown to 0 every frame, so held-fire moves (dashes, AoEs) refired ~60x/second instead of respecting their real cooldown
 function arcaneEchoesUnlocked(){
   return mageGameplayActive() && (UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING || avatarLevel()>=10);
 }
