@@ -1453,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.74.03 - Nyxara Ultimates Rebuilt';
+const GAME_VERSION='23.75.00 - Nyxara Secondary Rework & Hellgate Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3479,12 +3479,12 @@ const CHARACTER_COMBAT = {
         desc:'A three-hit claw combo — left rake, right rake, then a two-handed cross that throws a burst of embers. Hold FIRE to keep the chain going.'},
       dragonlord_infernal_glaive:{name:'Infernal Glaive Combo', price:420, slot:'primary', kind:'dragonlord_infernal_glaive', cooldown:0.27, damage:1.75, radius:3.5, arc:2.05, auto:true, fireRateCap:2.5,
         desc:'Trades speed for reach: a heavier three-hit greatsword chain wreathed in dragonfire that hits harder and further than the claws.'},
-      dragonlord_brimstone_bolt:{name:'Brimstone Bolt', price:0, slot:'secondary', kind:'dragonlord_brimstone_bolt', cooldown:0.55, damage:1.6, splash:1.1, auto:true, fireRateCap:2.5,
-        desc:'Hurls a homing brimstone fireball that explodes in a small blast radius on contact.'},
-      dragonlord_wing_gale_dash:{name:'Wing Gale Dash', price:400, slot:'secondary', kind:'dragonlord_wing_gale_dash', cooldown:2.4, damage:1.5, radius:2.4, fireRateCap:3,
-        desc:'Rockets forward on demon wings, slashing through everything in the flight path and leaving a burning wind trail.'},
-      dragonlord_demonfire_nova:{name:'Demonfire Nova', price:480, slot:'secondary', kind:'dragonlord_demonfire_nova', cooldown:4.2, damage:2.0, radius:4.6, fireRateCap:3,
-        desc:'Slams the ground and detonates a ring of hellfire around her, hitting every enemy in range.'}
+      dragonlord_brimstone_barrage:{name:'Brimstone Barrage', price:0, slot:'secondary', kind:'dragonlord_brimstone_barrage', cooldown:1.5, damage:0.95, splash:1.2, auto:true, fireRateCap:2.2,
+        desc:'Looses a 3-bolt volley of homing brimstone fireballs in a tight spread, then detonates the ground beneath her in a burst of hellfire.'},
+      dragonlord_wing_gale_dash:{name:'Wing Gale Dash', price:400, slot:'secondary', kind:'dragonlord_wing_gale_dash', cooldown:2.0, damage:1.9, radius:2.7, fireRateCap:3,
+        desc:'Rockets forward on demon wings, slashing through everything in the flight path and slamming down in a burning shockwave on landing.'},
+      dragonlord_void_maw:{name:'Void Maw', price:450, slot:'secondary', kind:'dragonlord_void_maw', cooldown:3.4, damage:2.1, radius:3.6, fireRateCap:3,
+        desc:'Tears open a void rift ahead of her that drags every nearby enemy toward its center, then collapses in a violent implosion of hellfire.'}
     }
   },
   hooded: {
@@ -23516,9 +23516,9 @@ function doDragonLordAttack(w){
   if(!player) return;
   switch(w.kind){
     case 'dragonlord_infernal_glaive': dragonlordGlaiveCombo(w); break;
-    case 'dragonlord_brimstone_bolt': dragonlordBrimstoneBolt(w); break;
+    case 'dragonlord_brimstone_barrage': dragonlordBrimstoneBarrage(w); break;
     case 'dragonlord_wing_gale_dash': dragonlordWingGaleDash(w); break;
-    case 'dragonlord_demonfire_nova': dragonlordDemonfireNova(w); break;
+    case 'dragonlord_void_maw': dragonlordVoidMaw(w); break;
     default: dragonlordClawRend(w); break;
   }
 }
@@ -23554,28 +23554,39 @@ function dragonlordGlaiveCombo(w){
   triggerCombatShake(hits>0?10:4,hits>0?140:80);
   if(hits>0)navigator.vibrate&&navigator.vibrate([20,14,26]);
 }
-// Brimstone Bolt Burst: rapid-fire projectile. The projectile itself still
-// rides the game's shared bullet pool (fireBullet/bullets[]) rather than a
-// second parallel pool — only the muzzle flash is dragonlord-pooled.
-function dragonlordBrimstoneBolt(w){
-  if(player.userData.playKayClip) player.userData.playKayClip('Spell_Simple_Shoot',true,true,.18);
+// Brimstone Barrage: bolt + nova merged into one secondary. Three
+// spread-fired homing bolts (shared bullet pool, as the old Bolt used)
+// followed by a pooled ground-burst ring at her feet — keeps the ranged
+// pressure of the old Bolt and the AoE payoff of the old Nova in one slot.
+function dragonlordBrimstoneBarrage(w){
+  if(player.userData.playKayClip) player.userData.playKayClip('Spell_Simple_Shoot',true,true,.20);
   const yaw=player.rotation.y;
-  const muzzle={x:player.position.x+Math.sin(yaw)*.7,y:player.position.y+1.15,z:player.position.z+Math.cos(yaw)*.7};
-  dragonlordImpactFlash(muzzle,DL_EMBER,.9,.10);
-  const boosted=dragonlordRuntime.wyrmFormTimer>0?{...w,damage:w.damage*dragonlordAttackDamageMult()}:w;
-  shootFromPosition(boosted,player.position,0);
-  const b=bullets[bullets.length-1];
-  if(b&&b.mesh){
-    b.mesh.scale.multiplyScalar(1.7);
-    b.mesh.traverse(o=>{ if(o.material&&o.material.color) o.material.color.setHex(DL_FIRE); });
-  }
+  const dmgMult=dragonlordAttackDamageMult();
+  [-0.14,0,0.14].forEach(spread=>{
+    const muzzle={x:player.position.x+Math.sin(yaw+spread)*.7,y:player.position.y+1.15,z:player.position.z+Math.cos(yaw+spread)*.7};
+    dragonlordImpactFlash(muzzle,DL_EMBER,.7,.09);
+    shootFromPosition({...w,damage:w.damage*dmgMult},player.position,spread);
+    const b=bullets[bullets.length-1];
+    if(b&&b.mesh){
+      b.mesh.scale.multiplyScalar(1.5);
+      b.mesh.traverse(o=>{ if(o.material&&o.material.color) o.material.color.setHex(DL_FIRE); });
+    }
+  });
+  const origin=player.position;
+  const burstRadius=2.3*dragonlordAttackRangeMult();
+  const hits=damageNearby(origin,burstRadius,w.damage*1.15*dmgMult);
+  dragonlordFireSweepRing(origin,DL_EMBER,burstRadius);
+  dragonlordImpactFlash(origin,DL_FIRE,1.6,.16);
+  triggerCombatShake(hits>0?9:4,120);
+  navigator.vibrate&&navigator.vibrate(hits>0?[24,16,32]:14);
 }
-// Wing Gale Dash: single pooled ground-trail strip instead of particles
-// spawned along the path.
+// Wing Gale Dash (buffed): higher damage/radius, shorter cooldown, and a
+// bigger landing shockwave so the finish reads as an actual impact instead
+// of just stopping — the "needs more love" pass on this move.
 function dragonlordWingGaleDash(w){
   const yaw=player.rotation.y;
   if(player.userData.playKayClip) player.userData.playKayClip('Flying_Forward_Super',true,true,.30);
-  const dashDist=4.2, steps=5;
+  const dashDist=4.4, steps=5;
   let hits=0;
   const startPos={x:player.position.x,y:player.position.y,z:player.position.z};
   for(let i=1;i<=steps;i++){
@@ -23588,22 +23599,39 @@ function dragonlordWingGaleDash(w){
   dragonlordFireDashTrail(startPos,endPos,DL_FIRE);
   const moved=resolveCollision(endPos.x,endPos.z,player.position.y);
   player.position.x=moved.x; player.position.z=moved.z;
-  if(hits>0)dragonlordImpactFlash(player.position,DL_FIRE,1.5,.16);
-  triggerCombatShake(hits>0?9:5,130);
-  navigator.vibrate&&navigator.vibrate(hits>0?[22,16,30]:14);
+  const landHits=damageNearby(player.position,2.0*dragonlordAttackRangeMult(),w.damage*.6*dragonlordAttackDamageMult());
+  hits+=landHits;
+  dragonlordFireSweepRing(player.position,DL_FIRE,2.6*dragonlordAttackRangeMult());
+  if(hits>0)dragonlordImpactFlash(player.position,DL_FIRE,1.9,.18);
+  triggerCombatShake(hits>0?11:6,150);
+  navigator.vibrate&&navigator.vibrate(hits>0?[26,18,36]:16);
 }
-// Infernal Glaive Sweep FX (360 knockback ring), applied to her existing
-// Demonfire Nova secondary: single pooled expanding ring, no ground-crack
-// mesh pile-up, no particle burst.
-function dragonlordDemonfireNova(w){
-  if(player.userData.playKayClip) player.userData.playKayClip('Attack_Ground_Pound',true,true,.32);
-  const boostedRadius=w.radius*dragonlordAttackRangeMult();
-  const hits=damageNearby(player.position,boostedRadius,w.damage*dragonlordAttackDamageMult());
-  const origin=player.position;
-  dragonlordFireSweepRing(origin,DL_FIRE,boostedRadius);
-  dragonlordImpactFlash(origin,DL_EMBER,2.0,.18);
-  triggerCombatShake(hits>0?12:6,180);
-  navigator.vibrate&&navigator.vibrate(hits>0?[40,24,60]:20);
+// Void Maw: new 3rd secondary. Opens a void rift ahead of her that yanks
+// nearby enemies toward its center, then implodes — crowd-control flavor,
+// visually and mechanically distinct from the two fire-projectile moves.
+function dragonlordVoidMaw(w){
+  if(player.userData.playKayClip) player.userData.playKayClip('Spell_Simple_Shoot',true,true,.26);
+  const yaw=player.rotation.y;
+  const rangeMult=dragonlordAttackRangeMult();
+  const dist=3.0*rangeMult;
+  const origin={x:player.position.x+Math.sin(yaw)*dist,y:player.position.y,z:player.position.z+Math.cos(yaw)*dist};
+  const radius=w.radius*rangeMult;
+  for(const z of zombies){
+    if(!z||z.userData.dead||z.userData.spawnPending) continue;
+    const dx=origin.x-z.position.x, dz=origin.z-z.position.z;
+    const d=Math.hypot(dx,dz);
+    if(d<=radius && d>0.05){
+      const pull=Math.min(d-0.3,1.6);
+      if(pull>0){ z.position.x+=(dx/d)*pull; z.position.z+=(dz/d)*pull; }
+    }
+  }
+  dragonlordFireRing(origin,radius*.4,DL_VOID,.5);
+  const hits=damageNearby(origin,radius,w.damage*dragonlordAttackDamageMult());
+  dragonlordFireSweepRing(origin,DL_VOID,radius);
+  dragonlordImpactFlash(origin,DL_VOID,2.2,.2);
+  dragonlordEmberBurst(origin.x,origin.y+.7,origin.z,18,4.2);
+  triggerCombatShake(hits>0?12:6,160);
+  navigator.vibrate&&navigator.vibrate(hits>0?[35,20,55]:20);
 }
 
 /* ------------------------------------------------------------- PASSIVE */
@@ -23713,7 +23741,13 @@ function dragonlordSyncAvatarScale(){
 // every other power-up/ultimate iframe already uses.
 function triggerDragonLordWyrmForm(){
   if(!dragonlordIsActive()||!player) return;
-  if(dragonlordRuntime.wyrmFormTimer>0||dragonlordRuntime.wyrmFormCooldown>0) return;
+  if(dragonlordRuntime.wyrmFormTimer>0) return;
+  if(dragonlordRuntime.wyrmFormCooldown>0){
+    // A blocked press used to just do nothing, which reads as "the move
+    // didn't trigger" if you're not staring at the small cooldown number.
+    toast('TITAN FORM recharging — '+Math.ceil(dragonlordRuntime.wyrmFormCooldown)+'s');
+    return;
+  }
   markUltimateUsed();
   dragonlordRuntime.wyrmFormTimer=10;
   dragonlordRuntime.wyrmFormCooldown=20;
@@ -23753,7 +23787,15 @@ function dragonlordConvertToAlly(z){
     if(!o.isMesh||!o.material) return;
     const mats=Array.isArray(o.material)?o.material:[o.material];
     for(const m of mats){
-      if(m.color) m.color.lerp(new THREE.Color(DL_FIRE),.5);
+      if(m.color){
+        m.color.lerp(new THREE.Color(DL_FIRE),.5);
+        // flashZombie() caches o.userData.origColor on a zombie's first hit
+        // and restores it after every hit-flash. Without updating that
+        // cache here, the very next time this ally takes or lands a hit the
+        // restore snaps it straight back to its pre-conversion color, which
+        // is why converted enemies looked like they never changed.
+        o.userData.origColor=m.color.getHex();
+      }
       if(m.emissive) m.emissive.setHex(0x3d1206);
     }
   });
@@ -23774,7 +23816,11 @@ function dragonlordChooseAllyTarget(z,dt){
 }
 function triggerDragonLordHellgate(){
   if(!dragonlordIsActive()||!player) return;
-  if(dragonlordRuntime.hellgateTimer>0||dragonlordRuntime.hellgateCooldown>0) return;
+  if(dragonlordRuntime.hellgateTimer>0) return;
+  if(dragonlordRuntime.hellgateCooldown>0){
+    toast('HELLGATE recharging — '+Math.ceil(dragonlordRuntime.hellgateCooldown)+'s');
+    return;
+  }
   markUltimateUsed();
   dragonlordRuntime.hellgateTimer=10;
   dragonlordRuntime.hellgateCooldown=24;
@@ -23816,16 +23862,33 @@ function dragonlordUpdateHellgate(dt){
     }
   }
   if(dragonlordRuntime.hellgateTimer<=0){
-    for(const z of [...zombies]){
-      if(!z||z.userData.dead) continue;
-      if((z.userData.archetype||'walker')==='boss') continue;
-      z.userData.hp=0; killZombie(z);
-    }
-    dragonlordImpactFlash(player.position,DL_EMBER,3.0,.24);
-    triggerCombatShake(16,260);
-    navigator.vibrate&&navigator.vibrate([70,20,50]);
-    toast('THE HELLGATE CLOSES');
+    dragonlordHellgateFinale();
   }
+}
+// Guaranteed "everyone dies" payoff, shared by the natural 10s countdown
+// above and by clearKnightRoundSpecials(): if a round completes early (very
+// likely — converted allies kill hostiles fast, which can hit the round's
+// kill target and end the round before the timer runs out), the old code
+// silently zeroed hellgateTimer and reverted every ally with no kill ever
+// happening, which is exactly the "nothing dies after 10s" the finale was
+// supposed to guarantee. Calling this from both places means the payoff
+// always fires once Hellgate is cast, whether the round is still running
+// or has already been cut short underneath it.
+function dragonlordHellgateFinale(){
+  let any=false;
+  for(const z of [...zombies]){
+    if(!z||z.userData.dead) continue;
+    if((z.userData.archetype||'walker')==='boss') continue;
+    any=true;
+    z.userData.hp=0; killZombie(z);
+  }
+  if(!any) return;
+  if(player){
+    dragonlordImpactFlash(player.position,DL_EMBER,3.0,.24);
+  }
+  triggerCombatShake(16,260);
+  navigator.vibrate&&navigator.vibrate([70,20,50]);
+  toast('THE HELLGATE CLOSES');
 }
 
 /* ---------------------------------------------------- LEGION OF THE ABYSS */
@@ -23844,9 +23907,9 @@ function dragonlordLegionUnlocked(){
   return dragonlordIsActive() && Math.max(1,Number(round)||1)>=10;
 }
 function dragonlordCloneAvailableMoves(){
-  const moves=['dragonlord_claw_rend'];
+  const moves=['dragonlord_claw_rend','dragonlord_brimstone_barrage'];
   if(ownedWeapons&&ownedWeapons.dragonlord_infernal_glaive) moves.push('dragonlord_infernal_glaive');
-  if(ownedWeapons&&ownedWeapons.dragonlord_demonfire_nova) moves.push('dragonlord_demonfire_nova');
+  if(ownedWeapons&&ownedWeapons.dragonlord_void_maw) moves.push('dragonlord_void_maw');
   return moves;
 }
 function dragonlordCloneDamageBase(){
@@ -23913,12 +23976,18 @@ function dragonlordClonePerformMove(c,target){
   const dx=target.position.x-c.position.x,dz=target.position.z-c.position.z;
   const dist=Math.hypot(dx,dz)||1;
   c.rotation.y=Math.atan2(dx,dz);
-  if(kind==='dragonlord_demonfire_nova'){
+  if(kind==='dragonlord_brimstone_barrage'){
     knightClonePlayClip(c,['ground','pound'],'Punch_Cross');
     dragonlordFireRing(c.position,2.4,DL_FIRE,.3);
     dragonlordImpactFlash(c.position,DL_EMBER,1.5,.16);
     for(const z of zombies)if(z&&!z.userData.dead&&!z.userData.spawnPending&&Math.hypot(z.position.x-c.position.x,z.position.z-c.position.z)<=2.6)applyBulletDamage(z,base*.85);
     c.userData.attackCooldown=.85;
+  }else if(kind==='dragonlord_void_maw'){
+    knightClonePlayClip(c,['ground','pound'],'Punch_Cross');
+    dragonlordFireRing(c.position,2.0,DL_VOID,.35);
+    dragonlordImpactFlash(c.position,DL_VOID,1.6,.18);
+    for(const z of zombies)if(z&&!z.userData.dead&&!z.userData.spawnPending&&Math.hypot(z.position.x-c.position.x,z.position.z-c.position.z)<=2.8)applyBulletDamage(z,base*.9);
+    c.userData.attackCooldown=1.0;
   }else if(kind==='dragonlord_infernal_glaive'){
     knightClonePlayClip(c,['sword','regular'],'Punch_Cross');
     dragonlordFireSwipe(c.position,c.rotation.y,DL_VOID,1.1,1.6);
@@ -24230,6 +24299,10 @@ function clearKnightRoundSpecials(resetCooldowns=true){
     if(dragonlordRuntime.wyrmSpeedBoostApplied){ playerStats.speed-=0.3; dragonlordRuntime.wyrmSpeedBoostApplied=false; }
     if(dragonlordRuntime.wyrmFormTimer>0) document.body.style.filter='';
     dragonlordRuntime.wyrmFormTimer=0;
+    // Interrupted before its natural 10s finale (round ended early, death,
+    // avatar swap, manual reset) — still guarantee the "everyone dies" payoff
+    // rather than silently reverting every converted ally with nothing killed.
+    if(dragonlordRuntime.hellgateTimer>0) dragonlordHellgateFinale();
     dragonlordRuntime.hellgateTimer=0;
     dragonlordRuntime.hellgateOrigin=null;
     dragonlordMeteorEpoch++;
