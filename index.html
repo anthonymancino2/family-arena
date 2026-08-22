@@ -1453,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.73.11 - Nyxara TINY (diagnostic)';
+const GAME_VERSION='23.73.12 - Nyxara 50% Bigger';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -1934,12 +1934,10 @@ function passiveForAvatar(type=state.avatarType){
 // Archer / Hooded Rogue / Mage = small
 // Knight = medium (larger than those three)
 // Barbarian = largest; V22.22.03 makes the playable Aesir a true 1.5x larger.
-const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:1.0, knight:1.18, barbarian:1.5, cloud:1.0, rhino:1.5, chopper:1.0, spider:1.0, dragonlord:0.3 };
-// TEMP diagnostic value — deliberately tiny (should be obviously, unmissably
-// small) to prove the scale pipeline actually affects rendering at all,
-// after pixel-based verification attempts proved unreliable (WebGL buffer
-// clearing, then floor-geometry contaminating the bounding box). Once
-// confirmed visibly smaller, dial back up to a real target.
+const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:1.0, knight:1.18, barbarian:1.5, cloud:1.0, rhino:1.5, chopper:1.0, spider:1.0, dragonlord:0.45 };
+// 0.3 (tiny diagnostic) confirmed visually correct — the scale pipeline
+// does work. 0.45 = 0.3 * 1.5, i.e. 50% bigger than that confirmed baseline,
+// per direct request.
 // Dragon Lord height: mage(fox) is 1.30 world units tall (gameplay- and
 // preview-verified — buildNineTailedFoxPlayer and its preview branch both
 // use targetHeight=1.30). dragonlord:0.878 * her 1.48 base = 1.2986, an
