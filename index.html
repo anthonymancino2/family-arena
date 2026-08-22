@@ -1453,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.75.00 - Nyxara Secondary Rework & Hellgate Fix';
+const GAME_VERSION='23.75.01 - Nyxara Legion Clone Damage Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3301,6 +3301,11 @@ function updateEnemyProjectiles(baseDt){
     if(hitTarget&&hitDist<.55){
       spawnBurst(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z,12,FX_MAT_ENEMY_SHOT,3.4);
       if(hitTarget.userData&&hitTarget.userData.isArcaneEcho){
+        hitTarget.userData.hp=Infinity;
+        hitTarget.userData.dead=false;
+        spawnBurst(hitTarget.position.x,hitTarget.position.y+.65,hitTarget.position.z,4,FX_MAT_SPARK,1.8);
+      }
+      else if(hitTarget.userData&&hitTarget.userData.isDragonLordClone){
         hitTarget.userData.hp=Infinity;
         hitTarget.userData.dead=false;
         spawnBurst(hitTarget.position.x,hitTarget.position.y+.65,hitTarget.position.z,4,FX_MAT_SPARK,1.8);
@@ -38017,6 +38022,18 @@ function update(dt){
           // Broadside crew are true invincible decoys. Enemy contact is absorbed
           // here and must never fall through to playerTakeHit().
           target.userData.hp=Infinity;target.userData.dead=false;
+        }
+        else if(target.userData&&target.userData.isDragonLordClone){
+          // Legion of the Abyss clones are invincible decoys, same contract
+          // as the Arcane Echo/Broadside clones above — enemy contact must
+          // be absorbed right here. Without this branch it fell through to
+          // the final `else playerTakeHit(type)`, which always damages the
+          // real player regardless of what the zombie actually swung at, so
+          // hitting a clone silently drained the player's real HP instead of
+          // doing nothing to either side.
+          spawnBurst(target.position.x,target.position.y+.65,target.position.z,5,FX_MAT_SPARK,2.0);
+          target.userData.hp=Infinity;
+          target.userData.dead=false;
         }
         else if(target.userData&&target.userData.isArcherMirror)damageArcherMirrorClone(target);
         else if(target.userData&&target.userData.isKnightRoyalClone){
