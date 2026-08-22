@@ -2738,13 +2738,25 @@ async function updateAvatarPreview(characterId){
       const fullBodyMaxHeight=2.12;
       const fullBodyFitScale=fullBodyMaxHeight/Math.max(.001,size.y);
       root.scale.setScalar(Math.min(relativeScale,fullBodyFitScale));
+      if(characterId==='dragonlord'){
+        // Same width-compression as the gameplay build: her raw export is
+        // wider than tall (wings/horns), so a height-only fit leaves the
+        // preview card looking oversized even though her height is correct.
+        root.scale.x*=0.5;
+        root.scale.z*=0.5;
+      }
       const box2=new THREEAsset.Box3().setFromObject(root);
       root.position.y-=box2.min.y;
     }
     root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
     previewRoot=root;previewScene.add(root);
     previewMixer=new THREEAsset.AnimationMixer(root);
-    if(characterId!=='wolverine'){
+    if(characterId==='dragonlord'){
+      // Her native clip is "Fighting_Idle", not "idle" — the generic lookup
+      // below would miss it and fall back to gltf.animations[0] (Angry).
+      const dlIdle=gltf.animations.find(c=>c.name==='Fighting_Idle')||gltf.animations[0];
+      if(dlIdle)previewMixer.clipAction(dlIdle).play();
+    }else if(characterId!=='wolverine'){
       const idle=gltf.animations.find(c=>c.name.toLowerCase()==='idle')||gltf.animations[0];
       if(idle)previewMixer.clipAction(idle).play();
     }else{
