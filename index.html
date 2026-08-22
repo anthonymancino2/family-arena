@@ -1453,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.73.09 - Nyxara Scale Reverified';
+const GAME_VERSION='23.73.10 - Preview Readback Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -2510,7 +2510,7 @@ async function ensureAvatarPreview(){
   const canvas=document.getElementById('avatarPreviewCanvas');
   if(!canvas || previewRenderer) return;
   const THREEP=await import('three');
-  previewRenderer=new THREEP.WebGLRenderer({canvas,alpha:true,antialias:true});
+  previewRenderer=new THREEP.WebGLRenderer({canvas,alpha:true,antialias:true,preserveDrawingBuffer:true});
   previewRenderer.setPixelRatio(Math.min(devicePixelRatio,2));
   previewRenderer.setSize(220,245,false);
   previewRenderer.outputColorSpace=THREEP.SRGBColorSpace;
