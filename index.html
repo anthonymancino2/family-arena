@@ -2739,11 +2739,11 @@ async function updateAvatarPreview(characterId){
       const fullBodyFitScale=fullBodyMaxHeight/Math.max(.001,size.y);
       root.scale.setScalar(Math.min(relativeScale,fullBodyFitScale));
       if(characterId==='dragonlord'){
-        // Same width-compression as the gameplay build: her raw export is
-        // wider than tall (wings/horns), so a height-only fit leaves the
-        // preview card looking oversized even though her height is correct.
-        root.scale.x*=0.5;
-        root.scale.z*=0.5;
+        // Same Cloud-calibrated compression as the gameplay build (see
+        // buildKayKitPlayer) — matches her measured footprint to Cloud's
+        // actual footprint at the same height, not a guessed constant.
+        root.scale.x*=0.687;
+        root.scale.z*=0.992;
       }
       const box2=new THREEAsset.Box3().setFromObject(root);
       root.position.y-=box2.min.y;
@@ -13722,15 +13722,15 @@ function buildKayKitPlayer(characterId, options={}){
       const rawSize=rawBox.getSize(new THREEAsset.Vector3());
       root.scale.setScalar(1.48/Math.max(.001,rawSize.y));
       if(characterId==='dragonlord'){
-        // Her raw export is WIDER than it is tall (rawSize x=0.82 vs y=0.68 —
-        // wings/horns push the X/Z bounds well past a normal humanoid's), so
-        // a pure height-normalize left her silhouette far wider than every
-        // other hero at the same in-game height, reading as oversized even
-        // though her standing height already matched Cloud's 1.48. Compress
-        // X/Z only, after the height scale, so height stays matched but her
-        // footprint reads sane.
-        root.scale.x*=0.5;
-        root.scale.z*=0.5;
+        // Her raw export's width/depth come from a rigid, unskinned mesh
+        // (wings/hair — confirmed by measuring bind-pose vs Idle-posed
+        // bounds: identical, so it's not a T-pose artifact, it's static
+        // geometry) that isn't proportioned like a normal humanoid. Measured
+        // against Cloud's own actual footprint at this same 1.48 height
+        // (x=1.221, z=1.369 vs her uncompressed x=1.777, z=1.380), her depth
+        // was already correct — only her width needed correcting.
+        root.scale.x*=0.687;
+        root.scale.z*=0.992;
       }
       root.updateMatrixWorld(true);
       const placedBox=new THREEAsset.Box3().setFromObject(root);
@@ -23734,7 +23734,7 @@ function triggerDragonLordLegion(){
       root.rotation.y=AVATAR_MODEL_YAW.dragonlord||0;
       const box=new THREEAsset.Box3().setFromObject(root),size=box.getSize(new THREEAsset.Vector3());
       root.scale.setScalar(1.48/Math.max(.001,size.y));
-      root.scale.x*=0.5;root.scale.z*=0.5; // match the width-compression applied to the live player model
+      root.scale.x*=0.687;root.scale.z*=0.992; // match the Cloud-calibrated compression applied to the live player model
       const box2=new THREEAsset.Box3().setFromObject(root);root.position.y-=box2.min.y;
       tintDragonLordClone(root,i);wrap.add(root);decorateDragonLordClone(wrap,i);
       const slot=knightRoyalCloneFormationSlot(i,cfg.count,formationScale,-Math.PI/2);
