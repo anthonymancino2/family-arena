@@ -1453,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.74.02 - Nyxara 10s Ultimates';
+const GAME_VERSION='23.74.03 - Nyxara Ultimates Rebuilt';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -14354,6 +14354,10 @@ function recoverRoundIfNeeded(dt){
 // Shared enemy steering helpers. These keep movement behavior centralized so
 // every enemy archetype benefits without changing its damage, HP, or speed.
 function chooseEnemyTarget(z,dt){
+  // Hellgate-converted allies (Nyxara's ultimate) hunt other zombies instead
+  // of the player. Only ever true for zombies explicitly flagged by that
+  // ultimate, so this is a no-op for every other character's games.
+  if(z.userData.dragonlordAlly) return dragonlordChooseAllyTarget(z,dt);
   if(blizzardActiveTimer>0 && player){ const br=blizzardRadius(); if(Math.hypot(z.position.x-blizzardCenter.x,z.position.z-blizzardCenter.z)<=br && Math.hypot(player.position.x-blizzardCenter.x,player.position.z-blizzardCenter.z)<=br) return null; }
   const candidates=livingPlayers();
   if(!candidates.length) return null;
@@ -23328,7 +23332,10 @@ function isDragonLordWeaponKind(kind){ return String(kind||'').indexOf('dragonlo
 let dragonlordComboStep=0;
 let dragonlordRuntime={wyrmFormTimer:0,wyrmFormCooldown:0,wyrmFormPulse:0,wyrmSpeedBoostApplied:false,hellgateTimer:0,hellgateCooldown:0,hellgatePulse:0,hellgateOrigin:null,hellgateSweepStart:0};
 let dragonlordMeteorActiveTimer=0, dragonlordMeteorCooldownTimer=0, dragonlordMeteorEpoch=0;
-function dragonlordAttackDamageMult(){ return dragonlordRuntime.wyrmFormTimer>0 ? 1.6 : 1; }
+let dragonlordMeteorSpawnTimer=0, dragonlordMeteorDamageTimer=0;
+let dragonlordFireballs=[];
+function dragonlordAttackDamageMult(){ return dragonlordRuntime.wyrmFormTimer>0 ? 2.5 : 1; }
+function dragonlordAttackRangeMult(){ return dragonlordRuntime.wyrmFormTimer>0 ? 1.8 : 1; }
 function dragonlordEmberBurst(x,y,z,count=10,spread=3){ spawnBurst(x,y,z,count,FX_MAT_SPARK,spread); }
 function dragonlordFireRing(origin,radius,color=DL_FIRE,life=.4){
   const ring=new THREE.Mesh(new THREE.RingGeometry(radius*.30,radius*.40,48),knightMat(color,.88));
@@ -23522,10 +23529,11 @@ function dragonlordClawRend(w){
   const step=dragonlordComboStep++%2;
   const clipNames=['Punch_Jab','Punch_Cross'];
   if(player.userData.playKayClip) player.userData.playKayClip(clipNames[step],true,true,.16);
-  const hits=damageMeleeArc(player.position,yaw,w.radius,w.arc,w.damage*dragonlordAttackDamageMult());
+  const rangeMult=dragonlordAttackRangeMult();
+  const hits=damageMeleeArc(player.position,yaw,w.radius*rangeMult,w.arc*rangeMult,w.damage*dragonlordAttackDamageMult());
   const fx=player.position;
-  const tip={x:fx.x+Math.sin(yaw)*1.3,y:fx.y,z:fx.z+Math.cos(yaw)*1.3};
-  dragonlordFireSwipe(fx,yaw+(step?0.18:-0.18),step?DL_VOID:DL_FIRE,1.0,1);
+  const tip={x:fx.x+Math.sin(yaw)*1.3*rangeMult,y:fx.y,z:fx.z+Math.cos(yaw)*1.3*rangeMult};
+  dragonlordFireSwipe(fx,yaw+(step?0.18:-0.18),step?DL_VOID:DL_FIRE,1.0,rangeMult);
   dragonlordFireSparks(tip,4,DL_EMBER);
   if(hits>0)dragonlordImpactFlash(tip,DL_EMBER,1.1,.14);
   triggerCombatShake(hits>0?7:3,hits>0?110:60);
@@ -23536,10 +23544,11 @@ function dragonlordGlaiveCombo(w){
   const step=dragonlordComboStep++%3;
   const clipNames=['Sword_Regular_A','Sword_Regular_B','Sword_Regular_C'];
   if(player.userData.playKayClip) player.userData.playKayClip(clipNames[step],true,true,.24);
-  const hits=damageMeleeArc(player.position,yaw,w.radius,w.arc,w.damage*dragonlordAttackDamageMult());
+  const rangeMult=dragonlordAttackRangeMult();
+  const hits=damageMeleeArc(player.position,yaw,w.radius*rangeMult,w.arc*rangeMult,w.damage*dragonlordAttackDamageMult());
   const fx=player.position;
-  const tip={x:fx.x+Math.sin(yaw)*2.0,y:fx.y,z:fx.z+Math.cos(yaw)*2.0};
-  dragonlordFireSwipe(fx,yaw,DL_VOID,1.1,1.8);
+  const tip={x:fx.x+Math.sin(yaw)*2.0*rangeMult,y:fx.y,z:fx.z+Math.cos(yaw)*2.0*rangeMult};
+  dragonlordFireSwipe(fx,yaw,DL_VOID,1.1,1.8*rangeMult);
   dragonlordFireSparks(tip,6,DL_VOID);
   if(hits>0)dragonlordImpactFlash(tip,DL_VOID,1.6,.16);
   triggerCombatShake(hits>0?10:4,hits>0?140:80);
@@ -23553,7 +23562,8 @@ function dragonlordBrimstoneBolt(w){
   const yaw=player.rotation.y;
   const muzzle={x:player.position.x+Math.sin(yaw)*.7,y:player.position.y+1.15,z:player.position.z+Math.cos(yaw)*.7};
   dragonlordImpactFlash(muzzle,DL_EMBER,.9,.10);
-  shootFromPosition(w,player.position,0);
+  const boosted=dragonlordRuntime.wyrmFormTimer>0?{...w,damage:w.damage*dragonlordAttackDamageMult()}:w;
+  shootFromPosition(boosted,player.position,0);
   const b=bullets[bullets.length-1];
   if(b&&b.mesh){
     b.mesh.scale.multiplyScalar(1.7);
@@ -23572,7 +23582,7 @@ function dragonlordWingGaleDash(w){
     const t=i/steps;
     const px=player.position.x+Math.sin(yaw)*dashDist*t;
     const pz=player.position.z+Math.cos(yaw)*dashDist*t;
-    hits+=damageMeleeArc({x:px,y:player.position.y,z:pz},yaw,w.radius,Math.PI*2/3,w.damage*dragonlordAttackDamageMult()/steps);
+    hits+=damageMeleeArc({x:px,y:player.position.y,z:pz},yaw,w.radius*dragonlordAttackRangeMult(),Math.PI*2/3,w.damage*dragonlordAttackDamageMult()/steps);
   }
   const endPos={x:player.position.x+Math.sin(yaw)*dashDist,y:player.position.y,z:player.position.z+Math.cos(yaw)*dashDist};
   dragonlordFireDashTrail(startPos,endPos,DL_FIRE);
@@ -23587,9 +23597,10 @@ function dragonlordWingGaleDash(w){
 // mesh pile-up, no particle burst.
 function dragonlordDemonfireNova(w){
   if(player.userData.playKayClip) player.userData.playKayClip('Attack_Ground_Pound',true,true,.32);
-  const hits=damageNearby(player.position,w.radius,w.damage*dragonlordAttackDamageMult());
+  const boostedRadius=w.radius*dragonlordAttackRangeMult();
+  const hits=damageNearby(player.position,boostedRadius,w.damage*dragonlordAttackDamageMult());
   const origin=player.position;
-  dragonlordFireSweepRing(origin,DL_FIRE,w.radius);
+  dragonlordFireSweepRing(origin,DL_FIRE,boostedRadius);
   dragonlordImpactFlash(origin,DL_EMBER,2.0,.18);
   triggerCombatShake(hits>0?12:6,180);
   navigator.vibrate&&navigator.vibrate(hits>0?[40,24,60]:20);
@@ -23651,199 +23662,169 @@ function triggerDragonLordAbility(){
 // ground-target warning ring + rising pillar telegraph BEFORE it lands
 // (0.7s notice), so the player can actually read "something is about to
 // hit here" instead of getting hit with no warning.
+// Ashfall Cataclysm (v3): mirrors Blizzard Storm's mechanic exactly —
+// player teleports to arena center, is invincible for the full 10s, and
+// every enemy on and off the map is pulled steadily toward center the
+// whole duration, insta-killed on reaching it (non-boss). Giant molten
+// fireballs (the same mesh factory the fox's Giant Fireball uses) rain
+// down across the storm radius throughout, each impact hitting anything
+// nearby.
+function dragonlordAshfallRadius(){ return Math.max(10,(typeof arenaSize!=='undefined'?arenaSize:16)*.85); }
+function dragonlordSpawnFireball(){
+  const stormR=Math.min(dragonlordAshfallRadius(),(typeof arenaSize!=='undefined'?arenaSize:16)-2.4);
+  const a=Math.random()*Math.PI*2, r=Math.sqrt(Math.random())*stormR;
+  const x=Math.cos(a)*r, z=Math.sin(a)*r;
+  const mesh=createMageGiantFireballMeshFast();
+  mesh.position.set(x,11+Math.random()*5,z);
+  scene.add(mesh);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(2.2,2.6,32),knightMat(DL_FIRE,.62));
+  ring.rotation.x=-Math.PI/2; ring.position.set(x,.035,z);
+  scene.add(ring);
+  dragonlordFireballs.push({mesh,ring,x,z,vy:16+Math.random()*4,life:1.3});
+}
 function triggerDragonLordAshfallCataclysm(){
   if(!dragonlordIsActive()||!player) return;
   if(dragonlordMeteorActiveTimer>0||dragonlordMeteorCooldownTimer>0) return;
   markUltimateUsed();
   dragonlordMeteorEpoch++;
-  const epoch=dragonlordMeteorEpoch;
-  const center={x:player.position.x,y:0,z:player.position.z};
-  const radius=Math.min(8,Math.max(5.5,(typeof arenaSize!=='undefined'?arenaSize:16)*0.46));
   dragonlordMeteorActiveTimer=10.0;
-  dragonlordMeteorCooldownTimer=18;
+  dragonlordMeteorCooldownTimer=20;
+  dragonlordMeteorSpawnTimer=0; dragonlordMeteorDamageTimer=0;
+  const moved=resolveCollision(0,0,player.position.y);
+  player.position.x=moved.x; player.position.z=moved.z;
+  invincibleTimer=Math.max(invincibleTimer,10.2);
+  updateInvincibleHud();
+  dragonlordFireRing(player.position,3.0,DL_FIRE,.6);
+  dragonlordImpactFlash(player.position,DL_EMBER,2.6,.22);
+  triggerCombatShake(12,240);
+  navigator.vibrate&&navigator.vibrate([60,30,90]);
   toast('ASHFALL CATACLYSM — 10s');
-  navigator.vibrate&&navigator.vibrate([50,20,80]);
-  dragonlordFireRing(player.position,2.8,DL_VOID,.5);
-  triggerCombatShake(10,220);
-  const strikeCount=7;
-  for(let i=0;i<strikeCount;i++){
-    const delay=600+(i/(strikeCount-1))*8600+(Math.random()*400-200);
-    setTimeout(()=>{
-      if(epoch!==dragonlordMeteorEpoch||!gameRunning) return;
-      const ang=Math.random()*Math.PI*2, r=Math.random()*radius;
-      dragonlordAshfallTelegraph(center.x+Math.cos(ang)*r,center.z+Math.sin(ang)*r,epoch);
-    },delay);
-  }
-  setTimeout(()=>{ if(epoch===dragonlordMeteorEpoch) toast('ASHFALL FADES'); },9600);
-}
-function dragonlordAshfallTelegraph(x,z,epoch){
-  const warnRing=new THREE.Mesh(new THREE.RingGeometry(2.6,2.85,40),knightMat(DL_FIRE,.85));
-  warnRing.rotation.x=-Math.PI/2; warnRing.position.set(x,.06,z);
-  warnRing.userData.baseOpacity=.85;
-  pushKnightFx(warnRing,{life:.7,grow:0,from:1});
-  dragonlordEmberPillar(x,0,z,DL_EMBER,.75,3.4);
-  setTimeout(()=>dragonlordAshfallImpact(x,z,epoch),700);
-}
-function dragonlordAshfallImpact(x,z,epoch){
-  if(epoch!==dragonlordMeteorEpoch||!gameRunning) return;
-  dragonlordFireSweepRing({x,y:0,z},DL_FIRE,3.2);
-  dragonlordImpactFlash({x,y:0,z},DL_EMBER,2.2,.2);
-  knightGroundCracks({x,y:0,z},3.2,5,DL_ASH);
-  triggerCombatShake(9,140);
-  let hits=0;
-  for(const zom of [...zombies]){
-    if(zom.userData.dead) continue;
-    const dist=Math.hypot(zom.position.x-x,zom.position.z-z);
-    if(dist>3.2) continue;
-    zom.userData.hitStun=Math.max(zom.userData.hitStun||0,1.0);
-    const len=dist||1;
-    zom.userData.knockbackX=((zom.position.x-x)/len)*4.4;
-    zom.userData.knockbackZ=((zom.position.z-z)/len)*4.4;
-    applyBulletDamage(zom,2.0*playerStats.power);
-    hits++;
-  }
-  if(hits>0)navigator.vibrate&&navigator.vibrate(16);
 }
 function dragonlordSyncAvatarScale(){
   if(!player||state.avatarType!=='dragonlord') return;
   const base=player.userData.baseAvatarScale||AVATAR_SCALE.dragonlord||1;
-  const mult=dragonlordRuntime.wyrmFormTimer>0?1.65:1;
+  const mult=dragonlordRuntime.wyrmFormTimer>0?3.2:1;
   player.scale.setScalar(base*mult);
   player.userData.currentSizeMult=mult;
 }
+// Ascend: Wyrm Form (v3), reskinned as a Titan transformation: massive
+// scale-up, +150% damage, +80% range on every move, and (test-mode only)
+// full invincibility for the 10s duration via the same invincibleTimer
+// every other power-up/ultimate iframe already uses.
 function triggerDragonLordWyrmForm(){
   if(!dragonlordIsActive()||!player) return;
   if(dragonlordRuntime.wyrmFormTimer>0||dragonlordRuntime.wyrmFormCooldown>0) return;
   markUltimateUsed();
   dragonlordRuntime.wyrmFormTimer=10;
   dragonlordRuntime.wyrmFormCooldown=20;
-  dragonlordRuntime.wyrmFormPulse=.8;
-  if(!dragonlordRuntime.wyrmSpeedBoostApplied){ playerStats.speed+=0.3; dragonlordRuntime.wyrmSpeedBoostApplied=true; }
+  dragonlordRuntime.wyrmFormPulse=.7;
+  invincibleTimer=Math.max(invincibleTimer,10.2); // test-mode: no damage taken during Titan form
+  updateInvincibleHud();
   dragonlordSyncAvatarScale();
-  // Sustained screen tint for the whole 10s makes "you are in a different
-  // mode right now" unmistakable, not just a one-off burst at activation.
-  document.body.style.filter='saturate(1.2) brightness(1.04) contrast(1.05)';
-  dragonlordFireRing(player.position,3.4,DL_VOID,.5);
-  dragonlordImpactFlash(player.position,DL_EMBER,3.0,.24);
-  dragonlordEmberBurst(player.position.x,player.position.y+1.0,player.position.z,30,5.0);
-  triggerCombatShake(14,260);
-  navigator.vibrate&&navigator.vibrate([70,30,110]);
-  toast('ASCEND: WYRM FORM — 10s');
+  document.body.style.filter='saturate(1.25) brightness(1.05) contrast(1.06)';
+  dragonlordFireRing(player.position,4.0,DL_VOID,.6);
+  dragonlordImpactFlash(player.position,DL_EMBER,3.4,.26);
+  dragonlordEmberBurst(player.position.x,player.position.y+1.0,player.position.z,32,5.5);
+  triggerCombatShake(16,280);
+  navigator.vibrate&&navigator.vibrate([80,30,120]);
+  toast('ASCEND: TITAN FORM — 10s');
 }
 function dragonlordEndWyrmForm(){
   dragonlordRuntime.wyrmFormTimer=0;
   if(dragonlordRuntime.wyrmSpeedBoostApplied){ playerStats.speed-=0.3; dragonlordRuntime.wyrmSpeedBoostApplied=false; }
   dragonlordSyncAvatarScale();
   document.body.style.filter='';
-  toast('WYRM FORM ENDS');
+  toast('TITAN FORM ENDS');
 }
-// Open the Hellgate (v2): a genuine 10-second ultimate with an actual
-// VISIBLE beam mesh connecting the dragon head to the ground — the v1
-// design only fired periodic flash pulses with no continuous geometry
-// showing the beam's path, which is very likely why it read as unclear.
-// The beam ping-pongs across a wide arc for the full duration instead of
-// a single quick pass, so the threat stays visible and readable the
-// whole time. Head + beam are each a single reusable mesh, never rebuilt.
-let dragonlordHeadMesh=null;
-let dragonlordBeamMesh=null;
-function dragonlordHellgateSpawnHead(){
-  if(!dragonlordHeadMesh){
-    const g=new THREE.Group();
-    const skull=new THREE.Mesh(new THREE.ConeGeometry(.5,1.0,8),knightMat(DL_VOID,.95));
-    skull.rotation.x=Math.PI/2; g.add(skull);
-    const hornL=new THREE.Mesh(new THREE.ConeGeometry(.11,.46,6),knightMat(DL_FIRE,.9));
-    hornL.position.set(-.26,.32,-.15); hornL.rotation.z=.35; g.add(hornL);
-    const hornR=new THREE.Mesh(new THREE.ConeGeometry(.11,.46,6),knightMat(DL_FIRE,.9));
-    hornR.position.set(.26,.32,-.15); hornR.rotation.z=-.35; g.add(hornR);
-    const core=new THREE.Mesh(new THREE.SphereGeometry(.2,10,8),knightMat(DL_EMBER,1));
-    core.position.z=.48; g.add(core);
-    dragonlordHeadMesh=g;
-    scene.add(g);
+// Open the Hellgate (v3): player teleports to arena center; a pulsing
+// ring radiates outward for the full 10s; 3/4 of every already-spawned
+// enemy (on-map or still walking in from outside the boundary) is
+// converted into an ally that stops targeting the player and instead
+// hunts the remaining hostiles (see chooseEnemyTarget/
+// dragonlordChooseAllyTarget). After 10s every enemy on and off the map
+// — allies and holdouts alike — dies instantly, bosses excepted.
+function dragonlordConvertToAlly(z){
+  if(!z||!z.userData||z.userData.dead) return;
+  z.userData.dragonlordAlly=true;
+  z.userData.targetPlayer=null;
+  z.userData.targetRefresh=0;
+  z.userData.dragonlordAllyAttackCooldown=0;
+  z.traverse(o=>{
+    if(!o.isMesh||!o.material) return;
+    const mats=Array.isArray(o.material)?o.material:[o.material];
+    for(const m of mats){
+      if(m.color) m.color.lerp(new THREE.Color(DL_FIRE),.5);
+      if(m.emissive) m.emissive.setHex(0x3d1206);
+    }
+  });
+}
+function dragonlordChooseAllyTarget(z,dt){
+  z.userData.targetRefresh=Math.max(0,(z.userData.targetRefresh||0)-dt);
+  const current=z.userData.targetPlayer;
+  if(current&&current.parent&&!current.userData.dead&&!current.userData.dragonlordAlly&&z.userData.targetRefresh>0) return current;
+  let best=null,bestDist=Infinity;
+  for(const other of zombies){
+    if(other===z||!other||other.userData.dead||other.userData.spawnPending||other.userData.dragonlordAlly) continue;
+    const d=(other.position.x-z.position.x)**2+(other.position.z-z.position.z)**2;
+    if(d<bestDist){bestDist=d;best=other;}
   }
-  dragonlordHeadMesh.visible=true;
-}
-function dragonlordHellgateSpawnBeam(){
-  if(!dragonlordBeamMesh){
-    const m=new THREE.Mesh(new THREE.CylinderGeometry(.14,.24,1,10,1,true),knightMat(DL_FIRE,.85));
-    dragonlordBeamMesh=m;
-    scene.add(m);
-  }
-  dragonlordBeamMesh.visible=true;
-}
-function dragonlordUpdateBeam(headPos,groundPos,opacity){
-  if(!dragonlordBeamMesh) return;
-  const dir=new THREE.Vector3(groundPos.x-headPos.x,groundPos.y-headPos.y,groundPos.z-headPos.z);
-  const len=dir.length();
-  if(len<.05){ dragonlordBeamMesh.visible=false; return; }
-  dir.normalize();
-  dragonlordBeamMesh.visible=true;
-  dragonlordBeamMesh.position.set((headPos.x+groundPos.x)/2,(headPos.y+groundPos.y)/2,(headPos.z+groundPos.z)/2);
-  dragonlordBeamMesh.scale.set(1,len,1);
-  dragonlordBeamMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);
-  dragonlordBeamMesh.material.opacity=opacity;
+  z.userData.targetPlayer=best;
+  z.userData.targetRefresh=.35+Math.random()*.25;
+  return best;
 }
 function triggerDragonLordHellgate(){
   if(!dragonlordIsActive()||!player) return;
   if(dragonlordRuntime.hellgateTimer>0||dragonlordRuntime.hellgateCooldown>0) return;
   markUltimateUsed();
   dragonlordRuntime.hellgateTimer=10;
-  dragonlordRuntime.hellgateCooldown=20;
-  dragonlordRuntime.hellgatePulse=.12;
-  dragonlordRuntime.hellgateSweepStart=player.rotation.y;
-  dragonlordHellgateSpawnHead();
-  dragonlordHellgateSpawnBeam();
-  triggerCombatShake(10,200);
-  navigator.vibrate&&navigator.vibrate([50,25,80]);
+  dragonlordRuntime.hellgateCooldown=24;
+  dragonlordRuntime.hellgatePulse=.5;
+  const moved=resolveCollision(0,0,player.position.y);
+  player.position.x=moved.x; player.position.z=moved.z;
+  dragonlordFireRing(player.position,3.0,DL_VOID,.6);
+  dragonlordImpactFlash(player.position,DL_EMBER,3.0,.24);
+  triggerCombatShake(12,240);
+  navigator.vibrate&&navigator.vibrate([60,25,90]);
   toast('THE HELLGATE OPENS — 10s');
+  const eligible=zombies.filter(z=>z&&z.userData&&!z.userData.dead&&(z.userData.archetype||'walker')!=='boss');
+  const convertCount=Math.floor(eligible.length*0.75);
+  const shuffled=[...eligible];
+  for(let i=shuffled.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]]; }
+  for(let i=0;i<convertCount;i++) dragonlordConvertToAlly(shuffled[i]);
 }
 function dragonlordUpdateHellgate(dt){
   if(dragonlordRuntime.hellgateTimer<=0){
-    if(dragonlordHeadMesh) dragonlordHeadMesh.visible=false;
-    if(dragonlordBeamMesh) dragonlordBeamMesh.visible=false;
     if(dragonlordRuntime.hellgateCooldown>0)dragonlordRuntime.hellgateCooldown=Math.max(0,dragonlordRuntime.hellgateCooldown-dt);
     return;
   }
-  const total=10;
   dragonlordRuntime.hellgateTimer=Math.max(0,dragonlordRuntime.hellgateTimer-dt);
-  const t=1-(dragonlordRuntime.hellgateTimer/total);
-  // Ping-pong sweep: ~1.7 back-and-forth passes across a wide arc over the
-  // full 10s, so the beam stays visibly active the whole duration instead
-  // of a single quick pass that's easy to miss.
-  const arcHalf=1.35;
-  const sweepPhase=Math.sin(t*Math.PI*2*1.7);
-  const yaw=dragonlordRuntime.hellgateSweepStart+sweepPhase*arcHalf;
-  const beamLen=9.5, beamHalfWidth=1.15;
-  const beamOriginX=player.position.x, beamOriginZ=player.position.z;
-  const headPos={x:player.position.x+Math.sin(yaw)*.9,y:player.position.y+1.55,z:player.position.z+Math.cos(yaw)*.9};
-  const groundPos={x:beamOriginX+Math.sin(yaw)*beamLen,y:.05,z:beamOriginZ+Math.cos(yaw)*beamLen};
-  const fade=Math.min(1,t*8)*Math.min(1,(1-t)*8);
-  if(dragonlordHeadMesh){
-    dragonlordHeadMesh.position.set(headPos.x,headPos.y,headPos.z);
-    dragonlordHeadMesh.rotation.y=yaw;
-    dragonlordHeadMesh.traverse(o=>{ if(o.material) o.material.opacity=(o.userData.baseOp||(o.userData.baseOp=o.material.opacity))*fade; });
-  }
-  dragonlordUpdateBeam(headPos,groundPos,.8*fade);
   dragonlordRuntime.hellgatePulse-=dt;
   if(dragonlordRuntime.hellgatePulse<=0){
-    dragonlordRuntime.hellgatePulse=0.12;
-    dragonlordImpactFlash(groundPos,DL_FIRE,1.0,.1);
-    const dirX=Math.sin(yaw), dirZ=Math.cos(yaw);
-    for(const z of zombies){
-      if(z.userData.dead) continue;
-      const relX=z.position.x-beamOriginX, relZ=z.position.z-beamOriginZ;
-      const proj=relX*dirX+relZ*dirZ;
-      if(proj<0||proj>beamLen) continue;
-      const perpX=relX-dirX*proj, perpZ=relZ-dirZ*proj;
-      if(Math.hypot(perpX,perpZ)>beamHalfWidth) continue;
-      applyBulletDamage(z,0.42*playerStats.power);
+    dragonlordRuntime.hellgatePulse=.5;
+    dragonlordFireRing(player.position,3.0+Math.random()*1.5,DL_VOID,.5);
+  }
+  for(const z of zombies){
+    if(!z||z.userData.dead||!z.userData.dragonlordAlly) continue;
+    z.userData.dragonlordAllyAttackCooldown=Math.max(0,(z.userData.dragonlordAllyAttackCooldown||0)-dt);
+    const target=z.userData.targetPlayer;
+    if(target&&target.parent&&!target.userData.dead&&z.userData.dragonlordAllyAttackCooldown<=0){
+      const dist=Math.hypot(target.position.x-z.position.x,target.position.z-z.position.z);
+      if(dist<=1.6){
+        applyBulletDamage(target,Math.max(1,(z.userData.maxHp||z.userData.hp||3)*0.22));
+        z.userData.dragonlordAllyAttackCooldown=.6;
+      }
     }
   }
   if(dragonlordRuntime.hellgateTimer<=0){
-    dragonlordImpactFlash(player.position,DL_EMBER,2.2,.2);
-    triggerCombatShake(8,140);
-    if(dragonlordHeadMesh) dragonlordHeadMesh.visible=false;
-    if(dragonlordBeamMesh) dragonlordBeamMesh.visible=false;
-    toast('HELLGATE CLOSES');
+    for(const z of [...zombies]){
+      if(!z||z.userData.dead) continue;
+      if((z.userData.archetype||'walker')==='boss') continue;
+      z.userData.hp=0; killZombie(z);
+    }
+    dragonlordImpactFlash(player.position,DL_EMBER,3.0,.24);
+    triggerCombatShake(16,260);
+    navigator.vibrate&&navigator.vibrate([70,20,50]);
+    toast('THE HELLGATE CLOSES');
   }
 }
 
@@ -24065,12 +24046,61 @@ function updateDragonLordSystems(dt){
     if(dragonlordLegionClones.length) clearDragonLordLegion();
     if(dragonlordRuntime.wyrmFormTimer>0) dragonlordEndWyrmForm();
     dragonlordRuntime.hellgateTimer=0; dragonlordRuntime.hellgateOrigin=null;
-    if(dragonlordHeadMesh) dragonlordHeadMesh.visible=false;
-    if(dragonlordBeamMesh) dragonlordBeamMesh.visible=false;
     return;
   }
   if(!player) return;
-  if(dragonlordMeteorActiveTimer>0)dragonlordMeteorActiveTimer=Math.max(0,dragonlordMeteorActiveTimer-dt);
+  if(dragonlordMeteorActiveTimer>0){
+    dragonlordMeteorActiveTimer=Math.max(0,dragonlordMeteorActiveTimer-dt);
+    const stormR=Math.min(3.2,dragonlordAshfallRadius()*0.16);
+    for(const z of [...zombies]){
+      if(!z||!z.userData||z.userData.dead||z.userData.spawnPending) continue;
+      const dx=-z.position.x,dz=-z.position.z,dist=Math.hypot(dx,dz);
+      if(dist>.001){
+        const speed=Math.max(3.0,(z.userData.baseSpeed||z.userData.speed||3.2)*0.55);
+        const step=Math.min(dist,speed*dt);
+        z.position.x+=(dx/dist)*step; z.position.z+=(dz/dist)*step;
+      }
+      if(dist<=stormR&&(z.userData.archetype||'walker')!=='boss'){ z.userData.hp=0; killZombie(z); }
+    }
+    dragonlordMeteorSpawnTimer-=dt;
+    if(dragonlordMeteorSpawnTimer<=0){
+      dragonlordMeteorSpawnTimer=0.22;
+      if(dragonlordFireballs.length<9) dragonlordSpawnFireball();
+    }
+    dragonlordMeteorDamageTimer-=dt;
+    if(dragonlordMeteorDamageTimer<=0){
+      dragonlordMeteorDamageTimer=.9;
+      const br=dragonlordAshfallRadius()*0.55;
+      for(const z of [...zombies]){
+        if(z.userData.dead) continue;
+        if(Math.hypot(z.position.x,z.position.z)>br) continue;
+        if((z.userData.archetype||'walker')!=='boss'){ z.userData.hp=0; killZombie(z); }
+        else{
+          applyBulletDamage(z,Math.max(1,(z.userData.maxHp||z.userData.hp||1)*0.03));
+          z.userData.slowTimer=Math.max(z.userData.slowTimer||0,1.2);
+          z.userData.slowMult=Math.min(z.userData.slowMult||1,.3);
+        }
+      }
+    }
+    if(dragonlordMeteorActiveTimer<=0) toast('ASHFALL FADES');
+  }
+  for(let i=dragonlordFireballs.length-1;i>=0;i--){
+    const m=dragonlordFireballs[i];
+    m.life-=dt; m.mesh.position.y-=m.vy*dt; m.mesh.rotation.y+=dt*1.4;
+    m.ring.material.opacity=Math.max(.08,m.life*.5);
+    if(m.mesh.position.y<=.6||m.life<=0){
+      dragonlordFireRing({x:m.x,y:0,z:m.z},2.6,DL_FIRE,.4);
+      dragonlordImpactFlash({x:m.x,y:0,z:m.z},DL_EMBER,1.8,.16);
+      for(const zom of [...zombies]){
+        if(zom.userData.dead) continue;
+        if(Math.hypot(zom.position.x-m.x,zom.position.z-m.z)>2.6) continue;
+        applyBulletDamage(zom,1.6*playerStats.power);
+      }
+      scene.remove(m.mesh); disposeGroup(m.mesh);
+      scene.remove(m.ring); disposeGroup(m.ring);
+      dragonlordFireballs.splice(i,1);
+    }
+  }
   if(dragonlordMeteorCooldownTimer>0)dragonlordMeteorCooldownTimer=Math.max(0,dragonlordMeteorCooldownTimer-dt);
   if(dragonlordRuntime.wyrmFormCooldown>0)dragonlordRuntime.wyrmFormCooldown=Math.max(0,dragonlordRuntime.wyrmFormCooldown-dt);
   if(dragonlordRuntime.wyrmFormTimer>0){
@@ -24202,13 +24232,27 @@ function clearKnightRoundSpecials(resetCooldowns=true){
     dragonlordRuntime.wyrmFormTimer=0;
     dragonlordRuntime.hellgateTimer=0;
     dragonlordRuntime.hellgateOrigin=null;
-    if(dragonlordHeadMesh) dragonlordHeadMesh.visible=false;
-    if(dragonlordBeamMesh) dragonlordBeamMesh.visible=false;
     dragonlordMeteorEpoch++;
+    dragonlordMeteorActiveTimer=0;
+    // An interrupted Hellgate must not leave zombies permanently converted —
+    // hand them back to normal hostile targeting for whichever character
+    // plays next.
+    for(const z of zombies){
+      if(z&&z.userData&&z.userData.dragonlordAlly){
+        z.userData.dragonlordAlly=false;
+        z.userData.targetPlayer=null;
+        z.userData.targetRefresh=0;
+      }
+    }
+    for(const m of dragonlordFireballs){
+      if(m.mesh){ scene.remove(m.mesh); disposeGroup(m.mesh); }
+      if(m.ring){ scene.remove(m.ring); disposeGroup(m.ring); }
+    }
+    dragonlordFireballs=[];
     dragonlordSyncAvatarScale();
     if(resetCooldowns){
       dragonlordLegionCooldown=0; dragonlordLegionCycleDuration=0;
-      dragonlordMeteorActiveTimer=0; dragonlordMeteorCooldownTimer=0;
+      dragonlordMeteorCooldownTimer=0;
       dragonlordRuntime.wyrmFormCooldown=0; dragonlordRuntime.hellgateCooldown=0;
     }
   }catch(_err){}
