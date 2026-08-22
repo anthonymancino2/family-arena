@@ -1453,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.75.02 - Nyxara Soul Rend Chain & Barrage Speed';
+const GAME_VERSION='23.75.03 - Nyxara Secondary FX & Hellgate Mutual Combat';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -14364,7 +14364,15 @@ function chooseEnemyTarget(z,dt){
   // ultimate, so this is a no-op for every other character's games.
   if(z.userData.dragonlordAlly) return dragonlordChooseAllyTarget(z,dt);
   if(blizzardActiveTimer>0 && player){ const br=blizzardRadius(); if(Math.hypot(z.position.x-blizzardCenter.x,z.position.z-blizzardCenter.z)<=br && Math.hypot(player.position.x-blizzardCenter.x,player.position.z-blizzardCenter.z)<=br) return null; }
-  const candidates=livingPlayers();
+  let candidates=livingPlayers();
+  // While Hellgate is open, hostile zombies can also engage converted
+  // allies instead of only ever beelining for the player — otherwise
+  // allies never take a hit back and the "everyone dies at 10s" fight
+  // never actually looks like a fight.
+  if(dragonlordRuntime.hellgateTimer>0){
+    const allies=zombies.filter(o=>o&&o!==z&&!o.userData.dead&&!o.userData.spawnPending&&o.userData.dragonlordAlly);
+    if(allies.length) candidates=candidates.concat(allies);
+  }
   if(!candidates.length) return null;
   z.userData.targetRefresh=Math.max(0,(z.userData.targetRefresh||0)-dt);
   const current=z.userData.targetPlayer;
@@ -23472,7 +23480,7 @@ function dragonlordUpdateSparks(dt){
 let dragonlordDashTrailPool=null;
 function dragonlordDashTrailFactory(){ return new THREE.Mesh(new THREE.PlaneGeometry(1,1),knightMat(DL_FIRE,.7)); }
 function dragonlordFireDashTrail(fromPos,toPos,color=DL_FIRE){
-  if(!dragonlordDashTrailPool) dragonlordDashTrailPool=dragonlordCreatePool(1,dragonlordDashTrailFactory);
+  if(!dragonlordDashTrailPool) dragonlordDashTrailPool=dragonlordCreatePool(2,dragonlordDashTrailFactory);
   const slot=dragonlordPoolGet(dragonlordDashTrailPool);
   slot.life=slot.maxLife=1.2; // matches the blueprint's 1.2s linear fade window
   const dx=toPos.x-fromPos.x, dz=toPos.z-fromPos.z;
@@ -23499,7 +23507,7 @@ function dragonlordSweepRingFactory(){
   return m;
 }
 function dragonlordFireSweepRing(origin,color=DL_FIRE,targetRadius=4){
-  if(!dragonlordSweepRingPool) dragonlordSweepRingPool=dragonlordCreatePool(1,dragonlordSweepRingFactory);
+  if(!dragonlordSweepRingPool) dragonlordSweepRingPool=dragonlordCreatePool(3,dragonlordSweepRingFactory);
   const slot=dragonlordPoolGet(dragonlordSweepRingPool);
   slot.life=slot.maxLife=.2; // matches the blueprint's 0.20s expand-then-terminate
   slot.targetRadius=targetRadius;
@@ -23570,21 +23578,26 @@ function dragonlordBrimstoneBarrage(w){
   const dmgMult=dragonlordAttackDamageMult();
   [-0.14,0,0.14].forEach(spread=>{
     const muzzle={x:player.position.x+Math.sin(yaw+spread)*.7,y:player.position.y+1.15,z:player.position.z+Math.cos(yaw+spread)*.7};
-    dragonlordImpactFlash(muzzle,DL_EMBER,.7,.09);
+    dragonlordImpactFlash(muzzle,DL_EMBER,1.2,.12);
+    dragonlordFireSparks(muzzle,3,DL_EMBER);
     shootFromPosition({...w,damage:w.damage*dmgMult},player.position,spread);
     const b=bullets[bullets.length-1];
     if(b&&b.mesh){
-      b.mesh.scale.multiplyScalar(1.5);
+      b.mesh.scale.multiplyScalar(2.1);
       b.mesh.traverse(o=>{ if(o.material&&o.material.color) o.material.color.setHex(DL_FIRE); });
     }
   });
   const origin=player.position;
   const burstRadius=2.3*dragonlordAttackRangeMult();
   const hits=damageNearby(origin,burstRadius,w.damage*1.15*dmgMult);
+  // Layered double-ring + particle-heavy ground ignition so the payoff
+  // reads as a real detonation instead of a quick flicker.
   dragonlordFireSweepRing(origin,DL_EMBER,burstRadius);
-  dragonlordImpactFlash(origin,DL_FIRE,1.6,.16);
-  triggerCombatShake(hits>0?9:4,120);
-  navigator.vibrate&&navigator.vibrate(hits>0?[24,16,32]:14);
+  dragonlordFireRing(origin,burstRadius*.55,DL_FIRE,.32);
+  dragonlordImpactFlash(origin,DL_FIRE,2.4,.22);
+  dragonlordEmberBurst(origin.x,origin.y+.6,origin.z,hits>0?24:14,5.0);
+  triggerCombatShake(hits>0?13:7,160);
+  navigator.vibrate&&navigator.vibrate(hits>0?[30,18,42]:18);
 }
 // Soul Rend Chain: replaces Wing Gale Dash. A single-target execute move
 // instead of a movement-reliant dash — no player repositioning or
@@ -23608,22 +23621,33 @@ function dragonlordSoulRendChain(w){
     if(dist<bestDist){bestDist=dist;best=z;}
   }
   const chainStart={x:player.position.x,y:player.position.y+1.1,z:player.position.z};
+  // Cast flourish at her hand so the move reads as a deliberate cast even
+  // on a miss, instead of just a thin line appearing.
+  dragonlordImpactFlash(chainStart,DL_VOID,1.3,.14);
+  dragonlordFireSparks(chainStart,4,DL_VOID);
   if(!best){
     const missEnd={x:player.position.x+Math.sin(yaw)*range,y:player.position.y+1.1,z:player.position.z+Math.cos(yaw)*range};
     dragonlordFireDashTrail(chainStart,missEnd,DL_VOID);
     triggerCombatShake(3,60);
     return;
   }
-  dragonlordFireDashTrail(chainStart,{x:best.position.x,y:best.position.y+1,z:best.position.z},DL_VOID);
+  const targetPos={x:best.position.x,y:best.position.y+1,z:best.position.z};
+  // Two overlapping strands (void + fire) read as a twisted chain instead
+  // of a single flat line — the pool is sized for exactly this.
+  dragonlordFireDashTrail(chainStart,targetPos,DL_VOID);
+  dragonlordFireDashTrail({x:chainStart.x,y:chainStart.y-.15,z:chainStart.z},{x:targetPos.x,y:targetPos.y-.15,z:targetPos.z},DL_FIRE);
   applyBulletDamage(best,w.damage*dragonlordAttackDamageMult());
   const dx=player.position.x-best.position.x,dz=player.position.z-best.position.z;
   const d=Math.hypot(dx,dz)||1;
   const pull=Math.min(d-1.4,d*0.7);
   if(pull>0){ best.position.x+=(dx/d)*pull; best.position.z+=(dz/d)*pull; }
-  dragonlordImpactFlash(best.position,DL_VOID,1.9,.18);
-  dragonlordFireSparks(best.position,7,DL_FIRE);
-  triggerCombatShake(9,140);
-  navigator.vibrate&&navigator.vibrate([30,20,40]);
+  // Execution-grade payoff: telegraph ring + big flash + heavy spark/ember burst.
+  dragonlordFireRing(best.position,1.8,DL_VOID,.4);
+  dragonlordImpactFlash(best.position,DL_VOID,2.6,.22);
+  dragonlordFireSparks(best.position,10,DL_FIRE);
+  dragonlordEmberBurst(best.position.x,best.position.y+.7,best.position.z,16,4.4);
+  triggerCombatShake(13,180);
+  navigator.vibrate&&navigator.vibrate([34,22,50]);
 }
 // Void Maw: new 3rd secondary. Opens a void rift ahead of her that yanks
 // nearby enemies toward its center, then implodes — crowd-control flavor,
@@ -38048,6 +38072,13 @@ function update(dt){
           spawnBurst(target.position.x,target.position.y+.65,target.position.z,5,FX_MAT_SPARK,2.0);
           target.userData.hp=Infinity;
           target.userData.dead=false;
+        }
+        else if(target.userData&&target.userData.dragonlordAlly){
+          // Hellgate allies are real, mortal zombies wearing a different
+          // color, not invincible decoys — they can actually die here,
+          // mirroring the ~22% of the attacker's own maxHp allies deal back
+          // in dragonlordUpdateHellgate()'s ally-attack tick.
+          applyBulletDamage(target,Math.max(1,(z.userData.maxHp||z.userData.hp||3)*0.22));
         }
         else if(target.userData&&target.userData.isArcherMirror)damageArcherMirrorClone(target);
         else if(target.userData&&target.userData.isKnightRoyalClone){
