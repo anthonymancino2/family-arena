@@ -1453,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.73.12 - Nyxara 50% Bigger';
+const GAME_VERSION='23.74.00 - Nyxara Moveset Overhaul';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -3475,15 +3475,15 @@ const CHARACTER_COMBAT = {
     defaultId:'dragonlord_claw_rend',
     baseMoveMult:1.16,
     weapons:{
-      dragonlord_claw_rend:{name:'Demon Claw Rend', price:0, slot:'primary', kind:'dragonlord_claw_rend', cooldown:0.20, damage:1.30, radius:2.7, arc:2.3, auto:true,
+      dragonlord_claw_rend:{name:'Demon Claw Rend', price:0, slot:'primary', kind:'dragonlord_claw_rend', cooldown:0.20, damage:1.30, radius:2.7, arc:2.3, auto:true, fireRateCap:2.5,
         desc:'A three-hit claw combo — left rake, right rake, then a two-handed cross that throws a burst of embers. Hold FIRE to keep the chain going.'},
-      dragonlord_infernal_glaive:{name:'Infernal Glaive Combo', price:420, slot:'primary', kind:'dragonlord_infernal_glaive', cooldown:0.27, damage:1.75, radius:3.5, arc:2.05, auto:true,
+      dragonlord_infernal_glaive:{name:'Infernal Glaive Combo', price:420, slot:'primary', kind:'dragonlord_infernal_glaive', cooldown:0.27, damage:1.75, radius:3.5, arc:2.05, auto:true, fireRateCap:2.5,
         desc:'Trades speed for reach: a heavier three-hit greatsword chain wreathed in dragonfire that hits harder and further than the claws.'},
-      dragonlord_brimstone_bolt:{name:'Brimstone Bolt', price:0, slot:'secondary', kind:'dragonlord_brimstone_bolt', cooldown:0.55, damage:1.6, splash:1.1, auto:true,
+      dragonlord_brimstone_bolt:{name:'Brimstone Bolt', price:0, slot:'secondary', kind:'dragonlord_brimstone_bolt', cooldown:0.55, damage:1.6, splash:1.1, auto:true, fireRateCap:2.5,
         desc:'Hurls a homing brimstone fireball that explodes in a small blast radius on contact.'},
-      dragonlord_wing_gale_dash:{name:'Wing Gale Dash', price:400, slot:'secondary', kind:'dragonlord_wing_gale_dash', cooldown:2.4, damage:1.5, radius:2.4,
+      dragonlord_wing_gale_dash:{name:'Wing Gale Dash', price:400, slot:'secondary', kind:'dragonlord_wing_gale_dash', cooldown:2.4, damage:1.5, radius:2.4, fireRateCap:3,
         desc:'Rockets forward on demon wings, slashing through everything in the flight path and leaving a burning wind trail.'},
-      dragonlord_demonfire_nova:{name:'Demonfire Nova', price:480, slot:'secondary', kind:'dragonlord_demonfire_nova', cooldown:4.2, damage:2.0, radius:4.6,
+      dragonlord_demonfire_nova:{name:'Demonfire Nova', price:480, slot:'secondary', kind:'dragonlord_demonfire_nova', cooldown:4.2, damage:2.0, radius:4.6, fireRateCap:3,
         desc:'Slams the ground and detonates a ring of hellfire around her, hitting every enemy in range.'}
     }
   },
@@ -23326,7 +23326,7 @@ function updateKnightRoyalClones(dt){
 const DL_FIRE=0xff5a1f, DL_EMBER=0xffc35a, DL_VOID=0x9b3dff, DL_ASH=0x2b1420;
 function isDragonLordWeaponKind(kind){ return String(kind||'').indexOf('dragonlord_')===0; }
 let dragonlordComboStep=0;
-let dragonlordRuntime={wyrmFormTimer:0,wyrmFormCooldown:0,wyrmFormPulse:0,wyrmSpeedBoostApplied:false,hellgateTimer:0,hellgateCooldown:0,hellgatePulse:0,hellgateOrigin:null};
+let dragonlordRuntime={wyrmFormTimer:0,wyrmFormCooldown:0,wyrmFormPulse:0,wyrmSpeedBoostApplied:false,hellgateTimer:0,hellgateCooldown:0,hellgatePulse:0,hellgateOrigin:null,hellgateSweepStart:0};
 let dragonlordMeteorActiveTimer=0, dragonlordMeteorCooldownTimer=0, dragonlordMeteorEpoch=0;
 function dragonlordAttackDamageMult(){ return dragonlordRuntime.wyrmFormTimer>0 ? 1.6 : 1; }
 function dragonlordEmberBurst(x,y,z,count=10,spread=3){ spawnBurst(x,y,z,count,FX_MAT_SPARK,spread); }
@@ -23342,47 +23342,166 @@ function dragonlordEmberPillar(x,y,z,color=DL_EMBER,life=.5,h=2.2){
   pillar.userData.baseOpacity=.7;
   pushKnightFx(pillar,{life,grow:.9,from:1,vy:.6});
 }
-// Bright, fast core flash — reads as a sharp "impact" beat on every landed
-// hit, distinct from the softer ambient ember bursts.
+
+/* --------------------------------------------------- OBJECT POOLING (mobile)
+   Fixed-size pools, allocated once on first use, reused forever after —
+   no per-swing/per-shot `new THREE.Mesh(...)`. This backs every high-
+   frequency effect (primaries, and the two hot secondaries); the rarely-
+   cast ultimates still use the plain one-off pushKnightFx system since
+   they're cooldown-gated and never spammed. */
+function dragonlordCreatePool(size, factory){
+  const pool=[];
+  for(let i=0;i<size;i++){
+    const obj=factory();
+    obj.visible=false;
+    scene.add(obj);
+    pool.push({obj, busy:false, life:0, maxLife:1});
+  }
+  return pool;
+}
+function dragonlordPoolGet(pool){
+  let slot=pool.find(s=>!s.busy);
+  if(!slot) slot=pool.reduce((a,b)=>a.life<b.life?a:b); // steal the one nearest expiry
+  slot.busy=true; slot.obj.visible=true;
+  return slot;
+}
+function dragonlordPoolUpdate(pool,dt,onTick){
+  for(const slot of pool){
+    if(!slot.busy) continue;
+    slot.life-=dt;
+    const q=Math.max(0,slot.life/slot.maxLife);
+    if(onTick) onTick(slot,q);
+    if(slot.life<=0){ slot.busy=false; slot.obj.visible=false; }
+  }
+}
+
+// Impact flash — pooled, reused by every move below plus the ultimates.
+let dragonlordFlashPool=null;
+function dragonlordFlashFactory(){ return new THREE.Mesh(new THREE.SphereGeometry(.5,8,6),knightMat(DL_EMBER,1)); }
 function dragonlordImpactFlash(origin,color=DL_EMBER,size=1.4,life=.16){
-  const flash=new THREE.Mesh(new THREE.SphereGeometry(size*.5,10,8),knightMat(color,1));
-  flash.position.set(origin.x,(origin.y||0)+1.0,origin.z);
-  flash.userData.baseOpacity=1;
-  pushKnightFx(flash,{life,grow:2.6,from:.35});
+  if(!dragonlordFlashPool) dragonlordFlashPool=dragonlordCreatePool(6,dragonlordFlashFactory);
+  const slot=dragonlordPoolGet(dragonlordFlashPool);
+  slot.life=slot.maxLife=life; slot.baseSize=size*.5;
+  slot.obj.position.set(origin.x,(origin.y||0)+1.0,origin.z);
+  slot.obj.material.color.setHex(color);
+  slot.obj.material.opacity=1;
 }
-// Shaped crescent slash (mirrors knightSwordTrail's approach) — a visible
-// blade/claw arc rather than a generic particle puff, so each swing reads
-// as a distinct, legible attack instead of a formless flash of dust.
-function dragonlordClawSlash(origin,yaw,color=DL_FIRE,scale=1,arcSpan=2.3,heightOffset=1.0){
+function dragonlordUpdateFlashes(dt){
+  if(!dragonlordFlashPool) return;
+  dragonlordPoolUpdate(dragonlordFlashPool,dt,(slot,q)=>{
+    slot.obj.scale.setScalar((slot.baseSize||.5)*(1+(1-q)*2.4));
+    slot.obj.material.opacity=q;
+  });
+}
+
+// Claw/glaive swipe — pool of 2, per the blueprint's explicit "reuse a
+// fixed pool of 2 swipe planes" requirement.
+let dragonlordSwipePool=null;
+function dragonlordSwipeFactory(){
   const g=new THREE.Group();
-  const core=new THREE.Mesh(new THREE.RingGeometry(.55*scale,1.15*scale,36,1,-arcSpan/2,arcSpan),knightMat(color,.92));
-  core.rotation.x=-Math.PI/2; core.rotation.z=-yaw; g.add(core);
-  const edge=new THREE.Mesh(new THREE.RingGeometry(1.08*scale,1.24*scale,36,1,-arcSpan/2,arcSpan),knightMat(DL_EMBER,.98));
-  edge.rotation.x=-Math.PI/2; edge.rotation.z=-yaw; edge.position.y=.015; g.add(edge);
+  const core=new THREE.Mesh(new THREE.RingGeometry(.55,1.15,24,1,-1.1,2.2),knightMat(DL_FIRE,.92));
+  core.rotation.x=-Math.PI/2;
+  const edge=new THREE.Mesh(new THREE.RingGeometry(1.08,1.24,24,1,-1.1,2.2),knightMat(DL_EMBER,.98));
+  edge.rotation.x=-Math.PI/2; edge.position.y=.015;
+  g.add(core,edge); g.userData.core=core; g.userData.edge=edge;
+  return g;
+}
+function dragonlordFireSwipe(origin,yaw,color=DL_FIRE,heightOffset=1.0,scale=1){
+  if(!dragonlordSwipePool) dragonlordSwipePool=dragonlordCreatePool(2,dragonlordSwipeFactory);
+  const slot=dragonlordPoolGet(dragonlordSwipePool);
+  slot.life=slot.maxLife=.15; // matches the blueprint's swipe erosion window
+  const g=slot.obj;
   g.position.set(origin.x,(origin.y||0)+heightOffset,origin.z);
-  knightBaseOpacity(g);
-  pushKnightFx(g,{life:.20,grow:.55,from:.82});
+  g.rotation.z=-yaw;
+  g.scale.setScalar(scale);
+  g.userData.core.material.color.setHex(color);
+  g.userData.core.material.opacity=.92;
+  g.userData.edge.material.opacity=.98;
 }
-// Flat ribbon stretched between two points — used to leave a visible burning
-// streak behind fast movement (Wing Gale Dash) instead of just dust puffs.
-function dragonlordFlameTrail(fromPos,toPos,color=DL_FIRE,life=.28){
+function dragonlordUpdateSwipes(dt){
+  if(!dragonlordSwipePool) return;
+  dragonlordPoolUpdate(dragonlordSwipePool,dt,(slot,q)=>{
+    slot.obj.userData.core.material.opacity=.92*q;
+    slot.obj.userData.edge.material.opacity=.98*q;
+  });
+}
+
+// Claw sparks — small pool of 8, 4 fired per swipe (per blueprint), simple
+// linear outward travel with light gravity, no collision math beyond the
+// caller's own hit check.
+let dragonlordSparkPool=null;
+function dragonlordSparkFactory(){ return new THREE.Mesh(new THREE.PlaneGeometry(.14,.14),knightMat(DL_EMBER,1)); }
+function dragonlordFireSparks(origin,count=4,color=DL_EMBER){
+  if(!dragonlordSparkPool) dragonlordSparkPool=dragonlordCreatePool(8,dragonlordSparkFactory);
+  for(let i=0;i<count;i++){
+    const slot=dragonlordPoolGet(dragonlordSparkPool);
+    slot.life=slot.maxLife=.15;
+    const a=Math.random()*Math.PI*2;
+    slot.vx=Math.cos(a)*2.4; slot.vz=Math.sin(a)*2.4; slot.vy=1.6+Math.random();
+    slot.obj.position.set(origin.x,origin.y+1.0,origin.z);
+    slot.obj.material.color.setHex(color);
+    slot.obj.material.opacity=1;
+  }
+}
+function dragonlordUpdateSparks(dt){
+  if(!dragonlordSparkPool) return;
+  dragonlordPoolUpdate(dragonlordSparkPool,dt,(slot,q)=>{
+    slot.obj.position.x+=(slot.vx||0)*dt;
+    slot.obj.position.y+=(slot.vy||0)*dt;
+    slot.obj.position.z+=(slot.vz||0)*dt;
+    slot.vy=(slot.vy||0)-6*dt;
+    slot.obj.material.opacity=q;
+  });
+}
+
+// Wing Gale Dash ground trail — a single reusable strip stretched between
+// start/end each cast, instead of spawning particles along the path.
+let dragonlordDashTrailPool=null;
+function dragonlordDashTrailFactory(){ return new THREE.Mesh(new THREE.PlaneGeometry(1,1),knightMat(DL_FIRE,.7)); }
+function dragonlordFireDashTrail(fromPos,toPos,color=DL_FIRE){
+  if(!dragonlordDashTrailPool) dragonlordDashTrailPool=dragonlordCreatePool(1,dragonlordDashTrailFactory);
+  const slot=dragonlordPoolGet(dragonlordDashTrailPool);
+  slot.life=slot.maxLife=1.2; // matches the blueprint's 1.2s linear fade window
   const dx=toPos.x-fromPos.x, dz=toPos.z-fromPos.z;
-  const len=Math.hypot(dx,dz);
-  if(len<.05)return;
+  const len=Math.max(.4,Math.hypot(dx,dz));
   const yaw=Math.atan2(dx,dz);
-  const ribbon=new THREE.Mesh(new THREE.PlaneGeometry(.6,len),knightMat(color,.62));
-  ribbon.rotation.x=-Math.PI/2; ribbon.rotation.z=yaw;
-  ribbon.position.set((fromPos.x+toPos.x)/2,(fromPos.y||0)+.08,(fromPos.z+toPos.z)/2);
-  ribbon.userData.baseOpacity=.62;
-  pushKnightFx(ribbon,{life,grow:.25,from:1});
+  const m=slot.obj;
+  m.scale.set(.9,len,1);
+  m.rotation.x=-Math.PI/2; m.rotation.z=yaw;
+  m.position.set((fromPos.x+toPos.x)/2,(fromPos.y||0)+.05,(fromPos.z+toPos.z)/2);
+  m.material.color.setHex(color);
+  m.material.opacity=.7;
 }
-// Slow-spinning inner ring layered under/over a fire ring — gives AoE/portal
-// effects a "churning vortex" read instead of a flat static circle.
-function dragonlordVortexRing(origin,radius,color=DL_VOID,life=.5,spin=6){
-  const ring=new THREE.Mesh(new THREE.RingGeometry(radius*.72,radius*.86,54),knightMat(color,.55));
-  ring.rotation.x=-Math.PI/2; ring.position.set(origin.x,(origin.y||0)+.1,origin.z);
-  ring.userData.baseOpacity=.55;
-  pushKnightFx(ring,{life,grow:.15,from:1,spin});
+function dragonlordUpdateDashTrail(dt){
+  if(!dragonlordDashTrailPool) return;
+  dragonlordPoolUpdate(dragonlordDashTrailPool,dt,(slot,q)=>{ slot.obj.material.opacity=.7*q; });
+}
+
+// Expanding shockwave ring — single reusable mesh, scales 0->target over
+// 0.20s then hides. Backs Demonfire Nova's AoE and the passive kill-nova.
+let dragonlordSweepRingPool=null;
+function dragonlordSweepRingFactory(){
+  const m=new THREE.Mesh(new THREE.RingGeometry(.85,1,40),knightMat(DL_FIRE,.9));
+  m.rotation.x=-Math.PI/2;
+  return m;
+}
+function dragonlordFireSweepRing(origin,color=DL_FIRE,targetRadius=4){
+  if(!dragonlordSweepRingPool) dragonlordSweepRingPool=dragonlordCreatePool(1,dragonlordSweepRingFactory);
+  const slot=dragonlordPoolGet(dragonlordSweepRingPool);
+  slot.life=slot.maxLife=.2; // matches the blueprint's 0.20s expand-then-terminate
+  slot.targetRadius=targetRadius;
+  slot.obj.position.set(origin.x,(origin.y||0)+.1,origin.z);
+  slot.obj.scale.setScalar(.15);
+  slot.obj.material.color.setHex(color);
+  slot.obj.material.opacity=.9;
+}
+function dragonlordUpdateSweepRing(dt){
+  if(!dragonlordSweepRingPool) return;
+  dragonlordPoolUpdate(dragonlordSweepRingPool,dt,(slot,q)=>{
+    const p=1-q;
+    slot.obj.scale.setScalar(.15+(slot.targetRadius-.15)*p);
+    slot.obj.material.opacity=.9*q;
+  });
 }
 
 /* ---------------------------------------------------------- WEAPON KIT */
@@ -23396,41 +23515,44 @@ function doDragonLordAttack(w){
     default: dragonlordClawRend(w); break;
   }
 }
+// Demon Claw Cleave: fast two-hit spammable swipe. Pooled crescent + 4
+// pooled sparks per hit — zero per-swing allocation.
 function dragonlordClawRend(w){
   const yaw=player.rotation.y;
-  const step=dragonlordComboStep++%3;
-  const clipNames=['Punch_Jab','Punch_Cross','Melee_Hook'];
-  if(player.userData.playKayClip) player.userData.playKayClip(clipNames[step],true,true,.20);
+  const step=dragonlordComboStep++%2;
+  const clipNames=['Punch_Jab','Punch_Cross'];
+  if(player.userData.playKayClip) player.userData.playKayClip(clipNames[step],true,true,.16);
   const hits=damageMeleeArc(player.position,yaw,w.radius,w.arc,w.damage*dragonlordAttackDamageMult());
   const fx=player.position;
   const tip={x:fx.x+Math.sin(yaw)*1.3,y:fx.y,z:fx.z+Math.cos(yaw)*1.3};
-  dragonlordClawSlash(fx,yaw+(step-1)*.22,step%2?DL_VOID:DL_FIRE,1.0+step*.08,2.1);
-  dragonlordEmberBurst(tip.x,fx.y+1.0,tip.z,hits>0?16:8,hits>0?3.6:2.4);
-  if(hits>0)dragonlordImpactFlash(tip,DL_EMBER,1.3,.15);
-  triggerCombatShake(hits>0?7:3,hits>0?120:70);
-  if(hits>0)navigator.vibrate&&navigator.vibrate(16);
+  dragonlordFireSwipe(fx,yaw+(step?0.18:-0.18),step?DL_VOID:DL_FIRE,1.0,1);
+  dragonlordFireSparks(tip,4,DL_EMBER);
+  if(hits>0)dragonlordImpactFlash(tip,DL_EMBER,1.1,.14);
+  triggerCombatShake(hits>0?7:3,hits>0?110:60);
+  if(hits>0)navigator.vibrate&&navigator.vibrate(14);
 }
 function dragonlordGlaiveCombo(w){
   const yaw=player.rotation.y;
   const step=dragonlordComboStep++%3;
   const clipNames=['Sword_Regular_A','Sword_Regular_B','Sword_Regular_C'];
-  if(player.userData.playKayClip) player.userData.playKayClip(clipNames[step],true,true,.26);
+  if(player.userData.playKayClip) player.userData.playKayClip(clipNames[step],true,true,.24);
   const hits=damageMeleeArc(player.position,yaw,w.radius,w.arc,w.damage*dragonlordAttackDamageMult());
   const fx=player.position;
   const tip={x:fx.x+Math.sin(yaw)*2.0,y:fx.y,z:fx.z+Math.cos(yaw)*2.0};
-  dragonlordClawSlash(fx,yaw,DL_VOID,1.9,2.7,1.1);
-  dragonlordEmberBurst(tip.x,fx.y+1.0,tip.z,hits>0?22:10,hits>0?4.6:3.0);
-  dragonlordFireRing(fx,2.6,DL_FIRE,.3);
-  if(hits>0)dragonlordImpactFlash(tip,DL_VOID,1.8,.18);
-  triggerCombatShake(hits>0?10:4,hits>0?150:85);
+  dragonlordFireSwipe(fx,yaw,DL_VOID,1.1,1.8);
+  dragonlordFireSparks(tip,6,DL_VOID);
+  if(hits>0)dragonlordImpactFlash(tip,DL_VOID,1.6,.16);
+  triggerCombatShake(hits>0?10:4,hits>0?140:80);
   if(hits>0)navigator.vibrate&&navigator.vibrate([20,14,26]);
 }
+// Brimstone Bolt Burst: rapid-fire projectile. The projectile itself still
+// rides the game's shared bullet pool (fireBullet/bullets[]) rather than a
+// second parallel pool — only the muzzle flash is dragonlord-pooled.
 function dragonlordBrimstoneBolt(w){
-  if(player.userData.playKayClip) player.userData.playKayClip('Spell_Simple_Shoot',true,true,.22);
+  if(player.userData.playKayClip) player.userData.playKayClip('Spell_Simple_Shoot',true,true,.18);
   const yaw=player.rotation.y;
   const muzzle={x:player.position.x+Math.sin(yaw)*.7,y:player.position.y+1.15,z:player.position.z+Math.cos(yaw)*.7};
-  dragonlordImpactFlash(muzzle,DL_EMBER,1.0,.12);
-  dragonlordEmberBurst(muzzle.x,muzzle.y,muzzle.z,10,2.2);
+  dragonlordImpactFlash(muzzle,DL_EMBER,.9,.10);
   shootFromPosition(w,player.position,0);
   const b=bullets[bullets.length-1];
   if(b&&b.mesh){
@@ -23438,45 +23560,38 @@ function dragonlordBrimstoneBolt(w){
     b.mesh.traverse(o=>{ if(o.material&&o.material.color) o.material.color.setHex(DL_FIRE); });
   }
 }
+// Wing Gale Dash: single pooled ground-trail strip instead of particles
+// spawned along the path.
 function dragonlordWingGaleDash(w){
   const yaw=player.rotation.y;
   if(player.userData.playKayClip) player.userData.playKayClip('Flying_Forward_Super',true,true,.30);
-  const dashDist=4.2, steps=6;
+  const dashDist=4.2, steps=5;
   let hits=0;
-  let prevPos={x:player.position.x,y:player.position.y,z:player.position.z};
-  dragonlordClawSlash(player.position,yaw,DL_FIRE,1.1,2.6,.9);
+  const startPos={x:player.position.x,y:player.position.y,z:player.position.z};
   for(let i=1;i<=steps;i++){
     const t=i/steps;
     const px=player.position.x+Math.sin(yaw)*dashDist*t;
     const pz=player.position.z+Math.cos(yaw)*dashDist*t;
     hits+=damageMeleeArc({x:px,y:player.position.y,z:pz},yaw,w.radius,Math.PI*2/3,w.damage*dragonlordAttackDamageMult()/steps);
-    dragonlordFlameTrail(prevPos,{x:px,y:player.position.y,z:pz},i%2?DL_VOID:DL_FIRE,.26);
-    if(i%2===0) dragonlordEmberBurst(px,player.position.y+0.9,pz,7,2.2);
-    prevPos={x:px,y:player.position.y,z:pz};
   }
-  const moved=resolveCollision(player.position.x+Math.sin(yaw)*dashDist,player.position.z+Math.cos(yaw)*dashDist,player.position.y);
+  const endPos={x:player.position.x+Math.sin(yaw)*dashDist,y:player.position.y,z:player.position.z+Math.cos(yaw)*dashDist};
+  dragonlordFireDashTrail(startPos,endPos,DL_FIRE);
+  const moved=resolveCollision(endPos.x,endPos.z,player.position.y);
   player.position.x=moved.x; player.position.z=moved.z;
-  dragonlordFireRing(player.position,2.2,DL_EMBER,.32);
-  if(hits>0)dragonlordImpactFlash(player.position,DL_FIRE,1.6,.16);
-  triggerCombatShake(hits>0?9:5,140);
+  if(hits>0)dragonlordImpactFlash(player.position,DL_FIRE,1.5,.16);
+  triggerCombatShake(hits>0?9:5,130);
   navigator.vibrate&&navigator.vibrate(hits>0?[22,16,30]:14);
 }
+// Infernal Glaive Sweep FX (360 knockback ring), applied to her existing
+// Demonfire Nova secondary: single pooled expanding ring, no ground-crack
+// mesh pile-up, no particle burst.
 function dragonlordDemonfireNova(w){
-  if(player.userData.playKayClip) player.userData.playKayClip('Attack_Ground_Pound',true,true,.4);
+  if(player.userData.playKayClip) player.userData.playKayClip('Attack_Ground_Pound',true,true,.32);
   const hits=damageNearby(player.position,w.radius,w.damage*dragonlordAttackDamageMult());
   const origin=player.position;
-  dragonlordFireRing(origin,w.radius,DL_FIRE,.5);
-  dragonlordFireRing(origin,w.radius*0.62,DL_VOID,.42);
-  dragonlordVortexRing(origin,w.radius*0.85,DL_EMBER,.4,-5);
-  knightGroundCracks(origin,w.radius,9,DL_ASH);
-  const spikes=6;
-  for(let i=0;i<spikes;i++){
-    const a=(i/spikes)*Math.PI*2;
-    dragonlordEmberPillar(origin.x+Math.cos(a)*w.radius*.7,origin.y,origin.z+Math.sin(a)*w.radius*.7,i%2?DL_VOID:DL_FIRE,.4,1.6);
-  }
-  dragonlordEmberBurst(origin.x,origin.y+0.6,origin.z,28,w.radius*0.9);
-  dragonlordImpactFlash(origin,DL_EMBER,2.4,.2);
-  triggerCombatShake(hits>0?14:7,220);
+  dragonlordFireSweepRing(origin,DL_FIRE,w.radius);
+  dragonlordImpactFlash(origin,DL_EMBER,2.0,.18);
+  triggerCombatShake(hits>0?12:6,180);
   navigator.vibrate&&navigator.vibrate(hits>0?[40,24,60]:20);
 }
 
@@ -23503,10 +23618,8 @@ function triggerDragonLordKillNova(){
   if(!dragonlordIsActive()||!player) return;
   const p=HERO_PASSIVES.dragonlord;
   const radius=p.shockwaveRadius||4.8;
-  dragonlordFireRing(player.position,radius,DL_FIRE,.45);
-  dragonlordVortexRing(player.position,radius*.7,DL_VOID,.4,-4);
-  dragonlordImpactFlash(player.position,DL_EMBER,2.0,.18);
-  knightGroundCracks(player.position,radius,7,DL_ASH);
+  dragonlordFireSweepRing(player.position,DL_VOID,radius);
+  dragonlordImpactFlash(player.position,DL_EMBER,1.8,.18);
   for(const z of [...zombies]){
     if(z.userData.dead||z.userData.spawnPending) continue;
     const dx=z.position.x-player.position.x,dz=z.position.z-player.position.z;
@@ -23528,50 +23641,62 @@ function triggerDragonLordAbility(){
   else if(equippedAbilityId==='dragonlord_wyrmform') triggerDragonLordWyrmForm();
   else if(equippedAbilityId==='dragonlord_hellgate') triggerDragonLordHellgate();
 }
+// Ashfall Cataclysm (redesigned): a brief wing-flare windup telegraph,
+// then a single ground-slam impact — a shockwave ring, a capped 5 debris
+// chunks, and a couple of amber light-beam columns. No per-frame physics
+// on the debris (simple explicit arc via pushKnightFx vy+spin), no
+// unbounded particle counts.
 function triggerDragonLordAshfallCataclysm(){
   if(!dragonlordIsActive()||!player) return;
   if(dragonlordMeteorActiveTimer>0||dragonlordMeteorCooldownTimer>0) return;
   markUltimateUsed();
   dragonlordMeteorEpoch++;
   const epoch=dragonlordMeteorEpoch;
-  const center={x:player.position.x,y:0,z:player.position.z};
-  const radius=Math.max(7,(typeof arenaSize!=='undefined'?arenaSize:16)*0.85);
-  const count=14;
-  dragonlordMeteorActiveTimer=3.2;
+  const origin={x:player.position.x,y:0,z:player.position.z};
+  const radius=Math.min(7.5,Math.max(5,(typeof arenaSize!=='undefined'?arenaSize:16)*0.42));
+  dragonlordMeteorActiveTimer=0.6;
   dragonlordMeteorCooldownTimer=16;
-  document.body.style.filter='brightness(.94) saturate(1.2) contrast(1.05)';
   toast('ASHFALL CATACLYSM');
-  navigator.vibrate&&navigator.vibrate([60,30,100]);
-  triggerCombatShake(12,260);
-  for(let i=0;i<count;i++){
-    const delay=120+Math.random()*2600;
-    const ang=Math.random()*Math.PI*2, r=Math.random()*radius;
-    const x=center.x+Math.cos(ang)*r, z=center.z+Math.sin(ang)*r;
-    dragonlordEmberPillar(x,0,z,DL_EMBER,delay/1000+.2,3.0);
-    setTimeout(()=>{
-      if(epoch!==dragonlordMeteorEpoch||!gameRunning) return;
-      dragonlordFireRing({x,y:0,z},3.0,DL_FIRE,.5);
-      dragonlordFireRing({x,y:0,z},1.6,DL_VOID,.35);
-      dragonlordImpactFlash({x,y:0,z},DL_EMBER,2.2,.18);
-      knightGroundCracks({x,y:0,z},3.0,6,DL_ASH);
-      dragonlordEmberBurst(x,.4,z,20,3.6);
-      triggerCombatShake(9,140);
-      let hits=0;
-      for(const zom of [...zombies]){
-        if(zom.userData.dead) continue;
-        const dist=Math.hypot(zom.position.x-x,zom.position.z-z);
-        if(dist>3.0) continue;
-        zom.userData.hitStun=Math.max(zom.userData.hitStun||0,1.2);
-        const len=dist||1;
-        zom.userData.knockbackX=((zom.position.x-x)/len)*4.5;
-        zom.userData.knockbackZ=((zom.position.z-z)/len)*4.5;
-        applyBulletDamage(zom,2.6*playerStats.power);
-        hits++;
-      }
-      if(hits>0)navigator.vibrate&&navigator.vibrate(18);
-    },delay);
+  navigator.vibrate&&navigator.vibrate([40,20,60]);
+  dragonlordFireRing(player.position,2.6,DL_VOID,.5);
+  dragonlordFireSparks(player.position,4,DL_EMBER);
+  setTimeout(()=>dragonlordAshfallSlam(origin,radius,epoch),550);
+}
+function dragonlordAshfallDebris(x,z,color){
+  const mesh=new THREE.Mesh(new THREE.TetrahedronGeometry(.34+Math.random()*.22,0),knightMat(color,.95));
+  mesh.position.set(x,.2,z);
+  mesh.userData.baseOpacity=.95;
+  pushKnightFx(mesh,{life:.6,grow:0,from:1,vy:3.2+Math.random(),spin:(Math.random()<.5?-1:1)*7});
+}
+function dragonlordAshfallSlam(origin,radius,epoch){
+  if(epoch!==dragonlordMeteorEpoch||!gameRunning) return;
+  document.body.style.filter='brightness(.92) saturate(1.25) contrast(1.08)';
+  dragonlordFireSweepRing(origin,DL_FIRE,radius);
+  dragonlordImpactFlash(origin,DL_EMBER,3.0,.22);
+  knightGroundCracks(origin,radius,6,DL_ASH);
+  const debrisCount=5;
+  for(let i=0;i<debrisCount;i++){
+    const a=(i/debrisCount)*Math.PI*2+Math.random()*.4;
+    const r=radius*(.35+Math.random()*.5);
+    const dx=origin.x+Math.cos(a)*r, dz=origin.z+Math.sin(a)*r;
+    dragonlordAshfallDebris(dx,dz,i%2?DL_VOID:DL_ASH);
+    if(i%2===0) dragonlordEmberPillar(dx,0,dz,DL_EMBER,.55,2.4);
   }
-  setTimeout(()=>{ if(epoch===dragonlordMeteorEpoch) document.body.style.filter=''; },3400);
+  let hits=0;
+  for(const z of [...zombies]){
+    if(z.userData.dead) continue;
+    const dist=Math.hypot(z.position.x-origin.x,z.position.z-origin.z);
+    if(dist>radius) continue;
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,1.1);
+    const len=dist||1;
+    z.userData.knockbackX=((z.position.x-origin.x)/len)*5.0;
+    z.userData.knockbackZ=((z.position.z-origin.z)/len)*5.0;
+    applyBulletDamage(z,3.2*playerStats.power);
+    hits++;
+  }
+  triggerCombatShake(hits>0?16:9,240);
+  if(navigator.vibrate) navigator.vibrate(hits>0?[60,20,40]:24);
+  setTimeout(()=>{ if(epoch===dragonlordMeteorEpoch) document.body.style.filter=''; },260);
 }
 function dragonlordSyncAvatarScale(){
   if(!player||state.avatarType!=='dragonlord') return;
@@ -23590,7 +23715,6 @@ function triggerDragonLordWyrmForm(){
   if(!dragonlordRuntime.wyrmSpeedBoostApplied){ playerStats.speed+=0.3; dragonlordRuntime.wyrmSpeedBoostApplied=true; }
   dragonlordSyncAvatarScale();
   dragonlordFireRing(player.position,3.4,DL_VOID,.5);
-  dragonlordVortexRing(player.position,2.6,DL_FIRE,.6,8);
   dragonlordImpactFlash(player.position,DL_EMBER,3.0,.24);
   dragonlordEmberBurst(player.position.x,player.position.y+1.0,player.position.z,30,5.0);
   triggerCombatShake(14,260);
@@ -23602,20 +23726,84 @@ function dragonlordEndWyrmForm(){
   if(dragonlordRuntime.wyrmSpeedBoostApplied){ playerStats.speed-=0.3; dragonlordRuntime.wyrmSpeedBoostApplied=false; }
   dragonlordSyncAvatarScale();
 }
+// Open the Hellgate (redesigned): a compact demonic head materializes over
+// her shoulder and a beam sweeps a ~126 degree arc in front of her, ticking
+// damage along its path. The head is a single reusable mesh (created once,
+// shown/hidden per cast, never rebuilt), and the beam's own visuals are
+// just the existing pooled impact-flash fired along the sweep — no
+// per-frame particle spawning, no dynamic array growth.
+let dragonlordHeadMesh=null;
+function dragonlordHellgateSpawnHead(){
+  if(!dragonlordHeadMesh){
+    const g=new THREE.Group();
+    const skull=new THREE.Mesh(new THREE.ConeGeometry(.5,1.0,8),knightMat(DL_VOID,.95));
+    skull.rotation.x=Math.PI/2; g.add(skull);
+    const hornL=new THREE.Mesh(new THREE.ConeGeometry(.11,.46,6),knightMat(DL_FIRE,.9));
+    hornL.position.set(-.26,.32,-.15); hornL.rotation.z=.35; g.add(hornL);
+    const hornR=new THREE.Mesh(new THREE.ConeGeometry(.11,.46,6),knightMat(DL_FIRE,.9));
+    hornR.position.set(.26,.32,-.15); hornR.rotation.z=-.35; g.add(hornR);
+    const core=new THREE.Mesh(new THREE.SphereGeometry(.2,10,8),knightMat(DL_EMBER,1));
+    core.position.z=.48; g.add(core);
+    dragonlordHeadMesh=g;
+    scene.add(g);
+  }
+  dragonlordHeadMesh.visible=true;
+}
 function triggerDragonLordHellgate(){
   if(!dragonlordIsActive()||!player) return;
   if(dragonlordRuntime.hellgateTimer>0||dragonlordRuntime.hellgateCooldown>0) return;
   markUltimateUsed();
-  dragonlordRuntime.hellgateTimer=5;
+  dragonlordRuntime.hellgateTimer=3.2;
   dragonlordRuntime.hellgateCooldown=20;
-  dragonlordRuntime.hellgatePulse=.5;
-  dragonlordRuntime.hellgateOrigin={x:player.position.x,y:0,z:player.position.z};
-  dragonlordFireRing(dragonlordRuntime.hellgateOrigin,4.0,DL_VOID,.6);
-  dragonlordVortexRing(dragonlordRuntime.hellgateOrigin,3.2,DL_FIRE,.8,10);
-  dragonlordImpactFlash(dragonlordRuntime.hellgateOrigin,DL_EMBER,2.6,.22);
-  triggerCombatShake(10,220);
+  dragonlordRuntime.hellgatePulse=.08;
+  dragonlordRuntime.hellgateSweepStart=player.rotation.y-1.1;
+  dragonlordHellgateSpawnHead();
+  triggerCombatShake(10,200);
   navigator.vibrate&&navigator.vibrate([50,25,80]);
   toast('THE HELLGATE OPENS');
+}
+function dragonlordUpdateHellgate(dt){
+  if(dragonlordRuntime.hellgateTimer<=0){
+    if(dragonlordHeadMesh) dragonlordHeadMesh.visible=false;
+    if(dragonlordRuntime.hellgateCooldown>0)dragonlordRuntime.hellgateCooldown=Math.max(0,dragonlordRuntime.hellgateCooldown-dt);
+    return;
+  }
+  const total=3.2;
+  dragonlordRuntime.hellgateTimer=Math.max(0,dragonlordRuntime.hellgateTimer-dt);
+  const t=1-(dragonlordRuntime.hellgateTimer/total);
+  const yaw=dragonlordRuntime.hellgateSweepStart+t*2.2;
+  const beamLen=9, beamHalfWidth=1.1;
+  const beamOriginX=player.position.x, beamOriginZ=player.position.z;
+  if(dragonlordHeadMesh){
+    dragonlordHeadMesh.position.set(
+      player.position.x+Math.sin(yaw)*.9,
+      player.position.y+1.55,
+      player.position.z+Math.cos(yaw)*.9
+    );
+    dragonlordHeadMesh.rotation.y=yaw;
+    const fade=Math.min(1,t*6)*Math.min(1,(1-t)*6);
+    dragonlordHeadMesh.traverse(o=>{ if(o.material) o.material.opacity=(o.userData.baseOp||(o.userData.baseOp=o.material.opacity))*fade; });
+  }
+  dragonlordRuntime.hellgatePulse-=dt;
+  if(dragonlordRuntime.hellgatePulse<=0){
+    dragonlordRuntime.hellgatePulse=0.08;
+    dragonlordImpactFlash({x:beamOriginX+Math.sin(yaw)*beamLen,y:0,z:beamOriginZ+Math.cos(yaw)*beamLen},DL_FIRE,1.0,.1);
+    const dirX=Math.sin(yaw), dirZ=Math.cos(yaw);
+    for(const z of zombies){
+      if(z.userData.dead) continue;
+      const relX=z.position.x-beamOriginX, relZ=z.position.z-beamOriginZ;
+      const proj=relX*dirX+relZ*dirZ;
+      if(proj<0||proj>beamLen) continue;
+      const perpX=relX-dirX*proj, perpZ=relZ-dirZ*proj;
+      if(Math.hypot(perpX,perpZ)>beamHalfWidth) continue;
+      applyBulletDamage(z,0.55*playerStats.power);
+    }
+  }
+  if(dragonlordRuntime.hellgateTimer<=0){
+    dragonlordImpactFlash(player.position,DL_EMBER,2.2,.2);
+    triggerCombatShake(8,140);
+    if(dragonlordHeadMesh) dragonlordHeadMesh.visible=false;
+  }
 }
 
 /* ---------------------------------------------------- LEGION OF THE ABYSS */
@@ -23664,7 +23852,6 @@ function decorateDragonLordClone(wrap,index){
 }
 function dragonlordLegionArrivalFx(origin,index){
   dragonlordFireRing(origin,1.6,index%2?DL_VOID:DL_FIRE,.34);
-  dragonlordVortexRing(origin,1.2,index%2?DL_FIRE:DL_VOID,.3,index%2?-6:6);
   dragonlordImpactFlash(origin,DL_EMBER,1.4,.16);
   dragonlordEmberBurst(origin.x,origin.y+.6,origin.z,14,3.2);
 }
@@ -23712,7 +23899,7 @@ function dragonlordClonePerformMove(c,target){
     c.userData.attackCooldown=.85;
   }else if(kind==='dragonlord_infernal_glaive'){
     knightClonePlayClip(c,['sword','regular'],'Punch_Cross');
-    dragonlordClawSlash(c.position,c.rotation.y,DL_VOID,1.1,2.2);
+    dragonlordFireSwipe(c.position,c.rotation.y,DL_VOID,1.1,1.6);
     dragonlordEmberBurst(c.position.x,c.position.y+.9,c.position.z,8,2.6);
     if(dist<=2.6)applyBulletDamage(target,base*1.3);
     c.userData.attackCooldown=.42;
@@ -23837,6 +24024,7 @@ function updateDragonLordSystems(dt){
     if(dragonlordLegionClones.length) clearDragonLordLegion();
     if(dragonlordRuntime.wyrmFormTimer>0) dragonlordEndWyrmForm();
     dragonlordRuntime.hellgateTimer=0; dragonlordRuntime.hellgateOrigin=null;
+    if(dragonlordHeadMesh) dragonlordHeadMesh.visible=false;
     return;
   }
   if(!player) return;
@@ -23855,46 +24043,12 @@ function updateDragonLordSystems(dt){
     }
     if(dragonlordRuntime.wyrmFormTimer<=0) dragonlordEndWyrmForm();
   }
-  if(dragonlordRuntime.hellgateTimer>0){
-    dragonlordRuntime.hellgateTimer=Math.max(0,dragonlordRuntime.hellgateTimer-dt);
-    const origin=dragonlordRuntime.hellgateOrigin;
-    if(origin){
-      for(const z of zombies){
-        if(z.userData.dead) continue;
-        const dx=origin.x-z.position.x, dz=origin.z-z.position.z;
-        const dist=Math.hypot(dx,dz)||1;
-        if(dist<9){
-          const pull=6.0*dt;
-          z.userData.knockbackX=(z.userData.knockbackX||0)+(dx/dist)*pull;
-          z.userData.knockbackZ=(z.userData.knockbackZ||0)+(dz/dist)*pull;
-        }
-      }
-      dragonlordRuntime.hellgatePulse-=dt;
-      if(dragonlordRuntime.hellgatePulse<=0){
-        dragonlordRuntime.hellgatePulse=.5;
-        dragonlordFireRing(origin,3.2,DL_VOID,.4);
-        dragonlordVortexRing(origin,2.4,DL_FIRE,.5,-6);
-        for(const z of zombies){
-          if(z.userData.dead) continue;
-          if(Math.hypot(z.position.x-origin.x,z.position.z-origin.z)<=4.0) applyBulletDamage(z,0.9*playerStats.power);
-        }
-      }
-      if(dragonlordRuntime.hellgateTimer<=0){
-        dragonlordFireRing(origin,5.5,DL_FIRE,.6);
-        dragonlordFireRing(origin,3.2,DL_VOID,.5);
-        dragonlordImpactFlash(origin,DL_EMBER,3.5,.26);
-        dragonlordEmberBurst(origin.x,.6,origin.z,34,6.0);
-        let hits=0;
-        for(const z of [...zombies]){
-          if(z.userData.dead) continue;
-          if(Math.hypot(z.position.x-origin.x,z.position.z-origin.z)<=5.0){ applyBulletDamage(z,2.2*playerStats.power); hits++; }
-        }
-        triggerCombatShake(hits>0?14:6,220);
-        dragonlordRuntime.hellgateOrigin=null;
-      }
-    }
-  }
-  if(dragonlordRuntime.hellgateCooldown>0)dragonlordRuntime.hellgateCooldown=Math.max(0,dragonlordRuntime.hellgateCooldown-dt);
+  dragonlordUpdateHellgate(dt);
+  dragonlordUpdateSwipes(dt);
+  dragonlordUpdateSparks(dt);
+  dragonlordUpdateDashTrail(dt);
+  dragonlordUpdateSweepRing(dt);
+  dragonlordUpdateFlashes(dt);
   updateDragonLordLegion(dt);
   if(String(equippedAbilityId||'').indexOf('dragonlord_')===0 || dragonlordMeteorActiveTimer>0 || dragonlordMeteorCooldownTimer>0 ||
      dragonlordRuntime.wyrmFormTimer>0 || dragonlordRuntime.hellgateTimer>0 ||
@@ -24005,6 +24159,7 @@ function clearKnightRoundSpecials(resetCooldowns=true){
     dragonlordRuntime.wyrmFormTimer=0;
     dragonlordRuntime.hellgateTimer=0;
     dragonlordRuntime.hellgateOrigin=null;
+    if(dragonlordHeadMesh) dragonlordHeadMesh.visible=false;
     dragonlordMeteorEpoch++;
     dragonlordSyncAvatarScale();
     if(resetCooldowns){
