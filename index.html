@@ -1515,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.88.00 - Dudu: 10s Map-Clearing Ultimates';
+const GAME_VERSION='23.89.00 - Dudu: Hydro-Snap Fix, No-Delay Kills, Bigger Ultimates';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -4311,9 +4311,23 @@ function duduHydroSnap(w){
   let endDist=range;
   if(hits.length) endDist=Math.min(...hits.map(h=>h.forward));
   const ex=ox+dirX*endDist, ez=oz+dirZ*endDist;
-  duduSpawnSwarm(ox,oy,oz,{shape:'line',dirX,dirZ,count:22,speed:15,life:Math.max(.15,endDist/15),size:.13,color:0x2f8fd6,color2:0xeafcff,damping:0.4,burstSpread:.02});
-  duduSpawnSwarm(ex,oy,ez,{shape:'sphere',count:16,speed:4.2,life:.35,size:.14,color:0x6fd8ff,color2:0xffffff,gravity:-2,damping:2.2});
-  if(hits.length) triggerCombatShake(2.5,70);
+  // Real hero geometry: a bright glowing water blade that snaps out to its
+  // full length almost instantly, not just sparse particles — this is the
+  // primary visible read of the move, particles are texture on top of it.
+  const bladeGeo=new THREE.CylinderGeometry(0.17,0.06,endDist,8,1,true);
+  bladeGeo.rotateX(-Math.PI/2); bladeGeo.translate(0,0,endDist/2);
+  const blade=new THREE.Mesh(bladeGeo,DUDU_GLOW_MAT.clone());
+  blade.material.uniforms.uOpacity.value=0.9;
+  blade.position.set(ox,oy,oz);
+  blade.rotation.y=Math.atan2(dirX,dirZ);
+  blade.scale.z=0.001;
+  duduAddMeshFx(blade,0.32,(dt,t)=>{
+    blade.scale.z=Math.min(1,t/0.06);
+    if(t>0.1){ const q=1-Math.min(1,(t-0.1)/0.2); if(blade.material)blade.material.uniforms.uOpacity.value=0.9*q; }
+  });
+  duduSpawnSwarm(ox,oy,oz,{shape:'line',dirX,dirZ,count:30,speed:16,life:.35,size:.16,color:0x2f8fd6,color2:0xeafcff,damping:0.5,burstSpread:.03});
+  duduSpawnSwarm(ex,oy,ez,{shape:'sphere',count:20,speed:5,life:.4,size:.17,color:0x6fd8ff,color2:0xffffff,gravity:-2,damping:2.0});
+  triggerCombatShake(hits.length?4:1.8,100);
 }
 // --- PRIMARY 2: Frost-Fracture — crystals crackle across the ground ---
 function duduFrostFracture(w){
@@ -4366,6 +4380,10 @@ function duduGlacialMonolith(w){
   duduEnsureMaterials();
   const yaw=player.rotation.y, dirX=Math.sin(yaw), dirZ=Math.cos(yaw);
   const cx=player.position.x+dirX*4.5, cz=player.position.z+dirZ*4.5, cy=player.position.y;
+  toast('🗻 Glacial Monolith!');
+  // Damage lands immediately on cast — enemies must die on-press, not after
+  // the eruption's cosmetic delay, so kill/spawn pacing never stalls.
+  duduHitRadius(cx,cz,w.radius||3.2,w.damage||2.4,2.0,.22);
   duduSpawnSwarm(cx,cy+.1,cz,{shape:'ring',count:16,speed:2.2,life:.3,size:.1,color:0x8fe3ff,color2:0xffffff,damping:2.6});
   setTimeout(()=>{
     if(!corsairIsActive()||!scene)return;
@@ -4393,10 +4411,8 @@ function duduGlacialMonolith(w){
         g.traverse(o=>{ if(o.material&&o.material.uniforms&&o.material.uniforms.uOpacity) o.material.uniforms.uOpacity.value=(o===body?0.94:0.5)*q; });
       }
     });
-    duduHitRadius(cx,cz,w.radius||3.2,w.damage||2.4,2.0,.22);
     duduSpawnSwarm(cx,cy+1.5,cz,{shape:'sphere',count:22,speed:5.5,life:.6,size:.13,color:0x6fd8ff,color2:0xffffff,gravity:-4,damping:1.4});
-    toast('🗻 Glacial Monolith!');
-  },260);
+  },180);
 }
 // --- SECONDARY 3: Blizzard Blitz — directional cone of frost wind ---
 function duduBlizzardBlitz(w){
@@ -4473,12 +4489,21 @@ function duduBlizzardBlitz(w){
 let duduTidal=null;
 const DUDU_TIDAL_TOTAL_WAVES=4, DUDU_TIDAL_SPAWN_EVERY=2.5, DUDU_TIDAL_WAVE_DURATION=2.5;
 function duduTidalWaveMesh(start,end,halfWidth){
-  const wall=new THREE.Mesh(new THREE.PlaneGeometry(halfWidth*2,6.5,36,8),DUDU_WATER_MAT.clone());
+  const g=new THREE.Group();
+  const wall=new THREE.Mesh(new THREE.PlaneGeometry(halfWidth*2,8.5,36,10),DUDU_WATER_MAT.clone());
   wall.material.uniforms.uOpacity.value=0;
-  wall.rotation.y=Math.atan2(end.x-start.x,end.z-start.z);
-  wall.position.copy(start); wall.position.y+=2.4;
-  scene.add(wall);
-  return wall;
+  wall.position.y=2.9;
+  g.add(wall);
+  // Bright glowing crest along the leading top edge for extra height/drama.
+  const crest=new THREE.Mesh(new THREE.PlaneGeometry(halfWidth*2,1.4,36,1),DUDU_GLOW_MAT.clone());
+  crest.material.uniforms.uOpacity.value=0;
+  crest.position.y=6.6;
+  g.add(crest);
+  g.userData.wall=wall; g.userData.crest=crest;
+  g.rotation.y=Math.atan2(end.x-start.x,end.z-start.z);
+  g.position.copy(start);
+  scene.add(g);
+  return g;
 }
 function triggerDuduTidalCataclysm(){
   if(!corsairIsActive()||!gameRunning||!player||duduTidal)return;
@@ -4515,11 +4540,18 @@ function updateDuduTidalCataclysm(dt){
     const p=Math.min(1,w.t/w.d), ease=p*p*(3-2*p);
     const pos=s.start.clone().lerp(s.end,ease);
     w.mesh.position.x=pos.x; w.mesh.position.z=pos.z;
-    if(w.mesh.material&&w.mesh.material.uniforms)w.mesh.material.uniforms.uTime.value+=dt*3;
+    const wallMat=w.mesh.userData.wall.material, crestMat=w.mesh.userData.crest.material;
+    wallMat.uniforms.uTime.value+=dt*3; crestMat.uniforms.uTime.value+=dt*4;
     const edgeFade=p<0.06?p/0.06:(p>0.94?(1-p)/0.06:1);
-    if(w.mesh.material&&w.mesh.material.uniforms)w.mesh.material.uniforms.uOpacity.value=0.92*edgeFade;
-    if(Math.random()<dt*22){
-      duduSpawnSwarm(pos.x+(Math.random()-.5)*s.halfWidth*1.6,player.position.y+.15,pos.z+(Math.random()-.5)*s.halfWidth*1.6,{shape:'sphere',count:4,speed:1.4,life:.4,size:.12,color:0xdff7ff,color2:0xffffff,damping:2.2});
+    wallMat.uniforms.uOpacity.value=0.94*edgeFade;
+    crestMat.uniforms.uOpacity.value=0.7*edgeFade;
+    w.mesh.userData.crest.rotation.z+=dt*2;
+    // Continuous spray across the FULL width of the wave, not one random
+    // point — this is what makes it read as a wall, not a line of sparks.
+    if(Math.random()<dt*46){
+      const along=(Math.random()-.5)*s.halfWidth*1.9;
+      const sprayX=pos.x+s.dir.z*along*-1, sprayZ=pos.z+s.dir.x*along;
+      duduSpawnSwarm(sprayX,player.position.y+.1,sprayZ,{shape:'sphere',count:6,speed:2.2,life:.45,size:.14,color:0xdff7ff,color2:0xffffff,damping:2.0,gravity:-1});
     }
     const thick=2.8;
     for(const z of zombies){
@@ -4596,15 +4628,25 @@ function updateDuduCryoPrison(dt){
       b.z.userData.hitStun=Math.max(b.z.userData.hitStun||0,0.3);
       b.mesh.position.x=b.z.position.x; b.mesh.position.z=b.z.position.z;
     }
-    if(b.mesh.scale.x<1)b.mesh.scale.setScalar(Math.min(1,b.mesh.scale.x+dt*3.2));
+    if(b.mesh.scale.x<1){
+      b.mesh.scale.setScalar(Math.min(1,b.mesh.scale.x+dt*3.2));
+    }else{
+      // Slow held pulse so the whole frozen field feels alive, not static.
+      const pulse=1+Math.sin(s.t*2.2+(b.mesh.position.x+b.mesh.position.z))*0.04;
+      b.mesh.scale.setScalar(pulse);
+    }
     b.mesh.rotation.y+=dt*0.5;
+    if(Math.random()<dt*0.9){
+      duduSpawnSwarm(b.mesh.position.x,b.mesh.position.y-.6,b.mesh.position.z,{shape:'sphere',count:3,speed:.5,life:.7,size:.08,color:0x9fe8ff,color2:0xffffff,damping:1.6,gravity:.6});
+    }
   }
   if(s.t>=s.duration){
-    triggerCombatShake(18,460);
+    triggerCombatShake(20,560);
     toast('🧊 Cryo Prison shatters!');
     for(const b of s.blocks){
       if(b.mesh){
-        duduSpawnSwarm(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,{shape:'sphere',count:16,speed:5,life:.6,size:.13,color:0x8fe3ff,color2:0xffffff,gravity:-3,damping:1.4});
+        duduSpawnSwarm(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,{shape:'sphere',count:22,speed:6,life:.7,size:.14,color:0x8fe3ff,color2:0xffffff,gravity:-3,damping:1.3});
+        duduSpawnSwarm(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,{shape:'ring',count:10,speed:4,life:.4,size:.11,color:0x4fd0ff,color2:0xffffff,damping:1.8});
         scene.remove(b.mesh); duduDisposeMesh(b.mesh);
       }
       if(b.z&&b.z.parent&&!b.z.userData.dead){
@@ -4612,7 +4654,20 @@ function updateDuduCryoPrison(dt){
         applyBulletDamage(b.z,isBoss?(b.z.userData.maxHp||b.z.userData.hp||1)*.32:999);
       }
     }
-    spawnFrostWaveRing(s.px,s.py,s.pz,Math.max(arenaSize*1.6,24),1.0);
+    // Layered shockwave dome finale: a bright expanding glow sphere plus
+    // three staggered ground rings racing out to the map edge.
+    const domeR=Math.max(arenaSize*1.6,24);
+    const dome=new THREE.Mesh(new THREE.SphereGeometry(1,20,20),DUDU_GLOW_MAT.clone());
+    dome.material.uniforms.uOpacity.value=0.7;
+    dome.position.set(s.px,s.py+1.2,s.pz);
+    duduAddMeshFx(dome,0.6,(dt2,t)=>{
+      const p=t/0.6;
+      dome.scale.setScalar(1+p*10);
+      if(dome.material)dome.material.uniforms.uOpacity.value=0.7*(1-p);
+    });
+    [0,0.15,0.3].forEach((delay,i)=>{
+      setTimeout(()=>{ if(gameRunning) spawnFrostWaveRing(s.px,s.py,s.pz,domeR*(0.45+i*0.3),0.8); },delay*1000);
+    });
     duduCryo=null;
     updateHoodedHud();
   }
@@ -4622,31 +4677,36 @@ function updateDuduCryoPrison(dt){
 // claw strikes erupting across the whole map (prioritizing living enemies,
 // falling back to scattered map coverage), not a handful of quick pokes. ---
 let duduKraken=null;
-const DUDU_KRAKEN_DURATION=10.0, DUDU_KRAKEN_STRIKE_EVERY=0.42, DUDU_KRAKEN_RADIUS=4.4;
-function duduKrakenStrike(x,z,py){
-  duduSpawnSwarm(x,py+.1,z,{shape:'ring',count:18,speed:2.4,life:.3,size:.11,color:0x8fe3ff,color2:0xffffff,damping:2.6});
-  setTimeout(()=>{
-    if(!corsairIsActive()||!scene)return;
-    triggerCombatShake(9,170);
-    const g=new THREE.Group();
-    for(let s=0;s<6;s++){
-      const spike=new THREE.Mesh(new THREE.ConeGeometry(0.25,2.7+Math.random()*1.1,6),DUDU_ICE_MAT.clone());
-      const a=s*Math.PI/3+Math.random()*.3;
-      spike.position.set(Math.sin(a)*0.42,1.15,Math.cos(a)*0.42);
-      spike.rotation.z=Math.sin(a)*.28; spike.rotation.x=Math.cos(a)*.28;
-      g.add(spike);
-    }
-    g.position.set(x,py,z);
-    g.scale.set(1,0.02,1);
-    duduAddMeshFx(g,0.9,(dt,t)=>{
-      if(t<0.2){ g.scale.y=Math.min(1.3,(t/0.2)*1.3); }
-      else if(t<0.3){ g.scale.y=1.3-((t-0.2)/0.1)*0.3; }
-      else{ g.scale.y=1; }
-      if(t>0.55){ const q=1-Math.min(1,(t-0.55)/0.3); g.traverse(o=>{ if(o.material&&o.material.uniforms&&o.material.uniforms.uOpacity)o.material.uniforms.uOpacity.value=0.94*q; }); }
-    });
-    duduHitRadius(x,z,DUDU_KRAKEN_RADIUS,999,3.6,.09);
-    duduSpawnSwarm(x,py+1.1,z,{shape:'sphere',count:20,speed:6,life:.55,size:.14,color:0x6fd8ff,color2:0xffffff,gravity:-3.5,damping:1.4});
-  },130);
+const DUDU_KRAKEN_DURATION=10.0, DUDU_KRAKEN_STRIKE_EVERY=0.38, DUDU_KRAKEN_MEGA_EVERY=1.8, DUDU_KRAKEN_RADIUS=4.8;
+function duduKrakenStrike(x,z,py,big){
+  // Damage lands the instant the strike fires — no telegraph delay gating
+  // the kill, so enemy clear-rate (and new-enemy spawn pacing) never stalls.
+  duduSpawnSwarm(x,py+.1,z,{shape:'ring',count:big?28:18,speed:big?3.4:2.4,life:.35,size:.13,color:0x8fe3ff,color2:0xffffff,damping:2.4});
+  triggerCombatShake(big?13:9,big?230:170);
+  const spikeCount=big?9:6;
+  const g=new THREE.Group();
+  for(let s=0;s<spikeCount;s++){
+    const spike=new THREE.Mesh(new THREE.ConeGeometry(big?0.3:0.25,(big?3.3:2.7)+Math.random()*1.1,6),DUDU_ICE_MAT.clone());
+    const a=s*(Math.PI*2/spikeCount)+Math.random()*.3;
+    const rr=big?0.55:0.42;
+    spike.position.set(Math.sin(a)*rr,1.15,Math.cos(a)*rr);
+    spike.rotation.z=Math.sin(a)*.28; spike.rotation.x=Math.cos(a)*.28;
+    g.add(spike);
+  }
+  const glowRing=new THREE.Mesh(new THREE.TorusGeometry(big?1.6:1.1,0.06,8,32),DUDU_GLOW_MAT.clone());
+  glowRing.rotation.x=Math.PI/2; glowRing.position.y=.15;
+  g.add(glowRing);
+  g.position.set(x,py,z);
+  g.scale.set(1,0.02,1);
+  duduAddMeshFx(g,big?1.1:0.9,(dt,t)=>{
+    if(t<0.2){ g.scale.y=Math.min(1.3,(t/0.2)*1.3); }
+    else if(t<0.3){ g.scale.y=1.3-((t-0.2)/0.1)*0.3; }
+    else{ g.scale.y=1; }
+    glowRing.rotation.z+=dt*4;
+    if(t>0.55){ const q=1-Math.min(1,(t-0.55)/0.3); g.traverse(o=>{ if(o.material&&o.material.uniforms&&o.material.uniforms.uOpacity)o.material.uniforms.uOpacity.value=0.94*q; }); }
+  });
+  duduHitRadius(x,z,big?DUDU_KRAKEN_RADIUS*1.35:DUDU_KRAKEN_RADIUS,999,3.6,big?.32:.09);
+  duduSpawnSwarm(x,py+1.1,z,{shape:'sphere',count:big?32:20,speed:big?7.5:6,life:.6,size:.15,color:0x6fd8ff,color2:0xffffff,gravity:-3.5,damping:1.4});
 }
 function triggerDuduKrakenGrasp(){
   if(!corsairIsActive()||!gameRunning||!player||duduKraken)return;
@@ -4654,28 +4714,36 @@ function triggerDuduKrakenGrasp(){
   duduEnsureMaterials();
   toast("🐙 Kraken's Grasp!");
   triggerCombatShake(10,350);
-  duduKraken={t:0,nextStrike:0,duration:DUDU_KRAKEN_DURATION};
+  duduKraken={t:0,nextStrike:0,nextMega:DUDU_KRAKEN_MEGA_EVERY,duration:DUDU_KRAKEN_DURATION};
   updateHoodedHud();
-  duduKrakenStrike(player.position.x,player.position.z,player.position.y);
+  duduKrakenStrike(player.position.x,player.position.z,player.position.y,true);
+}
+function duduKrakenPickPoint(){
+  const targets=livingEnemiesByDistance(Math.max(arenaSize*1.8,26));
+  if(targets.length){
+    const pick=targets[Math.floor(Math.random()*Math.min(targets.length,10))];
+    return {x:pick.position.x+(Math.random()-.5)*1.6, z:pick.position.z+(Math.random()-.5)*1.6};
+  }
+  const a=Math.random()*Math.PI*2, r=Math.random()*arenaSize*0.85;
+  return {x:Math.cos(a)*r, z:Math.sin(a)*r};
 }
 function updateDuduKrakenGrasp(dt){
   if(!duduKraken)return;
   if(!corsairIsActive()){ duduKraken=null; return; }
   const s=duduKraken;
-  s.t+=dt; s.nextStrike-=dt;
+  s.t+=dt; s.nextStrike-=dt; s.nextMega-=dt;
   if(s.t>=s.duration){ duduKraken=null; updateHoodedHud(); return; }
-  if(s.nextStrike<=0&&player){
+  if(!player)return;
+  if(s.nextMega<=0){
+    // Escalating cluster strike every ~1.8s — three simultaneous big
+    // eruptions instead of one, so intensity keeps building through the
+    // full 10 seconds rather than staying flat.
+    s.nextMega+=DUDU_KRAKEN_MEGA_EVERY;
+    for(let i=0;i<3;i++){ const pt=duduKrakenPickPoint(); duduKrakenStrike(pt.x,pt.z,player.position.y,true); }
+  }else if(s.nextStrike<=0){
     s.nextStrike+=DUDU_KRAKEN_STRIKE_EVERY;
-    const targets=livingEnemiesByDistance(Math.max(arenaSize*1.8,26));
-    let x,z;
-    if(targets.length){
-      const pick=targets[Math.floor(Math.random()*Math.min(targets.length,10))];
-      x=pick.position.x+(Math.random()-.5)*1.6; z=pick.position.z+(Math.random()-.5)*1.6;
-    }else{
-      const a=Math.random()*Math.PI*2, r=Math.random()*arenaSize*0.85;
-      x=Math.cos(a)*r; z=Math.sin(a)*r;
-    }
-    duduKrakenStrike(x,z,player.position.y);
+    const pt=duduKrakenPickPoint();
+    duduKrakenStrike(pt.x,pt.z,player.position.y,false);
   }
 }
 
