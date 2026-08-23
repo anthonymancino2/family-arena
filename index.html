@@ -1515,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.96.00 - Dudu: Cryo Prison repeats for the full 10s until the map is cleared';
+const GAME_VERSION='23.97.00 - Dudu: Cryo Prison slowed down, no more fast-forward feel';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -4565,13 +4565,16 @@ function updateDuduTidalCataclysm(dt){
 }
 
 // --- ULTIMATE 2: Cryo Prison — every enemy on the map is yanked toward the
-// middle of the arena in a fast pull, frozen solid the instant it lands,
-// then shatters and dies exactly 0.5s after ITS OWN freeze — a rolling wave
-// of individual kills as encasement rolls out, not one held-for-10s,
-// synchronized shatter-everything-at-once finale. Once a wave is fully
-// drained, it starts a fresh wave over whoever is still alive (including
-// enemies the round spawned in mid-ultimate) and keeps repeating until the
-// full 10 seconds are up or nothing is left alive to freeze. ---
+// middle of the arena in a slow, visible pull, frozen solid the instant it
+// lands, then shatters and dies exactly 0.5s after ITS OWN freeze — a
+// rolling wave of individual kills as encasement rolls out, not one
+// held-for-10s, synchronized shatter-everything-at-once finale. Once a
+// wave is fully drained, it pauses for a beat, then starts a fresh wave
+// over whoever is still alive (including enemies the round spawned in
+// mid-ultimate) — repeating until the full 10 seconds are up or nothing
+// is left alive to freeze. Pull duration/stagger and the inter-wave pause
+// are deliberately slow — a fast version of this read as sped-up/on
+// fast-forward rather than a weighty ice prison. ---
 let duduCryo=null;
 const DUDU_CRYO_DURATION=10.0;
 function triggerDuduCryoPrison(){
@@ -4586,7 +4589,7 @@ function triggerDuduCryoPrison(){
     setTimeout(()=>{ if(corsairIsActive()&&gameRunning) spawnFrostWaveRing(cx,cy,cz,maxR*(0.3+delay*1.1),0.85); },delay*1000);
   });
   duduSpawnSwarm(cx,cy+.6,cz,{shape:'ring',count:50,speed:9,life:.6,size:.15,color:0x4fd0ff,color2:0xffffff,damping:1.1});
-  duduCryo={t:0,duration:DUDU_CRYO_DURATION,wave:livingEnemiesByDistance(Infinity),waveIdx:0,nextPull:0,blocks:[],cx,cy,cz};
+  duduCryo={t:0,duration:DUDU_CRYO_DURATION,wave:livingEnemiesByDistance(Infinity),waveIdx:0,nextPull:0,waveGap:0,blocks:[],cx,cy,cz};
   updateHoodedHud();
 }
 function updateDuduCryoPrison(dt){
@@ -4596,17 +4599,18 @@ function updateDuduCryoPrison(dt){
     for(const b of s.blocks){ if(b.mesh){scene.remove(b.mesh); duduDisposeMesh(b.mesh);} }
     duduCryo=null; return;
   }
-  s.t+=dt; s.nextPull-=dt;
-  // Kick off a fast pull-to-center for each target in the current wave,
-  // staggered like the old encasement roll-out was — but only while there's
-  // still time left in the 10-second window.
-  while(s.t<s.duration&&s.waveIdx<s.wave.length&&s.nextPull<=0){
+  s.t+=dt; s.nextPull-=dt; s.waveGap-=dt;
+  // Kick off a slow, visible pull-to-center for each target in the current
+  // wave, clearly staggered rather than a near-instant simultaneous yank —
+  // but only while there's still time left in the 10-second window, and not
+  // until this wave's own starting pause has elapsed.
+  while(s.t<s.duration&&s.waveGap<=0&&s.waveIdx<s.wave.length&&s.nextPull<=0){
     const z=s.wave[s.waveIdx++];
-    s.nextPull+=0.045;
+    s.nextPull+=0.11;
     if(!z||!z.parent||z.userData.dead)continue;
     const a=Math.random()*Math.PI*2, r=Math.sqrt(Math.random())*3.2;
-    z.userData.hitStun=Math.max(z.userData.hitStun||0,1.0);
-    s.blocks.push({z,mesh:null,phase:'pull',pullFrom:z.position.clone(),landX:s.cx+Math.cos(a)*r,landZ:s.cz+Math.sin(a)*r,pullT:0,pullDur:0.32,frozenAt:0});
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,1.4);
+    s.blocks.push({z,mesh:null,phase:'pull',pullFrom:z.position.clone(),landX:s.cx+Math.cos(a)*r,landZ:s.cz+Math.sin(a)*r,pullT:0,pullDur:0.65,frozenAt:0});
   }
   for(let bi=s.blocks.length-1;bi>=0;bi--){
     const b=s.blocks[bi];
@@ -4674,7 +4678,9 @@ function updateDuduCryoPrison(dt){
     }else if(s.waveIdx>=s.wave.length){
       const remaining=livingEnemiesByDistance(Infinity);
       if(remaining.length){
-        s.wave=remaining; s.waveIdx=0; s.nextPull=0; // repeat: freeze whoever's still alive
+        // A visible beat before the next wave kicks off, so the ultimate
+        // reads as a sequence of deliberate strikes, not a nonstop blur.
+        s.wave=remaining; s.waveIdx=0; s.nextPull=0; s.waveGap=0.5;
       }else{
         duduCryo=null; updateHoodedHud(); // map cleared — nothing left to freeze
       }
