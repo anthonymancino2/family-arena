@@ -1453,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.75.03 - Nyxara Secondary FX & Hellgate Mutual Combat';
+const GAME_VERSION='23.75.04 - Nyxara Hellgate Invincibility Fix';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -23870,6 +23870,11 @@ function triggerDragonLordHellgate(){
   dragonlordRuntime.hellgatePulse=.5;
   const moved=resolveCollision(0,0,player.position.y);
   player.position.x=moved.x; player.position.z=moved.z;
+  // Same 10s no-damage contract as the other two ultimates (Ashfall,
+  // Wyrm Form) — this was missing here, which is why the player kept
+  // taking hits during Hellgate while the other two felt safe.
+  invincibleTimer=Math.max(invincibleTimer,10.2);
+  updateInvincibleHud();
   dragonlordFireRing(player.position,3.0,DL_VOID,.6);
   dragonlordImpactFlash(player.position,DL_EMBER,3.0,.24);
   triggerCombatShake(12,240);
