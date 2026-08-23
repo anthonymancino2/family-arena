@@ -1465,7 +1465,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.78.00 - Universal Shield Gauge & Per-Character Stat Profiles';
+const GAME_VERSION='23.79.00 - Round-Based Power & Attack Speed Scaling';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -3448,6 +3448,26 @@ function upgradeAmountForActiveHero(stat){
   return Number.isFinite(amount) && amount>0 ? amount : 1;
 }
 let playerStats = {power:1, speed:1, hp:1};
+// Round-based combat scaling: playerStats.power is what every damage
+// formula in the game already multiplies against directly, so instead of
+// touching every attack function individually, basePlayerPower tracks the
+// pure purchased/starting value (what the shop should keep displaying)
+// and startRound() rescales playerStats.power = basePlayerPower *
+// roundPowerMult(round) once per round. Capped, modest growth — enemies
+// scale on the same difficultyRound curve, so this keeps pace with them
+// rather than out-scaling them.
+let basePlayerPower = 1;
+function roundPowerMult(r=round){
+  const n=Math.max(1,Math.floor(Number(r))||1);
+  return 1+Math.min(0.6,(n-1)*0.012); // +1.2%/round, capped at +60% (~round 51+)
+}
+// Attack cooldown gets the same treatment through attackCooldownFor()
+// directly (see below) rather than through playerStats.speed, since that
+// stat also drives movement pace and this should only affect firing rate.
+function roundAttackSpeedMult(r=round){
+  const n=Math.max(1,Math.floor(Number(r))||1);
+  return 1+Math.min(0.35,(n-1)*0.007); // +0.7%/round, capped at +35%
+}
 function createFreshPassiveState(){
   return {
     shadowstepTimer:0, archerKillCounter:0, archerTailwindTimer:0, archerTailwindFxCooldown:0, knightArmor:0, knightArmorRegenDelay:0, knightArmorRegenTimer:0, knightWhirlwindCounter:0, knightWhirlwindTimer:0, knightWhirlwindPulse:0, knightWhirlwindHudFlash:0, battleFuryActive:false,
@@ -14098,6 +14118,10 @@ function clearZombies(){
 }
 
 function startRound(){
+  // Round-based power scaling: rescale from the purchased base every round
+  // so it never compounds with itself and always reflects the current
+  // round's multiplier exactly.
+  playerStats.power = basePlayerPower * roundPowerMult(round);
   clearMageRoundSpecials(true,true);
   if(state.avatarType==='mage'&&player){
     nineFoxRepairPresentation(true);
@@ -14345,6 +14369,7 @@ function applyStartRoundCatchUp(startRound){
       const amount = upgradeAmountForActiveHero(stat);
       roundStatPurchases[stat]++;   // keeps the in-run shop's price ladder honest
       playerStats[stat] += amount;
+      if(stat==='power') basePlayerPower += amount;
       if(stat === 'hp') maxHearts += amount;
     }
   }
@@ -14361,7 +14386,9 @@ function refreshRoundStatShop(){
     const price=roundStatPrice(stat);
     const label=document.getElementById('scLevel'+(stat==='hp'?'Hp':stat[0].toUpperCase()+stat.slice(1)));
     const btn=document.getElementById('statBtn'+(stat==='hp'?'Hp':stat[0].toUpperCase()+stat.slice(1)));
-    if(label) label.textContent='Lv '+playerStats[stat]+' · '+price+'🪙';
+    // Power shows the purchased base, not the round-scaled combat value
+    // (playerStats.power), so "Lv" reflects what you've actually bought.
+    if(label) label.textContent='Lv '+(stat==='power'?basePlayerPower:playerStats[stat])+' · '+price+'🪙';
     if(btn){
       btn.disabled=runTokens<price;
       btn.style.opacity=btn.disabled?'.48':'1';
@@ -14386,6 +14413,7 @@ function pickStat(stat){
   roundStatPurchases[stat]++;
   const amount=upgradeAmountForActiveHero(stat);
   playerStats[stat]+=amount;
+  if(stat==='power') basePlayerPower+=amount;
   if(stat === 'hp'){
     maxHearts+=amount;
     hearts=Math.min(maxHearts,hearts+amount);
@@ -17086,6 +17114,7 @@ function attackCooldownFor(w){
   if(barbarianIsActive()) factor /= barbarianAttackSpeedMult();
   if(chopperIsActive()) factor *= CHOPPER_TUNING.attack;
   if(heroKitIsActive()) factor *= velocityWeaverAttackSpeedMultiplier();
+  factor *= roundAttackSpeedMult();
   if(w.fireRateCap) factor = Math.min(w.fireRateCap, factor);
   const computed=w.cooldown / factor;
   if(knightIsActive() && isKnightWeaponKind(w.kind)){
@@ -37706,6 +37735,7 @@ function startSurvival(){
   ultimateUsedThisRound=false;
   hearts=3;maxHearts=3;round=runStartRound;kills=0;hoodedMeleeHits=0;hoodedComboStep=0;hoodedUltimateCharge=0;hoodedUltimateActive=0;chopperBroadsideCharge=0;chopperMeleeHits=0;chopperBroadsideCooldown=0;chopperBroadsideCycleDuration=0;clearChopperBroadsideClones();archerVolleyStep=0;mageCastStep=0;knightUltimateCharge=0;knightUltimateActive=0;knightUltimatePulse=0;knightComboStep=0;barbarianUltimateCharge=0;barbarianUltimateActive=0;barbarianUltimatePulse=0;barbarianComboStep=0;barbarianFlurryStep=0;barbarianResetRuntime();clearBarbarianKinClones();barbarianKinCooldown=0;document.body.style.filter='';updateHoodedHud();
   playerStats = startingStatsForActiveHero();
+  basePlayerPower = playerStats.power;
   // Base survival health is three hearts. Hero HP bonuses are represented by
   // HP levels above 1, so +2 starting HP produces five full hearts.
   maxHearts = 3 + Math.max(0, playerStats.hp - 1);
