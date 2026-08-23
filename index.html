@@ -430,6 +430,14 @@
     transform:translateX(-50%);background:rgba(127,216,240,0.92);color:#052233;
     font-weight:800;font-size:12px;padding:6px 14px;border-radius:999px;display:none;}
   .freeBanner.on{display:block;}
+  .tutorialBanner{position:absolute;top:calc(60px + env(safe-area-inset-top));left:50%;
+    transform:translateX(-50%);background:rgba(20,24,32,0.88);color:#fff;
+    border:2px solid rgba(255,214,90,0.85);border-radius:14px;padding:10px 18px;
+    max-width:min(86vw,380px);text-align:center;display:none;z-index:60;
+    box-shadow:0 6px 20px rgba(0,0,0,0.4);}
+  .tutorialBanner.show{display:block;}
+  .tutorialStep{font-size:10px;font-weight:800;letter-spacing:1px;color:#ffd65a;margin-bottom:3px;}
+  .tutorialText{font-size:13px;font-weight:700;line-height:1.35;}
   .leftCluster{position:absolute;top:50%;left:14px;transform:translateY(-50%);
     display:flex;flex-direction:column;align-items:center;gap:10px;}
   .lookFwdBtn{position:relative;bottom:auto;right:auto;
@@ -1255,7 +1263,7 @@
   <div class="screen" id="screenMoveLoadout">
     <div class="backRow"><button class="ghostBtn" id="backMoveLoadout">&larr; Back</button></div>
     <h1 class="title" style="font-size:22px;">Choose your moves</h1>
-    <div class="subtitle" id="preGameLoadoutHero">Pick a Primary, Secondary and Ultimate for quick testing.</div>
+    <div class="subtitle" id="preGameLoadoutHero">Pick a Primary, Secondary and Ultimate from what you've unlocked.</div>
     <div class="preGameLoadoutWrap">
       <div id="preGameLoadoutList"></div>
       <div class="preGameLoadoutSummary" id="preGameLoadoutSummary"></div>
@@ -1313,6 +1321,10 @@
         <div class="invinciblePill" id="invinciblePill">🛡 <span id="invincibleTime">0</span>s</div>
         <div class="toast" id="toast"></div>
         <div class="freeBanner" id="freeBanner">FREE ROAM · INVINCIBLE</div>
+        <div class="tutorialBanner" id="tutorialBanner">
+          <div class="tutorialStep" id="tutorialStepLabel">STEP 1 / 3</div>
+          <div class="tutorialText" id="tutorialText"></div>
+        </div>
         <div class="shopPromptBtn" id="shopPromptBtn">🛒 TAP TO SHOP</div>
         <div class="vertBtn upBtn" id="upBtn"><span class="vbIcon">▲</span><span class="vbLabel">UP</span></div>
         <div class="vertBtn downBtn" id="downBtn"><span class="vbIcon">▼</span><span class="vbLabel">DOWN</span></div>
@@ -1453,7 +1465,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.76.03 - Preview Spin Off, Whirlwind Anim Fix';
+const GAME_VERSION='23.77.00 - Difficulty Rework: Round-1=Round-10, Move Unlocks, Tutorial';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -1945,11 +1957,7 @@ const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:1.0, knight:1.18, barbarian
 // use targetHeight=1.30). dragonlord:0.878 * her 1.48 base = 1.2986, an
 // exact match to the fox, per direct request.
 const FREE_AVATAR_TYPES = [...AVATAR_TYPES];
-// TESTING ONLY: sET this back to false to re-lock Bunny/Dog/all 15 heroes
-// behind crystals. Everything else about the unlock system (CATALOG
-// prices, the Crystal Shop, profile.unlocked) is untouched — this just
-// bypasses the lock CHECK so every avatar is selectable for testing.
-const UNLOCK_ALL_AVATARS_FOR_TESTING = true;
+const UNLOCK_ALL_AVATARS_FOR_TESTING = false;
 
 let state = {
   currentName: null,
@@ -1969,10 +1977,9 @@ let state = {
 // if the practice range should reach further later.
 // ---------------------------------------------------------------------
 const START_ROUND_MAX = 50;
-// Development switch, matching UNLOCK_ALL_AVATARS_FOR_TESTING above.
-// While true every round is selectable. Set it to false and players can
-// only pick up to one past the highest round they have actually cleared.
-const UNLOCK_ALL_ROUNDS_FOR_TESTING = true;
+// Players can start a run at most one round past the highest round they
+// have actually cleared — no jumping straight to round 50.
+const UNLOCK_ALL_ROUNDS_FOR_TESTING = false;
 let runStartRound = 1; // the round the current run actually began on
 
 function highestUnlockedStartRound(){
@@ -1985,6 +1992,17 @@ function clampStartRound(r){
   return Math.min(highestUnlockedStartRound(), Math.max(1, n));
 }
 
+// V23.77 Round-1 Difficulty Reset: enemy count/HP/speed/type-mix now start
+// at what used to be Round 10's baseline instead of Round 1's soft ramp, so
+// the game is a real challenge from the first round instead of a long easy
+// warm-up. Boss-round SCHEDULING (every 5th real round) is deliberately NOT
+// shifted by this offset — an immediate boss ambush on Round 1, before the
+// player has unlocked a second move, would be an unfair gut-punch rather
+// than a challenge, not the "hard but fair" target.
+const ROUND_DIFFICULTY_OFFSET = 9;
+function difficultyRound(r=round){
+  return Math.max(1, Math.floor(Number(r)) || 1) + ROUND_DIFFICULTY_OFFSET;
+}
 // How many enemies a round is worth, as a pure function of the round
 // number. This used to be accumulated one round at a time (+1, +1, +10...),
 // which meant round 25's target only existed if you had actually played
@@ -1992,7 +2010,7 @@ function clampStartRound(r){
 // round 25's real crowd -- 226 enemies, not 4.
 //   R1 = 4, R2 = 5, R3 = 6, then +10 every round after that.
 function killTargetForRound(r){
-  const n = Math.max(1, Math.floor(Number(r)) || 1);
+  const n = difficultyRound(r);
   // Endless survival needs difficulty to come from enemy quality as well as
   // quantity. This keeps late rounds challenging without demanding 500-1000
   // kills per round on a phone.
@@ -3129,7 +3147,7 @@ function bossNameForRound(r=round){
   return cycle>0 ? `${base} · Ascendant ${cycle+1}` : base;
 }
 function enemyProgressForRound(r=round){
-  const n=Math.max(1,Math.floor(Number(r)||1));
+  const n=difficultyRound(r);
   // HP continues climbing forever. Speed and attack cadence are capped so
   // late-game difficulty does not turn into physically unreadable teleporting.
   const hpMult=1 + Math.min(2.4,(n-1)*0.045) + Math.max(0,n-50)*0.025;
@@ -3139,14 +3157,15 @@ function enemyProgressForRound(r=round){
 }
 function chooseZombieArchetype(){
   const p=Math.random();
+  const r=difficultyRound(round);
   // The roster itself progresses: advanced enemies become a larger share of
   // every wave while Walkers slowly become the minority.
-  if(round<2) return 'walker';
-  if(round<4) return p<0.70?'walker':'runner';
-  if(round<6) return p<0.45?'walker':p<0.75?'runner':p<0.90?'spitter':'brute';
-  if(round<10) return p<0.30?'walker':p<0.55?'runner':p<0.75?'spitter':p<0.90?'brute':'shadow';
-  if(round<20) return p<0.20?'walker':p<0.42?'runner':p<0.64?'spitter':p<0.84?'brute':'shadow';
-  if(round<35) return p<0.12?'walker':p<0.30?'runner':p<0.53?'spitter':p<0.75?'brute':'shadow';
+  if(r<2) return 'walker';
+  if(r<4) return p<0.70?'walker':'runner';
+  if(r<6) return p<0.45?'walker':p<0.75?'runner':p<0.90?'spitter':'brute';
+  if(r<10) return p<0.30?'walker':p<0.55?'runner':p<0.75?'spitter':p<0.90?'brute':'shadow';
+  if(r<20) return p<0.20?'walker':p<0.42?'runner':p<0.64?'spitter':p<0.84?'brute':'shadow';
+  if(r<35) return p<0.12?'walker':p<0.30?'runner':p<0.53?'spitter':p<0.75?'brute':'shadow';
   return p<0.08?'walker':p<0.24?'runner':p<0.48?'spitter':p<0.73?'brute':'shadow';
 }
 function styleZombieArchetype(z){
@@ -3626,10 +3645,8 @@ function arcaneEchoesCooldownForLevel(level=avatarLevel()){
   if(typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)return 0;
   return Math.max(1.5, 15 - (Math.max(1,level)-1)*(10/19));
 }
-// Global development unlock switch for combat testing. This is game-wide and is
-// intentionally independent of the completed Fox Mage integration.
-const UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING = true;
-const TEST_NO_ULTIMATE_COOLDOWNS = true;
+const UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING = false;
+const TEST_NO_ULTIMATE_COOLDOWNS = false;
 const TEST_NO_MOVE_COOLDOWNS = false; // was left on in production — forced every character's primary/secondary cooldown to 0 every frame, so held-fire moves (dashes, AoEs) refired ~60x/second instead of respecting their real cooldown
 function arcaneEchoesUnlocked(){
   return mageGameplayActive() && (UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING || avatarLevel()>=10);
@@ -3674,10 +3691,15 @@ function preGameMoveOptionsForAvatar(){
     if(w.hidden)continue;
     if(w.cloudOnly&&state.avatarType!=='cloud')continue;
     const isDefault=id===c.defaultId;
+    // Only the free starting move and whatever's actually been unlocked
+    // (bought in the shop after reaching its round) show up here — this
+    // used to list every move in the roster regardless of progression.
+    if(!isDefault && !ownedWeapons[id])continue;
     const slot=w.slot||(isDefault?'primary':'secondary');
     (slot==='primary'?primary:secondary).push({id,w,isDefault});
   }
   const abilities=(HERO_ABILITIES[state.avatarType]||HERO_ABILITIES[gameplayAvatarType()]||[])
+    .filter(a=>ownedAbilities[a.id])
     .map(a=>({id:a.id,a}));
   return {c,primary,secondary,abilities};
 }
@@ -3712,7 +3734,7 @@ function renderPreGameLoadout(){
   if(!root||!summary)return;
   const opts=preGameMoveOptionsForAvatar();
   const info=HERO_ROSTER_INFO[state.avatarType]||HERO_ROSTER_INFO[gameplayAvatarType()]||{};
-  if(hero)hero.textContent=`${info.title||'Hero'} · choose one move in each slot for this test run.`;
+  if(hero)hero.textContent=`${info.title||'Hero'} · choose one unlocked move in each slot.`;
   root.innerHTML='';
 
   const addSection=(title,items,kind)=>{
@@ -3754,7 +3776,7 @@ function renderPreGameLoadout(){
   const primary=opts.primary.find(x=>x.id===preGameLoadout.primary);
   const secondary=opts.secondary.find(x=>x.id===preGameLoadout.secondary);
   const ability=opts.abilities.find(x=>x.id===preGameLoadout.ability);
-  summary.innerHTML=`<strong>TEST LOADOUT</strong><br>`
+  summary.innerHTML=`<strong>YOUR LOADOUT</strong><br>`
     +`Primary: ${primary?primary.w.name:'None'} &nbsp;·&nbsp; `
     +`Secondary: ${secondary?secondary.w.name:'None'} &nbsp;·&nbsp; `
     +`Ultimate: ${ability?ability.a.name:'None'}`;
@@ -3773,7 +3795,8 @@ function applyPendingPreGameLoadout(){
   const secondary=opts.secondary.find(x=>x.id===p.secondary);
   const ability=opts.abilities.find(x=>x.id===p.ability);
 
-  // Everything is unlocked for the development loadout screen.
+  // opts is already filtered to owned/default moves only — this just
+  // reconfirms ownership for whatever was actually picked below.
   for(const item of opts.primary)ownedWeapons[item.id]=true;
   for(const item of opts.secondary)ownedWeapons[item.id]=true;
   for(const item of opts.abilities)ownedAbilities[item.id]=true;
@@ -3834,20 +3857,20 @@ const SUPER_METEOR = {id:'super_meteor', name:'Super Meteor', price:900,
 
 const SKYFALL_BARRAGE = {id:'skyfall_barrage', name:'Skyfall Barrage', price:780,
   desc:'Ultimate-tier damage. For 10 seconds, giant translucent arrows rain onto enemy clusters with clear landing markers and strong area damage. Boss damage is capped at 25% per cast. No cooldown during development testing.'};
-const KNIGHT_GUARDIAN_QUAKE = {id:'knight_guardian_quake', name:'Guardian Titan', price:760, avatar:'knight', unlockLevel:12,
+const KNIGHT_GUARDIAN_QUAKE = {id:'knight_guardian_quake', name:'Guardian Titan', price:760, avatar:'knight', unlockLevel:24,
   desc:'Hold the Ability button to begin Guardian Charge and automatically flow into Earth Shatter when the charge finishes. Releasing before the charge ends cancels the Earth Shatter follow-up. Steer the charge with the normal movement controls. After the sequence, the Knight remains in Titan form for 15 seconds. Cooldown begins after Titan mode ends and scales with the current round tier.'};
-const KNIGHT_AEGIS_COUNTER = {id:'knight_aegis_counter', name:'Royal Onslaught', price:880, avatar:'knight', unlockLevel:14,
+const KNIGHT_AEGIS_COUNTER = {id:'knight_aegis_counter', name:'Royal Onslaught', price:880, avatar:'knight', unlockLevel:29,
   desc:'Map-clearing active ultimate. Activation freezes every enemy inside the playable area solid until the third endpoint lands; enemies still outside the arena close at full speed and freeze the instant they cross in. The three crossings deal no damage at all - each destination is at least 115 degrees around the perimeter from the last and never near the point two back. The Knight then takes the middle of the map, enemies inside resume at 50% speed, and three cycles of five slash waves fire outward past the arena edge two seconds apart, killing every enemy inside the map on each cycle. You are invulnerable for the whole sequence. Cooldown scales down by round to 0 at Round 45; boss damage remains capped.'};
-const KNIGHT_JUDGMENT_ULTIMATE = {id:'knight_judgment', name:'Judgment of the King', price:920, avatar:'knight', unlockLevel:18,
+const KNIGHT_JUDGMENT_ULTIMATE = {id:'knight_judgment', name:'Judgment of the King', price:920, avatar:'knight', unlockLevel:34,
   desc:'Ultimate-tier royal execution equipped in the Ability slot. Hammer rain begins immediately and continues throughout the sequence before the arena-wide final impact. The Knight can move during Judgment, cooldown scales down by round to 0 at Round 45, and boss damage remains capped.'};
 const SUPERNOVA_PIERCER = {id:'supernova_piercer', name:'Supernova Piercer', price:860,
   desc:'Signature ultimate. Enter a 3-second rooted sniper charge, then fire a solar beam completely across the map. Instantly defeats non-boss enemies in its path and deals 50% max HP to bosses. No cooldown during development testing.'};
-const DRAGONLORD_ASHFALL_CATACLYSM = {id:'dragonlord_meteorstorm', name:'Ashfall Cataclysm', price:0, avatar:'dragonlord', unlockLevel:1,
-  desc:'Ultimate-tier ability, free and pre-owned. Nyxara rears back and calls down a storm of blazing meteors across the arena — a dozen fiery impacts crater the ground, each one damaging, knocking back, and briefly stunning every enemy caught in the blast.'};
-const DRAGONLORD_WYRM_FORM = {id:'dragonlord_wyrmform', name:'Ascend: Wyrm Form', price:0, avatar:'dragonlord', unlockLevel:1,
-  desc:'Ultimate-tier ability, free and pre-owned. Nyxara ascends into a towering true-dragon silhouette for 12 seconds: 65% larger, hitting 60% harder, moving 30% faster, and radiating a pulsing fire aura that scorches anything nearby.'};
-const DRAGONLORD_HELLGATE = {id:'dragonlord_hellgate', name:'Open the Hellgate', price:0, avatar:'dragonlord', unlockLevel:1,
-  desc:'Ultimate-tier ability, free and pre-owned. Tears open a churning hellgate vortex that pulls every enemy on the map toward it and repeatedly burns them for 5 seconds, then collapses in one final detonation.'};
+const DRAGONLORD_ASHFALL_CATACLYSM = {id:'dragonlord_meteorstorm', name:'Ashfall Cataclysm', price:0, avatar:'dragonlord', unlockLevel:24,
+  desc:'Ultimate-tier ability, free once unlocked. Nyxara rears back and calls down a storm of blazing meteors across the arena — a dozen fiery impacts crater the ground, each one damaging, knocking back, and briefly stunning every enemy caught in the blast.'};
+const DRAGONLORD_WYRM_FORM = {id:'dragonlord_wyrmform', name:'Ascend: Wyrm Form', price:0, avatar:'dragonlord', unlockLevel:29,
+  desc:'Ultimate-tier ability, free once unlocked. Nyxara ascends into a towering true-dragon silhouette for 12 seconds: 65% larger, hitting 60% harder, moving 30% faster, and radiating a pulsing fire aura that scorches anything nearby.'};
+const DRAGONLORD_HELLGATE = {id:'dragonlord_hellgate', name:'Open the Hellgate', price:0, avatar:'dragonlord', unlockLevel:34,
+  desc:'Ultimate-tier ability, free once unlocked. Tears open a churning hellgate vortex that pulls every enemy on the map toward it and repeatedly burns them for 5 seconds, then collapses in one final detonation.'};
 // Coins earned per kill — a flat rate that inches up in later rounds so
 // the pricier weapons stay reachable in a long run.
 function tokensPerKill(){ return 5 + Math.floor(round/5); }
@@ -14707,7 +14730,9 @@ function updateEnemyRadar(){
 // step, which keeps this readable for a young player.
 // ---------------------------------------------------------------------
 let ownedWeapons = {pistol:true,phantom_flurry:true,shadow_sweep:true,shadowstep:true,smoke_bomb:true,vipers_fan:true};
-let ownedAbilities = {hooded_thousand_cuts:true,hooded_dancing_steel:true,hooded_twilight_execution:true,spider_maximum:true,spider_web_of_shadows:true,spider_city_webline:true,dragonlord_meteorstorm:true,dragonlord_wyrmform:true,dragonlord_hellgate:true};
+// Every ultimate is gated by its own unlockLevel now (see MOVE_UNLOCK_ROUNDS)
+// — none of them start pre-owned, hooded/spider/dragonlord included.
+let ownedAbilities = {};
 let equippedAbilityId = null;
 let shopMode = 'weapons';
 let shopOpenedFromPause = false;
@@ -14746,12 +14771,30 @@ function closeShop(){
   clock.getDelta();
   animate();
 }
-const KNIGHT_WEAPON_UNLOCK_LEVELS = {royal_vanguard:5, defensive_whirlwind:6, shield_toss:8};
+// Uniform move-unlock schedule for every character. Each character's own
+// weapons object already lists its moves in
+// primary1(free start), primary2, secondary1, secondary2[, secondary3]
+// declaration order — position among the non-starting moves determines
+// which round it unlocks on. One rule for the whole roster, replacing the
+// old Knight-only KNIGHT_WEAPON_UNLOCK_LEVELS side table.
+const MOVE_UNLOCK_ROUNDS = [4, 9, 14, 19, 24, 29, 34];
+function weaponUnlockRound(combat, weaponId){
+  if(!combat) return 1;
+  if(weaponId===combat.defaultId) return 1;
+  const ids=Object.keys(combat.weapons).filter(id=>{
+    const w=combat.weapons[id];
+    return !w.cloudOnly || state.avatarType==='cloud';
+  });
+  const idx=ids.filter(id=>id!==combat.defaultId).indexOf(weaponId);
+  if(idx<0) return 1;
+  return MOVE_UNLOCK_ROUNDS[Math.min(idx,MOVE_UNLOCK_ROUNDS.length-1)];
+}
 function renderShopList(){
   updateRunTokensHud();
   const list = document.getElementById('shopList');
   list.innerHTML = '';
-  const weapons = combatForAvatar().weapons;
+  const combat = combatForAvatar();
+  const weapons = combat.weapons;
   if(shopMode==='abilities'){
     const attacksHeader=document.createElement('div');
     attacksHeader.className='wName';
@@ -14770,9 +14813,11 @@ function renderShopList(){
     const equipped=isPrimary
       ? ((isDefault&&!currentPrimaryWeaponId)||currentPrimaryWeaponId===id)
       : currentWeaponId===id;
-    if(!UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING && KNIGHT_WEAPON_UNLOCK_LEVELS[id] && avatarLevel()<KNIGHT_WEAPON_UNLOCK_LEVELS[id] && !owned) continue;
+    const unlockRound=weaponUnlockRound(combat,id);
+    const roundLocked=!UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING && unlockRound>1 && avatarLevel()<unlockRound && !owned;
     const row=document.createElement('div');
     row.className='weaponRow'+(equipped?' equipped':'');
+    if(roundLocked) row.style.opacity='.5';
     const swatch = document.createElement('div');
     swatch.className = 'weaponSwatch';
     swatch.style.background = w.kind.includes('fire') ? '#ff7a3d'
@@ -14785,9 +14830,15 @@ function renderShopList(){
       : (w.kind.indexOf('knight_')===0 ? '#ffd35a' : '#b88cff')))))));
     const info = document.createElement('div');
     info.className = 'weaponInfo';
-    info.innerHTML = `<div class="wName">${w.name}</div><div class="wDesc">${w.desc}</div>`;
+    info.innerHTML = roundLocked
+      ? `<div class="wName">🔒 ${w.name}</div><div class="wDesc">Unlocks at Round ${unlockRound}</div>`
+      : `<div class="wName">${w.name}</div><div class="wDesc">${w.desc}</div>`;
     const btn = document.createElement('button');
-    if(equipped){
+    if(roundLocked){
+      btn.className='weaponBuyBtn';
+      btn.textContent='Round '+unlockRound;
+      btn.disabled=true;
+    }else if(equipped){
       btn.className='weaponBuyBtn equippedTag';
       btn.textContent=isPrimary?'Primary':'Secondary';
       btn.disabled=true;
@@ -14819,18 +14870,18 @@ function renderShopList(){
 // Mage abilities use one mutually-exclusive loadout slot. The shared HUD
 // button remains in the approved position directly left of FIRE. Buying
 // an ability equips it immediately; owned abilities can be swapped here.
-const HOODED_THOUSAND_CUTS = {id:'hooded_thousand_cuts', name:'Infinite Speed Blitz', price:0, avatar:'hooded', unlockLevel:1,
+const HOODED_THOUSAND_CUTS = {id:'hooded_thousand_cuts', name:'Infinite Speed Blitz', price:0, avatar:'hooded', unlockLevel:24,
   desc:'Vanish and chain jagged yellow lightning through up to six enemies over 1 second. Every strike forces one rendered-frame hit-stop and violent camera shake; reappear at the final target.'};
-const HOODED_DANCING_STEEL = {id:'hooded_dancing_steel', name:'Tachyon Dome', price:0, avatar:'hooded', unlockLevel:1,
+const HOODED_DANCING_STEEL = {id:'hooded_dancing_steel', name:'Tachyon Dome', price:0, avatar:'hooded', unlockLevel:29,
   desc:'Expand a giant cyan wireframe time dome over 0.4s. For 4 seconds enemies inside run at 10% speed while your movement and attack speed are tripled and five fading ghosts trail behind you.'};
-const HOODED_TWILIGHT_EXECUTION = {id:'hooded_twilight_execution', name:'Speedforce Cataclysm', price:0, avatar:'hooded', unlockLevel:1,
+const HOODED_TWILIGHT_EXECUTION = {id:'hooded_twilight_execution', name:'Speedforce Cataclysm', price:0, avatar:'hooded', unlockLevel:34,
   desc:'Kill ambient light for 6 seconds, turn the avatar into blazing neon-blue wireframe, move at 3x speed, and stamp an expanding floor shockwave every five frames.'};
 
 
-const BARBARIAN_PRIMAL_RAGE = {id:'barbarian_primal_rage', name:'Wrath of Mount Olympus - Supernova', price:0, avatar:'barbarian', unlockLevel:5,
+const BARBARIAN_PRIMAL_RAGE = {id:'barbarian_primal_rage', name:'Wrath of Mount Olympus - Supernova', price:0, avatar:'barbarian', unlockLevel:24,
   desc:'Teleport to exact arena center, grow to Guardian Titan size and become invincible for 10 seconds. A colossal Olympus lightning strike ignites the move, then Mjolnir supernova rings keep erupting outward for the entire duration while repeated golden sky bolts punish the arena.'};
-const BARBARIAN_RAGNAROK_WAVE = {id:'barbarian_ragnarok_wave', name:'Titan Ascension', price:900, avatar:'barbarian', unlockLevel:18,
-  desc:'TITAN TRANSFORMATION. Uses the same Guardian Titan rules: grow to 5x size for 15 seconds, gain 5x Primary/Secondary damage and 2.6x combat reach, move at 85% speed, keep Primary and the equipped Secondary available, and lock other specials until the transformation ends. Cooldown is 0 during development testing.'};
+const BARBARIAN_RAGNAROK_WAVE = {id:'barbarian_ragnarok_wave', name:'Titan Ascension', price:900, avatar:'barbarian', unlockLevel:29, cooldown:26,
+  desc:'TITAN TRANSFORMATION. Uses the same Guardian Titan rules: grow to 5x size for 15 seconds, gain 5x Primary/Secondary damage and 2.6x combat reach, move at 85% speed, keep Primary and the equipped Secondary available, and lock other specials until the transformation ends.'};
 const BARBARIAN_STORM_STEP_OVERDRIVE = {id:'barbarian_storm_step_overdrive', name:'World-Breaker Crashing Bolt', price:950, avatar:'barbarian', unlockLevel:20,
   desc:'Dash to arena center, then perform four complete leap-and-crash cycles. Every crash launches one numbered circular kill wave; each wave travels to the playable edge before the next leap begins. This is the former Ranger World-Breaker move, transferred intact to Aesir.'};
 
@@ -14840,11 +14891,11 @@ const RHINO_SHATTERED_DOMAIN = {id:'rhino_shattered_domain', name:'Titan Rampage
   desc:'TRANSFORMATION. Grow to the exact same 5x size as Knight Guardian Titan for the same 15-second duration and use the same cooldown curve. Primary remains available. Secondary keeps using only the move you actually equipped before the match. Giant attacks use Knight Titan-scaled power and combat reach.'};
 const RHINO_SKY_FATHER = {id:'rhino_sky_father', name:'Armageddon', price:900, avatar:'rhino', unlockLevel:18,
   desc:'Leap impossibly high off-screen, return to exact arena center and crash down, stunning every enemy already on the map for 8 seconds. Then the Mage\'s giant Super Meteors continuously rain across the arena for 10 seconds. Most normal enemies caught by an impact are instantly erased; survivors, including bosses, are stunned and burned.'};
-const CHOPPER_STAMPEDE = {id:'hooded_thousand_cuts', name:'Anchor Rain', price:0, avatar:'chopper', unlockLevel:1,
+const CHOPPER_STAMPEDE = {id:'hooded_thousand_cuts', name:'Anchor Rain', price:0, avatar:'chopper', unlockLevel:24,
   desc:'Enormous gold low-poly anchors, matching Anchor Drop\'s visual style, continuously crash across the battlefield. They favor huge readable shape over texture detail. Direct hits instantly defeat normal enemies and every landing creates nearby explosion damage.'};
-const CHOPPER_GUARD_DOME = {id:'hooded_dancing_steel', name:'Tidal Cataclysm', price:0, avatar:'chopper', unlockLevel:1,
+const CHOPPER_GUARD_DOME = {id:'hooded_dancing_steel', name:'Tidal Cataclysm', price:0, avatar:'chopper', unlockLevel:29,
   desc:'Summon one enormous wall of ocean water that sweeps across the full arena. Normal enemies caught by the wall are erased; larger enemies are shoved, damaged and stunned when the wave passes.'};
-const CHOPPER_MONSTER_POINT = {id:'hooded_twilight_execution', name:'Kraken Rising', price:0, avatar:'chopper', unlockLevel:1,
+const CHOPPER_MONSTER_POINT = {id:'hooded_twilight_execution', name:'Kraken Rising', price:0, avatar:'chopper', unlockLevel:34,
   desc:'TITAN TRANSFORMATION. Follow the Knight Guardian Titan rules: grow to 5x size for 15 seconds, gain 5x attack damage and 2.6x combat reach, move at 85% speed, keep Primary/Secondary attacks, and lock other specials until the transformation ends. Cooldown begins afterward on the Knight Titan curve.'};
 
 const SPIDER_MAXIMUM = {id:'spider_maximum', name:'Maximum Spider', price:0, avatar:'spider', unlockLevel:1,
@@ -14855,6 +14906,7 @@ const SPIDER_CITY_WEBLINE = {id:'spider_city_webline', name:'Skyline Dive', pric
   desc:'AIRBORNE ULTIMATE, ~10s, invulnerable throughout. He web-lines straight up out of frame, marks the densest cluster on the board with a ground reticle, then dive-bombs it - roughly eleven crashes, each erasing normal enemies within 5.6 units and taking 4.5% off bosses, recoiling back up the line between dives. The last dive is the big one: a 13-unit touchdown crater worth 24% boss max HP.'};
 
 const HERO_ABILITIES = { spider:[SPIDER_MAXIMUM,SPIDER_WEB_OF_SHADOWS,SPIDER_CITY_WEBLINE], rhino:[RHINO_CRASHING_BOLT,RHINO_SHATTERED_DOMAIN,RHINO_SKY_FATHER], chopper:[CHOPPER_STAMPEDE,CHOPPER_GUARD_DOME,CHOPPER_MONSTER_POINT], hooded:[HOODED_THOUSAND_CUTS,HOODED_DANCING_STEEL,HOODED_TWILIGHT_EXECUTION], mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
+  dragonlord:[DRAGONLORD_ASHFALL_CATACLYSM, DRAGONLORD_WYRM_FORM, DRAGONLORD_HELLGATE],
   knight:[KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER, KNIGHT_JUDGMENT_ULTIMATE],
   barbarian:[BARBARIAN_PRIMAL_RAGE, BARBARIAN_RAGNAROK_WAVE, BARBARIAN_STORM_STEP_OVERDRIVE],
   dragonlord:[DRAGONLORD_ASHFALL_CATACLYSM, DRAGONLORD_WYRM_FORM, DRAGONLORD_HELLGATE] };
@@ -14933,9 +14985,11 @@ function renderAbilityShopList(list){
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${a.name}</div><div class="wDesc">${a.desc}</div>`;
     const btn = document.createElement('button');
-    const levelLocked = !UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING && a.unlockLevel && avatarLevel() < a.unlockLevel;
+    const levelLocked = !UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING && a.unlockLevel && avatarLevel() < a.unlockLevel && !owned;
     if(levelLocked){
-      btn.className='weaponBuyBtn'; btn.textContent='LVL '+a.unlockLevel; btn.disabled=true;
+      info.innerHTML = `<div class="wName">🔒 ${a.name}</div><div class="wDesc">Unlocks at Round ${a.unlockLevel}</div>`;
+      row.style.opacity='.5';
+      btn.className='weaponBuyBtn'; btn.textContent='Round '+a.unlockLevel; btn.disabled=true;
       row.append(swatch,info,btn); list.appendChild(row); continue;
     }
     if(equipped){
@@ -15724,6 +15778,82 @@ function applyCameraMode(){
 let vy = 0, onGround = true, wasAirborne = false, jumpsUsed = 0;
 const MAX_JUMPS = 2;
 let dashActive = false, dashTimer = 0, dashCooldownTimer = 0, dashDir = {x:0,z:1}, dashStartedAt = 0;
+// First-run tutorial: shown once per profile, right before Round 1 of a
+// fresh run actually begins spawning enemies. gameRunning is already true
+// at this point (movement/camera/attack input all work normally through
+// the real update() loop) — zombiesRemainingToSpawn just stays at its
+// reset value of 0 until startRound() is called, so nothing spawns and
+// nothing can hurt the player while they practice.
+let tutorialActive=false, tutorialStep=0;
+let tutorialStartX=0, tutorialStartZ=0, tutorialLastYaw=0, tutorialYawAccum=0, tutorialAttacked=false;
+let tutorialPendingCatchUpGrant=null;
+const TUTORIAL_STEPS=[
+  'Move — use the left stick (or WASD) to walk around.',
+  'Look Around — drag the screen (or move the mouse) to look around.',
+  'Attack — tap FIRE to attack.'
+];
+function tutorialShouldShow(){
+  if(!state.currentName) return false;
+  try{ return !Store.getProfile(state.currentName).tutorialDone; }catch(_e){ return false; }
+}
+function updateTutorialUI(){
+  const banner=document.getElementById('tutorialBanner');
+  const stepLabel=document.getElementById('tutorialStepLabel');
+  const text=document.getElementById('tutorialText');
+  if(!banner) return;
+  banner.classList.toggle('show', tutorialActive);
+  if(!tutorialActive) return;
+  if(stepLabel) stepLabel.textContent='STEP '+(tutorialStep+1)+' / '+TUTORIAL_STEPS.length;
+  if(text) text.textContent=TUTORIAL_STEPS[tutorialStep]||'';
+}
+function beginTutorial(catchUpGrant){
+  tutorialActive=true;
+  tutorialStep=0;
+  tutorialStartX=player.position.x;
+  tutorialStartZ=player.position.z;
+  tutorialLastYaw=camYaw;
+  tutorialYawAccum=0;
+  tutorialAttacked=false;
+  tutorialPendingCatchUpGrant=catchUpGrant||null;
+  updateTutorialUI();
+}
+function completeTutorial(){
+  tutorialActive=false;
+  tutorialAttacked=false;
+  updateTutorialUI();
+  if(state.currentName){
+    try{
+      const p=Store.getProfile(state.currentName);
+      p.tutorialDone=true;
+      Store.saveProfile(p);
+    }catch(_e){}
+  }
+  startRound();
+  const catchUpGrant=tutorialPendingCatchUpGrant;
+  tutorialPendingCatchUpGrant=null;
+  if(catchUpGrant){
+    setTimeout(()=>toast('Catch-up loadout: 💪+'+catchUpGrant.power
+      +' ❤️+'+catchUpGrant.hp+' ⚡+'+catchUpGrant.speed
+      +' · '+catchUpGrant.coins.toLocaleString()+'🪙 · practice run'), 2600);
+  }
+}
+function updateTutorial(dt){
+  if(!tutorialActive||!player) return;
+  if(tutorialStep===0){
+    const dx=player.position.x-tutorialStartX, dz=player.position.z-tutorialStartZ;
+    if(Math.hypot(dx,dz)>2.5){
+      tutorialStep=1; tutorialLastYaw=camYaw; tutorialYawAccum=0; updateTutorialUI();
+    }
+  }else if(tutorialStep===1){
+    let d=camYaw-tutorialLastYaw;
+    d=((d%(Math.PI*2))+Math.PI*3)%(Math.PI*2)-Math.PI; // shortest signed delta
+    tutorialYawAccum+=Math.abs(d);
+    tutorialLastYaw=camYaw;
+    if(tutorialYawAccum>1.0){ tutorialStep=2; updateTutorialUI(); }
+  }else if(tutorialStep===2){
+    if(tutorialAttacked) completeTutorial();
+  }
+}
 // Free-roam: fly anywhere around the stage with no gravity and no
 // damage taken. Handy for actually looking at an environment properly
 // instead of fighting through it. Dedicated UP/DOWN buttons appear for
@@ -15989,7 +16119,8 @@ let barbarianRuntime = {
   whirlTimer:0, whirlPulse:0, whirlCooldown:0, whirlElapsed:0, whirlThunderAccum:0, whirlDust:0, whirlFx:null,
   primalCooldown:0, primalFx:null, primalFxPulse:0,
   wbCooldown:0, wbActive:0, wbStage:0, wbTimer:0, wbOriginX:0, wbOriginZ:0,
-  rfCooldown:0, rfActive:0, rfStage:0, rfTimer:0, rfOriginX:0, rfOriginZ:0, stormStepActive:0, stormStepDashTick:0, stormStepContactGate:new Map(), stormStepPrevX:0, stormStepPrevZ:0, stormStepTargetX:0, stormStepTargetZ:0, stormStepRingTick:0
+  rfCooldown:0, rfActive:0, rfStage:0, rfTimer:0, rfOriginX:0, rfOriginZ:0, stormStepActive:0, stormStepDashTick:0, stormStepContactGate:new Map(), stormStepPrevX:0, stormStepPrevZ:0, stormStepTargetX:0, stormStepTargetZ:0, stormStepRingTick:0,
+  twilightCooldown:0
 };
 function barbarianResetRuntime(){
   rhinoResetRuntime();
@@ -24291,7 +24422,7 @@ function knightAbilityCooldownInfo(){
     }
     case 'barbarian_ragnarok_wave': {
       const active=(barbarianRuntime.twilightActive||0)>0;
-      return {label:active?'TITAN '+Math.max(0,barbarianRuntime.twilightActive||0).toFixed(1):'TITAN',cd:0,active,activeTime:active?barbarianRuntime.twilightActive:undefined};
+      return {label:active?'TITAN '+Math.max(0,barbarianRuntime.twilightActive||0).toFixed(1):'TITAN',cd:barbarianRuntime.twilightCooldown||0,active,activeTime:active?barbarianRuntime.twilightActive:undefined};
     }
     case 'barbarian_storm_step_overdrive': {
       const active=!!rhinoRuntime.crashing;
@@ -27604,6 +27735,7 @@ function triggerRagnarokWave(){
   if(!gameRunning||!barbarianIsActive()||rhinoIsActive()||!player)return false;
   const r=barbarianRuntime;
   if((r.twilightActive||0)>0||(r.stormStepActive||0)>0||(r.olympusSupernovaActive||0)>0||barbarianUltimateActive>0)return false;
+  if((r.twilightCooldown||0)>0)return false;
   markUltimateUsed();
   r.twilightActive=aesirTitanDuration();
   r.twilightTimer=0;
@@ -27624,6 +27756,7 @@ function triggerRagnarokWave(){
 }
 function updateRagnarokWave(dt){
   const r=barbarianRuntime;
+  if(r.twilightCooldown>0) r.twilightCooldown=Math.max(0,r.twilightCooldown-dt);
   if(!(r.twilightActive>0))return;
   r.twilightActive=Math.max(0,r.twilightActive-dt);
   r.twilightTimer=(r.twilightTimer||0)+dt;
@@ -27633,6 +27766,7 @@ function updateRagnarokWave(dt){
   if(r.twilightActive<=0){
     r.twilightActive=0;
     r.twilightTimer=0;
+    r.twilightCooldown=26;
     aesirTitanSyncScale(false);
     knightShockRing(player.position,5.0,0xeaffff,.28);
     triggerCombatShake(12,210);
@@ -34165,6 +34299,7 @@ function updateCrimsonMirror(dt){
 
 function performWeaponAttack(w, countsAsPrimary=true){
   if(!w) return;
+  if(tutorialActive) tutorialAttacked=true;
   if(state.avatarType==='mage'&&mageGameplayActive())foxMageWowCastFx(w.kind,w.kind==='giant_fireball'?1.7:(w.kind==='fox_arcane_bloom'?2.05:(w.kind==='fox_gravity_prison'?2.1:(w.kind==='arcane_lance'?1.45:1.0))),false);
   // V23.12.05: Chopper's Secondary moves own their gameplay inside the
   // standalone ChopperPirateKit. Previously these kinds fell through to the
@@ -36520,6 +36655,7 @@ function updateSceneryOcclusion(dt){
 
 // ---- Main update ----
 function update(dt){
+  if(tutorialActive) updateTutorial(dt);
   // Knight hit-stop: a very short, hard-capped global slow that makes a
   // successful sword contact land. Always finite and cleared on cleanup.
   if(knightRuntime.hitStop>0){
@@ -37593,21 +37729,30 @@ function startSurvival(){
   runStartTime = performance.now();
   roundTimerFrozenElapsed = null;
   roundCompletionStartedAt = 0;
-  startRound();
-  if(catchUpGrant){
-    // Announced after startRound()'s own banner so both are readable.
-    setTimeout(()=>toast('Catch-up loadout: \uD83D\uDCAA+'+catchUpGrant.power
-      +' \u2764\uFE0F+'+catchUpGrant.hp+' \u26A1+'+catchUpGrant.speed
-      +' \u00B7 '+catchUpGrant.coins.toLocaleString()+'\uD83E\uDE99 \u00B7 practice run'), 2600);
-  }
+  // Movement/camera/attack input all run through update(dt), which only
+  // executes while gameRunning is true \u2014 so this has to flip on before the
+  // tutorial (if any) can let the player actually walk/look/attack.
   gameRunning = true;
   onResize();
   clock.getDelta();
   animate();
+  if(tutorialShouldShow()){
+    beginTutorial(catchUpGrant);
+  }else{
+    startRound();
+    if(catchUpGrant){
+      // Announced after startRound()'s own banner so both are readable.
+      setTimeout(()=>toast('Catch-up loadout: \uD83D\uDCAA+'+catchUpGrant.power
+        +' \u2764\uFE0F+'+catchUpGrant.hp+' \u26A1+'+catchUpGrant.speed
+        +' \u00B7 '+catchUpGrant.coins.toLocaleString()+'\uD83E\uDE99 \u00B7 practice run'), 2600);
+    }
+  }
 }
 
 function endSurvival(){
   gameRunning = false;
+  tutorialActive = false;
+  updateTutorialUI();
   try{ spiderCinema.clear(); }catch(_e){}
   try{ disposeSpiderKit(); }catch(_e){}
   clearArcaneEchoes();
