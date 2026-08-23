@@ -1453,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.75.06 - Nyxara Somersault Hunt';
+const GAME_VERSION='23.75.07 - Nyxara Infernal Whirlwind';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -1840,7 +1840,7 @@ const AVATAR_TYPE_LABELS = {
   spider:'🕷️ Spider',
 };
 const HERO_ROSTER_INFO = {
-  dragonlord:{title:'Nyxara, the Demon Dragon Queen',role:'HYBRID • APEX RAID BOSS',desc:'A wing-flaring, fire-breathing demon dragon queen built on a full 81-clip cinematic animation set, so she never freezes into a stiff pose. She fights up close with Demon Claw and Infernal Glaive combos, burns from range with a Brimstone Barrage volley and the same Phoenix-scale Giant Fireball the Fox commands, and hunts with the same acrobatic Somersault Hunt Spider-Man uses, burning a ring of hellfire at every point she lands. Her three ultimate-tier powers — Ashfall Cataclysm, Ascend: Wyrm Form, and Open the Hellgate — are all free and pre-owned the moment she is selected, and Round 10 unlocks her signature Legion of the Abyss: a horde of invincible demon-dragon clones fighting at her side. Built to be the single strongest, flashiest avatar in the roster.'},
+  dragonlord:{title:'Nyxara, the Demon Dragon Queen',role:'HYBRID • APEX RAID BOSS',desc:'A wing-flaring, fire-breathing demon dragon queen built on a full 81-clip cinematic animation set, so she never freezes into a stiff pose. She fights up close with Demon Claw and Infernal Glaive combos, burns from range with the same Phoenix-scale Giant Fireball the Fox commands, hunts with the same acrobatic Somersault Hunt Spider-Man uses (burning a ring of hellfire at every point she lands), and holds the line with the same Defensive Whirlwind Cloud uses, reskinned in her own orange hellfire. Her three ultimate-tier powers — Ashfall Cataclysm, Ascend: Wyrm Form, and Open the Hellgate — are all free and pre-owned the moment she is selected, and Round 10 unlocks her signature Legion of the Abyss: a horde of invincible demon-dragon clones fighting at her side. Built to be the single strongest, flashiest avatar in the roster.'},
   spider:{title:'Spider',role:'MELEE • ACROBAT',desc:'A wall-crawling acrobat built on 25 hand-authored clips. Quick and evasive without being a blur: he closes distance with web-lines and Bezier vaults rather than raw speed. The kit is a setup-and-payoff loop — Web Snap and Web Trap wrap targets, and everything wrapped takes 45% extra damage from every source, including all three of his ultimates.'},
   rogue:{title:'Tempest Archer',role:'RANGED • EASY',desc:'The speed-focused ranged avatar: fast movement, long-lived piercing arrows, and precise crowd control. Every fifth defeat triggers Tailwind for a short burst of movement and firing speed.'},
   chopper:{title:'Chopper',role:'MELEE • PIRATE',desc:'A cutlass-swinging pirate built on 15 hand-authored animations. Every move — combos, rolls, guards, throws, shots and a full three-phase jump — plays a real take, so nothing ever snaps to a frozen pose.'},
@@ -3484,8 +3484,8 @@ const CHARACTER_COMBAT = {
         desc:'A three-hit claw combo — left rake, right rake, then a two-handed cross that throws a burst of embers. Hold FIRE to keep the chain going.'},
       dragonlord_infernal_glaive:{name:'Infernal Glaive Combo', price:420, slot:'primary', kind:'dragonlord_infernal_glaive', cooldown:0.27, damage:1.75, radius:3.5, arc:2.05, auto:true, fireRateCap:2.5,
         desc:'Trades speed for reach: a heavier three-hit greatsword chain wreathed in dragonfire that hits harder and further than the claws.'},
-      dragonlord_brimstone_barrage:{name:'Brimstone Barrage', price:0, slot:'secondary', kind:'dragonlord_brimstone_barrage', cooldown:0.9, damage:0.65, splash:1.2, auto:true, fireRateCap:2.0,
-        desc:'Looses a 3-bolt volley of homing brimstone fireballs in a tight spread, then detonates the ground beneath her in a burst of hellfire.'},
+      dragonlord_whirlwind:{name:'Infernal Whirlwind', price:0, slot:'secondary', kind:'dragonlord_whirlwind', cooldown:0, damage:0, radius:3.25,
+        desc:'The same Defensive Whirlwind Cloud uses, reskinned in her own orange hellfire: hold Secondary to spin, repeatedly damaging and pushing enemies away while deflecting weak projectiles. Releasing Secondary ends it immediately.'},
       dragonlord_giant_fireball:{name:'Giant Fireball', price:400, slot:'secondary', kind:'dragonlord_giant_fireball', cooldown:0.9, damage:999, splash:5.0, splashDamage:4.2, directInstakill:true, auto:true, fireRateCap:2.0,
         desc:'Hurls the same Phoenix-scale molten fireball the Fox commands — a direct hit executes any non-boss outright, and the impact scorches a wide area around it.'},
       dragonlord_somersault_hunt:{name:'Somersault Hunt', price:450, slot:'secondary', kind:'dragonlord_somersault_hunt', cooldown:3.0, range:12,
@@ -14794,7 +14794,8 @@ function updateSecondaryButton(){
   }
   const whirlwindActive=!!(w&&((w.kind==='knight_whirlwind_secondary'&&knightRuntime.whirlwindTimer>0)
                             ||(w.kind==='barbarian_whirlwind'&&barbarianRuntime.whirlTimer>0)
-                            ||(w.kind==='rhino_cloud_whirlwind'&&rhinoCloudWhirlwindActive())));
+                            ||(w.kind==='rhino_cloud_whirlwind'&&rhinoCloudWhirlwindActive())
+                            ||(w.kind==='dragonlord_whirlwind'&&dragonlordWhirlwindActive())));
   btn.classList.toggle('locked',!w);
   btn.classList.toggle('cooling',!!w&&cooldown>0);
   btn.classList.toggle('whirlwindActive',whirlwindActive);
@@ -14804,13 +14805,13 @@ function updateSecondaryButton(){
     return;
   }
   const icon=w.kind==='spider_zip_takedown'?'🪝':(w.kind==='spider_web_trap'?'🕸️':(w.kind==='spider_somersault_slam'||w.kind==='dragonlord_somersault_hunt'?'🤸':
-    w.kind==='velocity_quantum_slingshot'?'⚡':(w.kind==='velocity_phasing_resonance'?'〰️':(w.kind==='velocity_synaptic_snare'?'▦':(w.kind==='giant_fireball'?'☄️':(w.kind==='cloud_great_sword_slash'?'⚔️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='barbarian_whirlwind'?'🌀':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind==='rhino_cloud_whirlwind'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'))))))))))));
+    w.kind==='velocity_quantum_slingshot'?'⚡':(w.kind==='velocity_phasing_resonance'?'〰️':(w.kind==='velocity_synaptic_snare'?'▦':(w.kind==='giant_fireball'?'☄️':(w.kind==='cloud_great_sword_slash'?'⚔️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='barbarian_whirlwind'?'🌀':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind==='rhino_cloud_whirlwind'||w.kind==='dragonlord_whirlwind'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'))))))))))));
   if(whirlwindActive){
     const wTimer=(w.kind==='barbarian_whirlwind')
       ? barbarianRuntime.whirlTimer
-      : (w.kind==='rhino_cloud_whirlwind'?rhinoRuntime.cloudWhirlTimer:knightRuntime.whirlwindTimer);
+      : (w.kind==='rhino_cloud_whirlwind'?rhinoRuntime.cloudWhirlTimer:(w.kind==='dragonlord_whirlwind'?dragonlordRuntime.whirlTimer:knightRuntime.whirlwindTimer));
     const remaining=(w.kind==='barbarian_whirlwind'&&!Number.isFinite(wTimer)) ? 'HOLD'
-      : (w.kind==='rhino_cloud_whirlwind' ? 'HOLD' : (Number.isFinite(wTimer) ? `${wTimer.toFixed(1)}s` : '∞'));
+      : (w.kind==='rhino_cloud_whirlwind'||w.kind==='dragonlord_whirlwind' ? 'HOLD' : (Number.isFinite(wTimer) ? `${wTimer.toFixed(1)}s` : '∞'));
     btn.innerHTML=`<span class="secondaryIcon">${icon}</span><span class="secondaryLabel">WHIRLWIND ACTIVE</span><span class="secondaryTimer">${remaining}</span>`;
     return;
   }
@@ -16472,6 +16473,7 @@ function barbarianMoveMultiplier(){
   if((barbarianRuntime.whirlTimer||0)>0) m*=BARB_WHIRL.moveMult;
   if((barbarianRuntime.twilightActive||0)>0) m*=((typeof KNIGHT_CFG!=='undefined'&&KNIGHT_CFG.guardianQuakeGiant)?KNIGHT_CFG.guardianQuakeGiant.moveMult:0.85);
   if(rhinoIsActive()&&rhinoCloudWhirlwindActive()) m*=KNIGHT_CFG.whirlwind.moveMult;
+  if(dragonlordIsActive()&&dragonlordRuntime.whirlTimer>0) m*=KNIGHT_CFG.whirlwind.moveMult;
   return Math.max(0,m);
 }
 
@@ -23343,7 +23345,7 @@ function updateKnightRoyalClones(dt){
 const DL_FIRE=0xff5a1f, DL_EMBER=0xffc35a, DL_VOID=0x9b3dff, DL_ASH=0x2b1420;
 function isDragonLordWeaponKind(kind){ return String(kind||'').indexOf('dragonlord_')===0; }
 let dragonlordComboStep=0;
-let dragonlordRuntime={wyrmFormTimer:0,wyrmFormCooldown:0,wyrmFormPulse:0,wyrmSpeedBoostApplied:false,hellgateTimer:0,hellgateCooldown:0,hellgatePulse:0,hellgateOrigin:null,hellgateSweepStart:0,somersault:null,somersaultCooldown:0};
+let dragonlordRuntime={wyrmFormTimer:0,wyrmFormCooldown:0,wyrmFormPulse:0,wyrmSpeedBoostApplied:false,hellgateTimer:0,hellgateCooldown:0,hellgatePulse:0,hellgateOrigin:null,hellgateSweepStart:0,somersault:null,somersaultCooldown:0,whirlTimer:0,whirlPulse:0,whirlHitCounter:0};
 let dragonlordMeteorActiveTimer=0, dragonlordMeteorCooldownTimer=0, dragonlordMeteorEpoch=0;
 let dragonlordMeteorSpawnTimer=0, dragonlordMeteorDamageTimer=0;
 let dragonlordFireballs=[];
@@ -23506,7 +23508,7 @@ function doDragonLordAttack(w){
   if(!player) return;
   switch(w.kind){
     case 'dragonlord_infernal_glaive': dragonlordGlaiveCombo(w); break;
-    case 'dragonlord_brimstone_barrage': dragonlordBrimstoneBarrage(w); break;
+    case 'dragonlord_whirlwind': /* hold-based, handled entirely by the dedicated secondary-input gate */ break;
     case 'dragonlord_giant_fireball': dragonlordGiantFireball(w); break;
     case 'dragonlord_somersault_hunt': /* handled entirely by the dedicated secondary-input gate; never reached via the normal cast path */ break;
     default: dragonlordClawRend(w); break;
@@ -23544,36 +23546,103 @@ function dragonlordGlaiveCombo(w){
   triggerCombatShake(hits>0?10:4,hits>0?140:80);
   if(hits>0)navigator.vibrate&&navigator.vibrate([20,14,26]);
 }
-// Brimstone Barrage: bolt + nova merged into one secondary. Three
-// spread-fired homing bolts (shared bullet pool, as the old Bolt used)
-// followed by a pooled ground-burst ring at her feet — keeps the ranged
-// pressure of the old Bolt and the AoE payoff of the old Nova in one slot.
-function dragonlordBrimstoneBarrage(w){
-  if(player.userData.playKayClip) player.userData.playKayClip('Spell_Simple_Shoot',true,true,.20);
-  const yaw=player.rotation.y;
-  const dmgMult=dragonlordAttackDamageMult();
-  [-0.14,0,0.14].forEach(spread=>{
-    const muzzle={x:player.position.x+Math.sin(yaw+spread)*.7,y:player.position.y+1.15,z:player.position.z+Math.cos(yaw+spread)*.7};
-    dragonlordImpactFlash(muzzle,DL_EMBER,1.2,.12);
-    dragonlordFireSparks(muzzle,3,DL_EMBER);
-    shootFromPosition({...w,damage:w.damage*dmgMult},player.position,spread);
-    const b=bullets[bullets.length-1];
-    if(b&&b.mesh){
-      b.mesh.scale.multiplyScalar(2.1);
-      b.mesh.traverse(o=>{ if(o.material&&o.material.color) o.material.color.setHex(DL_FIRE); });
+// Infernal Whirlwind: the same mechanic as Cloud/Knight's Defensive
+// Whirlwind (knight_whirlwind_secondary) and Rhino's own port of it
+// (rhino_cloud_whirlwind) — hold-to-spin, periodic pulse damage/knockback/
+// stun using the same shared KNIGHT_CFG.whirlwind tuning, weak-projectile
+// deflection, strict release-ends-it-immediately behavior. Only the FX are
+// her own: DL_FIRE/DL_EMBER (orange) instead of Knight's steel palette,
+// built from her own pooled ring/flash/spark toolkit instead of
+// replicating Knight's bespoke mesh-group FX functions.
+function dragonlordWhirlwindActive(){
+  return dragonlordIsActive() && (dragonlordRuntime.whirlTimer||0)>0;
+}
+function triggerDragonLordWhirlwind(){
+  if(!gameRunning||!dragonlordIsActive()||!player) return false;
+  if((dragonlordRuntime.whirlTimer||0)>0) return false;
+  dragonlordRuntime.whirlTimer=1;
+  dragonlordRuntime.whirlPulse=0;
+  dragonlordRuntime.whirlHitCounter=0;
+  if(player.userData.playKayClip) player.userData.playKayClip('spin',true,true,.32);
+  player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,.18);
+  player.userData.spinVisualSpeed=KNIGHT_CFG.whirlwind.spinSpeed;
+  dragonlordFireSweepRing(player.position,DL_FIRE,KNIGHT_CFG.whirlwind.radius*dragonlordAttackRangeMult());
+  dragonlordEmberBurst(player.position.x,player.position.y+.6,player.position.z,14,3.6);
+  triggerCombatShake(9,150);
+  navigator.vibrate&&navigator.vibrate([28,16,42]);
+  toast('INFERNAL WHIRLWIND');
+  return true;
+}
+function dragonlordWhirlwindPulse(){
+  if(!player) return;
+  const c=KNIGHT_CFG.whirlwind;
+  const radius=c.radius*dragonlordAttackRangeMult();
+  const pos=player.position;
+  dragonlordFireSweepRing(pos,DL_EMBER,radius);
+  dragonlordFireSparks(pos,4,DL_FIRE);
+  if(typeof enemyProjectiles!=='undefined'){
+    for(let i=enemyProjectiles.length-1;i>=0;i--){
+      const p=enemyProjectiles[i];
+      if(!p||!p.mesh) continue;
+      if(Math.hypot(p.mesh.position.x-pos.x,p.mesh.position.z-pos.z)>radius) continue;
+      const px=p.mesh.position.x,py=p.mesh.position.y,pz=p.mesh.position.z;
+      scene.remove(p.mesh);disposeGroup(p.mesh);
+      if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}
+      enemyProjectiles.splice(i,1);
+      dragonlordImpactFlash({x:px,y:py,z:pz},DL_FIRE,1.1,.14);
+      dragonlordFireSparks({x:px,y:py,z:pz},5,DL_EMBER);
     }
-  });
-  const origin=player.position;
-  const burstRadius=2.3*dragonlordAttackRangeMult();
-  const hits=damageNearby(origin,burstRadius,w.damage*1.15*dmgMult);
-  // Layered double-ring + particle-heavy ground ignition so the payoff
-  // reads as a real detonation instead of a quick flicker.
-  dragonlordFireSweepRing(origin,DL_EMBER,burstRadius);
-  dragonlordFireRing(origin,burstRadius*.55,DL_FIRE,.32);
-  dragonlordImpactFlash(origin,DL_FIRE,2.4,.22);
-  dragonlordEmberBurst(origin.x,origin.y+.6,origin.z,hits>0?24:14,5.0);
-  triggerCombatShake(hits>0?13:7,160);
-  navigator.vibrate&&navigator.vibrate(hits>0?[30,18,42]:18);
+  }
+  let hits=0;
+  const dmgMult=dragonlordAttackDamageMult();
+  for(const z of zombies){
+    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending) continue;
+    const dx=z.position.x-pos.x,dz=z.position.z-pos.z;
+    const dist=Math.hypot(dx,dz);
+    if(dist>radius) continue;
+    const cls=z.userData.archetype==='boss'?'boss':(z.userData.archetype==='brute'?'brute':'normal');
+    dragonlordRuntime.whirlHitCounter=(dragonlordRuntime.whirlHitCounter||0)+1;
+    let dmg=c.damage*playerStats.power*dmgMult;
+    if(cls==='boss')dmg*=c.bossMult; else if(cls==='brute')dmg*=c.bruteMult;
+    applyBulletDamage(z,dmg);
+    if(z.userData.dead){hits++;continue;}
+    const stunScale=cls==='boss'?.18:(cls==='brute'?.55:1);
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,c.stun*stunScale);
+    const len=dist||1;
+    let force=c.knockback*(cls==='boss'?.14:(cls==='brute'?.45:1));
+    const prior=Math.hypot(z.userData.knockbackX||0,z.userData.knockbackZ||0);
+    force=Math.max(force,prior);
+    z.userData.knockbackX=(dx/len)*force;
+    z.userData.knockbackZ=(dz/len)*force;
+    hits++;
+  }
+  if(hits) triggerCombatShake(6,85);
+}
+function dragonlordEndWhirlwind(){
+  if(!(dragonlordRuntime.whirlTimer>0)) return;
+  dragonlordRuntime.whirlTimer=0;
+  dragonlordRuntime.whirlPulse=0;
+  dragonlordRuntime.whirlHitCounter=0;
+  if(player){
+    dragonlordFireSweepRing(player.position,DL_FIRE,2.1);
+    dragonlordImpactFlash(player.position,DL_EMBER,1.6,.16);
+    player.userData.spinVisualTimer=0;
+  }
+}
+function dragonlordUpdateWhirlwind(dt){
+  if(!(dragonlordRuntime.whirlTimer>0)) return;
+  // Strict hold-to-spin, same as Rhino's port of this move: any release
+  // ends it immediately rather than inheriting Knight's round-duration timer.
+  if(typeof secondaryInputHeld!=='undefined' && !secondaryInputHeld){
+    dragonlordEndWhirlwind();
+    return;
+  }
+  dragonlordRuntime.whirlTimer=1; // active flag only, never a counting-down duration
+  dragonlordRuntime.whirlPulse-=dt;
+  if(dragonlordRuntime.whirlPulse<=0){
+    dragonlordRuntime.whirlPulse=KNIGHT_CFG.whirlwind.pulse;
+    dragonlordWhirlwindPulse();
+  }
 }
 // Giant Fireball: the same Phoenix-scale molten fireball the Fox fires.
 // shootFromPosition() already contains a generic kind==='giant_fireball'
@@ -23976,12 +24045,12 @@ function dragonlordLegionUnlocked(){
   return dragonlordIsActive() && Math.max(1,Number(round)||1)>=10;
 }
 function dragonlordCloneAvailableMoves(){
-  const moves=['dragonlord_claw_rend','dragonlord_brimstone_barrage'];
+  const moves=['dragonlord_claw_rend'];
   if(ownedWeapons&&ownedWeapons.dragonlord_infernal_glaive) moves.push('dragonlord_infernal_glaive');
-  // Somersault Hunt needs real cross-map player movement (bezier leaps),
-  // which doesn't translate to a stationary clone — intentionally not
-  // added to the clone moveset, same as the old Wing Gale Dash/Soul Rend
-  // Chain before it.
+  // Somersault Hunt (cross-map leaps) and Infernal Whirlwind (hold-based,
+  // moves the caster) both need real player-style control a clone doesn't
+  // have — intentionally not added to the clone moveset, same as the old
+  // Wing Gale Dash/Soul Rend Chain/Void Maw before them.
   return moves;
 }
 function dragonlordCloneDamageBase(){
@@ -24048,13 +24117,7 @@ function dragonlordClonePerformMove(c,target){
   const dx=target.position.x-c.position.x,dz=target.position.z-c.position.z;
   const dist=Math.hypot(dx,dz)||1;
   c.rotation.y=Math.atan2(dx,dz);
-  if(kind==='dragonlord_brimstone_barrage'){
-    knightClonePlayClip(c,['ground','pound'],'Punch_Cross');
-    dragonlordFireRing(c.position,2.4,DL_FIRE,.3);
-    dragonlordImpactFlash(c.position,DL_EMBER,1.5,.16);
-    for(const z of zombies)if(z&&!z.userData.dead&&!z.userData.spawnPending&&Math.hypot(z.position.x-c.position.x,z.position.z-c.position.z)<=2.6)applyBulletDamage(z,base*.85);
-    c.userData.attackCooldown=.85;
-  }else if(kind==='dragonlord_infernal_glaive'){
+  if(kind==='dragonlord_infernal_glaive'){
     knightClonePlayClip(c,['sword','regular'],'Punch_Cross');
     dragonlordFireSwipe(c.position,c.rotation.y,DL_VOID,1.1,1.6);
     dragonlordEmberBurst(c.position.x,c.position.y+.9,c.position.z,8,2.6);
@@ -24180,7 +24243,9 @@ function updateDragonLordSystems(dt){
   if(!dragonlordIsActive()){
     if(dragonlordLegionClones.length) clearDragonLordLegion();
     if(dragonlordRuntime.wyrmFormTimer>0) dragonlordEndWyrmForm();
+    if(dragonlordRuntime.whirlTimer>0){ dragonlordRuntime.whirlTimer=0; dragonlordRuntime.whirlPulse=0; }
     dragonlordRuntime.hellgateTimer=0; dragonlordRuntime.hellgateOrigin=null;
+    dragonlordRuntime.somersault=null;
     return;
   }
   if(!player) return;
@@ -24252,6 +24317,7 @@ function updateDragonLordSystems(dt){
   }
   dragonlordUpdateHellgate(dt);
   dragonlordUpdateSomersault(dt);
+  dragonlordUpdateWhirlwind(dt);
   dragonlordUpdateSwipes(dt);
   dragonlordUpdateSparks(dt);
   dragonlordUpdateSweepRing(dt);
@@ -24365,6 +24431,8 @@ function clearKnightRoundSpecials(resetCooldowns=true){
     if(dragonlordRuntime.wyrmSpeedBoostApplied){ playerStats.speed-=0.3; dragonlordRuntime.wyrmSpeedBoostApplied=false; }
     if(dragonlordRuntime.wyrmFormTimer>0) document.body.style.filter='';
     dragonlordRuntime.wyrmFormTimer=0;
+    if(dragonlordRuntime.whirlTimer>0){ dragonlordRuntime.whirlTimer=0; dragonlordRuntime.whirlPulse=0; if(player)player.userData.spinVisualTimer=0; }
+    dragonlordRuntime.somersault=null;
     // Interrupted before its natural 10s finale (round ended early, death,
     // avatar swap, manual reset) — still guarantee the "everyone dies" payoff
     // rather than silently reverting every converted ally with nothing killed.
@@ -35796,6 +35864,18 @@ function doSecondaryShoot(){
     // the shared secondaryAttackCooldown must stay out of the way.
     player.userData.secondaryAttackCooldown=0;
     const fired=dragonlordSomersaultHunt(w);
+    if(fired) markSecondaryUsed();
+    else navigator.vibrate&&navigator.vibrate(10);
+    return;
+  }
+  if(w.kind==='dragonlord_whirlwind'){
+    // Same contract as Rhino's own port of this exact move
+    // (rhino_cloud_whirlwind): the hold state lives in her own runtime
+    // (dragonlordRuntime.whirlTimer), so the shared secondaryAttackCooldown
+    // stays out of the way and dragonlordUpdateWhirlwind() ends it the
+    // instant secondaryInputHeld goes false.
+    player.userData.secondaryAttackCooldown=0;
+    const fired=triggerDragonLordWhirlwind();
     if(fired) markSecondaryUsed();
     else navigator.vibrate&&navigator.vibrate(10);
     return;
