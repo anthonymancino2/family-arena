@@ -1515,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.98.00 - Dudu and Chopper moves back to normal round-based unlock progression';
+const GAME_VERSION='23.99.00 - Dudu: real cooldowns on every move, primaries through ultimates';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -4502,9 +4502,18 @@ function duduBlizzardBlitz(w){
 // same move. chopperFX.update(dt) still needs to run every frame for the
 // ring/flash effects to fade and dispose — see updateCorsairFury() below. ---
 let duduTidal=null;
+// Real post-use cooldowns for Dudu's three ultimates — previously there
+// was none at all (only "can't retrigger while already active"), so a
+// 16-second map-clearing wave could be recast the instant it finished.
+// Escalating by unlock tier, same convention as the unlock levels
+// themselves (24/29/34): earliest-unlocked recovers fastest.
+let duduTidalCooldown=0, duduCryoCooldown=0, duduKrakenCooldown=0;
+const DUDU_TIDAL_COOLDOWN=25, DUDU_CRYO_COOLDOWN=30, DUDU_KRAKEN_COOLDOWN=35;
 function triggerDuduTidalCataclysm(){
   if(!corsairIsActive()||!gameRunning||!player||duduTidal)return;
+  if(duduTidalCooldown>0){ toast('TIDAL CATACLYSM recharging — '+Math.ceil(duduTidalCooldown)+'s'); return; }
   markUltimateUsed();
+  duduTidalCooldown=DUDU_TIDAL_COOLDOWN;
   toast('🌊 Tidal Cataclysm!');
   const yaw=player.rotation.y;
   const dir=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
@@ -4578,7 +4587,9 @@ let duduCryo=null;
 const DUDU_CRYO_DURATION=10.0;
 function triggerDuduCryoPrison(){
   if(!corsairIsActive()||!gameRunning||!player||duduCryo)return;
+  if(duduCryoCooldown>0){ toast('CRYO PRISON recharging — '+Math.ceil(duduCryoCooldown)+'s'); return; }
   markUltimateUsed();
+  duduCryoCooldown=DUDU_CRYO_COOLDOWN;
   duduEnsureMaterials();
   toast('🧊 Cryo Prison!');
   triggerCombatShake(13,420);
@@ -4724,7 +4735,9 @@ function duduKrakenStrike(x,z,py,big){
 }
 function triggerDuduKrakenGrasp(){
   if(!corsairIsActive()||!gameRunning||!player||duduKraken)return;
+  if(duduKrakenCooldown>0){ toast("KRAKEN'S GRASP recharging — "+Math.ceil(duduKrakenCooldown)+'s'); return; }
   markUltimateUsed();
+  duduKrakenCooldown=DUDU_KRAKEN_COOLDOWN;
   duduEnsureMaterials();
   toast("🐙 Kraken's Grasp!");
   triggerCombatShake(10,350);
@@ -4813,6 +4826,9 @@ function updateCorsairFury(dt){
   if(wasActive||nowActive){
     playerStats.power=basePlayerPower*roundPowerMult(round)*(nowActive?CORSAIR_FURY_POWER_MULT:1);
   }
+  if(duduTidalCooldown>0) duduTidalCooldown=Math.max(0,duduTidalCooldown-dt);
+  if(duduCryoCooldown>0) duduCryoCooldown=Math.max(0,duduCryoCooldown-dt);
+  if(duduKrakenCooldown>0) duduKrakenCooldown=Math.max(0,duduKrakenCooldown-dt);
   updateDuduFx(dt);
   updateDuduTidalCataclysm(dt);
   updateDuduCryoPrison(dt);
@@ -18159,7 +18175,7 @@ function findClipByWords(parts, fallback='1H_Melee_Attack_Chop'){
   return found || fallback;
 }
 function attackCooldownFor(w){
-  if(((typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)||corsairIsActive()))return 0;
+  if(((typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)))return 0;
   if(chopperClassIsActive()&&w&&w.name==='Cannon Shot'){const r=Math.max(1,Number(round)||1);return r>=20?0:.38*((20-r)/19);}
   // Green Ranger tactical Secondaries intentionally have NO post-move cooldown.
   if(rhinoIsActive() && (w.kind==='rhino_overdrive'||w.kind==='rhino_gamma_leap'||w.kind==='rhino_cloud_whirlwind')) return 0;
@@ -18394,17 +18410,20 @@ function updateHoodedHud(){
         abilityBtn.classList.toggle('active',dragonlordRuntime.hellgateTimer>0);
         abilityBtn.classList.toggle('cooling',dragonlordRuntime.hellgateCooldown>0&&dragonlordRuntime.hellgateTimer<=0);
       }else if(equippedAbilityId==='dudu_tidal_cataclysm'){
-        abilityBtn.textContent=duduTidal?`WAVE ${duduTidal.spawned}/${duduTidal.totalWaves}`:'TIDAL CATACLYSM';
+        abilityBtn.textContent=duduTidal?`WAVE ${duduTidal.spawned}/${duduTidal.totalWaves}`
+          :(duduTidalCooldown>0?`TIDAL ${Math.ceil(duduTidalCooldown)}`:'TIDAL CATACLYSM');
         abilityBtn.classList.toggle('active',!!duduTidal);
-        abilityBtn.classList.remove('cooling');
+        abilityBtn.classList.toggle('cooling',duduTidalCooldown>0&&!duduTidal);
       }else if(equippedAbilityId==='dudu_cryo_prison'){
-        abilityBtn.textContent=duduCryo?`FROZEN ${duduCryo.blocks.length}`:'CRYO PRISON';
+        abilityBtn.textContent=duduCryo?`FROZEN ${duduCryo.blocks.length}`
+          :(duduCryoCooldown>0?`CRYO ${Math.ceil(duduCryoCooldown)}`:'CRYO PRISON');
         abilityBtn.classList.toggle('active',!!duduCryo);
-        abilityBtn.classList.remove('cooling');
+        abilityBtn.classList.toggle('cooling',duduCryoCooldown>0&&!duduCryo);
       }else if(equippedAbilityId==='dudu_kraken_grasp'){
-        abilityBtn.textContent=duduKraken?`GRASP ${Math.max(0,duduKraken.duration-duduKraken.t).toFixed(1)}`:"KRAKEN'S GRASP";
+        abilityBtn.textContent=duduKraken?`GRASP ${Math.max(0,duduKraken.duration-duduKraken.t).toFixed(1)}`
+          :(duduKrakenCooldown>0?`GRASP ${Math.ceil(duduKrakenCooldown)}`:"KRAKEN'S GRASP");
         abilityBtn.classList.toggle('active',!!duduKraken);
-        abilityBtn.classList.remove('cooling');
+        abilityBtn.classList.toggle('cooling',duduKrakenCooldown>0&&!duduKraken);
       }else if(isSpider){
         const kit=ensureSpiderKit()||{maximum:null,shadows:null,webline:null,cooldownForAbility:()=>0};
         const label=equippedAbilityId==='spider_maximum'
@@ -38919,6 +38938,7 @@ function startSurvival(){
   supernovaChargeTimer = 0;
   supernovaBeamTimer = 0;
   stopArcaneLaser(); laserCharge = LASER_MAX_CHARGE; laserRegenDelayTimer = 0;
+  duduTidalCooldown = 0; duduCryoCooldown = 0; duduKrakenCooldown = 0;
   resetCharacterLoadout();
   resetAbilityLoadout();
   applyPendingPreGameLoadout();
