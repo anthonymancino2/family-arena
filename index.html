@@ -1453,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.76.00 - Choose Your Champion, Hide Archer/Hooded Rogue';
+const GAME_VERSION='23.76.01 - Dead Code Cleanup Pt.1';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -1898,7 +1898,6 @@ function chopperClassIsActive(){ return gameplayAvatarType(state.avatarType)==='
 // Spider is his own combat class, exactly as Chopper is. Nothing rogue-,
 // pirate- or barbarian-flavoured may reach him: he has no shared moveset, no
 // borrowed clone special, and no inherited ultimate IDs.
-function spiderIsActive(){ return state.avatarType==='spider'; }
 function spiderClassIsActive(){ return gameplayAvatarType(state.avatarType)==='spider'; }
 // Dragon Lord is her own combat class, exactly as Spider/Chopper are: no
 // shared moveset, no borrowed clone special, no inherited ultimate IDs.
@@ -9789,12 +9788,6 @@ function physicalViewportSize(){
 function portraitLogicalViewport(){
   const p=physicalViewportSize();
   return p.w>p.h ? {w:p.h,h:p.w} : {w:p.w,h:p.h};
-}
-function orientationAngle(){
-  const a=(screen.orientation&&Number.isFinite(screen.orientation.angle))
-    ? screen.orientation.angle
-    : (Number.isFinite(window.orientation)?window.orientation:0);
-  return ((a%360)+360)%360;
 }
 async function requestPortraitOrientationLock(){
   // Landscape is now a fully native presentation on every device - phone,
@@ -21450,12 +21443,6 @@ function triggerKnightAegisCounter(){
   toast('ROYAL ONSLAUGHT · '+ONSLAUGHT_POINTS+' POINTS, THEN THE CENTRE');
   updateHoodedHud();
 }
-function knightRoyalOnslaughtSkipCountForRound(){
-  const r=Math.max(1,Number(round)||1);
-  if(r<=1) return 0;
-  if(r<=20) return Math.round(((r-1)/19)*5);
-  return Math.min(10,5+Math.floor((r-20)/10));
-}
 function knightRoyalOnslaughtSegmentDistanceSq(point,a,b){
   const abx=b.x-a.x, abz=b.z-a.z;
   const apx=point.x-a.x, apz=point.z-a.z;
@@ -21532,32 +21519,6 @@ function knightRoyalOnslaughtSweepBodyContacts(from,to,index,hitSet,endpointTarg
   return contacts;
 }
 
-function knightRoyalOnslaughtEndpointContacts(index,hitSet,preferredTarget=null){
-  if(!player)return 0;
-  const radius=knightRoyalOnslaughtContactRadius(true);
-  const r2=radius*radius;
-  let contacts=0;
-
-  // Endpoint overlap check is intentionally independent of the planned target.
-  // If Cloud visually lands inside two or three enemies, all of them count.
-  for(const z of Array.from(zombies)){
-    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-    if(hitSet&&hitSet.has(z.uuid))continue;
-
-    const dx=z.position.x-player.position.x;
-    const dz=z.position.z-player.position.z;
-    if(dx*dx+dz*dz>r2)continue;
-
-    if(knightRoyalOnslaughtRegisterContact(
-      z,index,
-      {x:z.position.x,y:z.position.y||0,z:z.position.z},
-      hitSet,
-      true
-    ))contacts++;
-  }
-
-  return contacts;
-}
 
 function knightRoyalOnslaughtPathDamage(from,to,index,endpoint){
   // Compatibility/failsafe final sweep. The main hit detection now runs every
@@ -21565,18 +21526,6 @@ function knightRoyalOnslaughtPathDamage(from,to,index,endpoint){
   const hitSet=(knightRuntime.royalOnslaughtDash&&knightRuntime.royalOnslaughtDash.contactHitIds)
     || new Set();
   knightRoyalOnslaughtSweepBodyContacts(from,to,index,hitSet,endpoint);
-}
-function knightRoyalOnslaughtSelectTarget(){
-  const eligible=knightRuntime.royalOnslaughtEligibleIds;
-  const living=zombies.filter(z=>z&&!z.userData.dead&&!z.userData.spawnPending&&(!eligible||eligible.has(z.uuid)));
-  if(!living.length) return null;
-  living.sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position));
-  const skip=knightRoyalOnslaughtSkipCountForRound();
-  const stride=skip+1;
-  const cursor=Math.max(0,knightRuntime.royalOnslaughtTargetCursor||0);
-  const target=living[cursor%living.length];
-  knightRuntime.royalOnslaughtTargetCursor=(cursor+stride)%Math.max(1,living.length);
-  return target;
 }
 const KNIGHT_ONSLAUGHT_KILL_RADIUS=5.0;
 
@@ -21860,51 +21809,6 @@ function knightRoyalOnslaughtProvenImpactWow(target,index){
   if(navigator.vibrate)navigator.vibrate(milestone?[35,18,55]:24);
 }
 
-function knightRoyalOnslaughtImpactStrike(dash){
-  if(!dash||!player)return;
-  const {target,index}=dash;
-  const hitSet=dash.contactHitIds||(dash.contactHitIds=new Set());
-  const hitIds=knightRuntime.royalOnslaughtHitIds||(knightRuntime.royalOnslaughtHitIds=new Set());
-
-  // The endpoint itself is always an official impact point even if the planned
-  // target was already killed by Cloud's moving-body contact a frame earlier.
-  const endpointProxy={
-    position:new THREE.Vector3(player.position.x,player.position.y,player.position.z),
-    userData:{dead:false,spawnPending:false}
-  };
-  knightRoyalOnslaughtProvenImpactWow(endpointProxy,index);
-
-  // Final body-overlap capture around the landing position.
-  knightRoyalOnslaughtEndpointContacts(index,hitSet,target);
-
-  if(target&&target.userData&&!target.userData.dead&&!target.userData.spawnPending){
-    hitIds.add(target.uuid);
-    if(!hitSet.has(target.uuid)){
-      knightRoyalOnslaughtRegisterContact(
-        target,index,
-        {x:target.position.x,y:target.position.y||0,z:target.position.z},
-        hitSet,
-        true
-      );
-    }
-  }
-
-  // Attack motion remains after arrival.
-  knightPlayClip(
-    index%2?['melee','chop']:['melee','slash'],
-    index%2?'1H_Melee_Attack_Chop':'1H_Melee_Attack_Slice_Horizontal',
-    .22,.08
-  );
-
-  knightRuntime.royalOnslaughtStrikeIndex=index+1;
-  const survivors=knightRoyalOnslaughtLivingEligible();
-  const bossOnly=(knightRuntime.royalOnslaughtStrikeIndex||0)>=20 &&
-    survivors.length>0 &&
-    survivors.every(z=>knightEnemyClass(z)==='boss');
-  knightRuntime.royalOnslaughtStrikeTimer=bossOnly?.07:.09;
-
-  if(navigator.vibrate)navigator.vibrate(18);
-}
 
 function knightRoyalOnslaughtFinish(){
   if(!player) return;
@@ -21938,30 +21842,12 @@ function knightRoyalOnslaughtFinish(){
   triggerCombatShake(18,280);
   if(navigator.vibrate) navigator.vibrate([65,24,110]);
 }
-function knightRoyalOnslaughtLivingEligible(){
-  const eligible=knightRuntime.royalOnslaughtEligibleIds;
-  if(!eligible) return [];
-  return zombies.filter(z=>z&&!z.userData.dead&&eligible.has(z.uuid));
-}
 function knightRoyalOnslaughtActiveElapsed(){
   if(!(knightRuntime.aegisWindow>0)) return 0;
   return Math.max(0,knightRuntime.royalOnslaughtElapsed||0);
 }
 function knightRoyalOnslaughtCaptureRemaining(){
   return Math.max(0,knightRuntime.royalOnslaughtCaptureRemainingTime||0);
-}
-function knightRoyalOnslaughtPruneEligibility(){
-  const eligible=knightRuntime.royalOnslaughtEligibleIds;
-  if(!eligible) return;
-  const liveIds=new Set();
-  for(const z of zombies){
-    if(!z||!z.uuid) continue;
-    liveIds.add(z.uuid);
-    if(z.userData&&z.userData.dead) knightRoyalOnslaughtClearMarker(z);
-  }
-  for(const id of Array.from(eligible)){
-    if(!liveIds.has(id)) eligible.delete(id);
-  }
 }
 
 
@@ -23362,12 +23248,6 @@ function dragonlordFireRing(origin,radius,color=DL_FIRE,life=.4){
   ring.rotation.x=-Math.PI/2; ring.position.set(origin.x,(origin.y||0)+.08,origin.z);
   ring.userData.baseOpacity=.88;
   pushKnightFx(ring,{life,grow:2.4,from:1});
-}
-function dragonlordEmberPillar(x,y,z,color=DL_EMBER,life=.5,h=2.2){
-  const pillar=new THREE.Mesh(new THREE.CylinderGeometry(.18,.42,h,10,1,true),knightMat(color,.7));
-  pillar.position.set(x,y+h/2,z);
-  pillar.userData.baseOpacity=.7;
-  pushKnightFx(pillar,{life,grow:.9,from:1,vy:.6});
 }
 
 /* --------------------------------------------------- OBJECT POOLING (mobile)
@@ -26897,26 +26777,6 @@ function aesirPrimaryDamageScaleForRound(){
   // Round 1 starts at 35% and rises smoothly to 100% at Round 30.
   const r=Math.max(1,Math.min(30,Number(round)||1));
   return 0.35+0.65*((r-1)/29);
-}
-function aesirDamageAlongSegment(a,b,radius,damage,stun=.22,knock=3.0,hitSet=null){
-  const dx=b.x-a.x,dz=b.z-a.z,len2=dx*dx+dz*dz||1;
-  let hits=0;
-  for(const z of zombies){
-    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-    if(hitSet&&hitSet.has(z.uuid))continue;
-    const px=z.position.x-a.x,pz=z.position.z-a.z;
-    const t=Math.max(0,Math.min(1,(px*dx+pz*dz)/len2));
-    const cx=a.x+dx*t,cz=a.z+dz*t;
-    const ex=z.position.x-cx,ez=z.position.z-cz;
-    if(ex*ex+ez*ez>radius*radius)continue;
-    if(hitSet)hitSet.add(z.uuid);
-    z.userData.hitStun=Math.max(z.userData.hitStun||0,stun);
-    const dl=Math.hypot(ex,ez)||1;
-    z.userData.knockbackX=(z.userData.knockbackX||0)+(ex/dl)*knock;
-    z.userData.knockbackZ=(z.userData.knockbackZ||0)+(ez/dl)*knock;
-    applyBulletDamage(z,damage*playerStats.power);hits++;
-  }
-  return hits;
 }
 function aesirThunderbrandArc(w){
   if(!player||!gameRunning)return false;
