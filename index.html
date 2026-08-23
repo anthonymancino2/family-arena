@@ -1515,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.87.00 - Dudu: Auto-Target, Ice Ball, New Ultimates';
+const GAME_VERSION='23.88.00 - Dudu: 10s Map-Clearing Ultimates';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -4020,11 +4020,11 @@ const SUPERNOVA_PIERCER = {id:'supernova_piercer', name:'Supernova Piercer', pri
 // =====================================================================
 // Ultimate-tier ability metadata (shown in the Abilities shop/loadout).
 const DUDU_TIDAL_CATACLYSM_ABILITY = {id:'dudu_tidal_cataclysm', name:'Tidal Cataclysm', price:0,
-  desc:'Ultimate-tier ability, free and pre-owned. Five colossal waves sweep the full width of the map in sequence over the next several seconds, executing everything caught in each pass.'};
+  desc:'Ultimate-tier ability, free and pre-owned. Four colossal waves sweep the full width of the map over 10 seconds, executing everything caught in each pass.'};
 const DUDU_CRYO_PRISON_ABILITY = {id:'dudu_cryo_prison', name:'Cryo Prison', price:0,
-  desc:'Ultimate-tier ability, free and pre-owned. Every enemy near Dudu is encased in solid ice, then the blocks shatter into glittering shards.'};
+  desc:'Ultimate-tier ability, free and pre-owned. Every enemy on the map is encased in solid ice within moments, held frozen for 10 seconds, then every block shatters together in one synchronized finishing blow.'};
 const DUDU_KRAKEN_GRASP_ABILITY = {id:'dudu_kraken_grasp', name:"Kraken's Grasp", price:0,
-  desc:'Ultimate-tier ability, free and pre-owned. Jagged claws of ice erupt from below at multiple enemy positions across the map in rapid succession.'};
+  desc:'Ultimate-tier ability, free and pre-owned. For 10 relentless seconds, jagged claws of ice erupt from below across the entire map, chasing down anything still standing.'};
 // DUDU THE PENGUIN — shader-based ice/water FX engine.
 // Three reusable custom-shader building blocks (all Three.js
 // ShaderMaterial, WebGL-native, no external textures/assets):
@@ -4463,18 +4463,20 @@ function duduBlizzardBlitz(w){
 }
 
 // --- ULTIMATE 1: Tidal Cataclysm — ported from Chopper's doldrumsCannon()
-// wave-sweep structure (same 5-waves/2s-apart/8s-travel/full-map-width
-// shape, same per-archetype contact rules), rebuilt end to end on Dudu's
-// own water shader instead of Chopper's FX so nothing here is a reskin of
-// someone else's active visual — it is a persistent multi-wave state
-// machine (like Blizzard's/Skyfall's own runtime state), ticked every
-// frame from updateDuduTidalCataclysm() below. ---
+// wave-sweep structure (full-map-width, per-archetype contact rules),
+// rebuilt end to end on Dudu's own water shader instead of Chopper's FX so
+// nothing here is a reskin of someone else's active visual. Retimed to a
+// clean 10-second runtime (4 waves, 2.5s apart, 2.5s travel each — last
+// wave lands exactly at t=10s) and visually bigger — it is a persistent
+// multi-wave state machine (like Blizzard's/Skyfall's own runtime state),
+// ticked every frame from updateDuduTidalCataclysm() below. ---
 let duduTidal=null;
-const DUDU_TIDAL_TOTAL_WAVES=5, DUDU_TIDAL_SPAWN_EVERY=2.0, DUDU_TIDAL_WAVE_DURATION=8.0;
+const DUDU_TIDAL_TOTAL_WAVES=4, DUDU_TIDAL_SPAWN_EVERY=2.5, DUDU_TIDAL_WAVE_DURATION=2.5;
 function duduTidalWaveMesh(start,end,halfWidth){
-  const wall=new THREE.Mesh(new THREE.PlaneGeometry(halfWidth*2,3.6,28,6),DUDU_WATER_MAT.clone());
+  const wall=new THREE.Mesh(new THREE.PlaneGeometry(halfWidth*2,6.5,36,8),DUDU_WATER_MAT.clone());
+  wall.material.uniforms.uOpacity.value=0;
   wall.rotation.y=Math.atan2(end.x-start.x,end.z-start.z);
-  wall.position.copy(start); wall.position.y+=1.6;
+  wall.position.copy(start); wall.position.y+=2.4;
   scene.add(wall);
   return wall;
 }
@@ -4503,8 +4505,8 @@ function updateDuduTidalCataclysm(dt){
     s.spawned++; s.nextSpawn+=s.spawnEvery;
     const mesh=duduTidalWaveMesh(s.start,s.end,s.halfWidth);
     s.waves.push({t:0,d:s.waveDuration,mesh,hit:new Set()});
-    triggerCombatShake(9,150);
-    duduSpawnSwarm(s.start.x,player.position.y+.3,s.start.z,{shape:'ring',count:20,speed:3,life:.5,size:.15,color:0x4fd0ff,color2:0xffffff,damping:1.6});
+    triggerCombatShake(12,220);
+    duduSpawnSwarm(s.start.x,player.position.y+.3,s.start.z,{shape:'ring',count:44,speed:5,life:.6,size:.17,color:0x4fd0ff,color2:0xffffff,damping:1.4});
     updateHoodedHud();
   }
   for(let wi=s.waves.length-1;wi>=0;wi--){
@@ -4515,7 +4517,10 @@ function updateDuduTidalCataclysm(dt){
     w.mesh.position.x=pos.x; w.mesh.position.z=pos.z;
     if(w.mesh.material&&w.mesh.material.uniforms)w.mesh.material.uniforms.uTime.value+=dt*3;
     const edgeFade=p<0.06?p/0.06:(p>0.94?(1-p)/0.06:1);
-    if(w.mesh.material&&w.mesh.material.uniforms)w.mesh.material.uniforms.uOpacity.value=0.85*edgeFade;
+    if(w.mesh.material&&w.mesh.material.uniforms)w.mesh.material.uniforms.uOpacity.value=0.92*edgeFade;
+    if(Math.random()<dt*22){
+      duduSpawnSwarm(pos.x+(Math.random()-.5)*s.halfWidth*1.6,player.position.y+.15,pos.z+(Math.random()-.5)*s.halfWidth*1.6,{shape:'sphere',count:4,speed:1.4,life:.4,size:.12,color:0xdff7ff,color2:0xffffff,damping:2.2});
+    }
     const thick=2.8;
     for(const z of zombies){
       if(!z||z.userData.dead||w.hit.has(z))continue;
@@ -4525,7 +4530,7 @@ function updateDuduTidalCataclysm(dt){
       w.hit.add(z);
       const isBoss=z.userData.archetype==='boss', isBrute=z.userData.archetype==='brute';
       if(isBoss){
-        applyBulletDamage(z,(z.userData.maxHp||z.userData.hp||1)*.03);
+        applyBulletDamage(z,(z.userData.maxHp||z.userData.hp||1)*.07);
         z.userData.hitStun=Math.max(z.userData.hitStun||0,1.0);
       }else if(isBrute){
         z.userData.duduTidalContacts=(z.userData.duduTidalContacts||0)+1;
@@ -4535,80 +4540,143 @@ function updateDuduTidalCataclysm(dt){
       }else{
         applyBulletDamage(z,999);
       }
-      duduSpawnSwarm(z.position.x,z.position.y+.5,z.position.z,{shape:'sphere',count:8,speed:3,life:.4,size:.11,color:0x6fd8ff,color2:0xffffff,gravity:-2.5,damping:1.6});
+      duduSpawnSwarm(z.position.x,z.position.y+.5,z.position.z,{shape:'sphere',count:14,speed:4.5,life:.5,size:.13,color:0x6fd8ff,color2:0xffffff,gravity:-2.8,damping:1.5});
     }
     if(p>=1){ scene.remove(w.mesh); duduDisposeMesh(w.mesh); s.waves.splice(wi,1); triggerCombatShake(11,180); }
   }
   if(s.spawned>=s.totalWaves&&s.waves.length===0){ duduTidal=null; updateHoodedHud(); }
 }
 
-// --- ULTIMATE 2: Cryo Prison — encases nearby enemies in ice, then shatters ---
-const DUDU_CRYO_PRISON_RADIUS=9, DUDU_CRYO_PRISON_MAX_TARGETS=10;
+// --- ULTIMATE 2: Cryo Prison — every enemy on the map is encased in ice
+// within the first ~1.5s, held frozen for a full 10-second sentence, then
+// every block shatters together in one synchronized finishing blow. A
+// real 10-second map-clearing ultimate, not an instant snapshot. ---
+let duduCryo=null;
+const DUDU_CRYO_DURATION=10.0;
 function triggerDuduCryoPrison(){
-  if(!corsairIsActive()||!gameRunning||!player)return;
+  if(!corsairIsActive()||!gameRunning||!player||duduCryo)return;
   markUltimateUsed();
   duduEnsureMaterials();
   toast('🧊 Cryo Prison!');
-  triggerCombatShake(10,260);
+  triggerCombatShake(13,420);
   const px=player.position.x, py=player.position.y, pz=player.position.z;
-  const targets=duduHitRadius(px,pz,DUDU_CRYO_PRISON_RADIUS,999,0,.24).slice(0,DUDU_CRYO_PRISON_MAX_TARGETS);
-  duduSpawnSwarm(px,py+.6,pz,{shape:'ring',count:40,speed:7,life:.5,size:.14,color:0x4fd0ff,color2:0xffffff,damping:1.2});
-  spawnFrostWaveRing(px,py,pz,DUDU_CRYO_PRISON_RADIUS,0.7);
-  for(const z of targets){
-    if(!z||!z.parent)continue;
+  const targets=livingEnemiesByDistance(Infinity);
+  const maxR=Math.max(arenaSize*1.6,24);
+  [0,0.12,0.26,0.42,0.6].forEach(delay=>{
+    setTimeout(()=>{ if(corsairIsActive()&&gameRunning) spawnFrostWaveRing(px,py,pz,maxR*(0.3+delay*1.1),0.85); },delay*1000);
+  });
+  duduSpawnSwarm(px,py+.6,pz,{shape:'ring',count:50,speed:9,life:.6,size:.15,color:0x4fd0ff,color2:0xffffff,damping:1.1});
+  duduCryo={t:0,duration:DUDU_CRYO_DURATION,targets,encaseIndex:0,nextEncase:0,blocks:[],px,py,pz};
+  updateHoodedHud();
+}
+function updateDuduCryoPrison(dt){
+  if(!duduCryo)return;
+  const s=duduCryo;
+  if(!corsairIsActive()){
+    for(const b of s.blocks){ if(b.mesh){scene.remove(b.mesh); duduDisposeMesh(b.mesh);} }
+    duduCryo=null; return;
+  }
+  s.t+=dt; s.nextEncase-=dt;
+  while(s.encaseIndex<s.targets.length&&s.t<2.0&&s.nextEncase<=0){
+    const z=s.targets[s.encaseIndex++];
+    s.nextEncase+=0.045;
+    if(!z||!z.parent||z.userData.dead)continue;
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,s.duration-s.t+0.6);
     const block=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.7,1.1),DUDU_GLOW_MAT.clone());
-    block.material.uniforms.uOpacity.value=0.5;
+    block.material.uniforms.uOpacity.value=0.42;
     block.position.set(z.position.x,z.position.y+0.85,z.position.z);
     block.scale.setScalar(0.05);
-    duduAddMeshFx(block,1.1,(dt,t)=>{
-      if(z&&z.parent&&!z.userData.dead){ block.position.x=z.position.x; block.position.z=z.position.z; }
-      if(t<0.25){ block.scale.setScalar(0.05+(t/0.25)*0.95); }
-      else if(t>0.8){ const q=1-Math.min(1,(t-0.8)/0.3); if(block.material)block.material.uniforms.uOpacity.value=0.5*q; block.scale.setScalar(1+(1-q)*0.3); }
-    },()=>{
-      duduSpawnSwarm(block.position.x,block.position.y,block.position.z,{shape:'sphere',count:14,speed:4.5,life:.5,size:.12,color:0x8fe3ff,color2:0xffffff,gravity:-3,damping:1.4});
-    });
+    scene.add(block);
+    s.blocks.push({mesh:block,z});
+    if(Math.random()<0.4)duduSpawnSwarm(block.position.x,block.position.y,block.position.z,{shape:'sphere',count:5,speed:1.6,life:.35,size:.09,color:0x8fe3ff,color2:0xffffff,damping:2.4});
+  }
+  for(const b of s.blocks){
+    if(!b.mesh)continue;
+    if(b.z&&b.z.parent&&!b.z.userData.dead){
+      b.z.userData.hitStun=Math.max(b.z.userData.hitStun||0,0.3);
+      b.mesh.position.x=b.z.position.x; b.mesh.position.z=b.z.position.z;
+    }
+    if(b.mesh.scale.x<1)b.mesh.scale.setScalar(Math.min(1,b.mesh.scale.x+dt*3.2));
+    b.mesh.rotation.y+=dt*0.5;
+  }
+  if(s.t>=s.duration){
+    triggerCombatShake(18,460);
+    toast('🧊 Cryo Prison shatters!');
+    for(const b of s.blocks){
+      if(b.mesh){
+        duduSpawnSwarm(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,{shape:'sphere',count:16,speed:5,life:.6,size:.13,color:0x8fe3ff,color2:0xffffff,gravity:-3,damping:1.4});
+        scene.remove(b.mesh); duduDisposeMesh(b.mesh);
+      }
+      if(b.z&&b.z.parent&&!b.z.userData.dead){
+        const isBoss=b.z.userData.archetype==='boss';
+        applyBulletDamage(b.z,isBoss?(b.z.userData.maxHp||b.z.userData.hp||1)*.32:999);
+      }
+    }
+    spawnFrostWaveRing(s.px,s.py,s.pz,Math.max(arenaSize*1.6,24),1.0);
+    duduCryo=null;
+    updateHoodedHud();
   }
 }
 
-// --- ULTIMATE 3: Kraken's Grasp — icy claws erupt under nearby enemies ---
-const DUDU_KRAKEN_STRIKES=5, DUDU_KRAKEN_RADIUS=3.0;
+// --- ULTIMATE 3: Kraken's Grasp — a relentless 10-second onslaught of icy
+// claw strikes erupting across the whole map (prioritizing living enemies,
+// falling back to scattered map coverage), not a handful of quick pokes. ---
+let duduKraken=null;
+const DUDU_KRAKEN_DURATION=10.0, DUDU_KRAKEN_STRIKE_EVERY=0.42, DUDU_KRAKEN_RADIUS=4.4;
+function duduKrakenStrike(x,z,py){
+  duduSpawnSwarm(x,py+.1,z,{shape:'ring',count:18,speed:2.4,life:.3,size:.11,color:0x8fe3ff,color2:0xffffff,damping:2.6});
+  setTimeout(()=>{
+    if(!corsairIsActive()||!scene)return;
+    triggerCombatShake(9,170);
+    const g=new THREE.Group();
+    for(let s=0;s<6;s++){
+      const spike=new THREE.Mesh(new THREE.ConeGeometry(0.25,2.7+Math.random()*1.1,6),DUDU_ICE_MAT.clone());
+      const a=s*Math.PI/3+Math.random()*.3;
+      spike.position.set(Math.sin(a)*0.42,1.15,Math.cos(a)*0.42);
+      spike.rotation.z=Math.sin(a)*.28; spike.rotation.x=Math.cos(a)*.28;
+      g.add(spike);
+    }
+    g.position.set(x,py,z);
+    g.scale.set(1,0.02,1);
+    duduAddMeshFx(g,0.9,(dt,t)=>{
+      if(t<0.2){ g.scale.y=Math.min(1.3,(t/0.2)*1.3); }
+      else if(t<0.3){ g.scale.y=1.3-((t-0.2)/0.1)*0.3; }
+      else{ g.scale.y=1; }
+      if(t>0.55){ const q=1-Math.min(1,(t-0.55)/0.3); g.traverse(o=>{ if(o.material&&o.material.uniforms&&o.material.uniforms.uOpacity)o.material.uniforms.uOpacity.value=0.94*q; }); }
+    });
+    duduHitRadius(x,z,DUDU_KRAKEN_RADIUS,999,3.6,.09);
+    duduSpawnSwarm(x,py+1.1,z,{shape:'sphere',count:20,speed:6,life:.55,size:.14,color:0x6fd8ff,color2:0xffffff,gravity:-3.5,damping:1.4});
+  },130);
+}
 function triggerDuduKrakenGrasp(){
-  if(!corsairIsActive()||!gameRunning||!player)return;
+  if(!corsairIsActive()||!gameRunning||!player||duduKraken)return;
   markUltimateUsed();
   duduEnsureMaterials();
   toast("🐙 Kraken's Grasp!");
-  triggerCombatShake(8,300);
-  const px=player.position.x, py=player.position.y, pz=player.position.z;
-  const targets=livingEnemiesByDistance(arenaSize*1.6).slice(0,DUDU_KRAKEN_STRIKES);
-  const points=targets.length?targets.map(z=>({x:z.position.x,z:z.position.z})):[{x:px,z:pz}];
-  points.forEach((pt,i)=>{
-    setTimeout(()=>{
-      if(!corsairIsActive()||!scene)return;
-      duduSpawnSwarm(pt.x,py+.1,pt.z,{shape:'ring',count:14,speed:2,life:.3,size:.1,color:0x8fe3ff,color2:0xffffff,damping:2.6});
-      setTimeout(()=>{
-        if(!corsairIsActive()||!scene)return;
-        triggerCombatShake(7,140);
-        const g=new THREE.Group();
-        for(let s=0;s<4;s++){
-          const spike=new THREE.Mesh(new THREE.ConeGeometry(0.22,2.2+Math.random()*0.8,6),DUDU_ICE_MAT.clone());
-          const a=s*Math.PI/2+Math.random()*.4;
-          spike.position.set(Math.sin(a)*0.35,1.0,Math.cos(a)*0.35);
-          spike.rotation.z=Math.sin(a)*.25; spike.rotation.x=Math.cos(a)*.25;
-          g.add(spike);
-        }
-        g.position.set(pt.x,py,pt.z);
-        g.scale.set(1,0.02,1);
-        duduAddMeshFx(g,0.8,(dt,t)=>{
-          if(t<0.2){ g.scale.y=Math.min(1.2,(t/0.2)*1.2); }
-          else if(t<0.3){ g.scale.y=1.2-((t-0.2)/0.1)*0.2; }
-          else{ g.scale.y=1; }
-          if(t>0.55){ const q=1-Math.min(1,(t-0.55)/0.25); g.traverse(o=>{ if(o.material&&o.material.uniforms&&o.material.uniforms.uOpacity)o.material.uniforms.uOpacity.value=0.94*q; }); }
-        });
-        duduHitRadius(pt.x,pt.z,DUDU_KRAKEN_RADIUS,999,3.0,.16);
-        duduSpawnSwarm(pt.x,py+1.0,pt.z,{shape:'sphere',count:16,speed:5,life:.5,size:.12,color:0x6fd8ff,color2:0xffffff,gravity:-3.5,damping:1.4});
-      },140);
-    },i*140);
-  });
+  triggerCombatShake(10,350);
+  duduKraken={t:0,nextStrike:0,duration:DUDU_KRAKEN_DURATION};
+  updateHoodedHud();
+  duduKrakenStrike(player.position.x,player.position.z,player.position.y);
+}
+function updateDuduKrakenGrasp(dt){
+  if(!duduKraken)return;
+  if(!corsairIsActive()){ duduKraken=null; return; }
+  const s=duduKraken;
+  s.t+=dt; s.nextStrike-=dt;
+  if(s.t>=s.duration){ duduKraken=null; updateHoodedHud(); return; }
+  if(s.nextStrike<=0&&player){
+    s.nextStrike+=DUDU_KRAKEN_STRIKE_EVERY;
+    const targets=livingEnemiesByDistance(Math.max(arenaSize*1.8,26));
+    let x,z;
+    if(targets.length){
+      const pick=targets[Math.floor(Math.random()*Math.min(targets.length,10))];
+      x=pick.position.x+(Math.random()-.5)*1.6; z=pick.position.z+(Math.random()-.5)*1.6;
+    }else{
+      const a=Math.random()*Math.PI*2, r=Math.random()*arenaSize*0.85;
+      x=Math.cos(a)*r; z=Math.sin(a)*r;
+    }
+    duduKrakenStrike(x,z,player.position.y);
+  }
 }
 
 // Captain's Fury — Dudu's signature/special ability (the 4th HUD button,
@@ -4640,6 +4708,8 @@ function updateCorsairFury(dt){
   }
   updateDuduFx(dt);
   updateDuduTidalCataclysm(dt);
+  updateDuduCryoPrison(dt);
+  updateDuduKrakenGrasp(dt);
 }
 const DRAGONLORD_ASHFALL_CATACLYSM = {id:'dragonlord_meteorstorm', name:'Ashfall Cataclysm', price:0, avatar:'dragonlord', unlockLevel:24,
   desc:'Ultimate-tier ability, free once unlocked. Nyxara rears back and calls down a storm of blazing meteors across the arena — a dozen fiery impacts crater the ground, each one damaging, knocking back, and briefly stunning every enemy caught in the blast.'};
@@ -18197,11 +18267,13 @@ function updateHoodedHud(){
         abilityBtn.classList.toggle('active',!!duduTidal);
         abilityBtn.classList.remove('cooling');
       }else if(equippedAbilityId==='dudu_cryo_prison'){
-        abilityBtn.textContent='CRYO PRISON';
-        abilityBtn.classList.remove('active','cooling');
+        abilityBtn.textContent=duduCryo?`FROZEN ${Math.max(0,duduCryo.duration-duduCryo.t).toFixed(1)}`:'CRYO PRISON';
+        abilityBtn.classList.toggle('active',!!duduCryo);
+        abilityBtn.classList.remove('cooling');
       }else if(equippedAbilityId==='dudu_kraken_grasp'){
-        abilityBtn.textContent="KRAKEN'S GRASP";
-        abilityBtn.classList.remove('active','cooling');
+        abilityBtn.textContent=duduKraken?`GRASP ${Math.max(0,duduKraken.duration-duduKraken.t).toFixed(1)}`:"KRAKEN'S GRASP";
+        abilityBtn.classList.toggle('active',!!duduKraken);
+        abilityBtn.classList.remove('cooling');
       }else if(isSpider){
         const kit=ensureSpiderKit()||{maximum:null,shadows:null,webline:null,cooldownForAbility:()=>0};
         const label=equippedAbilityId==='spider_maximum'
