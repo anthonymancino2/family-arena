@@ -1465,7 +1465,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.79.00 - Round-Based Power & Attack Speed Scaling';
+const GAME_VERSION='23.79.01 - Fix Stuck-Enemy Recovery Spawning Inside Map';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -14296,14 +14296,16 @@ function enemySeparation(z){
   return {x:sx,z:sz};
 }
 function recoverStuckEnemy(z,target){
-  const baseAngle=Math.atan2(z.position.z-target.position.z,z.position.x-target.position.x);
-  for(let i=0;i<18;i++){
-    const a=baseAngle+(i%2?1:-1)*Math.ceil(i/2)*.34;
-    const rr=7+Math.random()*3;
-    const x=target.position.x+Math.cos(a)*rr,zp=target.position.z+Math.sin(a)*rr;
-    if(spawnPointBlocked(x,zp,z.userData.archetype==='brute'?1.05:.75)) continue;
-    if(livingPlayers().some(p=>Math.hypot(x-p.position.x,zp-p.position.z)<5.5)) continue;
-    z.position.set(x,0,zp);
+  // Used to nudge a stuck enemy to a spot 7-10 units from the player's
+  // CURRENT position — since the player is almost always well inside the
+  // playable area during combat, that routinely teleported enemies deep
+  // inside the map with a spawn-style particle burst, which reads exactly
+  // like "an enemy just spawned inside the arena." Reuses the same
+  // outside-the-map placement logic every fresh spawn already goes
+  // through instead of a bespoke near-player nudge.
+  const replacement=findEnemySpawnPosition(z.userData.archetype);
+  if(replacement){
+    z.position.set(replacement.x,0,replacement.z);
     z.userData.stuckTimer=0;
     z.userData.lastSafePosition=z.position.clone();
     spawnBurst(z.position.x,z.position.y+.5,z.position.z,8,FX_MAT_ZOMBIE,2.2);
