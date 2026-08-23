@@ -1515,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.83.02 - Renamed to Dudu the Penguin';
+const GAME_VERSION='23.84.00 - Dudu: 1/3 Size, Ice/Water Move Theme';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -2003,11 +2003,9 @@ function passiveForAvatar(type=state.avatarType){
 // Knight = medium (larger than those three)
 // Barbarian = largest; V22.22.03 makes the playable Aesir a true 1.5x larger.
 // Corsair's internal build normalizes to the same 1.48 generic height target
-// as most other imported avatars, but the Fox Mage build normalizes to a
-// smaller 1.30 (see buildNineTailedFoxPlayer). 0.84 puts Corsair's final
-// height (1.48*0.84=1.2432) a little under the Fox's 1.30 as requested,
-// rather than the ~14% bigger he was at the default 1.0 multiplier.
-const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:1.0, knight:1.18, barbarian:1.5, cloud:1.0, rhino:1.5, chopper:1.0, spider:1.0, dragonlord:0.45, corsair:0.84 };
+// as most other imported avatars. 0.28 (1/3 of the earlier 0.84) makes his
+// final in-game height ~0.414 -- a small penguin, per explicit request.
+const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:1.0, knight:1.18, barbarian:1.5, cloud:1.0, rhino:1.5, chopper:1.0, spider:1.0, dragonlord:0.45, corsair:0.28 };
 // 0.3 (tiny diagnostic) confirmed visually correct — the scale pipeline
 // does work. 0.45 = 0.3 * 1.5, i.e. 50% bigger than that confirmed baseline,
 // per direct request.
@@ -3630,14 +3628,14 @@ const CHARACTER_COMBAT = {
     defaultId:'corsair_cutlass_slash',
     baseMoveMult:1.20,
     weapons:{
-      corsair_cutlass_slash:{name:'Rune Cutlass Slash', price:0, slot:'primary', kind:'melee', cooldown:0.20, damage:1.25, radius:2.5, arc:2.0, auto:true, fireRateCap:2.5,
-        desc:'A glowing rune-etched cutlass slash. Hold FIRE to keep chaining swings.'},
-      corsair_cannon_volley:{name:'Cannon Volley', price:0, slot:'primary', kind:'multi_arrow', cooldown:0.32, damage:0.90, pierce:1, auto:true, fireRateCap:2,
-        desc:'Fires a five-shot spread of conjured cannonballs in a fan in front of him.'},
-      corsair_arcane_cannonball:{name:'Arcane Cannonball', price:0, slot:'secondary', kind:'giant_fireball', cooldown:0.9, damage:999, splash:5.0, splashDamage:4.2, directInstakill:true, auto:true, fireRateCap:2.0,
-        desc:'Conjures a giant molten cannonball — a direct hit executes any non-boss outright, and the impact scorches a wide area around it.'},
-      corsair_hookshot:{name:'Grappling Hookshot', price:0, slot:'secondary', kind:'corsair_hookshot', cooldown:0.6, damage:1.6, pierce:3,
-        desc:'Fires a rune-warded grappling hook that spears through up to four enemies in a line.'}
+      corsair_cutlass_slash:{name:'Frost Cutlass Slash', price:0, slot:'primary', kind:'melee', cooldown:0.20, damage:1.25, radius:2.5, arc:2.0, auto:true, fireRateCap:2.5,
+        desc:'An ice-rimed cutlass slash. Hold FIRE to keep chaining swings.'},
+      corsair_cannon_volley:{name:'Frost Cannon Volley', price:0, slot:'primary', kind:'multi_arrow', cooldown:0.32, damage:0.90, pierce:1, auto:true, fireRateCap:2,
+        desc:'Fires a five-shot spread of conjured ice cannonballs in a fan in front of him.'},
+      corsair_arcane_cannonball:{name:'Tidal Cannonball', price:0, slot:'secondary', kind:'corsair_ice_cannonball', cooldown:0.9, damage:999, splash:5.0, splashDamage:4.2, directInstakill:true, auto:true, fireRateCap:2.0,
+        desc:'Conjures a giant ice-and-seawater cannonball — a direct hit executes any non-boss outright, and the impact drenches a wide area in freezing spray.'},
+      corsair_hookshot:{name:'Frost Hookshot', price:0, slot:'secondary', kind:'corsair_hookshot', cooldown:0.6, damage:1.6, pierce:3,
+        desc:'Fires an ice-tipped grappling hook that spears through up to four enemies in a line.'}
     }
   },
   hooded: {
@@ -4020,9 +4018,9 @@ const SUPERNOVA_PIERCER = {id:'supernova_piercer', name:'Supernova Piercer', pri
 const CORSAIR_MAELSTROM_SQUALL = {id:'blizzard_storm', name:'Maelstrom Squall', price:0,
   desc:'Ultimate-tier ability, free and pre-owned. Conjures a 10-second gravity maelstrom that drags every enemy toward its center while conjured ice crashes down on them.'};
 const CORSAIR_SKYFALL_CANNONADE = {id:'skyfall_barrage', name:'Skyfall Cannonade', price:0,
-  desc:'Ultimate-tier ability, free and pre-owned. For 10 seconds, a ghost armada rains giant cannonballs onto enemy clusters with clear landing markers and strong area damage.'};
+  desc:'Ultimate-tier ability, free and pre-owned. For 10 seconds, a spectral ice-galleon rains giant frozen cannonballs onto enemy clusters with clear landing markers and strong area damage.'};
 const CORSAIR_LEVIATHAN_COMET = {id:'super_meteor', name:"Leviathan's Comet", price:0,
-  desc:'Ultimate-tier ability, free and pre-owned. Calls down one enormous comet. The impact heavily damages nearby enemies, stuns survivors, burns them, and chips a boss\'s health.'};
+  desc:'Ultimate-tier ability, free and pre-owned. Calls down one colossal shard of glacial ice torn from the deep. The impact heavily damages nearby enemies, stuns survivors, chills them, and chips a boss\'s health.'};
 // Captain's Fury — Corsair's signature/special ability (the 4th HUD button,
 // same slot Hooded/Barbarian/Mage/etc use for their own signature move).
 // A short self-contained power buff: attack cooldown is already 0 for this
@@ -30977,6 +30975,7 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
   const fake={
     damage:w.damage, splash:w.splash||0, rangeMult:1, kind:w.kind,
     mat:new THREE.MeshBasicMaterial({color:
+      corsairIsActive()?0x4fd0ff:
       w.kind==='primal_wave'?0xff5622:
       w.kind==='holy_wave'?0xffd04a:
       w.kind==='rocket_arrow'||w.kind==='giant_fireball'?0xff6b32:
