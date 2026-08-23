@@ -1453,8 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.76.01 - Dead Code Cleanup Pt.1';
-const LEGACY_ABILITY_RUNTIME_REMOVED=true;
+const GAME_VERSION='23.76.02 - Dead Code Cleanup Pt.2';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -1862,7 +1861,6 @@ const HERO_ROSTER_INFO = {
 // HERO_ROSTER_INFO in an earlier cleanup, which stopped the main game script.
 const HERO_PASSIVES = {
   dragonlord:{name:'Infernal Ascension',icon:'🔥',desc:'Every third defeat detonates a Hellfire Nova around her. Every fifth defeat grants 3 seconds of Invincibility plus a burst of speed.',shockwaveKills:3,shockwaveRadius:4.8,shockwaveDamage:1.3,shockwaveStun:.6,invincibleKills:5,invincibleDuration:3.0,killMoveMult:1.15,killMoveDuration:2.0},
-  wolverine:{name:'Healing Factor',icon:'🩸',desc:'Regenerates 1 heart every 18 seconds. Every third defeat grants 25% movement speed for 3 seconds, and rage builds with every claw that lands.',regenSeconds:18,killTrigger:3,killMoveMult:1.25,killMoveDuration:3.0},
   rogue:{name:'Eagle Eye',icon:'🎯',desc:'Arrows fly 18% faster and remain active 15% longer. Every fifth defeat triggers 3 seconds of Tailwind.',projectileSpeedMult:1.18,projectileLifeMult:1.15,tailwindKills:5,tailwindDuration:3,tailwindMoveMult:1.35,tailwindAttackMult:1.40},
   hooded:{name:"Predator's Rush",icon:'💨',desc:'Defeating an enemy grants 20% movement speed for 2.5 seconds.',killMoveMult:1.20,killMoveDuration:2.5},
   chopper:{name:"Predator's Rush",icon:'💨',desc:'Defeating an enemy grants 20% movement speed for 2.5 seconds.',killMoveMult:1.20,killMoveDuration:2.5},
@@ -2077,7 +2075,6 @@ function refreshCrystalPills(){
 }
 
 // ---- HOME: selected hero + stable global top-three showcase ----
-const HOME_HERO_ICONS = {rogue:'🏹',hooded:'🥷',mage:'🦊',knight:'🛡️',barbarian:'🪓',cloud:'⚔️',chopper:'🦌'};
 const STARTER_GLOBAL_TOP_THREE = [
   {name:'Arena Legend', points:750000},
   {name:'Iron Vanguard', points:500000},
@@ -2708,38 +2705,27 @@ async function updateAvatarPreview(characterId){
     const root=cloneSkinned(gltf.scene);
     cleanHeroEquipment(root,characterId);
     root.rotation.y=AVATAR_MODEL_YAW[characterId]||0;
-    if(characterId==='wolverine')tuneWolverineVisuals(root,THREEAsset,previewRenderer);
     if(characterId==='spider')tuneSpiderVisuals(root,THREEAsset,previewRenderer);
 
-
-    if(characterId==='carrot'||characterId==='wolverine'||characterId==='spider'){
+    if(characterId==='spider'){
       // Preview uses the same visible-mesh fit as gameplay. Do not apply the
       // gameplay parent scale here because previewRoot has no player wrapper.
       root.updateMatrixWorld(true);
       let meshBox=importedVisibleMeshBounds(root,THREEAsset);
       const meshSize=meshBox.getSize(new THREEAsset.Vector3());
-      const previewHeight=characterId==='carrot'?1.48:(characterId==='wolverine'?1.48:(characterId==='spider'?1.18:1.42));
+      const previewHeight=1.18;
       root.scale.multiplyScalar(previewHeight/Math.max(.001,meshSize.y));
-      if(characterId==='wolverine'){
-        root.scale.x*=.90;
-        root.scale.z*=.92;
-        root.scale.y*=1.06;
-      }
-      if(characterId==='spider'){
-        // Match the gameplay normalization so Spider no longer appears giant
-        // in the avatar selection preview card.
-        root.scale.x*=0.88;
-        root.scale.z*=0.88;
-        root.scale.y*=0.96;
-      }
+      // Match the gameplay normalization so Spider no longer appears giant
+      // in the avatar selection preview card.
+      root.scale.x*=0.88;
+      root.scale.z*=0.88;
+      root.scale.y*=0.96;
       root.updateMatrixWorld(true);
       meshBox=importedVisibleMeshBounds(root,THREEAsset);
       const meshCenter=meshBox.getCenter(new THREEAsset.Vector3());
       root.position.x-=meshCenter.x;
       root.position.z-=meshCenter.z;
       root.position.y-=meshBox.min.y;
-
-      if(characterId==='carrot')root.position.y-=0.16;
     }else{
       const box=new THREEAsset.Box3().setFromObject(root);
       const size=box.getSize(new THREEAsset.Vector3());
@@ -2767,14 +2753,9 @@ async function updateAvatarPreview(characterId){
       // below would miss it and fall back to gltf.animations[0] (Angry).
       const dlIdle=gltf.animations.find(c=>c.name==='Fighting_Idle')||gltf.animations[0];
       if(dlIdle)previewMixer.clipAction(dlIdle).play();
-    }else if(characterId!=='wolverine'){
+    }else{
       const idle=gltf.animations.find(c=>c.name.toLowerCase()==='idle')||gltf.animations[0];
       if(idle)previewMixer.clipAction(idle).play();
-    }else{
-      // Keep Wolverine in the source bind/rest pose for the selection preview.
-      // This makes the intended upright yellow/blue masked silhouette readable
-      // while the imported animation basis is repaired separately.
-      previewMixer.stopAllAction();
     }
     if(status)status.textContent=AVATAR_TYPE_LABELS[characterId].replace(/^.\s/,'');
   }catch(e){
@@ -3567,27 +3548,6 @@ const CHARACTER_COMBAT = {
         desc:'Instantly summons one giant molten fireball for 7 seconds. It seeks enemy clusters, pulls enemies inward, burns large targets and bosses, then erupts in a final fiery explosion. Only one may exist at a time.'}
     }
   },
-  wolverine: {
-    defaultId:'claw_combo',
-    baseMoveMult:1.10,
-    weapons:{
-      claw_combo:{name:'Adamantium Claws', price:0, slot:'primary', kind:'wolv_claw_combo',
-        cooldown:0.22, damage:1.45, radius:2.6, arc:2.3, auto:true,
-        desc:'A three-hit claw chain: left rake, right rake, then a two-handed cross that throws a short adamantium shockwave. Hold FIRE to keep the chain going.'},
-      savage_flurry:{name:'Savage Flurry', price:400, slot:'primary', kind:'wolv_flurry',
-        cooldown:0.10, damage:0.72, radius:2.2, arc:1.9, auto:true,
-        desc:'Abandons the combo for a blur of rapid claw strikes. Lower damage per hit, far more hits, and every landed strike builds rage faster.'},
-      lunging_pounce:{name:'Lunging Pounce', price:430, slot:'secondary', kind:'wolv_pounce',
-        cooldown:2.2, damage:3.2, radius:3.0, range:13,
-        desc:'Leap at the nearest enemy and land claws-first. Everything in the landing radius is thrown outward, and non-boss enemies caught directly under the pounce are executed.'},
-      rage_roar:{name:'Rage Roar', price:460, slot:'secondary', kind:'wolv_roar',
-        cooldown:6.0, damage:1.4, radius:9.0,
-        desc:'A berserker roar that staggers every enemy in a wide ring, knocks them back, and drives your own attack speed up for 5 seconds. Enemies flee briefly before they can close again.'},
-      claw_cyclone:{name:'Claw Cyclone', price:520, slot:'secondary', kind:'wolv_cyclone',
-        cooldown:0, damage:1.9, radius:3.4,
-        desc:'Spin with both claws extended, shredding everything you touch while you move. Duration grows with the round and deflects weak projectiles.'}
-    }
-  },
   knight: {
     defaultId:'royal_combo',
     baseMoveMult:0.96,
@@ -3875,14 +3835,10 @@ const SUPER_METEOR = {id:'super_meteor', name:'Super Meteor', price:900,
 
 const SKYFALL_BARRAGE = {id:'skyfall_barrage', name:'Skyfall Barrage', price:780,
   desc:'Ultimate-tier damage. For 10 seconds, giant translucent arrows rain onto enemy clusters with clear landing markers and strong area damage. Boss damage is capped at 25% per cast. No cooldown during development testing.'};
-const KNIGHT_DEFENSIVE_WHIRLWIND = {id:'knight_whirlwind', name:'Defensive Whirlwind', price:420, avatar:'knight', unlockLevel:6,
-  desc:'A controlled sword-and-shield rotation that lets you move slowly, deflects weak enemy projectiles, and repeatedly damages and pushes enemies outward. Duration starts at 3.8 seconds and grows by round, becoming permanent from Round 25. Cooldown scales from 8 seconds to 0 by Round 21.'};
 const KNIGHT_GUARDIAN_QUAKE = {id:'knight_guardian_quake', name:'Guardian Titan', price:760, avatar:'knight', unlockLevel:12,
   desc:'Hold the Ability button to begin Guardian Charge and automatically flow into Earth Shatter when the charge finishes. Releasing before the charge ends cancels the Earth Shatter follow-up. Steer the charge with the normal movement controls. After the sequence, the Knight remains in Titan form for 15 seconds. Cooldown begins after Titan mode ends and scales with the current round tier.'};
 const KNIGHT_AEGIS_COUNTER = {id:'knight_aegis_counter', name:'Royal Onslaught', price:880, avatar:'knight', unlockLevel:14,
   desc:'Map-clearing active ultimate. Activation freezes every enemy inside the playable area solid until the third endpoint lands; enemies still outside the arena close at full speed and freeze the instant they cross in. The three crossings deal no damage at all - each destination is at least 115 degrees around the perimeter from the last and never near the point two back. The Knight then takes the middle of the map, enemies inside resume at 50% speed, and three cycles of five slash waves fire outward past the arena edge two seconds apart, killing every enemy inside the map on each cycle. You are invulnerable for the whole sequence. Cooldown scales down by round to 0 at Round 45; boss damage remains capped.'};
-const KNIGHT_ROYAL_GUARD_CLONES = {id:'knight_royal_guard_clones', name:'Knights of the Round', price:0, avatar:'knight', unlockLevel:10,
-  desc:'Knight signature move. Summon invincible Knight clones that draw enemy attention and use only the Knight moves currently unlocked. Each clone deals 10% of the player\'s damage. Rounds 10–15 summon 2 clones for 8 seconds with a 10-second cooldown; Rounds 16–20 summon 5 for 15 seconds with a 5-second cooldown; Round 21 onward summons 10 for 30 seconds with a 1.5-second cooldown.'};
 const KNIGHT_JUDGMENT_ULTIMATE = {id:'knight_judgment', name:'Judgment of the King', price:920, avatar:'knight', unlockLevel:18,
   desc:'Ultimate-tier royal execution equipped in the Ability slot. Hammer rain begins immediately and continues throughout the sequence before the arena-wide final impact. The Knight can move during Judgment, cooldown scales down by round to 0 at Round 45, and boss damage remains capped.'};
 const SUPERNOVA_PIERCER = {id:'supernova_piercer', name:'Supernova Piercer', price:860,
@@ -3893,8 +3849,6 @@ const DRAGONLORD_WYRM_FORM = {id:'dragonlord_wyrmform', name:'Ascend: Wyrm Form'
   desc:'Ultimate-tier ability, free and pre-owned. Nyxara ascends into a towering true-dragon silhouette for 12 seconds: 65% larger, hitting 60% harder, moving 30% faster, and radiating a pulsing fire aura that scorches anything nearby.'};
 const DRAGONLORD_HELLGATE = {id:'dragonlord_hellgate', name:'Open the Hellgate', price:0, avatar:'dragonlord', unlockLevel:1,
   desc:'Ultimate-tier ability, free and pre-owned. Tears open a churning hellgate vortex that pulls every enemy on the map toward it and repeatedly burns them for 5 seconds, then collapses in one final detonation.'};
-const DRAGONLORD_LEGION_OF_ABYSS = {id:'dragonlord_legion_of_abyss', name:'Legion of the Abyss', price:0, avatar:'dragonlord', unlockLevel:10,
-  desc:'Nyxara\'s signature move. Summon invincible demon-dragon clones that draw enemy attention and use her currently unlocked moves. Each clone deals 10% of her damage. Rounds 10-15 summon 2 clones for 8 seconds with a 10-second cooldown; Rounds 16-20 summon 5 for 15 seconds with a 5-second cooldown; Round 21 onward summons 10 for 30 seconds with a 1.5-second cooldown.'};
 // Coins earned per kill — a flat rate that inches up in later rounds so
 // the pricier weapons stay reachable in a long run.
 function tokensPerKill(){ return 5 + Math.floor(round/5); }
@@ -10998,44 +10952,12 @@ function getSpiderAssetPromise(){
   return spiderAssetPromise;
 }
 
-// MiniZulu Warrior by RektoCraft Studios. Source pack is FBX plus ~50 loose
-// Mixamo animation files; converted to glTF, the clips merged onto the shared
-// 65-bone skeleton and renamed to match findClipByWords(), scale and per-bone
-// translation tracks stripped, texture resampled to 512. Licence permits use
-// in personal and commercial projects, not redistribution of the source files.
-// Wolverine. The pack's mesh/ folder is an unrigged static export, but every
-// Mixamo file in animation/ is a "with skin" export carrying the full rigged
-// character on a 44-joint mixamorig skeleton, so one of those is the base and
-// the rest contribute clips. Indices requantised to uint16, joints to uint8,
-// weights to normalised uint8, keys decimated to 30fps, texture at 512.
-const WOLVERINE_GLB_B64 = null; // V23.00.00: removed, see getWolverineAssetPromise
-let wolverineAssetPromise=null;
-
-function getWolverineAssetPromise(){
-  // Wolverine left the selectable roster in V22.19.07 and gameplayAvatarType() now folds it to rogue, so wolverineIsActive() can never be true.
-  return Promise.reject(new Error('getWolverineAssetPromise asset was removed in V23.00.00'));
-}
-
-// Carrot. Source is a Blender 2.79 file with three duplicate scene rigs
-// (main / portrait / sidescroller); assimp reads its geometry but drops the
-// armature, so this was exported through Blender itself. Kept the main
-// Armature + Carrot mesh, applied Mirror and Subsurf at level 1, and built a
-// breathing Idle by writing fcurves directly. Vertex coloured, no texture.
-const CARROT_GLB_B64 = null; // V23.00.00: removed, see getCarrotAssetPromise
-let carrotAssetPromise=null;
-
-function getCarrotAssetPromise(){
-  // The Cat/carrot avatar is not in AVATAR_TYPES, so no code path can reach it.
-  return Promise.reject(new Error('getCarrotAssetPromise asset was removed in V23.00.00'));
-}
-
-const MINIZULU_GLB_B64 = null; // V23.00.00: removed, see getMiniZuluAssetPromise
-let miniZuluAssetPromise=null;
-
-function getMiniZuluAssetPromise(){
-  // Zulu was removed from the roster in V22.19.03 and nothing ever called this.
-  return Promise.reject(new Error('getMiniZuluAssetPromise asset was removed in V23.00.00'));
-}
+// Wolverine, Carrot, and MiniZulu were all removed from the selectable
+// roster in earlier versions (V22.19.03/V22.19.07) and their asset blobs
+// were already nulled out in V23.00.00. Their loader stubs, promise
+// caches, and every remaining reference (weapon/ability defs, combat
+// logic, preview-build branches) were removed entirely in this pass —
+// none of it was reachable from any live code path.
 
 // Imported rigs do not all agree on which way is forward. One value per
 // character keeps that a data fix rather than a code change.
@@ -12445,8 +12367,6 @@ function tuneDragonLordVisuals(root,THREEAsset,activeRenderer){
   });
 }
 function getKayKitAssetPromise(characterId){
-  if(characterId === 'carrot') return getCarrotAssetPromise();
-  if(characterId === 'wolverine') return getWolverineAssetPromise();
   if(characterId === 'rogue') return kayKitAssetPromise;
   if(characterId === 'chopper') return getChopperAssetPromise();
   if(characterId === 'spider') return getSpiderAssetPromise();
@@ -12468,61 +12388,6 @@ function getKayKitAssetPromise(characterId){
 
 
 
-function tuneWolverineVisuals(root,THREEAsset,activeRenderer){
-  if(!root)return;
-
-  let maxAniso=8;
-  try{
-    if(activeRenderer&&activeRenderer.capabilities&&activeRenderer.capabilities.getMaxAnisotropy){
-      maxAniso=Math.max(1,Math.min(8,activeRenderer.capabilities.getMaxAnisotropy()));
-    }
-  }catch(_){}
-
-  root.traverse(obj=>{
-    if(!obj||!obj.isMesh)return;
-
-    // Wolverine uses the same flat-lighting philosophy as the rest of the
-    // stylized roster. No directional-light dark side, no specular highlight,
-    // and no cast/receive shadow changing his suit brightness.
-    obj.castShadow=false;
-    obj.receiveShadow=false;
-
-    const sourceMats=Array.isArray(obj.material)?obj.material:[obj.material];
-    const flatMats=sourceMats.map(src=>{
-      if(!src)return src;
-
-      const map=src.map||null;
-      if(map){
-        map.colorSpace=THREEAsset.SRGBColorSpace;
-        map.anisotropy=maxAniso;
-        map.magFilter=THREEAsset.LinearFilter;
-        map.minFilter=THREEAsset.LinearMipmapLinearFilter;
-        map.generateMipmaps=true;
-        map.needsUpdate=true;
-      }
-
-      const mat=new THREEAsset.MeshBasicMaterial({
-        map,
-        color:src.color?src.color.clone():new THREEAsset.Color(0xffffff),
-        transparent:!!src.transparent,
-        opacity:src.opacity===undefined?1:src.opacity,
-        alphaTest:src.alphaTest||0,
-        side:src.side===undefined?THREEAsset.FrontSide:src.side,
-        vertexColors:!!src.vertexColors,
-        toneMapped:false
-      });
-
-      // Neutral brightness: slightly below pure white to avoid an overexposed
-      // yellow suit while staying clearly brighter than the dark environment.
-      mat.color.multiplyScalar(.96);
-      mat.depthWrite=src.depthWrite!==false;
-      mat.needsUpdate=true;
-      return mat;
-    });
-
-    obj.material=Array.isArray(obj.material)?flatMats:flatMats[0];
-  });
-}
 // ---------------------------------------------------------------------
 // Chopper pirate presentation (V23.08.00).
 // IMPORTANT: this pass never touches UVs, texture.repeat, texture.offset or
@@ -13615,16 +13480,11 @@ function importedVisibleMeshBounds(root,THREEAsset){
 }
 
 function normalizeImportedPlayableRoot(root,characterId,THREEAsset){
+  // Only ever called for Spider — see the sole call site in buildKayKitPlayer.
   root.updateMatrixWorld(true);
 
   const parentScale=AVATAR_SCALE[characterId]||1;
-
-  // Cat should match Cloud's approved 1.48-unit height.
-  // Wolverine gets a slightly shorter visible fit so the claws/head stay in frame.
-  const desiredWorldHeight=characterId==='carrot'
-    ? 1.48
-    : (characterId==='wolverine'?1.48:(characterId==='spider'?1.18:1.42));
-
+  const desiredWorldHeight=1.18;
   const desiredRootHeight=desiredWorldHeight/Math.max(.001,parentScale);
 
   let box=importedVisibleMeshBounds(root,THREEAsset);
@@ -13633,18 +13493,11 @@ function normalizeImportedPlayableRoot(root,characterId,THREEAsset){
 
   root.scale.multiplyScalar(s);
 
-  if(characterId==='wolverine'){
-    root.scale.x*=.90;
-    root.scale.z*=.92;
-    root.scale.y*=1.06;
-  }
-  if(characterId==='spider'){
-    // Match Chopper's footprint more closely so Spider no longer reads titan-sized
-    // in gameplay or in the avatar preview card.
-    root.scale.x*=0.88;
-    root.scale.z*=0.88;
-    root.scale.y*=0.96;
-  }
+  // Match Chopper's footprint more closely so Spider no longer reads titan-sized
+  // in gameplay or in the avatar preview card.
+  root.scale.x*=0.88;
+  root.scale.z*=0.88;
+  root.scale.y*=0.96;
 
   root.updateMatrixWorld(true);
 
@@ -13656,13 +13509,6 @@ function normalizeImportedPlayableRoot(root,characterId,THREEAsset){
 
   // Ground by visible mesh only.
   root.position.y-=box.min.y;
-
-  // Cat's imported bind pose has its visible feet/body slightly above the
-  // measured mesh floor. Pull it down so it visually sits on the arena.
-  if(characterId==='carrot'){
-    root.position.y-=0.16/Math.max(.001,parentScale);
-  }
-
 
   root.updateMatrixWorld(true);
   return {scale:s,height:desiredWorldHeight};
@@ -13714,18 +13560,12 @@ function buildKayKitPlayer(characterId, options={}){
     cleanHeroEquipment(root, characterId);
     // Imported rigs get their correction from AVATAR_MODEL_YAW.
     root.rotation.y = AVATAR_MODEL_YAW[characterId] || 0;
-    if(characterId==='wolverine')tuneWolverineVisuals(root,THREEAsset,renderer);
     if(characterId==='spider')tuneSpiderVisuals(root,THREEAsset,renderer);
     if(characterId==='chopper')tuneChopperVisuals(root,THREEAsset,renderer);
     if(characterId==='dragonlord')tuneDragonLordVisuals(root,THREEAsset,renderer);
 
-    // Wolverine's embedded import arrives inverted relative to the game world.
-    // Flip the entire imported root upright before any mesh-fit/grounding pass.
-
-
-    // Imported custom avatars use visible mesh geometry only. This avoids
-    // Wolverine's remote Mixamo helper bones and gives Cat a Cloud-height fit.
-    if(characterId==='carrot'||characterId==='wolverine'||characterId==='spider'){
+    // Imported custom avatars use visible mesh geometry only.
+    if(characterId==='spider'){
       normalizeImportedPlayableRoot(root,characterId,THREEAsset);
     }else{
       const rawBox=new THREEAsset.Box3().setFromObject(root);
@@ -13760,9 +13600,6 @@ function buildKayKitPlayer(characterId, options={}){
 
           const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
           mats.forEach((m, matIndex) => {
-            // Vertex-coloured imports (the Carrot) carry their whole look in
-            // COLOR_0 and have no texture to fall back on.
-            if(characterId==='carrot') m.vertexColors = true;
             if('roughness' in m) m.roughness = 0.82;
             if('metalness' in m) m.metalness = Math.min(m.metalness || 0, 0.15);
 
@@ -13847,15 +13684,6 @@ function buildKayKitPlayer(characterId, options={}){
 
     wrapper.userData.playKayClip = function(name, force=false, oneShot=false, lockSeconds=0){
       if(this.kayActionLock > 0 && !force) return;
-
-      if(characterId==='wolverine'){
-        if(this.kayCurrentAction)this.kayCurrentAction.stop();
-        this.kayMixer.stopAllAction();
-        this.kayCurrentAction=null;
-        this.kayCurrentName='WolverineBindPose';
-        this.kayActionLock=0;
-        return;
-      }
 
       if(this.kayCurrentName === name && !force && !oneShot) return;
       const clip = this.kayClips[name] || this.kayClips.Idle;
@@ -13961,14 +13789,8 @@ function spawnPlayer(){
     locatorRing.scale.setScalar(inv);
   }
 
-  // Wolverine has no generic locator ring. On this imported body the ring was
-  // visually cutting through the character instead of reading as a floor cue.
-  if(state.avatarType!=='wolverine'){
-    player.add(locatorRing);
-    player.userData.visibilityRing=locatorRing;
-  }else{
-    player.userData.visibilityRing=null;
-  }
+  player.add(locatorRing);
+  player.userData.visibilityRing=locatorRing;
   player.userData.attackCooldown = 0;
   player.userData.secondaryAttackCooldown = 0;
   player.userData.spinVisualTimer = 0;
@@ -13976,15 +13798,13 @@ function spawnPlayer(){
   player.userData.spinBaseY = undefined;
   enableShadows(player, false);
 
-  if(state.avatarType!=='wolverine'){
-    addContactShadow(player, 0.5*avatarScale);
+  addContactShadow(player, 0.5*avatarScale);
+  {
     const playerShadow=player.children[player.children.length-1];
     if(playerShadow){
       playerShadow.userData.keepNormalWorldSize=true;
       player.userData.contactShadow=playerShadow;
     }
-  }else{
-    player.userData.contactShadow=null;
   }
   scene.add(player);
   // Every selectable character is now a real KayKit asset. Their fitted
@@ -14090,7 +13910,7 @@ function fillEnemySlotsFromQueue(){
   }
 }
 function spawnZombie(){
-  const zombieRoster = AVATAR_TYPES.filter(t=>t!=='cloud'&&t!=='zulu'&&t!=='wolverine');
+  const zombieRoster = AVATAR_TYPES.filter(t=>t!=='cloud');
   const zombieCharacter = zombieRoster[Math.floor(Math.random()*zombieRoster.length)];
   const spawningBoss=!!bossSpawnPending;
   const archetype = spawningBoss ? 'boss' : chooseZombieArchetype();
@@ -15007,19 +14827,9 @@ const HOODED_DANCING_STEEL = {id:'hooded_dancing_steel', name:'Tachyon Dome', pr
 const HOODED_TWILIGHT_EXECUTION = {id:'hooded_twilight_execution', name:'Speedforce Cataclysm', price:0, avatar:'hooded', unlockLevel:1,
   desc:'Kill ambient light for 6 seconds, turn the avatar into blazing neon-blue wireframe, move at 3x speed, and stamp an expanding floor shockwave every five frames.'};
 
-const WOLVERINE_BERSERKER_FRENZY = {id:'wolverine_frenzy', name:'Berserker Frenzy', price:880, avatar:'wolverine', unlockLevel:14,
-  desc:'Enter a blood frenzy. Every enemy on the map is marked, and you blink between them in a chain of claw strikes, executing non-boss targets on contact and tearing repeated capped damage off bosses. Ends with an adamantium cross-slash that scars the whole arena.'};
-const WOLVERINE_ADAMANTIUM_QUAKE = {id:'wolverine_quake', name:'Adamantium Quake', price:920, avatar:'wolverine', unlockLevel:18,
-  desc:'Drive both claws into the ground and split the arena. Fissures race outward along six lines, erupt at the map edge, and collapse inward in a final shockwave that clears everything still standing.'};
-const WOLVERINE_SHADOW_CLONES = {id:'wolverine_shadow_clones', name:'Savage Shadow Pack', price:0, avatar:'wolverine', unlockLevel:10,
-  desc:'Wolverine signature move. Summon five invincible shadow clones that hunt independently using your unlocked claw moves. Each clone deals 10% of your damage. Follows the same round scaling as the Knight clone pack.'};
 
 const BARBARIAN_PRIMAL_RAGE = {id:'barbarian_primal_rage', name:'Wrath of Mount Olympus - Supernova', price:0, avatar:'barbarian', unlockLevel:5,
   desc:'Teleport to exact arena center, grow to Guardian Titan size and become invincible for 10 seconds. A colossal Olympus lightning strike ignites the move, then Mjolnir supernova rings keep erupting outward for the entire duration while repeated golden sky bolts punish the arena.'};
-const BARBARIAN_THUNDER_DOME = {id:'barbarian_thunder_dome', name:'Mjolnir Supernova', price:850, avatar:'barbarian', unlockLevel:16,
-  desc:'Command the floating axe into a giant spinning supernova. Plasma rings, wind and thunder expand across the arena, clearing normal enemies and hammering tougher targets with repeated protected damage.'};
-const BARBARIAN_WORLD_BREAKER = {id:'barbarian_world_breaker', name:'Mjolnir Supernova', price:800, avatar:'barbarian', unlockLevel:14,
-  desc:'Command the floating axe into a giant spinning supernova. Plasma rings, wind and thunder expand across the arena, clearing normal enemies and hammering tougher targets with repeated protected damage.'};
 const BARBARIAN_RAGNAROK_WAVE = {id:'barbarian_ragnarok_wave', name:'Titan Ascension', price:900, avatar:'barbarian', unlockLevel:18,
   desc:'TITAN TRANSFORMATION. Uses the same Guardian Titan rules: grow to 5x size for 15 seconds, gain 5x Primary/Secondary damage and 2.6x combat reach, move at 85% speed, keep Primary and the equipped Secondary available, and lock other specials until the transformation ends. Cooldown is 0 during development testing.'};
 const BARBARIAN_STORM_STEP_OVERDRIVE = {id:'barbarian_storm_step_overdrive', name:'World-Breaker Crashing Bolt', price:950, avatar:'barbarian', unlockLevel:20,
@@ -15047,7 +14857,6 @@ const SPIDER_CITY_WEBLINE = {id:'spider_city_webline', name:'Skyline Dive', pric
 
 const HERO_ABILITIES = { spider:[SPIDER_MAXIMUM,SPIDER_WEB_OF_SHADOWS,SPIDER_CITY_WEBLINE], rhino:[RHINO_CRASHING_BOLT,RHINO_SHATTERED_DOMAIN,RHINO_SKY_FATHER], chopper:[CHOPPER_STAMPEDE,CHOPPER_GUARD_DOME,CHOPPER_MONSTER_POINT], hooded:[HOODED_THOUSAND_CUTS,HOODED_DANCING_STEEL,HOODED_TWILIGHT_EXECUTION], mage:[BLIZZARD_STORM, ARCANE_LASER, SUPER_METEOR], rogue:[SKYFALL_BARRAGE, SUPERNOVA_PIERCER],
   knight:[KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER, KNIGHT_JUDGMENT_ULTIMATE],
-  wolverine:[WOLVERINE_SHADOW_CLONES, WOLVERINE_BERSERKER_FRENZY, WOLVERINE_ADAMANTIUM_QUAKE],
   barbarian:[BARBARIAN_PRIMAL_RAGE, BARBARIAN_RAGNAROK_WAVE, BARBARIAN_STORM_STEP_OVERDRIVE],
   dragonlord:[DRAGONLORD_ASHFALL_CATACLYSM, DRAGONLORD_WYRM_FORM, DRAGONLORD_HELLGATE] };
 const REMOVED_WEAPON_IDS=['radiant_cleave','blade_cyclone','holy_wave','shield_bash','banner_spear','knight_banner_spear','primal_wave'];
@@ -15485,7 +15294,6 @@ function setupControls(){
     else if(String(equippedAbilityId||'').indexOf('spider_')===0) triggerSpiderAbility();
     else if(String(equippedAbilityId||'').indexOf('hooded_')===0) triggerHoodedEquippedAbility();
     else if(String(equippedAbilityId||'').indexOf('knight_')===0) triggerKnightEquippedAbility();
-    else if(String(equippedAbilityId||'').indexOf('wolverine_')===0) triggerWolverineEquippedAbility();
     else if(String(equippedAbilityId||'').indexOf('rhino_')===0) triggerBarbarianEquippedAbility();
     else if(String(equippedAbilityId||'').indexOf('barbarian_')===0) triggerBarbarianEquippedAbility();
     else if(String(equippedAbilityId||'').indexOf('dragonlord_')===0) triggerDragonLordAbility();
@@ -17113,7 +16921,6 @@ function attackCooldownFor(w){
   if(archerIsActive() && (passiveState.archerTailwindTimer||0)>0) factor *= (passive.tailwindAttackMult||1);
   // Barbarian Phase 2 replaces the old nearby-enemy attack-speed passive with kill-triggered Fury.
   if(knightIsActive()) factor *= knightDisciplineAttackSpeedMult();
-  if(wolverineIsActive()) factor /= wolverineAttackSpeedMult();
   if(barbarianIsActive()) factor /= barbarianAttackSpeedMult();
   if(chopperIsActive()) factor *= CHOPPER_TUNING.attack;
   if(heroKitIsActive()) factor *= velocityWeaverAttackSpeedMultiplier();
@@ -24286,13 +24093,6 @@ function updateKnightSystems(dt){
 }
 
 function clearKnightRoundSpecials(resetCooldowns=true){
-  // Wolverine specials share this teardown so a round end, death, avatar
-  // change or reset can never leave clones or an ultimate mid-sequence.
-  try{
-    clearWolverineClones();
-    wolverineResetRuntime();
-    if(resetCooldowns) wolverineCloneCooldown=0;
-  }catch(_err){}
   try{
     clearBarbarianKinClones();
     barbarianClearWhirlVisual();
@@ -24437,31 +24237,6 @@ function knightAbilityCooldownInfo(){
               ? knightRuntime.chargeTimer
               : (knightRuntime.shatterPhase>0?knightRuntime.shatterTimer:undefined))
       };
-    case 'wolverine_shadow_clones': {
-      const cfg=wolverineCloneConfig();
-      const active=wolverineClones.length>0;
-      return {
-        label:active?'PACK '+wolverineCloneTimer.toFixed(0)+'s':(cfg.count?'PACK '+cfg.count:'LVL 10'),
-        cd:wolverineCloneCooldown, active,
-        activeTime:active?wolverineCloneTimer:undefined
-      };
-    }
-    case 'wolverine_frenzy': {
-      const active=!!wolverineRuntime.frenzyActive;
-      return {
-        label:active?'FRENZY '+(wolverineRuntime.frenzyIndex||0)+'/'+WOLV_FRENZY_STRIKES:'FRENZY',
-        cd:wolverineRuntime.frenzyCooldown||0, active,
-        activeTime:active?(wolverineRuntime.frenzyTimer||0):undefined
-      };
-    }
-    case 'wolverine_quake': {
-      const active=!!wolverineRuntime.quakeActive;
-      return {
-        label:active?'QUAKE '+((wolverineRuntime.quakeStage||0)+1)+'/3':'QUAKE',
-        cd:wolverineRuntime.quakeCooldown||0, active,
-        activeTime:active?(wolverineRuntime.quakeTimer||0):undefined
-      };
-    }
     case 'knight_aegis_counter': {
       const active=knightRuntime.aegisWindow>0;
       const captureLeft=active?knightRoyalOnslaughtCaptureRemaining():0;
@@ -24519,12 +24294,6 @@ function knightAbilityCooldownInfo(){
     }
     default: return null;
   }
-}
-function triggerWolverineEquippedAbility(){
-  if(!wolverineIsActive())return;
-  if(equippedAbilityId==='wolverine_shadow_clones') triggerWolverineShadowClones();
-  else if(equippedAbilityId==='wolverine_frenzy') triggerWolverineFrenzy();
-  else if(equippedAbilityId==='wolverine_quake') triggerWolverineQuake();
 }
 function triggerBarbarianEquippedAbility(){
   if(!barbarianIsActive())return;
@@ -31067,688 +30836,6 @@ function updateFoxArcaneBloom(dt){
   if(rt.t>=rt.duration){for(const orb of rt.orbs)if(orb.visible)foxArcaneBloomImpact(rt,orb,orb.getWorldPosition(new THREE.Vector3()),.75);clearFoxArcaneBloom();}
 }
 
-/* ============================================================ WOLVERINE
-   Berserker kit. Every effect below routes through pushKnightFx() or
-   spawnBurst(), both of which are globally capped and auto-expiring, so
-   nothing here can outlive its move or fill the scene.                  */
-const WOLV_CLAW=0xffe27a, WOLV_STEEL=0xdfe9ff, WOLV_BLOOD=0xff5d5d;
-
-let wolverineRuntime={
-  comboStep:0, comboTimer:0,
-  rage:0, rageTimer:0,
-  cycloneTimer:0, cycloneCooldown:0,
-  roarBuffTimer:0,
-  frenzyActive:false, frenzyTimer:0, frenzyIndex:0, frenzyTargets:null,
-  quakeActive:false, quakeTimer:0, quakeStage:0,
-  regenTimer:0
-};
-
-function wolverineIsActive(){ return state.avatarType==='wolverine'; }
-function isWolverineWeaponKind(kind){
-  return kind==='wolv_claw_combo'||kind==='wolv_flurry'||kind==='wolv_pounce'||
-         kind==='wolv_roar'||kind==='wolv_cyclone';
-}
-function wolverineResetRuntime(){
-  wolverineRuntime={
-    comboStep:0, comboTimer:0, rage:0, rageTimer:0,
-    cycloneTimer:0, cycloneCooldown:0, roarBuffTimer:0,
-    frenzyActive:false, frenzyTimer:0, frenzyIndex:0, frenzyTargets:null,
-    quakeActive:false, quakeTimer:0, quakeStage:0, regenTimer:0
-  };
-}
-function wolverineAddRage(n=1){
-  wolverineRuntime.rage=Math.min(100,(wolverineRuntime.rage||0)+n);
-  wolverineRuntime.rageTimer=4.0;
-}
-function wolverineAttackSpeedMult(){
-  return (wolverineRuntime.roarBuffTimer||0)>0 ? 0.72 : 1;
-}
-
-/* ---------------------------------------------------------------- VFX */
-function wolverineClawTrail(origin,yaw,step=0,scale=1){
-  if(!scene||!knightFxBudget(3))return;
-  const g=new THREE.Group();
-  const spread=(step===2)?[-.34,.34]:[step===0?-.28:.28];
-  for(const off of spread){
-    for(let i=0;i<3;i++){
-      const blade=new THREE.Mesh(
-        new THREE.PlaneGeometry(.07*scale,2.05*scale),
-        knightMat(i===1?WOLV_STEEL:WOLV_CLAW,.86-i*.16)
-      );
-      blade.position.set((i-1)*.17*scale+off,1.05*scale,0);
-      blade.rotation.z=(step===0?-.62:(step===1?.62:(off<0?-.7:.7)));
-      blade.rotation.y=yaw;
-      g.add(blade);
-    }
-  }
-  g.position.set(origin.x,origin.y||0,origin.z);
-  knightBaseOpacity(g);
-  pushKnightFx(g,{life:.22,grow:.85,from:.85});
-}
-function wolverineImpactFx(pos,scale=1,color=WOLV_CLAW){
-  knightShockRing(pos,2.6*scale,color,.28);
-  spawnBurst(pos.x,(pos.y||0)+.85,pos.z,isMobile?6:10,FX_MAT_SPARK,3.2*scale);
-}
-
-/* ------------------------------------------------------------ PRIMARY */
-function wolverineComboArc(w,step){
-  const yaw=player.rotation.y;
-  const reach=(w.radius||2.6)*(step===2?1.25:1);
-  const arc=(w.arc||2.3)*(step===2?1.2:1);
-  const fx=Math.sin(yaw),fz=Math.cos(yaw);
-  let hits=0;
-  for(const z of Array.from(zombies)){
-    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-    const dx=z.position.x-player.position.x,dz=z.position.z-player.position.z;
-    const d=Math.hypot(dx,dz);
-    if(d>reach||d<.001)continue;
-    const dot=(dx*fx+dz*fz)/d;
-    if(Math.acos(Math.max(-1,Math.min(1,dot)))>arc*.5)continue;
-    applyBulletDamage(z,(w.damage||1.4)*playerStats.power*(step===2?1.6:1));
-    if(hits<3)wolverineImpactFx(z.position,.9);
-    hits++;
-  }
-  if(hits)wolverineAddRage(hits*2);
-  return hits;
-}
-function doWolverineClawCombo(w){
-  const r=wolverineRuntime;
-  if((r.comboTimer||0)<=0)r.comboStep=0;
-  const step=r.comboStep%3;
-  r.comboStep=(r.comboStep+1)%3;
-  r.comboTimer=.62;
-
-  const yaw=player.rotation.y;
-  wolverineClawTrail(player.position,yaw,step,1);
-  wolverineComboArc(w,step);
-
-  if(player.userData.playKayClip){
-    const clip=step===0?'1H_Melee_Attack_Chop':(step===1?'1H_Melee_Attack_Slice':'1H_Melee_Attack_Spin');
-    player.userData.playKayClip(clip,true,true,.24);
-  }
-  if(step===2){
-    // Finisher throws a short adamantium shockwave straight ahead.
-    const fx=Math.sin(yaw),fz=Math.cos(yaw);
-    const p={x:player.position.x+fx*2.6,y:player.position.y,z:player.position.z+fz*2.6};
-    knightShockRing(p,3.4,WOLV_STEEL,.34);
-    damageNearby(p,3.2,(w.damage||1.4)*1.1);
-    triggerCombatShake(6,90);
-    if(navigator.vibrate)navigator.vibrate(18);
-  }
-}
-function doWolverineFlurry(w){
-  const yaw=player.rotation.y;
-  wolverineClawTrail(player.position,yaw,(wolverineRuntime.comboStep++)%2,.8);
-  const hits=wolverineComboArc(w,0);
-  if(hits)wolverineAddRage(hits);
-  if(player.userData.playKayClip)
-    player.userData.playKayClip('1H_Melee_Attack_Chop',true,true,.10);
-}
-
-/* ---------------------------------------------------------- SECONDARY */
-function doWolverinePounce(w){
-  const target=findNearestEnemy(w.range||13);
-  const yaw=target
-    ? Math.atan2(target.position.x-player.position.x,target.position.z-player.position.z)
-    : player.rotation.y;
-  player.rotation.y=yaw;
-
-  const dist=target
-    ? Math.min(w.range||13,Math.hypot(target.position.x-player.position.x,target.position.z-player.position.z))
-    : 7;
-  const dest=knightRoyalOnslaughtSafePosition(
-    player.position.x+Math.sin(yaw)*dist,
-    player.position.z+Math.cos(yaw)*dist,
-    player.position.y
-  );
-
-  // Launch marker at the take-off point, then land claws first.
-  knightShockRing(player.position,2.4,WOLV_CLAW,.30);
-  player.position.x=dest.x;
-  player.position.z=dest.z;
-
-  if(player.userData.playKayClip)
-    player.userData.playKayClip('Leap_Slam',true,true,.42);
-
-  const landing={x:player.position.x,y:player.position.y,z:player.position.z};
-  knightShockRing(landing,(w.radius||3)*1.9,WOLV_STEEL,.40);
-  knightShockRing(landing,(w.radius||3)*1.2,WOLV_CLAW,.46);
-  knightGroundCracks(landing,(w.radius||3)*1.4,isMobile?7:10,WOLV_CLAW);
-  spawnBurst(landing.x,landing.y+.9,landing.z,isMobile?14:22,FX_MAT_SPARK,4.6);
-  triggerCombatShake(11,150);
-  if(navigator.vibrate)navigator.vibrate([30,12,44]);
-
-  const radius=w.radius||3;
-  for(const z of Array.from(zombies)){
-    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-    const dx=z.position.x-landing.x,dz=z.position.z-landing.z;
-    const d=Math.hypot(dx,dz);
-    if(d>radius*1.9)continue;
-    if(d<=radius && knightEnemyClass(z)!=='boss'){
-      z.userData.hp=0; killZombie(z);
-      continue;
-    }
-    applyBulletDamage(z,(w.damage||3.2)*playerStats.power);
-    // Thrown outward from the impact.
-    const n=Math.max(.001,d);
-    z.userData.knockbackX=(dx/n)*11;
-    z.userData.knockbackZ=(dz/n)*11;
-    z.userData.hitStun=Math.max(z.userData.hitStun||0,.35);
-  }
-  wolverineAddRage(12);
-}
-function doWolverineRoar(w){
-  const r=w.radius||9;
-  wolverineRuntime.roarBuffTimer=5.0;
-
-  if(player.userData.playKayClip)
-    player.userData.playKayClip('Rage_Roar',true,true,.55);
-
-  knightShockRing(player.position,r*.5,WOLV_BLOOD,.42);
-  knightShockRing(player.position,r*.78,WOLV_CLAW,.48);
-  knightShockRing(player.position,r,WOLV_STEEL,.54);
-  spawnKnightGuardBurst(player.position,Math.min(6.5,r*.55),WOLV_BLOOD);
-  spawnBurst(player.position.x,player.position.y+1.1,player.position.z,isMobile?16:26,FX_MAT_SPARK,5.0);
-  triggerCombatShake(13,190);
-  if(navigator.vibrate)navigator.vibrate([44,16,70]);
-
-  for(const z of Array.from(zombies)){
-    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-    const dx=z.position.x-player.position.x,dz=z.position.z-player.position.z;
-    const d=Math.hypot(dx,dz);
-    if(d>r)continue;
-    applyBulletDamage(z,(w.damage||1.4)*playerStats.power);
-    const n=Math.max(.001,d);
-    // Driven back and briefly unable to close again.
-    z.userData.knockbackX=(dx/n)*14;
-    z.userData.knockbackZ=(dz/n)*14;
-    z.userData.hitStun=Math.max(z.userData.hitStun||0,.75);
-    z.userData.attackCooldown=Math.max(z.userData.attackCooldown||0,1.2);
-  }
-  wolverineAddRage(20);
-  toast('RAGE ROAR');
-}
-function wolverineCycloneDuration(){
-  const r=Math.max(1,Number(round)||1);
-  if(r>=25)return Infinity;
-  return 3.6+Math.min(6,(r-1)*.28);
-}
-function doWolverineCyclone(w){
-  const r=wolverineRuntime;
-  if((r.cycloneCooldown||0)>0)return;
-  if((r.cycloneTimer||0)>0)return;
-  r.cycloneTimer=wolverineCycloneDuration();
-  r.cycloneCooldown=Math.max(2.5,8-Math.min(5,(Number(round)||1)*.16));
-  if(player.userData)player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,1);
-  if(player.userData.playKayClip)
-    player.userData.playKayClip('1H_Melee_Attack_Spin',true,false,0);
-  knightShockRing(player.position,3.6,WOLV_CLAW,.36);
-  toast('CLAW CYCLONE');
-}
-function wolverineUpdateCyclone(dt){
-  const r=wolverineRuntime,w=secondaryWeaponForAvatar();
-  if((r.cycloneCooldown||0)>0)r.cycloneCooldown=Math.max(0,r.cycloneCooldown-dt);
-  if(!((r.cycloneTimer||0)>0))return;
-  if(Number.isFinite(r.cycloneTimer))r.cycloneTimer=Math.max(0,r.cycloneTimer-dt);
-
-  r.cycloneTickTimer=(r.cycloneTickTimer||0)-dt;
-  if(r.cycloneTickTimer<=0){
-    r.cycloneTickTimer=.14;
-    const radius=(w&&w.radius)||3.4;
-    const hits=damageNearby(player.position,radius,((w&&w.damage)||1.9)*.55);
-    if(hits)wolverineAddRage(hits);
-    if(knightFxBudget(2)) wolverineClawTrail(player.position,player.rotation.y,2,1.1);
-  }
-  if(r.cycloneTimer<=0&&Number.isFinite(r.cycloneTimer)){
-    r.cycloneTimer=0;
-    if(player&&player.userData)player.userData.spinVisualTimer=0;
-  }
-}
-
-function doWolverineAttack(w){
-  if(!player||!gameRunning)return;
-  try{
-    if(w.kind==='wolv_claw_combo')doWolverineClawCombo(w);
-    else if(w.kind==='wolv_flurry')doWolverineFlurry(w);
-    else if(w.kind==='wolv_pounce')doWolverinePounce(w);
-    else if(w.kind==='wolv_roar')doWolverineRoar(w);
-    else if(w.kind==='wolv_cyclone')doWolverineCyclone(w);
-  }catch(err){
-    console.error('Wolverine attack recovered:',err);
-  }
-}
-
-/* ------------------------------------------------------------ UPDATE */
-function wolverineUpdate(dt){
-  if(!wolverineIsActive()||!player)return;
-  const r=wolverineRuntime;
-  if((r.comboTimer||0)>0)r.comboTimer=Math.max(0,r.comboTimer-dt);
-  if((r.rageTimer||0)>0){
-    r.rageTimer=Math.max(0,r.rageTimer-dt);
-    if(r.rageTimer<=0)r.rage=0;
-  }
-  if((r.roarBuffTimer||0)>0)r.roarBuffTimer=Math.max(0,r.roarBuffTimer-dt);
-  wolverineUpdateCyclone(dt);
-  wolverineUpdateFrenzy(dt);
-  wolverineUpdateQuake(dt);
-
-  // Healing Factor: one heart back on a fixed timer.
-  const passive=HERO_PASSIVES.wolverine;
-  r.regenTimer=(r.regenTimer||0)+dt;
-  if(r.regenTimer>=(passive.regenSeconds||18)){
-    r.regenTimer=0;
-    if(hearts<maxHearts){
-      hearts=Math.min(maxHearts,hearts+1);
-      renderHearts();
-      knightShockRing(player.position,2.2,WOLV_BLOOD,.34);
-      toast('HEALING FACTOR');
-    }
-  }
-}
-
-/* ========================================================= ULTIMATE 1
-   BERSERKER FRENZY. Marks the whole map, then blinks between targets in a
-   chain of claw strikes. Bounded by a strike cap, a hard timer, and the
-   same rate-limited execution used by Royal Onslaught, so a full arena
-   cannot stall the frame. */
-const WOLV_FRENZY_STRIKES=18;
-const WOLV_FRENZY_MAX_TIME=10;
-
-function wolverineFrenzyCooldownForRound(){ return 0; }
-function triggerWolverineFrenzy(){
-  if(!wolverineIsActive()||!gameRunning||!player)return false;
-  const r=wolverineRuntime;
-  if(r.frenzyActive||r.quakeActive)return false;
-  if((r.frenzyCooldown||0)>0)return false;
-
-  markUltimateUsed();
-  r.frenzyCooldown=wolverineFrenzyCooldownForRound();
-  r.frenzyActive=true;
-  r.frenzyTimer=0;
-  r.frenzyIndex=0;
-  r.frenzyStrikeTimer=0;
-  r.frenzyTargets=new Set(
-    Array.from(zombies)
-      .filter(z=>z&&z.userData&&!z.userData.dead)
-      .map(z=>z.uuid)
-  );
-
-  invincibleTimer=Math.max(invincibleTimer||0,WOLV_FRENZY_MAX_TIME);
-  knightShockRing(player.position,4.6,WOLV_BLOOD,.46);
-  knightShockRing(player.position,3.2,WOLV_CLAW,.52);
-  spawnKnightGuardBurst(player.position,3.8,WOLV_BLOOD);
-  triggerCombatShake(12,190);
-  if(player.userData.playKayClip)player.userData.playKayClip('Rage_Roar',true,true,.5);
-  toast('BERSERKER FRENZY');
-  if(navigator.vibrate)navigator.vibrate([50,18,80]);
-  return true;
-}
-function wolverineFrenzyStrike(){
-  const r=wolverineRuntime;
-  const living=Array.from(zombies).filter(z=>z&&z.userData&&!z.userData.dead&&!z.userData.spawnPending);
-  if(!living.length)return false;
-
-  const target=living[(r.frenzyIndex||0)%living.length];
-  const yaw=Math.atan2(target.position.x-player.position.x,target.position.z-player.position.z);
-  const safe=knightRoyalOnslaughtSafePosition(
-    target.position.x-Math.sin(yaw)*1.4,
-    target.position.z-Math.cos(yaw)*1.4,
-    player.position.y
-  );
-
-  // Blink to the target and rake it.
-  wolverineClawTrail(player.position,yaw,(r.frenzyIndex||0)%3,1.15);
-  player.position.x=safe.x;
-  player.position.z=safe.z;
-  player.rotation.y=yaw;
-  wolverineClawTrail(player.position,yaw,((r.frenzyIndex||0)+1)%3,1.25);
-
-  if(knightEnemyClass(target)==='boss'){
-    const hp=Math.max(1,Number(target.userData.hp)||1);
-    const maxHp=Math.max(1,Number(target.userData.maxHp)||hp);
-    const dmg=Math.min(Math.max(6*playerStats.power,maxHp*.06),Math.max(0,hp-.01));
-    if(dmg>0)applyBulletDamage(target,dmg);
-  }else{
-    target.userData.hp=0;
-    killZombie(target);
-  }
-  wolverineImpactFx(safe.x!==undefined?{x:safe.x,y:player.position.y,z:safe.z}:player.position,1.15,WOLV_BLOOD);
-  triggerCombatShake(5,70);
-  if(player.userData.playKayClip)
-    player.userData.playKayClip((r.frenzyIndex||0)%2?'1H_Melee_Attack_Slice':'1H_Melee_Attack_Chop',true,true,.10);
-
-  r.frenzyIndex=(r.frenzyIndex||0)+1;
-  return true;
-}
-function wolverineFrenzyFinisher(){
-  const p=player.position;
-  // Adamantium cross-slash across the whole arena.
-  for(const ang of [Math.PI/4,-Math.PI/4]){
-    for(let i=0;i<2;i++){
-      if(!knightFxBudget(2))break;
-      const bar=new THREE.Mesh(
-        new THREE.BoxGeometry(i?.5:.9,.10,Math.max(14,arenaSize*2.1)),
-        knightMat(i?WOLV_STEEL:WOLV_CLAW,i?.92:.6)
-      );
-      bar.position.set(p.x,.9,p.z);
-      bar.rotation.y=ang;
-      knightBaseOpacity(bar);
-      pushKnightFx(bar,{life:.52,grow:.30,from:1});
-    }
-  }
-  knightShockRing(p,Math.max(8,arenaSize*.9),WOLV_STEEL,.44);
-  knightShockRing(p,Math.max(6,arenaSize*.66),WOLV_BLOOD,.50);
-  spawnBurst(p.x,p.y+1,p.z,isMobile?20:32,FX_MAT_SPARK,5.6);
-  triggerCombatShake(15,220);
-  if(navigator.vibrate)navigator.vibrate([60,20,90]);
-
-  let killed=0;
-  for(const z of Array.from(zombies)){
-    if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-    if(knightEnemyClass(z)==='boss'){
-      const hp=Math.max(1,Number(z.userData.hp)||1);
-      applyBulletDamage(z,Math.min(hp*.25,Math.max(0,hp-.01)));
-      continue;
-    }
-    z.userData.hp=0; killZombie(z); killed++;
-    if(killed>=(isMobile?10:16))break;
-  }
-}
-function wolverineUpdateFrenzy(dt){
-  const r=wolverineRuntime;
-  if((r.frenzyCooldown||0)>0)r.frenzyCooldown=Math.max(0,r.frenzyCooldown-dt);
-  if(!r.frenzyActive)return;
-
-  r.frenzyTimer=(r.frenzyTimer||0)+dt;
-  const done=(r.frenzyIndex||0)>=WOLV_FRENZY_STRIKES||r.frenzyTimer>=WOLV_FRENZY_MAX_TIME;
-  if(done){
-    r.frenzyActive=false;
-    if(r.frenzyTargets){r.frenzyTargets.clear();r.frenzyTargets=null;}
-    try{ wolverineFrenzyFinisher(); }
-    catch(err){ console.error('Frenzy finisher recovered:',err); }
-    return;
-  }
-
-  r.frenzyStrikeTimer=(r.frenzyStrikeTimer||0)-dt;
-  if(r.frenzyStrikeTimer<=0){
-    r.frenzyStrikeTimer=.16;
-    try{
-      if(!wolverineFrenzyStrike())r.frenzyTimer=WOLV_FRENZY_MAX_TIME;
-    }catch(err){
-      console.error('Frenzy strike recovered:',err);
-      r.frenzyTimer=WOLV_FRENZY_MAX_TIME;
-    }
-  }
-}
-
-/* ========================================================= ULTIMATE 2
-   ADAMANTIUM QUAKE. Six fissures race outward, erupt at the boundary, then
-   collapse inward. Three fixed stages on a timer, so it always completes. */
-function wolverineQuakeCooldownForRound(){ return 0; }
-function triggerWolverineQuake(){
-  if(!wolverineIsActive()||!gameRunning||!player)return false;
-  const r=wolverineRuntime;
-  if(r.quakeActive||r.frenzyActive)return false;
-  if((r.quakeCooldown||0)>0)return false;
-
-  markUltimateUsed();
-  r.quakeCooldown=wolverineQuakeCooldownForRound();
-  r.quakeActive=true;
-  r.quakeTimer=0;
-  r.quakeStage=0;
-  r.quakeOriginX=player.position.x;
-  r.quakeOriginZ=player.position.z;
-
-  invincibleTimer=Math.max(invincibleTimer||0,3.4);
-  if(player.userData.playKayClip)player.userData.playKayClip('Leap_Slam',true,true,.6);
-  knightShockRing(player.position,3.0,WOLV_CLAW,.44);
-  knightGroundCracks(player.position,5.0,isMobile?8:12,WOLV_STEEL);
-  triggerCombatShake(14,220);
-  toast('ADAMANTIUM QUAKE');
-  if(navigator.vibrate)navigator.vibrate([70,20,60,20,90]);
-  return true;
-}
-function wolverineQuakeFissures(progress){
-  const r=wolverineRuntime;
-  const reach=Math.max(8,arenaSize*progress);
-  for(let i=0;i<6;i++){
-    if(!knightFxBudget(2))break;
-    const ang=(i/6)*Math.PI*2+(r.quakeSpin||0);
-    const bar=new THREE.Mesh(
-      new THREE.BoxGeometry(.65,.09,Math.max(2,reach)),
-      knightMat(i%2?WOLV_CLAW:WOLV_STEEL,.58)
-    );
-    bar.position.set(
-      r.quakeOriginX+Math.sin(ang)*reach*.5,
-      .08,
-      r.quakeOriginZ+Math.cos(ang)*reach*.5
-    );
-    bar.rotation.y=ang;
-    knightBaseOpacity(bar);
-    pushKnightFx(bar,{life:.34,grow:.18,from:1});
-  }
-}
-function wolverineUpdateQuake(dt){
-  const r=wolverineRuntime;
-  if((r.quakeCooldown||0)>0)r.quakeCooldown=Math.max(0,r.quakeCooldown-dt);
-  if(!r.quakeActive)return;
-
-  r.quakeTimer=(r.quakeTimer||0)+dt;
-  const t=r.quakeTimer;
-
-  try{
-    if(r.quakeStage===0){
-      // Stage 1: fissures race outward, damaging along the way.
-      wolverineQuakeFissures(Math.min(1,t/1.1));
-      const reach=arenaSize*Math.min(1,t/1.1);
-      for(const z of Array.from(zombies)){
-        if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-        if(z.userData.wolvQuakeHit)continue;
-        const d=Math.hypot(z.position.x-r.quakeOriginX,z.position.z-r.quakeOriginZ);
-        if(d>reach)continue;
-        z.userData.wolvQuakeHit=true;
-        applyBulletDamage(z,2.4*playerStats.power);
-        z.userData.hitStun=Math.max(z.userData.hitStun||0,.4);
-      }
-      if(t>=1.1){
-        r.quakeStage=1;
-        knightShockRing({x:r.quakeOriginX,y:0,z:r.quakeOriginZ},Math.max(8,arenaSize*.95),WOLV_STEEL,.48);
-        triggerCombatShake(12,180);
-      }
-    }else if(r.quakeStage===1){
-      // Stage 2: the boundary erupts.
-      if(t>=1.6){
-        r.quakeStage=2;
-        for(let i=0;i<8;i++){
-          const ang=(i/8)*Math.PI*2;
-          knightRoyalOnslaughtImpactColumn(
-            {x:Math.sin(ang)*(arenaSize-3),y:0,z:Math.cos(ang)*(arenaSize-3)},
-            1.5,WOLV_CLAW,320
-          );
-        }
-        triggerCombatShake(13,200);
-      }
-    }else{
-      // Stage 3: collapse inward and clear the arena.
-      if(t>=2.6){
-        r.quakeActive=false;
-        knightShockRing(player.position,Math.max(8,arenaSize*.9),WOLV_BLOOD,.52);
-        knightShockRing(player.position,Math.max(5,arenaSize*.55),WOLV_STEEL,.46);
-        spawnBurst(player.position.x,player.position.y+1,player.position.z,isMobile?20:34,FX_MAT_SPARK,6.0);
-        triggerCombatShake(16,240);
-        if(navigator.vibrate)navigator.vibrate([80,24,110]);
-
-        let killed=0;
-        for(const z of Array.from(zombies)){
-          if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-          z.userData.wolvQuakeHit=false;
-          if(knightEnemyClass(z)==='boss'){
-            const hp=Math.max(1,Number(z.userData.hp)||1);
-            applyBulletDamage(z,Math.min(hp*.30,Math.max(0,hp-.01)));
-            continue;
-          }
-          z.userData.hp=0; killZombie(z); killed++;
-          if(killed>=(isMobile?12:20))break;
-        }
-      }
-    }
-  }catch(err){
-    console.error('Adamantium Quake recovered:',err);
-    r.quakeActive=false;
-  }
-}
-
-/* ==================================================== SAVAGE SHADOW PACK
-   Five invincible clones on the Knight's rules: round-gated, fixed
-   duration and cooldown, 10% player damage, cleared on round end. */
-let wolverineClones=[];
-let wolverineCloneCooldown=0;
-let wolverineCloneTimer=0;
-let wolverineCloneEpoch=0;
-
-function wolverineCloneConfig(){
-  const r=Math.max(1,Number(round)||1);
-  if(r<10) return {count:0,duration:0,cooldown:0};
-  if(r<=15) return {count:5,duration:10,cooldown:0};
-  if(r<=20) return {count:5,duration:15,cooldown:0};
-  return {count:5,duration:30,cooldown:0};
-}
-function wolverineCloneUnlocked(){
-  return wolverineIsActive() && Math.max(1,Number(round)||1)>=10;
-}
-function clearWolverineClones(){
-  wolverineCloneEpoch++;
-  while(wolverineClones.length){
-    const c=wolverineClones.pop();
-    if(!c)continue;
-    try{ if(c.parent)scene.remove(c); }catch(_e){}
-    try{ disposeGroup(c); }catch(_e){}
-  }
-  wolverineCloneTimer=0;
-}
-function triggerWolverineShadowClones(){
-  if(!gameRunning||!wolverineCloneUnlocked()||wolverineCloneCooldown>0)return false;
-  const cfg=wolverineCloneConfig();
-  if(cfg.count<=0)return false;
-
-  markUltimateUsed();
-  clearWolverineClones();
-  const epoch=wolverineCloneEpoch;
-  wolverineCloneCooldown=cfg.cooldown;
-  wolverineCloneTimer=cfg.duration;
-
-  knightShockRing(player.position,4.4,WOLV_BLOOD,.46);
-  spawnKnightGuardBurst(player.position,3.6,WOLV_CLAW);
-  triggerCombatShake(11,190);
-  toast('SAVAGE SHADOW PACK · '+cfg.count);
-
-  getWolverineAssetPromise().then(({gltf,THREEAsset,cloneSkinned})=>{
-    if(epoch!==wolverineCloneEpoch||!player||!gameRunning)return;
-    for(let i=0;i<cfg.count;i++){
-      const wrap=new THREE.Group();
-      const root=cloneSkinned(gltf.scene);
-      root.rotation.y=AVATAR_MODEL_YAW.wolverine||0;
-
-      const box=new THREEAsset.Box3().setFromObject(root);
-      const size=box.getSize(new THREEAsset.Vector3());
-      root.scale.setScalar(1.48/Math.max(.001,size.y));
-      const placed=new THREEAsset.Box3().setFromObject(root);
-      root.position.y-=placed.min.y;
-
-      root.traverse(o=>{
-        if(!o.isMesh)return;
-        o.castShadow=false;
-        if(Array.isArray(o.material))o.material=o.material.map(m=>m.clone());
-        else if(o.material)o.material=o.material.clone();
-        const mats=Array.isArray(o.material)?o.material:[o.material];
-        mats.forEach(m=>{
-          m.transparent=true;
-          m.opacity=.55;
-          if(m.color)m.color.multiplyScalar(.62);
-          if(m.emissive)m.emissive.setHex(0x2a0d0d);
-        });
-      });
-
-      wrap.add(root);
-      const ang=(i/cfg.count)*Math.PI*2;
-      const spot=knightRoyalOnslaughtSafePosition(
-        player.position.x+Math.sin(ang)*2.6,
-        player.position.z+Math.cos(ang)*2.6,
-        player.position.y
-      );
-      wrap.position.set(spot.x,player.position.y,spot.z);
-      wrap.scale.setScalar((AVATAR_SCALE.wolverine||1)*.92);
-
-      const mixer=new THREEAsset.AnimationMixer(root);
-      const clips={};
-      gltf.animations.forEach(cl=>clips[cl.name]=cl);
-      wrap.userData={
-        isWolverineClone:true, invincible:true, hp:Infinity, maxHp:Infinity,
-        dead:false, cloneIndex:i, attackTimer:.2+i*.08,
-        kayMixer:mixer, kayClips:clips
-      };
-      if(clips.Idle)mixer.clipAction(clips.Idle).play();
-
-      scene.add(wrap);
-      wolverineClones.push(wrap);
-      knightShockRing(wrap.position,1.8,WOLV_BLOOD,.30);
-    }
-  }).catch(err=>console.error('Shadow pack load failed:',err));
-  return true;
-}
-function updateWolverineClones(dt){
-  if(wolverineCloneCooldown>0)wolverineCloneCooldown=Math.max(0,wolverineCloneCooldown-dt);
-  if(!wolverineClones.length)return;
-
-  if(wolverineCloneTimer>0){
-    wolverineCloneTimer=Math.max(0,wolverineCloneTimer-dt);
-    if(wolverineCloneTimer<=0){ clearWolverineClones(); return; }
-  }
-
-  const w=weaponForAvatar();
-  for(const c of wolverineClones){
-    if(!c||!c.userData)continue;
-    if(c.userData.kayMixer)c.userData.kayMixer.update(dt);
-
-    // Hunt the nearest living enemy, strike on its own timer.
-    let best=null,bestD=Infinity;
-    for(const z of zombies){
-      if(!z||!z.userData||z.userData.dead||z.userData.spawnPending)continue;
-      const d=c.position.distanceToSquared(z.position);
-      if(d<bestD){bestD=d;best=z;}
-    }
-    if(!best){
-      // No targets: fall back in beside the player.
-      c.position.lerp(new THREE.Vector3(player.position.x,player.position.y,player.position.z),Math.min(1,dt*1.2));
-      continue;
-    }
-
-    const dx=best.position.x-c.position.x, dz=best.position.z-c.position.z;
-    const d=Math.hypot(dx,dz);
-    c.rotation.y=Math.atan2(dx,dz);
-    if(d>2.0){
-      const step=Math.min(d,PLAYER_SPEED*1.05*dt);
-      const moved=resolveCollision(c.position.x+(dx/d)*step,c.position.z+(dz/d)*step,c.position.y);
-      c.position.x=moved.x;c.position.z=moved.z;
-    }
-
-    c.userData.attackTimer=(c.userData.attackTimer||0)-dt;
-    if(c.userData.attackTimer<=0&&d<=2.8){
-      c.userData.attackTimer=.42;
-      // Knight clone rule: clones deal 10% of the player's damage.
-      applyBulletDamage(best,((w&&w.damage)||1.4)*playerStats.power*.10);
-      wolverineClawTrail(c.position,c.rotation.y,(c.userData.cloneIndex||0)%3,.85);
-      if(c.userData.kayClips&&c.userData.kayMixer){
-        const clip=c.userData.kayClips[(c.userData.cloneIndex%2)?'1H_Melee_Attack_Slice':'1H_Melee_Attack_Chop'];
-        if(clip){
-          const act=c.userData.kayMixer.clipAction(clip);
-          act.reset(); act.setLoop(THREE.LoopOnce,1); act.clampWhenFinished=true; act.play();
-        }
-      }
-    }
-  }
-}
-
 /* ============================================================ SPECIAL CLONE
    BERSERKER KIN. The kill-charged meter that used to fire Primal Rage
    directly from the Ultimate button now summons two invincible clone
@@ -35094,8 +34181,6 @@ function performWeaponAttack(w, countsAsPrimary=true){
     triggerFoxArcaneBloom(w);
   } else if(w.kind==='fox_gravity_prison'){
     triggerFoxGravityPrison(w);
-  } else if(isWolverineWeaponKind(w.kind)){
-    doWolverineAttack(w);
   } else if(isRhinoWeaponKind(w.kind)){
     doRhinoAttack(w);
   } else if(w.kind==='barbarian_roar_slash_combo'){
@@ -37205,10 +36290,6 @@ function equippedUltimateIFrameActive(){
   if(id==='knight_aegis_counter') return (knightRuntime.aegisWindow||0)>0;
   if(id==='knight_judgment') return (knightRuntime.ultPhase||0)>0;
 
-  // WOLVERINE
-  if(id==='wolverine_frenzy') return !!wolverineRuntime.frenzyActive;
-  if(id==='wolverine_quake') return !!wolverineRuntime.quakeActive;
-
   // GREEN RHINO RANGER
   if(id==='rhino_crashing_bolt') return (barbarianRuntime.stormStepActive||0)>0;
   if(id==='rhino_shattered_domain') return rhinoTitanActive();
@@ -37442,12 +36523,6 @@ function update(dt){
   }
   updateKnightSystems(dt);
   updateDragonLordSystems(dt);
-  if(wolverineIsActive()){
-    try{
-      wolverineUpdate(dt);
-      updateWolverineClones(dt);
-    }catch(err){ console.error('Wolverine update recovered:',err); }
-  }
   updateCloudSkybreaker(dt);
   updateHeroIdentityAura(dt);
   updateShadowClones(dt);
