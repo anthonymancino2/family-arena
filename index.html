@@ -1453,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.75.05 - Nyxara Giant Fireball Secondary';
+const GAME_VERSION='23.75.06 - Nyxara Somersault Hunt';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -1840,7 +1840,7 @@ const AVATAR_TYPE_LABELS = {
   spider:'🕷️ Spider',
 };
 const HERO_ROSTER_INFO = {
-  dragonlord:{title:'Nyxara, the Demon Dragon Queen',role:'HYBRID • APEX RAID BOSS',desc:'A wing-flaring, fire-breathing demon dragon queen built on a full 81-clip cinematic animation set, so she never freezes into a stiff pose. She fights up close with Demon Claw and Infernal Glaive combos, burns from range with a Brimstone Barrage volley, hurls the same Phoenix-scale Giant Fireball the Fox commands, and pulls crowds apart with Void Maw. Her three ultimate-tier powers — Ashfall Cataclysm, Ascend: Wyrm Form, and Open the Hellgate — are all free and pre-owned the moment she is selected, and Round 10 unlocks her signature Legion of the Abyss: a horde of invincible demon-dragon clones fighting at her side. Built to be the single strongest, flashiest avatar in the roster.'},
+  dragonlord:{title:'Nyxara, the Demon Dragon Queen',role:'HYBRID • APEX RAID BOSS',desc:'A wing-flaring, fire-breathing demon dragon queen built on a full 81-clip cinematic animation set, so she never freezes into a stiff pose. She fights up close with Demon Claw and Infernal Glaive combos, burns from range with a Brimstone Barrage volley and the same Phoenix-scale Giant Fireball the Fox commands, and hunts with the same acrobatic Somersault Hunt Spider-Man uses, burning a ring of hellfire at every point she lands. Her three ultimate-tier powers — Ashfall Cataclysm, Ascend: Wyrm Form, and Open the Hellgate — are all free and pre-owned the moment she is selected, and Round 10 unlocks her signature Legion of the Abyss: a horde of invincible demon-dragon clones fighting at her side. Built to be the single strongest, flashiest avatar in the roster.'},
   spider:{title:'Spider',role:'MELEE • ACROBAT',desc:'A wall-crawling acrobat built on 25 hand-authored clips. Quick and evasive without being a blur: he closes distance with web-lines and Bezier vaults rather than raw speed. The kit is a setup-and-payoff loop — Web Snap and Web Trap wrap targets, and everything wrapped takes 45% extra damage from every source, including all three of his ultimates.'},
   rogue:{title:'Tempest Archer',role:'RANGED • EASY',desc:'The speed-focused ranged avatar: fast movement, long-lived piercing arrows, and precise crowd control. Every fifth defeat triggers Tailwind for a short burst of movement and firing speed.'},
   chopper:{title:'Chopper',role:'MELEE • PIRATE',desc:'A cutlass-swinging pirate built on 15 hand-authored animations. Every move — combos, rolls, guards, throws, shots and a full three-phase jump — plays a real take, so nothing ever snaps to a frozen pose.'},
@@ -3488,8 +3488,8 @@ const CHARACTER_COMBAT = {
         desc:'Looses a 3-bolt volley of homing brimstone fireballs in a tight spread, then detonates the ground beneath her in a burst of hellfire.'},
       dragonlord_giant_fireball:{name:'Giant Fireball', price:400, slot:'secondary', kind:'dragonlord_giant_fireball', cooldown:0.9, damage:999, splash:5.0, splashDamage:4.2, directInstakill:true, auto:true, fireRateCap:2.0,
         desc:'Hurls the same Phoenix-scale molten fireball the Fox commands — a direct hit executes any non-boss outright, and the impact scorches a wide area around it.'},
-      dragonlord_void_maw:{name:'Void Maw', price:450, slot:'secondary', kind:'dragonlord_void_maw', cooldown:3.4, damage:2.1, radius:3.6, fireRateCap:3,
-        desc:'Tears open a void rift ahead of her that drags every nearby enemy toward its center, then collapses in a violent implosion of hellfire.'}
+      dragonlord_somersault_hunt:{name:'Somersault Hunt', price:450, slot:'secondary', kind:'dragonlord_somersault_hunt', cooldown:3.0, range:12,
+        desc:'The same Somersault Hunt Spider-Man uses: a long acrobatic leap that crashes directly onto the nearest enemy. Hold the button to keep chaining target to target, and a ring of hellfire burns for 2 seconds at every point she touches down.'}
     }
   },
   hooded: {
@@ -14803,7 +14803,7 @@ function updateSecondaryButton(){
     btn.innerHTML='<span class="secondaryIcon">🔒</span><span class="secondaryLabel">SECONDARY</span>';
     return;
   }
-  const icon=w.kind==='spider_zip_takedown'?'🪝':(w.kind==='spider_web_trap'?'🕸️':(w.kind==='spider_somersault_slam'?'🤸':
+  const icon=w.kind==='spider_zip_takedown'?'🪝':(w.kind==='spider_web_trap'?'🕸️':(w.kind==='spider_somersault_slam'||w.kind==='dragonlord_somersault_hunt'?'🤸':
     w.kind==='velocity_quantum_slingshot'?'⚡':(w.kind==='velocity_phasing_resonance'?'〰️':(w.kind==='velocity_synaptic_snare'?'▦':(w.kind==='giant_fireball'?'☄️':(w.kind==='cloud_great_sword_slash'?'⚔️':(w.kind==='knight_shield_toss'?'🛡️':(w.kind==='barbarian_whirlwind'?'🌀':(w.kind==='knight_whirlwind_secondary'?'🌀':(w.kind==='rhino_cloud_whirlwind'?'🌀':(w.kind.includes('arrow')?'🏹':(w.kind.includes('spin')?'🌀':'✦'))))))))))));
   if(whirlwindActive){
     const wTimer=(w.kind==='barbarian_whirlwind')
@@ -23343,7 +23343,7 @@ function updateKnightRoyalClones(dt){
 const DL_FIRE=0xff5a1f, DL_EMBER=0xffc35a, DL_VOID=0x9b3dff, DL_ASH=0x2b1420;
 function isDragonLordWeaponKind(kind){ return String(kind||'').indexOf('dragonlord_')===0; }
 let dragonlordComboStep=0;
-let dragonlordRuntime={wyrmFormTimer:0,wyrmFormCooldown:0,wyrmFormPulse:0,wyrmSpeedBoostApplied:false,hellgateTimer:0,hellgateCooldown:0,hellgatePulse:0,hellgateOrigin:null,hellgateSweepStart:0};
+let dragonlordRuntime={wyrmFormTimer:0,wyrmFormCooldown:0,wyrmFormPulse:0,wyrmSpeedBoostApplied:false,hellgateTimer:0,hellgateCooldown:0,hellgatePulse:0,hellgateOrigin:null,hellgateSweepStart:0,somersault:null,somersaultCooldown:0};
 let dragonlordMeteorActiveTimer=0, dragonlordMeteorCooldownTimer=0, dragonlordMeteorEpoch=0;
 let dragonlordMeteorSpawnTimer=0, dragonlordMeteorDamageTimer=0;
 let dragonlordFireballs=[];
@@ -23508,7 +23508,7 @@ function doDragonLordAttack(w){
     case 'dragonlord_infernal_glaive': dragonlordGlaiveCombo(w); break;
     case 'dragonlord_brimstone_barrage': dragonlordBrimstoneBarrage(w); break;
     case 'dragonlord_giant_fireball': dragonlordGiantFireball(w); break;
-    case 'dragonlord_void_maw': dragonlordVoidMaw(w); break;
+    case 'dragonlord_somersault_hunt': /* handled entirely by the dedicated secondary-input gate; never reached via the normal cast path */ break;
     default: dragonlordClawRend(w); break;
   }
 }
@@ -23597,32 +23597,105 @@ function dragonlordGiantFireball(w){
   triggerCombatShake(6,110);
   navigator.vibrate&&navigator.vibrate(20);
 }
-// Void Maw: new 3rd secondary. Opens a void rift ahead of her that yanks
-// nearby enemies toward its center, then implodes — crowd-control flavor,
-// visually and mechanically distinct from the two fire-projectile moves.
-function dragonlordVoidMaw(w){
-  if(player.userData.playKayClip) player.userData.playKayClip('Spell_Simple_Shoot',true,true,.26);
-  const yaw=player.rotation.y;
-  const rangeMult=dragonlordAttackRangeMult();
-  const dist=3.0*rangeMult;
-  const origin={x:player.position.x+Math.sin(yaw)*dist,y:player.position.y,z:player.position.z+Math.cos(yaw)*dist};
-  const radius=w.radius*rangeMult;
+// Somersault Hunt: the same acrobatic hunting leap Spider-Man uses
+// (spider_somersault_slam / SpiderKit.somersaultSlam), reimplemented on
+// her own runtime state instead of hooking into SpiderKit — mirrors its
+// quadratic-bezier leap-and-land chain, hold-to-chain-to-next-target
+// logic, roam fallback when nothing is nearby, and full invincibility
+// while active. New addition on top of the original: a fire ring that
+// burns at every point she lands, fading out over exactly 2 seconds.
+function dragonlordNearestEnemy(range,exclude){
+  if(!player) return null;
+  let best=null,bestDist=range;
   for(const z of zombies){
     if(!z||z.userData.dead||z.userData.spawnPending) continue;
-    const dx=origin.x-z.position.x, dz=origin.z-z.position.z;
-    const d=Math.hypot(dx,dz);
-    if(d<=radius && d>0.05){
-      const pull=Math.min(d-0.3,1.6);
-      if(pull>0){ z.position.x+=(dx/d)*pull; z.position.z+=(dz/d)*pull; }
+    if(exclude&&exclude.has(z)) continue;
+    const d=Math.hypot(z.position.x-player.position.x,z.position.z-player.position.z);
+    if(d<bestDist){bestDist=d;best=z;}
+  }
+  return best;
+}
+function dragonlordBeginSomersaultLeg(target){
+  const s=dragonlordRuntime.somersault;
+  if(!s||!player) return;
+  const start={x:player.position.x,y:player.position.y,z:player.position.z};
+  let end,tracked=null;
+  if(target&&target.parent&&!target.userData.dead){
+    tracked=target;
+    s.visited.add(target);
+    end={x:target.position.x,y:start.y,z:target.position.z};
+    const bx=start.x-end.x,bz=start.z-end.z;
+    const bl=Math.hypot(bx,bz);
+    if(bl>0.0001){ end.x+=(bx/bl)*0.68; end.z+=(bz/bl)*0.68; }
+  }else{
+    const yaw=player.rotation.y+(s.roamCount%2===0?0.42:-0.42);
+    const dist=6.8+Math.min(2.6,s.chainCount*0.14);
+    end={x:start.x+Math.sin(yaw)*dist,y:start.y,z:start.z+Math.cos(yaw)*dist};
+    s.roamCount++;
+  }
+  const dist=Math.max(1,Math.hypot(end.x-start.x,end.z-start.z));
+  const control={x:(start.x+end.x)/2,y:start.y+Math.min(8.8,Math.max(5.4,3.8+dist*0.52)),z:(start.z+end.z)/2};
+  s.target=tracked; s.start=start; s.control=control; s.end=end; s.t=0;
+  s.dur=Math.min(0.60,Math.max(0.40,0.22+dist*0.032));
+  if(player.userData.playKayClip) player.userData.playKayClip('Flying_Forward_Super',true,true,s.dur+.05);
+  dragonlordImpactFlash(start,DL_VOID,1.2,.14);
+  dragonlordFireSparks(start,4,DL_VOID);
+}
+function dragonlordSomersaultLand(s){
+  if(!player) return;
+  const at=s.end;
+  player.position.x=at.x; player.position.y=at.y; player.position.z=at.z;
+  const direct=!!(s.target&&s.target.parent&&!s.target.userData.dead);
+  const dmgMult=dragonlordAttackDamageMult();
+  if(direct){
+    const e=s.target;
+    s.chainCount++;
+    if((e.userData.archetype||'walker')==='boss'){
+      const maxHp=Math.max(1,Number(e.userData.maxHp)||Number(e.userData.hp)||1);
+      applyBulletDamage(e,maxHp*0.05*dmgMult);
+    }else{
+      applyBulletDamage(e,(e.userData.hp||3)+1); // guaranteed takedown on any non-boss, same as Spider-Man's version
     }
   }
-  dragonlordFireRing(origin,radius*.4,DL_VOID,.5);
-  const hits=damageNearby(origin,radius,w.damage*dragonlordAttackDamageMult());
-  dragonlordFireSweepRing(origin,DL_VOID,radius);
-  dragonlordImpactFlash(origin,DL_VOID,2.2,.2);
-  dragonlordEmberBurst(origin.x,origin.y+.7,origin.z,18,4.2);
-  triggerCombatShake(hits>0?12:6,160);
-  navigator.vibrate&&navigator.vibrate(hits>0?[35,20,55]:20);
+  dragonlordImpactFlash(at,DL_FIRE,direct?2.2:1.6,.18);
+  dragonlordFireSparks(at,direct?10:6,DL_EMBER);
+  // The requested addition: a ring of fire blooms at every landing point
+  // and burns for exactly 2 seconds before disappearing.
+  dragonlordFireRing(at,direct?2.2:1.6,DL_FIRE,2.0);
+  triggerCombatShake(direct?10:6,140);
+  navigator.vibrate&&navigator.vibrate(direct?[24,16,32]:16);
+
+  const held=secondaryInputHeld && secondaryWeaponForAvatar() && secondaryWeaponForAvatar().kind==='dragonlord_somersault_hunt';
+  if(held && s.chainCount<8){
+    dragonlordBeginSomersaultLeg(dragonlordNearestEnemy(12,s.visited));
+  }else{
+    dragonlordRuntime.somersault=null;
+  }
+}
+function dragonlordUpdateSomersault(dt){
+  if(dragonlordRuntime.somersaultCooldown>0) dragonlordRuntime.somersaultCooldown=Math.max(0,dragonlordRuntime.somersaultCooldown-dt);
+  const s=dragonlordRuntime.somersault;
+  if(!s||!player) return;
+  invincibleTimer=Math.max(invincibleTimer,0.4); // full invulnerability for the whole active window
+  s.t+=dt;
+  const q=Math.min(1,s.t/s.dur);
+  const ix=(1-q)*(1-q)*s.start.x+2*(1-q)*q*s.control.x+q*q*s.end.x;
+  const iy=(1-q)*(1-q)*s.start.y+2*(1-q)*q*s.control.y+q*q*s.end.y;
+  const iz=(1-q)*(1-q)*s.start.z+2*(1-q)*q*s.control.z+q*q*s.end.z;
+  player.position.set(ix,iy,iz);
+  if(q>=1) dragonlordSomersaultLand(s);
+}
+function dragonlordSomersaultHunt(w){
+  if(!dragonlordIsActive()||!player) return false;
+  if(dragonlordRuntime.somersault) return true; // already chaining — let it keep running
+  if(dragonlordRuntime.somersaultCooldown>0) return false;
+  dragonlordRuntime.somersaultCooldown=w.cooldown||3.0;
+  invincibleTimer=Math.max(invincibleTimer||0,0.85);
+  updateInvincibleHud();
+  dragonlordRuntime.somersault={visited:new Set(),chainCount:0,roamCount:0,target:null,start:null,control:null,end:null,t:0,dur:0.45};
+  dragonlordBeginSomersaultLeg(dragonlordNearestEnemy(w.range||12));
+  toast('SOMERSAULT HUNT');
+  return true;
 }
 
 /* ------------------------------------------------------------- PASSIVE */
@@ -23905,7 +23978,10 @@ function dragonlordLegionUnlocked(){
 function dragonlordCloneAvailableMoves(){
   const moves=['dragonlord_claw_rend','dragonlord_brimstone_barrage'];
   if(ownedWeapons&&ownedWeapons.dragonlord_infernal_glaive) moves.push('dragonlord_infernal_glaive');
-  if(ownedWeapons&&ownedWeapons.dragonlord_void_maw) moves.push('dragonlord_void_maw');
+  // Somersault Hunt needs real cross-map player movement (bezier leaps),
+  // which doesn't translate to a stationary clone — intentionally not
+  // added to the clone moveset, same as the old Wing Gale Dash/Soul Rend
+  // Chain before it.
   return moves;
 }
 function dragonlordCloneDamageBase(){
@@ -23978,12 +24054,6 @@ function dragonlordClonePerformMove(c,target){
     dragonlordImpactFlash(c.position,DL_EMBER,1.5,.16);
     for(const z of zombies)if(z&&!z.userData.dead&&!z.userData.spawnPending&&Math.hypot(z.position.x-c.position.x,z.position.z-c.position.z)<=2.6)applyBulletDamage(z,base*.85);
     c.userData.attackCooldown=.85;
-  }else if(kind==='dragonlord_void_maw'){
-    knightClonePlayClip(c,['ground','pound'],'Punch_Cross');
-    dragonlordFireRing(c.position,2.0,DL_VOID,.35);
-    dragonlordImpactFlash(c.position,DL_VOID,1.6,.18);
-    for(const z of zombies)if(z&&!z.userData.dead&&!z.userData.spawnPending&&Math.hypot(z.position.x-c.position.x,z.position.z-c.position.z)<=2.8)applyBulletDamage(z,base*.9);
-    c.userData.attackCooldown=1.0;
   }else if(kind==='dragonlord_infernal_glaive'){
     knightClonePlayClip(c,['sword','regular'],'Punch_Cross');
     dragonlordFireSwipe(c.position,c.rotation.y,DL_VOID,1.1,1.6);
@@ -24181,6 +24251,7 @@ function updateDragonLordSystems(dt){
     if(dragonlordRuntime.wyrmFormTimer<=0) dragonlordEndWyrmForm();
   }
   dragonlordUpdateHellgate(dt);
+  dragonlordUpdateSomersault(dt);
   dragonlordUpdateSwipes(dt);
   dragonlordUpdateSparks(dt);
   dragonlordUpdateSweepRing(dt);
@@ -35714,6 +35785,17 @@ function doSecondaryShoot(){
     // nothing and answers with a haptic tick instead of eating the cooldown.
     player.userData.secondaryAttackCooldown=0;
     const fired=triggerSpiderSecondary(w);
+    if(fired) markSecondaryUsed();
+    else navigator.vibrate&&navigator.vibrate(10);
+    return;
+  }
+  if(w.kind==='dragonlord_somersault_hunt'){
+    // Same contract as Spider's own Somersault Hunt above: her own runtime
+    // state owns the gate (dragonlordRuntime.somersault/somersaultCooldown)
+    // since a chain spans multiple frames and holds to keep chaining, so
+    // the shared secondaryAttackCooldown must stay out of the way.
+    player.userData.secondaryAttackCooldown=0;
+    const fired=dragonlordSomersaultHunt(w);
     if(fired) markSecondaryUsed();
     else navigator.vibrate&&navigator.vibrate(10);
     return;
