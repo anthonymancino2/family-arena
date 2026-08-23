@@ -1515,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.97.00 - Dudu: Cryo Prison slowed down, no more fast-forward feel';
+const GAME_VERSION='23.98.00 - Dudu and Chopper moves back to normal round-based unlock progression';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -1907,7 +1907,7 @@ const AVATAR_TYPE_LABELS = {
   corsair:'🐧 Dudu the Penguin ✨NEW',
 };
 const HERO_ROSTER_INFO = {
-  corsair:{title:'Dudu the Penguin',role:'HYBRID • ICE & WATER MAGE',desc:'A near-motionless penguin mage whose entire kit is delivered through a custom GPU shader FX engine — every move is 100% ice/water, nothing red or orange anywhere. Hydro-Snap is the crisp spammable jet, Frost-Fracture auto-targets the nearest enemy; Ice Ball, Glacial Monolith and Blizzard Blitz are the heavy tactical secondaries; Tidal Cataclysm (five map-spanning waves), Cryo Prison (freeze and shatter) and Kraken\'s Grasp (multi-point ice claws) are the screen-shaking ultimates. Plus a temporary Captain\'s Fury battle-rage. Every move is unlocked and ready from the very first round.'},
+  corsair:{title:'Dudu the Penguin',role:'HYBRID • ICE & WATER MAGE',desc:'A near-motionless penguin mage whose entire kit is delivered through a custom GPU shader FX engine — every move is 100% ice/water, nothing red or orange anywhere. Hydro-Snap is the crisp spammable jet, Frost-Fracture auto-targets the nearest enemy; Ice Ball, Glacial Monolith and Blizzard Blitz are the heavy tactical secondaries; Tidal Cataclysm (five map-spanning waves), Cryo Prison (freeze and shatter) and Kraken\'s Grasp (multi-point ice claws) are the screen-shaking ultimates, unlocking at Rounds 24, 29 and 34. Plus a temporary Captain\'s Fury battle-rage.'},
   dragonlord:{title:'Nyxara, the Demon Dragon Queen',role:'HYBRID • APEX RAID BOSS',desc:'A wing-flaring, fire-breathing demon dragon queen built on a full 81-clip cinematic animation set, so she never freezes into a stiff pose. She fights up close with Demon Claw and Infernal Glaive combos, burns from range with the same Phoenix-scale Giant Fireball the Fox commands, hunts with the same acrobatic Somersault Hunt Spider-Man uses (burning a ring of hellfire at every point she lands), and holds the line with the same Defensive Whirlwind Cloud uses, reskinned in her own orange hellfire. Her three ultimate-tier powers — Ashfall Cataclysm, Ascend: Wyrm Form, and Open the Hellgate — are all free and pre-owned the moment she is selected, and Round 10 unlocks her signature Legion of the Abyss: a horde of invincible demon-dragon clones fighting at her side. Built to be the single strongest, flashiest avatar in the roster.'},
   spider:{title:'Spider',role:'MELEE • ACROBAT',desc:'A wall-crawling acrobat built on 25 hand-authored clips. Quick and evasive without being a blur: he closes distance with web-lines and Bezier vaults rather than raw speed. The kit is a setup-and-payoff loop — Web Snap and Web Trap wrap targets, and everything wrapped takes 45% extra damage from every source, including all three of his ultimates.'},
   rogue:{title:'Tempest Archer',role:'RANGED • EASY',desc:'The speed-focused ranged avatar: fast movement, long-lived piercing arrows, and precise crowd control. Every fifth defeat triggers Tailwind for a short burst of movement and firing speed.'},
@@ -3503,7 +3503,7 @@ const HERO_STAT_CONFIG = {
     startingBonus: {power:0, speed:0, hp:2},
     upgradeAmount: {power:1, speed:1, hp:2}
   },
-  corsair: { // Dudu the Penguin: strong all-rounder, every move unlocked from Round 1
+  corsair: { // Dudu the Penguin: strong all-rounder
     startingBonus: {power:3, speed:2, hp:2},
     upgradeAmount: {power:2, speed:2, hp:2}
   }
@@ -3624,11 +3624,14 @@ const CHARACTER_COMBAT = {
   },
   corsair: {
     // Dudu the Penguin: a shader-FX ice/water mage. Two Primaries, three
-    // Secondaries, all free (this hero always ships fully unlocked — see
-    // corsairIsActive() bypasses in resetCharacterLoadout/resetAbilityLoadout/
-    // attackCooldownFor). Every kind below is a bespoke 'dudu_' id dispatched
-    // through doShoot()/doSecondaryShoot() into its own DuduFX trigger
-    // function — none of these fall through to the generic bullet system.
+    // Secondaries, all price:0 (free once unlocked) and gated by the same
+    // round-based MOVE_UNLOCK_ROUNDS progression as every other avatar —
+    // see weaponUnlockRound(). Attack cooldown is still always zero (a
+    // deliberate, separate design choice — see the corsairIsActive()
+    // bypass in attackCooldownFor). Every kind below is a bespoke 'dudu_'
+    // id dispatched through doShoot()/doSecondaryShoot() into its own
+    // DuduFX trigger function — none of these fall through to the generic
+    // bullet system.
     defaultId:'dudu_hydro_snap',
     baseMoveMult:1.20,
     weapons:{
@@ -3836,11 +3839,7 @@ function preGameMoveOptionsForAvatar(){
   const c=combatForAvatar();
   const primary=[];
   const secondary=[];
-  // Corsair always ships fully unlocked (test-mode hero — see corsairIsActive()
-  // bypasses elsewhere), independent of whatever ownedWeapons/ownedAbilities
-  // happen to hold from a previously-active character this session. Chopper
-  // gets the same treatment by request — every move available from round 1.
-  const allUnlocked=corsairIsActive()||chopperClassIsActive();
+  const allUnlocked=UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING;
   for(const [id,w] of Object.entries(c.weapons||{})){
     if(w.hidden)continue;
     if(w.cloudOnly&&state.avatarType!=='cloud')continue;
@@ -3965,7 +3964,7 @@ function resetCharacterLoadout(){
   currentPrimaryWeaponId = null;
   currentWeaponId = null;
   ownedWeapons = {[c.defaultId]:true};
-  if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING || corsairIsActive() || chopperClassIsActive()){
+  if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING){
     for(const id of Object.keys(c.weapons||{})) ownedWeapons[id]=true;
   }
   // Shield Bash is now part of Royal Vanguard Combo, not a Secondary.
@@ -3982,7 +3981,7 @@ function resetAbilityLoadout(){
   if(removedAbilityIds.includes(equippedAbilityId)) equippedAbilityId=null;
   equippedAbilityId = null;
   ownedAbilities = {};
-  if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING || corsairIsActive() || chopperClassIsActive()){
+  if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING){
     for(const ability of (HERO_ABILITIES[state.avatarType]||HERO_ABILITIES[gameplayAvatarType()]||[])) ownedAbilities[ability.id]=true;
   }
 }
@@ -4021,12 +4020,12 @@ const SUPERNOVA_PIERCER = {id:'supernova_piercer', name:'Supernova Piercer', pri
   desc:'Signature ultimate. Enter a 3-second rooted sniper charge, then fire a solar beam completely across the map. Instantly defeats non-boss enemies in its path and deals 50% max HP to bosses. No cooldown during development testing.'};
 // =====================================================================
 // Ultimate-tier ability metadata (shown in the Abilities shop/loadout).
-const DUDU_TIDAL_CATACLYSM_ABILITY = {id:'dudu_tidal_cataclysm', name:'Tidal Cataclysm', price:0,
-  desc:'Ultimate-tier ability, free and pre-owned. Five colossal waves sweep the full width of the map over 16 seconds, executing everything caught in each pass.'};
-const DUDU_CRYO_PRISON_ABILITY = {id:'dudu_cryo_prison', name:'Cryo Prison', price:0,
-  desc:'Ultimate-tier ability, free and pre-owned. Every enemy on the map is yanked to the middle of the arena and frozen solid the instant it lands, then shatters and dies half a second later. Repeats on whoever is still standing until 10 seconds are up or the map is cleared.'};
-const DUDU_KRAKEN_GRASP_ABILITY = {id:'dudu_kraken_grasp', name:"Kraken's Grasp", price:0,
-  desc:'Ultimate-tier ability, free and pre-owned. For 10 relentless seconds, jagged claws of ice erupt from below across the entire map, chasing down anything still standing.'};
+const DUDU_TIDAL_CATACLYSM_ABILITY = {id:'dudu_tidal_cataclysm', name:'Tidal Cataclysm', price:0, avatar:'corsair', unlockLevel:24,
+  desc:'Ultimate-tier ability, free once unlocked. Five colossal waves sweep the full width of the map over 16 seconds, executing everything caught in each pass.'};
+const DUDU_CRYO_PRISON_ABILITY = {id:'dudu_cryo_prison', name:'Cryo Prison', price:0, avatar:'corsair', unlockLevel:29,
+  desc:'Ultimate-tier ability, free once unlocked. Every enemy on the map is yanked to the middle of the arena and frozen solid the instant it lands, then shatters and dies half a second later. Repeats on whoever is still standing until 10 seconds are up or the map is cleared.'};
+const DUDU_KRAKEN_GRASP_ABILITY = {id:'dudu_kraken_grasp', name:"Kraken's Grasp", price:0, avatar:'corsair', unlockLevel:34,
+  desc:'Ultimate-tier ability, free once unlocked. For 10 relentless seconds, jagged claws of ice erupt from below across the entire map, chasing down anything still standing.'};
 // DUDU THE PENGUIN — shader-based ice/water FX engine.
 // Three reusable custom-shader building blocks (all Three.js
 // ShaderMaterial, WebGL-native, no external textures/assets):
@@ -15851,7 +15850,6 @@ function closeShop(){
 const MOVE_UNLOCK_ROUNDS = [4, 9, 14, 19, 24, 29, 34];
 function weaponUnlockRound(combat, weaponId){
   if(!combat) return 1;
-  if(corsairIsActive()) return 1;
   if(weaponId===combat.defaultId) return 1;
   const ids=Object.keys(combat.weapons).filter(id=>{
     const w=combat.weapons[id];
