@@ -1515,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.99.00 - Dudu: real cooldowns on every move, primaries through ultimates';
+const GAME_VERSION='24.00.00 - Blizzard Storm: real cooldown countdown on the ability button';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -18480,11 +18480,22 @@ function updateHoodedHud(){
           abilityBtn.classList.remove('active','cooling');
         }
       }else{
-        abilityBtn.textContent='BLIZZARD';
+        // Blizzard Storm (blizzard_storm) — had a real cooldown/active cycle
+        // (blizzardCooldownTimer/blizzardActiveTimer) all along, but this
+        // branch never displayed either: the old abilityButtonCooldown()
+        // helper just toggled a 'cooling' class via setTimeout, and the
+        // classList.remove('...','cooling') a few lines below undid that on
+        // every single HUD refresh anyway, so the button never actually
+        // showed any cooldown feedback. Matches the skyfall_barrage pattern.
+        abilityBtn.textContent=blizzardActiveTimer>0
+          ? `BLIZZARD ${blizzardActiveTimer.toFixed(1)}`
+          : (blizzardCooldownTimer>0 ? `BLIZZARD ${Math.ceil(blizzardCooldownTimer)}` : 'BLIZZARD');
+        abilityBtn.classList.toggle('active',blizzardActiveTimer>0);
+        abilityBtn.classList.toggle('cooling',blizzardCooldownTimer>0&&blizzardActiveTimer<=0);
       }
       if(!laserMode){
         abilityBtn.style.removeProperty('--charge');
-        if(equippedAbilityId!=='arcane_laser'&&equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='supernova_piercer'&&equippedAbilityId!=='super_meteor'&&!isHooded&&!isChopper&&!isSpider&&!isKnight&&!isBarbarian){
+        if(equippedAbilityId!=='arcane_laser'&&equippedAbilityId!=='skyfall_barrage'&&equippedAbilityId!=='supernova_piercer'&&equippedAbilityId!=='super_meteor'&&equippedAbilityId!=='blizzard_storm'&&!isHooded&&!isChopper&&!isSpider&&!isKnight&&!isBarbarian){
           abilityBtn.classList.remove('empty','active','cooling');
         }
       }
