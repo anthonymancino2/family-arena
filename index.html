@@ -1515,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.92.00 - Fix mass-kill freeze: defer enemy-refill off the kill path';
+const GAME_VERSION='23.93.00 - Fix Tidal Cataclysm crash + Chopper all moves unlocked';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -3838,8 +3838,9 @@ function preGameMoveOptionsForAvatar(){
   const secondary=[];
   // Corsair always ships fully unlocked (test-mode hero — see corsairIsActive()
   // bypasses elsewhere), independent of whatever ownedWeapons/ownedAbilities
-  // happen to hold from a previously-active character this session.
-  const allUnlocked=corsairIsActive();
+  // happen to hold from a previously-active character this session. Chopper
+  // gets the same treatment by request — every move available from round 1.
+  const allUnlocked=corsairIsActive()||chopperClassIsActive();
   for(const [id,w] of Object.entries(c.weapons||{})){
     if(w.hidden)continue;
     if(w.cloudOnly&&state.avatarType!=='cloud')continue;
@@ -3964,7 +3965,7 @@ function resetCharacterLoadout(){
   currentPrimaryWeaponId = null;
   currentWeaponId = null;
   ownedWeapons = {[c.defaultId]:true};
-  if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING || corsairIsActive()){
+  if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING || corsairIsActive() || chopperClassIsActive()){
     for(const id of Object.keys(c.weapons||{})) ownedWeapons[id]=true;
   }
   // Shield Bash is now part of Royal Vanguard Combo, not a Secondary.
@@ -3981,7 +3982,7 @@ function resetAbilityLoadout(){
   if(removedAbilityIds.includes(equippedAbilityId)) equippedAbilityId=null;
   equippedAbilityId = null;
   ownedAbilities = {};
-  if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING || corsairIsActive()){
+  if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING || corsairIsActive() || chopperClassIsActive()){
     for(const ability of (HERO_ABILITIES[state.avatarType]||HERO_ABILITIES[gameplayAvatarType()]||[])) ownedAbilities[ability.id]=true;
   }
 }
@@ -4556,7 +4557,14 @@ function updateDuduTidalCataclysm(dt){
     const pos=s.start.clone().lerp(s.end,ease);
     w.mesh.position.x=pos.x; w.mesh.position.z=pos.z;
     const wallMat=w.mesh.userData.wall.material, crestMat=w.mesh.userData.crest.material;
-    wallMat.uniforms.uTime.value+=dt*3; crestMat.uniforms.uTime.value+=dt*4;
+    // crest uses DUDU_GLOW_MAT (Fresnel shader, view-angle driven — no uTime
+    // uniform exists on it). Animating crestMat.uniforms.uTime here threw
+    // every single frame once a wave spawned, and since that exception fired
+    // from deep inside update(dt) with only the outermost per-frame try/catch
+    // to catch it, EVERYTHING downstream in that frame's update() — movement,
+    // physics, all other systems — silently never ran, every frame, for as
+    // long as a wave was alive. This is what actually read as "frozen".
+    wallMat.uniforms.uTime.value+=dt*3;
     const edgeFade=p<0.06?p/0.06:(p>0.94?(1-p)/0.06:1);
     wallMat.uniforms.uOpacity.value=0.94*edgeFade;
     crestMat.uniforms.uOpacity.value=0.7*edgeFade;
