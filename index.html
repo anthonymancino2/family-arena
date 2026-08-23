@@ -1515,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.93.00 - Fix Tidal Cataclysm crash + Chopper all moves unlocked';
+const GAME_VERSION='23.94.00 - Dudu: Tidal Cataclysm = Choppers move, Cryo Prison pulls + fast kills';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -4022,9 +4022,9 @@ const SUPERNOVA_PIERCER = {id:'supernova_piercer', name:'Supernova Piercer', pri
 // =====================================================================
 // Ultimate-tier ability metadata (shown in the Abilities shop/loadout).
 const DUDU_TIDAL_CATACLYSM_ABILITY = {id:'dudu_tidal_cataclysm', name:'Tidal Cataclysm', price:0,
-  desc:'Ultimate-tier ability, free and pre-owned. Four colossal waves sweep the full width of the map over 10 seconds, executing everything caught in each pass.'};
+  desc:'Ultimate-tier ability, free and pre-owned. Five colossal waves sweep the full width of the map over 16 seconds, executing everything caught in each pass.'};
 const DUDU_CRYO_PRISON_ABILITY = {id:'dudu_cryo_prison', name:'Cryo Prison', price:0,
-  desc:'Ultimate-tier ability, free and pre-owned. Every enemy on the map is encased in solid ice within moments, held frozen for 10 seconds, then every block shatters together in one synchronized finishing blow.'};
+  desc:'Ultimate-tier ability, free and pre-owned. Every enemy on the map is yanked to the middle of the arena and frozen solid the instant it lands, then shatters and dies half a second later — a rolling wave of kills, not one long hold.'};
 const DUDU_KRAKEN_GRASP_ABILITY = {id:'dudu_kraken_grasp', name:"Kraken's Grasp", price:0,
   desc:'Ultimate-tier ability, free and pre-owned. For 10 relentless seconds, jagged claws of ice erupt from below across the entire map, chasing down anything still standing.'};
 // DUDU THE PENGUIN — shader-based ice/water FX engine.
@@ -4494,134 +4494,96 @@ function duduBlizzardBlitz(w){
   duduSpawnSwarm(ox,oy-.4,oz,{shape:'cone',dirX,dirZ,spread:.32,count:30,speed:2.8,life:1.4,size:.22,color:0xdff7ff,color2:0xffffff,damping:1.8,burstSpread:.4});
 }
 
-// --- ULTIMATE 1: Tidal Cataclysm — ported from Chopper's doldrumsCannon()
-// wave-sweep structure (full-map-width, per-archetype contact rules),
-// rebuilt end to end on Dudu's own water shader instead of Chopper's FX so
-// nothing here is a reskin of someone else's active visual. Retimed to a
-// clean 10-second runtime (4 waves, 2.5s apart, 2.5s travel each — last
-// wave lands exactly at t=10s) and visually bigger — it is a persistent
-// multi-wave state machine (like Blizzard's/Skyfall's own runtime state),
-// ticked every frame from updateDuduTidalCataclysm() below. ---
+// --- ULTIMATE 1: Tidal Cataclysm — by request, the EXACT SAME move as
+// Chopper's doldrumsCannon() "tidal" wave: identical 5-wave/2.0s-interval/
+// 8.0s-per-wave timing, identical per-archetype contact rules, and
+// Chopper's own chopperFX.tidalStart/tidalUpdate/tidalFinish visuals reused
+// as-is (that module is a generic, character-agnostic pool — see ensure()
+// above — safe to call from here). Not a reskin this time; the literal
+// same move. chopperFX.update(dt) still needs to run every frame for the
+// ring/flash effects to fade and dispose — see updateCorsairFury() below. ---
 let duduTidal=null;
-const DUDU_TIDAL_TOTAL_WAVES=4, DUDU_TIDAL_SPAWN_EVERY=2.5, DUDU_TIDAL_WAVE_DURATION=2.5;
-function duduTidalWaveMesh(start,end,halfWidth){
-  const g=new THREE.Group();
-  const wall=new THREE.Mesh(new THREE.PlaneGeometry(halfWidth*2,8.5,36,10),DUDU_WATER_MAT.clone());
-  wall.material.uniforms.uOpacity.value=0;
-  wall.position.y=2.9;
-  g.add(wall);
-  // Bright glowing crest along the leading top edge for extra height/drama.
-  const crest=new THREE.Mesh(new THREE.PlaneGeometry(halfWidth*2,1.4,36,1),DUDU_GLOW_MAT.clone());
-  crest.material.uniforms.uOpacity.value=0;
-  crest.position.y=6.6;
-  g.add(crest);
-  g.userData.wall=wall; g.userData.crest=crest;
-  g.rotation.y=Math.atan2(end.x-start.x,end.z-start.z);
-  g.position.copy(start);
-  scene.add(g);
-  return g;
-}
 function triggerDuduTidalCataclysm(){
   if(!corsairIsActive()||!gameRunning||!player||duduTidal)return;
   markUltimateUsed();
-  duduEnsureMaterials();
   toast('🌊 Tidal Cataclysm!');
   const yaw=player.rotation.y;
   const dir=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
-  const radius=Math.max(18,typeof arenaSize==='number'?arenaSize:30), halfWidth=radius*1.2;
+  const radius=Math.max(18,typeof arenaSize==='number'?arenaSize:30), halfWidth=radius*1.20;
   const center=new THREE.Vector3(0,player.position.y,0);
   const start=center.clone().addScaledVector(dir,-radius*1.35), end=center.clone().addScaledVector(dir,radius*1.35);
-  duduTidal={t:0,spawnEvery:DUDU_TIDAL_SPAWN_EVERY,nextSpawn:0,spawned:0,totalWaves:DUDU_TIDAL_TOTAL_WAVES,waveDuration:DUDU_TIDAL_WAVE_DURATION,start,end,dir,halfWidth,waves:[]};
-  triggerCombatShake(10,220);
+  duduTidal={t:0,spawnEvery:2.0,nextSpawn:0,spawned:0,totalWaves:5,waveDuration:8.0,start,end,dir,yaw,halfWidth,waves:[],contacts:new Map()};
+  chopperFX.screenFlash('rgba(16,126,166,.58)',.36,280);
+  triggerCombatShake(12,220);
 }
 function updateDuduTidalCataclysm(dt){
   if(!duduTidal)return;
   if(!corsairIsActive()){
-    for(const w of duduTidal.waves){ if(w.mesh){scene.remove(w.mesh); duduDisposeMesh(w.mesh);} }
+    for(const w of duduTidal.waves){ if(w.wave)chopperFX.tidalFinish(w.wave,duduTidal.end||player.position); }
     duduTidal=null; return;
   }
   const s=duduTidal;
   s.t+=dt; s.nextSpawn-=dt;
   while(s.spawned<s.totalWaves&&s.nextSpawn<=0){
     s.spawned++; s.nextSpawn+=s.spawnEvery;
-    const mesh=duduTidalWaveMesh(s.start,s.end,s.halfWidth);
-    s.waves.push({t:0,d:s.waveDuration,mesh,hit:new Set()});
-    triggerCombatShake(12,220);
-    duduSpawnSwarm(s.start.x,player.position.y+.3,s.start.z,{shape:'ring',count:44,speed:5,life:.6,size:.17,color:0x4fd0ff,color2:0xffffff,damping:1.4});
-    updateHoodedHud();
+    const wave=chopperFX.tidalStart(s.start,s.end,s.yaw,s.halfWidth*2);
+    s.waves.push({t:0,d:s.waveDuration,wave,hit:new Set()});
+    triggerCombatShake(9,150);
   }
   for(let wi=s.waves.length-1;wi>=0;wi--){
     const w=s.waves[wi];
     w.t+=dt;
     const p=Math.min(1,w.t/w.d), ease=p*p*(3-2*p);
     const pos=s.start.clone().lerp(s.end,ease);
-    w.mesh.position.x=pos.x; w.mesh.position.z=pos.z;
-    const wallMat=w.mesh.userData.wall.material, crestMat=w.mesh.userData.crest.material;
-    // crest uses DUDU_GLOW_MAT (Fresnel shader, view-angle driven — no uTime
-    // uniform exists on it). Animating crestMat.uniforms.uTime here threw
-    // every single frame once a wave spawned, and since that exception fired
-    // from deep inside update(dt) with only the outermost per-frame try/catch
-    // to catch it, EVERYTHING downstream in that frame's update() — movement,
-    // physics, all other systems — silently never ran, every frame, for as
-    // long as a wave was alive. This is what actually read as "frozen".
-    wallMat.uniforms.uTime.value+=dt*3;
-    const edgeFade=p<0.06?p/0.06:(p>0.94?(1-p)/0.06:1);
-    wallMat.uniforms.uOpacity.value=0.94*edgeFade;
-    crestMat.uniforms.uOpacity.value=0.7*edgeFade;
-    w.mesh.userData.crest.rotation.z+=dt*2;
-    // Continuous spray across the FULL width of the wave, not one random
-    // point — this is what makes it read as a wall, not a line of sparks.
-    if(Math.random()<dt*12){
-      const along=(Math.random()-.5)*s.halfWidth*1.9;
-      const sprayX=pos.x+s.dir.z*along*-1, sprayZ=pos.z+s.dir.x*along;
-      duduSpawnSwarm(sprayX,player.position.y+.1,sprayZ,{shape:'sphere',count:5,speed:2.2,life:.45,size:.14,color:0xdff7ff,color2:0xffffff,damping:2.0,gravity:-1});
-    }
-    const thick=2.8;
+    chopperFX.tidalUpdate(w.wave,pos,p);
+    const thick=2.65;
     for(const z of zombies){
       if(!z||z.userData.dead||w.hit.has(z))continue;
       const relX=z.position.x-pos.x, relZ=z.position.z-pos.z;
       const along=relX*s.dir.x+relZ*s.dir.z, side=Math.abs(relX*s.dir.z-relZ*s.dir.x);
       if(Math.abs(along)>thick||side>s.halfWidth)continue;
       w.hit.add(z);
-      const isBoss=z.userData.archetype==='boss', isBrute=z.userData.archetype==='brute';
+      const isBoss=z.userData.archetype==='boss'||z.userData.isRoundBoss;
+      const isLarge=isBoss||z.userData.archetype==='brute';
       if(isBoss){
-        applyBulletDamage(z,(z.userData.maxHp||z.userData.hp||1)*.07);
-        z.userData.hitStun=Math.max(z.userData.hitStun||0,1.0);
-      }else if(isBrute){
-        z.userData.duduTidalContacts=(z.userData.duduTidalContacts||0)+1;
-        z.userData.hitStun=Math.max(z.userData.hitStun||0,1.0);
-        if(z.userData.duduTidalContacts>=2)applyBulletDamage(z,999);
+        const maxHp=Math.max(1,Number(z.userData.maxHp)||Number(z.userData.hp)||1);
+        applyBulletDamage(z,maxHp*.03); // same deterministic 3% boss max-HP chip per wave as Chopper's
+        z.userData.chopperTidalSlow=Math.max(z.userData.chopperTidalSlow||0,10.0);
+      }else if(isLarge){
+        const contacts=(s.contacts.get(z)||0)+1; s.contacts.set(z,contacts);
+        z.userData.chopperTidalSlow=Math.max(z.userData.chopperTidalSlow||0,10.0);
+        if(contacts>=2){ z.userData.hp=0; killZombie(z); }
         else{ z.position.x+=s.dir.x*1.25; z.position.z+=s.dir.z*1.25; }
       }else{
-        applyBulletDamage(z,999);
+        z.userData.hp=0; killZombie(z);
       }
-      duduSpawnSwarm(z.position.x,z.position.y+.5,z.position.z,{shape:'sphere',count:14,speed:4.5,life:.5,size:.13,color:0x6fd8ff,color2:0xffffff,gravity:-2.8,damping:1.5});
     }
-    if(p>=1){ scene.remove(w.mesh); duduDisposeMesh(w.mesh); s.waves.splice(wi,1); triggerCombatShake(11,180); }
+    if(p>=1){ chopperFX.tidalFinish(w.wave,pos); s.waves.splice(wi,1); triggerCombatShake(12,180); }
   }
+  for(const z of zombies){ if(z&&z.userData&&z.userData.chopperTidalSlow>0) z.userData.chopperTidalSlow=Math.max(0,z.userData.chopperTidalSlow-dt); }
   if(s.spawned>=s.totalWaves&&s.waves.length===0){ duduTidal=null; updateHoodedHud(); }
 }
 
-// --- ULTIMATE 2: Cryo Prison — every enemy on the map is encased in ice
-// within the first ~1.5s, held frozen for a full 10-second sentence, then
-// every block shatters together in one synchronized finishing blow. A
-// real 10-second map-clearing ultimate, not an instant snapshot. ---
+// --- ULTIMATE 2: Cryo Prison — every enemy on the map is yanked toward the
+// middle of the arena in a fast pull, frozen solid the instant it lands,
+// then shatters and dies exactly 0.5s after ITS OWN freeze — a rolling wave
+// of individual kills as encasement rolls out, not one held-for-10s,
+// synchronized shatter-everything-at-once finale. ---
 let duduCryo=null;
-const DUDU_CRYO_DURATION=10.0;
 function triggerDuduCryoPrison(){
   if(!corsairIsActive()||!gameRunning||!player||duduCryo)return;
   markUltimateUsed();
   duduEnsureMaterials();
   toast('🧊 Cryo Prison!');
   triggerCombatShake(13,420);
-  const px=player.position.x, py=player.position.y, pz=player.position.z;
+  const cx=0, cy=player.position.y, cz=0; // draws everyone to the middle of the map, not wherever the player is standing
   const targets=livingEnemiesByDistance(Infinity);
   const maxR=Math.max(arenaSize*1.6,24);
   [0,0.12,0.26,0.42,0.6].forEach(delay=>{
-    setTimeout(()=>{ if(corsairIsActive()&&gameRunning) spawnFrostWaveRing(px,py,pz,maxR*(0.3+delay*1.1),0.85); },delay*1000);
+    setTimeout(()=>{ if(corsairIsActive()&&gameRunning) spawnFrostWaveRing(cx,cy,cz,maxR*(0.3+delay*1.1),0.85); },delay*1000);
   });
-  duduSpawnSwarm(px,py+.6,pz,{shape:'ring',count:50,speed:9,life:.6,size:.15,color:0x4fd0ff,color2:0xffffff,damping:1.1});
-  duduCryo={t:0,duration:DUDU_CRYO_DURATION,targets,encaseIndex:0,nextEncase:0,blocks:[],px,py,pz};
+  duduSpawnSwarm(cx,cy+.6,cz,{shape:'ring',count:50,speed:9,life:.6,size:.15,color:0x4fd0ff,color2:0xffffff,damping:1.1});
+  duduCryo={t:0,targets,pullIndex:0,nextPull:0,blocks:[],cx,cy,cz};
   updateHoodedHud();
 }
 function updateDuduCryoPrison(dt){
@@ -4631,72 +4593,72 @@ function updateDuduCryoPrison(dt){
     for(const b of s.blocks){ if(b.mesh){scene.remove(b.mesh); duduDisposeMesh(b.mesh);} }
     duduCryo=null; return;
   }
-  s.t+=dt; s.nextEncase-=dt;
-  while(s.encaseIndex<s.targets.length&&s.t<2.0&&s.nextEncase<=0){
-    const z=s.targets[s.encaseIndex++];
-    s.nextEncase+=0.045;
+  s.t+=dt; s.nextPull-=dt;
+  // Kick off a fast pull-to-center for each target, staggered like the old
+  // encasement roll-out was.
+  while(s.pullIndex<s.targets.length&&s.t<2.0&&s.nextPull<=0){
+    const z=s.targets[s.pullIndex++];
+    s.nextPull+=0.045;
     if(!z||!z.parent||z.userData.dead)continue;
-    z.userData.hitStun=Math.max(z.userData.hitStun||0,s.duration-s.t+0.6);
-    const block=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.7,1.1),DUDU_GLOW_MAT.clone());
-    block.material.uniforms.uOpacity.value=0.42;
-    block.position.set(z.position.x,z.position.y+0.85,z.position.z);
-    block.scale.setScalar(0.05);
-    scene.add(block);
-    s.blocks.push({mesh:block,z});
-    if(Math.random()<0.4)duduSpawnSwarm(block.position.x,block.position.y,block.position.z,{shape:'sphere',count:5,speed:1.6,life:.35,size:.09,color:0x8fe3ff,color2:0xffffff,damping:2.4});
+    const a=Math.random()*Math.PI*2, r=Math.sqrt(Math.random())*3.2;
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,1.0);
+    s.blocks.push({z,mesh:null,phase:'pull',pullFrom:z.position.clone(),landX:s.cx+Math.cos(a)*r,landZ:s.cz+Math.sin(a)*r,pullT:0,pullDur:0.32,frozenAt:0});
   }
-  for(const b of s.blocks){
-    if(!b.mesh)continue;
-    if(b.z&&b.z.parent&&!b.z.userData.dead){
+  for(let bi=s.blocks.length-1;bi>=0;bi--){
+    const b=s.blocks[bi];
+    if(b.phase==='pull'){
+      if(!b.z||!b.z.parent||b.z.userData.dead){ s.blocks.splice(bi,1); continue; }
+      b.pullT+=dt;
+      const p=Math.min(1,b.pullT/b.pullDur), ease=1-Math.pow(1-p,3);
+      b.z.position.x=b.pullFrom.x+(b.landX-b.pullFrom.x)*ease;
+      b.z.position.z=b.pullFrom.z+(b.landZ-b.pullFrom.z)*ease;
       b.z.userData.hitStun=Math.max(b.z.userData.hitStun||0,0.3);
-      b.mesh.position.x=b.z.position.x; b.mesh.position.z=b.z.position.z;
+      if(p>=1){
+        // Landed at the middle — freeze it solid right here.
+        b.phase='frozen'; b.frozenAt=s.t;
+        const block=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.7,1.1),DUDU_GLOW_MAT.clone());
+        block.material.uniforms.uOpacity.value=0.42;
+        block.position.set(b.z.position.x,b.z.position.y+0.85,b.z.position.z);
+        block.scale.setScalar(0.05);
+        scene.add(block);
+        b.mesh=block;
+        if(Math.random()<0.5)duduSpawnSwarm(block.position.x,block.position.y,block.position.z,{shape:'sphere',count:6,speed:1.8,life:.35,size:.09,color:0x8fe3ff,color2:0xffffff,damping:2.4});
+      }
+      continue;
     }
-    if(b.mesh.scale.x<1){
-      b.mesh.scale.setScalar(Math.min(1,b.mesh.scale.x+dt*3.2));
-    }else{
-      // Slow held pulse so the whole frozen field feels alive, not static.
-      const pulse=1+Math.sin(s.t*2.2+(b.mesh.position.x+b.mesh.position.z))*0.04;
-      b.mesh.scale.setScalar(pulse);
+    // phase==='frozen': held only 0.5s, then this one individually shatters.
+    if(b.mesh){
+      if(b.mesh.scale.x<1) b.mesh.scale.setScalar(Math.min(1,b.mesh.scale.x+dt*5.5));
+      else{ const pulse=1+Math.sin(s.t*3+(b.mesh.position.x+b.mesh.position.z))*0.05; b.mesh.scale.setScalar(pulse); }
+      b.mesh.rotation.y+=dt*0.8;
     }
-    b.mesh.rotation.y+=dt*0.5;
-  }
-  // Ambient mist is a fixed rate off a shared timer, not a per-block roll —
-  // with dozens of enemies frozen at once a per-block chance scales spawn
-  // volume with enemy count and can overwhelm the frame; this stays flat.
-  s.nextMist=(s.nextMist||0)-dt;
-  if(s.nextMist<=0&&s.blocks.length){
-    s.nextMist+=0.09;
-    const pick=s.blocks[Math.floor(Math.random()*s.blocks.length)];
-    if(pick&&pick.mesh)duduSpawnSwarm(pick.mesh.position.x,pick.mesh.position.y-.6,pick.mesh.position.z,{shape:'sphere',count:3,speed:.5,life:.7,size:.08,color:0x9fe8ff,color2:0xffffff,damping:1.6,gravity:.6});
-  }
-  if(s.t>=s.duration){
-    triggerCombatShake(20,560);
-    toast('🧊 Cryo Prison shatters!');
-    for(const b of s.blocks){
+    if(b.z&&b.z.parent&&!b.z.userData.dead) b.z.userData.hitStun=Math.max(b.z.userData.hitStun||0,0.3);
+    if(s.t-b.frozenAt>=0.5){
       if(b.mesh){
-        duduSpawnSwarm(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,{shape:'sphere',count:22,speed:6,life:.7,size:.14,color:0x8fe3ff,color2:0xffffff,gravity:-3,damping:1.3});
-        duduSpawnSwarm(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,{shape:'ring',count:10,speed:4,life:.4,size:.11,color:0x4fd0ff,color2:0xffffff,damping:1.8});
+        duduSpawnSwarm(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,{shape:'sphere',count:18,speed:5.5,life:.6,size:.13,color:0x8fe3ff,color2:0xffffff,gravity:-3,damping:1.3});
+        duduSpawnSwarm(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,{shape:'ring',count:8,speed:3.6,life:.35,size:.1,color:0x4fd0ff,color2:0xffffff,damping:1.8});
         scene.remove(b.mesh); duduDisposeMesh(b.mesh);
       }
       if(b.z&&b.z.parent&&!b.z.userData.dead){
         const isBoss=b.z.userData.archetype==='boss';
         applyBulletDamage(b.z,isBoss?(b.z.userData.maxHp||b.z.userData.hp||1)*.32:999);
       }
+      triggerCombatShake(5,90);
+      s.blocks.splice(bi,1);
     }
-    // Layered shockwave dome finale: a bright expanding glow sphere plus
-    // three staggered ground rings racing out to the map edge.
-    const domeR=Math.max(arenaSize*1.6,24);
-    const dome=new THREE.Mesh(new THREE.SphereGeometry(1,20,20),DUDU_GLOW_MAT.clone());
-    dome.material.uniforms.uOpacity.value=0.7;
-    dome.position.set(s.px,s.py+1.2,s.pz);
-    duduAddMeshFx(dome,0.6,(dt2,t)=>{
-      const p=t/0.6;
-      dome.scale.setScalar(1+p*10);
-      if(dome.material)dome.material.uniforms.uOpacity.value=0.7*(1-p);
-    });
-    [0,0.15,0.3].forEach((delay,i)=>{
-      setTimeout(()=>{ if(gameRunning) spawnFrostWaveRing(s.px,s.py,s.pz,domeR*(0.45+i*0.3),0.8); },delay*1000);
-    });
+  }
+  // Ambient mist off a shared timer, not a per-block roll — flat rate
+  // regardless of how many are currently frozen at once.
+  s.nextMist=(s.nextMist||0)-dt;
+  if(s.nextMist<=0){
+    const frozen=s.blocks.filter(b=>b.mesh);
+    if(frozen.length){
+      s.nextMist+=0.09;
+      const pick=frozen[Math.floor(Math.random()*frozen.length)];
+      duduSpawnSwarm(pick.mesh.position.x,pick.mesh.position.y-.6,pick.mesh.position.z,{shape:'sphere',count:3,speed:.5,life:.7,size:.08,color:0x9fe8ff,color2:0xffffff,damping:1.6,gravity:.6});
+    }
+  }
+  if(s.pullIndex>=s.targets.length&&s.blocks.length===0){
     duduCryo=null;
     updateHoodedHud();
   }
@@ -4807,6 +4769,12 @@ function updateCorsairFury(dt){
   updateDuduTidalCataclysm(dt);
   updateDuduCryoPrison(dt);
   updateDuduKrakenGrasp(dt);
+  // Tidal Cataclysm now reuses Chopper's own chopperFX ring/flash pool
+  // (a generic, character-agnostic module — see ensure() there) for its
+  // visuals; that pool only fades/disposes its live effects when its own
+  // update() runs, which normally only happens via updateChopperKit(). Tick
+  // it here too so Dudu's use of it doesn't leak or freeze mid-fade.
+  if(duduTidal) chopperFX.update(dt);
 }
 const DRAGONLORD_ASHFALL_CATACLYSM = {id:'dragonlord_meteorstorm', name:'Ashfall Cataclysm', price:0, avatar:'dragonlord', unlockLevel:24,
   desc:'Ultimate-tier ability, free once unlocked. Nyxara rears back and calls down a storm of blazing meteors across the arena — a dozen fiery impacts crater the ground, each one damaging, knocking back, and briefly stunning every enemy caught in the blast.'};
@@ -18383,7 +18351,7 @@ function updateHoodedHud(){
         abilityBtn.classList.toggle('active',!!duduTidal);
         abilityBtn.classList.remove('cooling');
       }else if(equippedAbilityId==='dudu_cryo_prison'){
-        abilityBtn.textContent=duduCryo?`FROZEN ${Math.max(0,duduCryo.duration-duduCryo.t).toFixed(1)}`:'CRYO PRISON';
+        abilityBtn.textContent=duduCryo?`FROZEN ${duduCryo.blocks.length}`:'CRYO PRISON';
         abilityBtn.classList.toggle('active',!!duduCryo);
         abilityBtn.classList.remove('cooling');
       }else if(equippedAbilityId==='dudu_kraken_grasp'){
@@ -35191,6 +35159,9 @@ function velocityWeaverIdleWatchdog(){
 function velocityWeaverMovementMultiplier(){if(chopperClassIsActive())return chopperKit?chopperKit.movementMultiplier():1;return (heroKitIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.movementMultiplier():1;}
 function velocityWeaverAttackSpeedMultiplier(){if(chopperClassIsActive())return chopperKit?chopperKit.attackSpeedMultiplier():1;return (heroKitIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.attackSpeedMultiplier():1;}
 function velocityWeaverEnemyTimeScale(z){if(chopperClassIsActive())return chopperKit?chopperKit.enemyTimeScale(z):1;
+  // Dudu's Tidal Cataclysm sets the same chopperTidalSlow flag as Chopper's
+  // own tidal wave (it's the exact same move) — read it here too.
+  if(corsairIsActive())return (z&&z.userData&&z.userData.chopperTidalSlow>0)?.38:1;
   return (heroKitIsActive()&&shadowStalkerMoveset)?shadowStalkerMoveset.enemyTimeScale(z):1;}
 function velocityWeaverPhasingActive(){if(chopperClassIsActive())return !!(chopperKit&&chopperKit.isGuarding());
   return !!(heroKitIsActive()&&shadowStalkerMoveset&&shadowStalkerMoveset.isPhasing());}
