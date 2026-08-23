@@ -1515,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.83.00 - New Avatar: Captain Frostbeak the Rune Corsair';
+const GAME_VERSION='23.83.01 - Corsair Scale: Slightly Smaller Than Fox';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -2002,7 +2002,12 @@ function passiveForAvatar(type=state.avatarType){
 // Archer / Hooded Rogue / Mage = small
 // Knight = medium (larger than those three)
 // Barbarian = largest; V22.22.03 makes the playable Aesir a true 1.5x larger.
-const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:1.0, knight:1.18, barbarian:1.5, cloud:1.0, rhino:1.5, chopper:1.0, spider:1.0, dragonlord:0.45, corsair:1.0 };
+// Corsair's internal build normalizes to the same 1.48 generic height target
+// as most other imported avatars, but the Fox Mage build normalizes to a
+// smaller 1.30 (see buildNineTailedFoxPlayer). 0.84 puts Corsair's final
+// height (1.48*0.84=1.2432) a little under the Fox's 1.30 as requested,
+// rather than the ~14% bigger he was at the default 1.0 multiplier.
+const AVATAR_SCALE = { rogue:0.88, hooded:0.88, mage:1.0, knight:1.18, barbarian:1.5, cloud:1.0, rhino:1.5, chopper:1.0, spider:1.0, dragonlord:0.45, corsair:0.84 };
 // 0.3 (tiny diagnostic) confirmed visually correct — the scale pipeline
 // does work. 0.45 = 0.3 * 1.5, i.e. 50% bigger than that confirmed baseline,
 // per direct request.
