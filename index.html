@@ -1515,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.90.00 - Dudu: Freeze Fix (FX Ceiling + Rate Tuning)';
+const GAME_VERSION='23.91.00 - Dudu: Ground Fix + Mass-Kill Freeze Fix';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -14589,6 +14589,16 @@ function buildKayKitPlayer(characterId, options={}){
       root.updateMatrixWorld(true);
       const placedBox=new THREEAsset.Box3().setFromObject(root);
       root.position.y-=placedBox.min.y;
+      if(characterId==='corsair'){
+        // Box3 grounding above only measures the STATIC bind pose, which for
+        // this asset reads lowest at the belly — but the human-proportioned
+        // rig's actual foot bones sit well above that once Idle plays (bind
+        // pose and Idle pose agree for Nyxara above; verified they don't
+        // here, measured via getWorldPosition() on foot/ball bones across a
+        // full Idle cycle, which reflects real animated transforms unlike
+        // Box3). Without this the penguin visibly hovers off the ground.
+        root.position.y-=0.753;
+      }
     }
 
     let zombieMeshIndex = 0;
@@ -15743,7 +15753,16 @@ function updateEnemyCountHud(){
   pill.setAttribute('aria-label', remaining + ' enemies remaining; ' + zombies.length + ' currently on the map');
   updateBossHealthHud();
 }
+let _enemyRadarLastDraw=0;
 function updateEnemyRadar(){
+  // A mass-kill instant (a full-width wave/ultimate killing dozens of
+  // enemies in one frame) used to redraw this canvas once per kill —
+  // dozens of full clear+redraw+per-zombie-arc passes in a single frame,
+  // which is exactly the kind of cost that reads as a hard freeze. The
+  // minimap doesn't need per-kill precision, so cap its real redraw rate.
+  const _now=(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
+  if(_now-_enemyRadarLastDraw<40)return;
+  _enemyRadarLastDraw=_now;
   const c=document.getElementById('enemyRadar');if(!c||!player)return;const ctx=c.getContext('2d'),w=c.width,h=c.height,cx=w/2,cy=h/2;
   ctx.clearRect(0,0,w,h);ctx.save();ctx.translate(cx,cy);ctx.strokeStyle='rgba(255,255,255,.22)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,w*.46,0,Math.PI*2);ctx.stroke();
   ctx.fillStyle='#7ff4ff';ctx.beginPath();ctx.moveTo(0,-9);ctx.lineTo(6,7);ctx.lineTo(0,4);ctx.lineTo(-6,7);ctx.closePath();ctx.fill();
