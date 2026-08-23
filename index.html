@@ -201,6 +201,7 @@
   .bigBtn:active{transform:scale(0.97);}
   .ghostBtn{background:transparent;color:var(--snow);border:1px solid rgba(255,255,255,0.3);
     border-radius:14px;padding:12px 28px;font-size:15px;font-weight:600;margin:6px 0;}
+  .ghostBtn.testModeOn{background:rgba(255,199,54,0.18);border-color:rgba(255,199,54,0.85);color:#ffe27a;}
 
   .nameRow{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;justify-content:center;}
   .nameChip{background:var(--panel);border:1px solid rgba(255,255,255,0.15);border-radius:12px;
@@ -543,6 +544,12 @@
     align-items:center;gap:8px;font-weight:800;font-size:15px;color:#4affea;
     box-shadow:0 0 14px rgba(74,255,234,0.5);}
   .invinciblePill.show{display:flex;}
+  .speedBoostPill{position:absolute;top:calc(160px + env(safe-area-inset-top));left:50%;
+    transform:translateX(-50%);background:rgba(255,199,54,0.18);
+    border:2px solid #ffc736;border-radius:16px;padding:8px 16px;display:none;
+    align-items:center;gap:8px;font-weight:800;font-size:15px;color:#ffc736;
+    box-shadow:0 0 14px rgba(255,199,54,0.5);}
+  .speedBoostPill.show{display:flex;}
 
   .shopPromptBtn{position:absolute;left:50%;top:62%;transform:translateX(-50%);
     background:var(--gold);color:#3a2a06;border:3px solid #fff;border-radius:16px;
@@ -1256,6 +1263,7 @@
           <button class="ghostBtn" id="btnGoShop">Crystal<br>Shop</button>
         </div>
         <button class="ghostBtn" id="btnHowToPlay" style="width:100%;margin-top:8px;">❔ How to Play</button>
+        <button class="ghostBtn" id="btnTestModeHome" style="width:100%;margin-top:8px;">🧪 Test Mode: OFF</button>
         <div class="homeUtilityRow">
           <button class="ghostBtn syncUpdateBtn" id="btnRefreshSync" type="button">
             <span class="syncUpdateIcon">↻</span>
@@ -1393,6 +1401,7 @@
         </div>
         <canvas class="enemyRadar" id="enemyRadar" width="184" height="184"></canvas>
         <div class="invinciblePill" id="invinciblePill">🛡 <span id="invincibleTime">0</span>s</div>
+        <div class="speedBoostPill" id="speedBoostPill">⚡ <span id="speedBoostTime">0</span>s</div>
         <div class="toast" id="toast"></div>
         <div class="freeBanner" id="freeBanner">FREE ROAM · INVINCIBLE</div>
         <div class="tutorialBanner" id="tutorialBanner">
@@ -1427,6 +1436,7 @@
             <button class="bigBtn" id="btnRestart">Restart from Round 1</button>
             <button class="bigBtn" id="btnRerun">Rerun Current Round</button>
             <button class="bigBtn" id="btnAbilities">Abilities</button>
+            <button class="ghostBtn" id="btnTestModeMid">🧪 Test Mode: OFF</button>
             <button class="ghostBtn" id="btnQuitMid">Quit to Main Menu</button>
           </div>
         </div>
@@ -1542,7 +1552,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='24.01.00 - Jump button moved to the right, above the attack buttons';
+const GAME_VERSION='24.02.00 - Slower base speed + Speed Boost power-up + Test Mode toggle';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -2404,6 +2414,7 @@ document.getElementById('btnGoShop').onclick = ()=>{
 document.getElementById('btnHowToPlay').onclick = ()=>{
   document.getElementById('howToPlayOverlay').classList.add('show');
 };
+document.getElementById('btnTestModeHome').onclick = ()=>toggleTestMode();
 document.getElementById('btnCloseHowToPlay').onclick = ()=>{
   document.getElementById('howToPlayOverlay').classList.remove('show');
 };
@@ -3426,6 +3437,14 @@ function updateEnemyProjectiles(baseDt){
     if(p.life<=0||bulletBlockedAt(p.mesh.position.x,p.mesh.position.y,p.mesh.position.z)){scene.remove(p.mesh);disposeGroup(p.mesh);if(p.tail){scene.remove(p.tail);disposeGroup(p.tail);}enemyProjectiles.splice(i,1);}
   }
 }
+// Test Mode: a single runtime toggle (see toggleTestMode()) standing in for
+// what used to be three separate hardcoded-false consts. While active it
+// unlocks every move for the current avatar and zeroes every primary/
+// secondary cooldown everywhere in the file (both were already wired to
+// these three names, just never flippable at runtime) — see
+// applyTestModeCooldownReset() for the ultimate-tier cooldowns that
+// weren't wired to either of the old flags.
+let TEST_MODE_ACTIVE = false;
 let hearts = 3, maxHearts = 3, round = 1, kills = 0, roundKillTarget = 0, roundKillsDone = 0;
 function avatarLevel(){ return round; }
 // Centralized round/level milestone registry. Gameplay systems can query this
@@ -3611,7 +3630,15 @@ let camMode = 3; // 1=POV, 2..8 = third-person pulling steadily back, 9 = bird's
 const CAM_DISTS = {2:2.6, 3:5.5, 4:9.5, 5:14, 6:19, 7:25, 8:32};
 const CAM_MODES = 9;
 const BIRD_MODE = 9;
-const PLAYER_SPEED = 6.5;
+// Lowered from 6.5 — full speed on every character, all the time, read as
+// unrealistically fast/overpowered. That higher pace is now what the
+// 'speed' power-up grants temporarily (see speedBoostMultiplier()) instead
+// of being the default.
+const PLAYER_SPEED = 4.8;
+let speedBoostTimer = 0;
+const SPEED_BOOST_DURATION = 10;
+const SPEED_BOOST_MULT = 1.55; // 4.8*1.55 ≈ 7.44 — a genuine burst, faster than the old baseline
+function speedBoostMultiplier(){ return speedBoostTimer>0 ? SPEED_BOOST_MULT : 1; }
 
 // ---------------------------------------------------------------------
 // Weapon shop. Pricing formula, so the numbers below aren't arbitrary:
@@ -3821,14 +3848,11 @@ let arcaneEchoSpawnGeneration = 0;
 const ARCANE_ECHO_COUNT = 5;
 const ARCANE_ECHO_INITIAL_CHARGE = 25;
 function arcaneEchoesCooldownForLevel(level=avatarLevel()){
-  if(((typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)||corsairIsActive()))return 0;
+  if(((typeof TEST_MODE_ACTIVE!=='undefined'&&TEST_MODE_ACTIVE)||corsairIsActive()))return 0;
   return Math.max(1.5, 15 - (Math.max(1,level)-1)*(10/19));
 }
-const UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING = false;
-const TEST_NO_ULTIMATE_COOLDOWNS = false;
-const TEST_NO_MOVE_COOLDOWNS = false; // was left on in production — forced every character's primary/secondary cooldown to 0 every frame, so held-fire moves (dashes, AoEs) refired ~60x/second instead of respecting their real cooldown
 function arcaneEchoesUnlocked(){
-  return mageGameplayActive() && (UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING || avatarLevel()>=10);
+  return mageGameplayActive() && (TEST_MODE_ACTIVE || avatarLevel()>=10);
 }
 let previewRenderer=null, previewScene=null, previewCamera=null, previewRoot=null, previewMixer=null, previewRAF=0;
 function combatForAvatar(){
@@ -3866,7 +3890,7 @@ function preGameMoveOptionsForAvatar(){
   const c=combatForAvatar();
   const primary=[];
   const secondary=[];
-  const allUnlocked=UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING;
+  const allUnlocked=TEST_MODE_ACTIVE;
   for(const [id,w] of Object.entries(c.weapons||{})){
     if(w.hidden)continue;
     if(w.cloudOnly&&state.avatarType!=='cloud')continue;
@@ -3991,7 +4015,7 @@ function resetCharacterLoadout(){
   currentPrimaryWeaponId = null;
   currentWeaponId = null;
   ownedWeapons = {[c.defaultId]:true};
-  if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING){
+  if(TEST_MODE_ACTIVE){
     for(const id of Object.keys(c.weapons||{})) ownedWeapons[id]=true;
   }
   // Shield Bash is now part of Royal Vanguard Combo, not a Secondary.
@@ -4008,9 +4032,63 @@ function resetAbilityLoadout(){
   if(removedAbilityIds.includes(equippedAbilityId)) equippedAbilityId=null;
   equippedAbilityId = null;
   ownedAbilities = {};
-  if(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING){
+  if(TEST_MODE_ACTIVE){
     for(const ability of (HERO_ABILITIES[state.avatarType]||HERO_ABILITIES[gameplayAvatarType()]||[])) ownedAbilities[ability.id]=true;
   }
+}
+// Test Mode: flippable from the home screen (pre-game) or the pause menu
+// (mid-run — see btnTestModeHome/btnTestModeMid). Turning it on immediately
+// grants ownership of every move for whichever avatar is currently active,
+// even mid-run, without touching the player's already-equipped loadout —
+// deliberately NOT the same as resetCharacterLoadout()/resetAbilityLoadout(),
+// which would also null out currentWeaponId/equippedAbilityId.
+// completeCurrentRound() checks this flag separately to keep a test-mode
+// clear from counting as real progress.
+function toggleTestMode(){
+  TEST_MODE_ACTIVE=!TEST_MODE_ACTIVE;
+  if(TEST_MODE_ACTIVE && state.avatarType){
+    const c=combatForAvatar();
+    if(c&&c.weapons) for(const id of Object.keys(c.weapons)) ownedWeapons[id]=true;
+    for(const ability of (HERO_ABILITIES[state.avatarType]||HERO_ABILITIES[gameplayAvatarType()]||[])) ownedAbilities[ability.id]=true;
+  }
+  updateTestModeButtons();
+  toast(TEST_MODE_ACTIVE ? '🧪 TEST MODE ON — no cooldowns, everything unlocked (round clears won\'t count)' : 'Test Mode OFF');
+  if(typeof updateHoodedHud==='function') updateHoodedHud();
+}
+function updateTestModeButtons(){
+  const label='🧪 Test Mode: '+(TEST_MODE_ACTIVE?'ON':'OFF');
+  const home=document.getElementById('btnTestModeHome');
+  const mid=document.getElementById('btnTestModeMid');
+  if(home){ home.textContent=label; home.classList.toggle('testModeOn',TEST_MODE_ACTIVE); }
+  if(mid){ mid.textContent=label; mid.classList.toggle('testModeOn',TEST_MODE_ACTIVE); }
+}
+// Primary/secondary weapon cooldowns and unlock gating were already wired
+// to the three flags TEST_MODE_ACTIVE now replaces, everywhere in the file.
+// Ultimate-tier cooldowns were never wired to either flag (each character
+// manages its own cooldown timer independently), so this forces every one
+// of them to 0 every frame while Test Mode is active — called once per
+// frame from update(). Safe to call regardless of which avatar is active:
+// each line is a plain assignment to an already-declared top-level `let`
+// or a property on an always-present runtime object, so touching ones for
+// an inactive avatar is inert, not an error.
+function applyTestModeCooldownReset(){
+  if(!TEST_MODE_ACTIVE)return;
+  skyfallCooldownTimer=0;
+  supernovaCooldownTimer=0;
+  superMeteorCooldownTimer=0;
+  dragonlordMeteorCooldownTimer=0;
+  blizzardCooldownTimer=0;
+  duduTidalCooldown=0; duduCryoCooldown=0; duduKrakenCooldown=0;
+  arcaneEchoesCooldownTimer=0;
+  archerMirrorCooldownTimer=0;
+  chopperBroadsideCooldown=0;
+  knightRoyalCloneCooldown=0;
+  rhinoRoyalCloneCooldown=0;
+  dragonlordLegionCooldown=0;
+  if(dragonlordRuntime){ dragonlordRuntime.wyrmFormCooldown=0; dragonlordRuntime.hellgateCooldown=0; }
+  if(knightRuntime){ knightRuntime.ultCooldown=0; knightRuntime.chargeCooldown=0; knightRuntime.shatterCooldown=0; knightRuntime.aegisCooldown=0; }
+  if(rhinoRuntime){ rhinoRuntime.titanCooldown=0; rhinoRuntime.armageddonCooldown=0; }
+  if(barbarianRuntime){ barbarianRuntime.twilightCooldown=0; }
 }
 
 const WEAPONS = {
@@ -4829,7 +4907,7 @@ function updateDuduKrakenGrasp(dt){
 // Captain's Fury — Dudu's signature/special ability (the 4th HUD button,
 // same slot Hooded/Barbarian/Mage/etc use for their own signature move).
 // A short self-contained power buff: attack cooldown is already 0 for this
-// avatar (see corsairIsActive() bypasses on TEST_NO_MOVE_COOLDOWNS), so a
+// avatar (see corsairIsActive() bypasses on TEST_MODE_ACTIVE), so a
 // speed buff here would be invisible — a temporary damage buff is the
 // effect that actually reads as "Fury" on top of already-instant attacks.
 let corsairFuryTimer=0;
@@ -6856,6 +6934,24 @@ function buildInvinciblePickup(){
   g.userData.pType = 'invincible';
   return g;
 }
+function buildSpeedPickup(){
+  const g = new THREE.Group();
+  const glow = GMAT(0xffc736);
+  // Simple lightning-bolt zigzag, same flat-shape-extrusion trick as the
+  // invincibility star above — reads as "speed" at a glance from any angle.
+  const pts = [
+    new THREE.Vector2(0.06, 0.30), new THREE.Vector2(-0.10, 0.04), new THREE.Vector2(0.02, 0.04),
+    new THREE.Vector2(-0.06, -0.30), new THREE.Vector2(0.10, -0.02), new THREE.Vector2(-0.02, -0.02)
+  ];
+  const shape = new THREE.Shape(pts);
+  const bolt = new THREE.Mesh(new THREE.ShapeGeometry(shape), glow);
+  bolt.rotation.x = -Math.PI/2;
+  bolt.position.y = 0.32;
+  g.add(bolt);
+  const ring = _a(g, new THREE.TorusGeometry(0.24, 0.02, 6, 16), glow, 0, 0.26, 0, Math.PI/2, 0, 0);
+  g.userData.pType = 'speed';
+  return g;
+}
 function buildHeartPickup(){
   const g = new THREE.Group();
   const glow = GMAT(0xff4d6d);
@@ -6870,11 +6966,11 @@ function buildHeartPickup(){
 const MAX_POWERUPS = 6; // cap so periodic respawns can't pile up forever if ignored
 function spawnOnePowerUp(){
   if(powerUps.length >= MAX_POWERUPS) return;
-  // Hearts spawn less often than tokens/invincibility — this mode is
+  // Hearts spawn less often than tokens/invincibility/speed — this mode is
   // about staying alive, not never having to be careful.
   const roll = Math.random();
-  const type = roll < 0.5 ? 'tokens' : (roll < 0.75 ? 'invincible' : 'heart');
-  const g = type==='tokens' ? buildTokenPickup() : type==='invincible' ? buildInvinciblePickup() : buildHeartPickup();
+  const type = roll < 0.4 ? 'tokens' : (roll < 0.6 ? 'invincible' : (roll < 0.8 ? 'speed' : 'heart'));
+  const g = type==='tokens' ? buildTokenPickup() : type==='invincible' ? buildInvinciblePickup() : type==='speed' ? buildSpeedPickup() : buildHeartPickup();
   const _p = scatterXZ(4, arenaSize-4);
   g.position.set(_p.x, 0, _p.z);
   scene.add(g);
@@ -6913,6 +7009,10 @@ function updatePowerUps(dt){
       } else if(p.type === 'invincible'){
         invincibleTimer = 8;
         toast('🛡 Invincible for 8s!');
+      } else if(p.type === 'speed'){
+        speedBoostTimer = SPEED_BOOST_DURATION;
+        updateSpeedBoostHud();
+        toast('⚡ Speed Boost for '+SPEED_BOOST_DURATION+'s!');
       } else { // heart
         if(hearts < maxHearts){
           hearts++;
@@ -15779,6 +15879,16 @@ function updateInvincibleHud(){
     pill.classList.remove('show');
   }
 }
+function updateSpeedBoostHud(){
+  const pill = document.getElementById('speedBoostPill');
+  if(!pill)return;
+  if(speedBoostTimer > 0){
+    pill.classList.add('show');
+    document.getElementById('speedBoostTime').textContent = speedBoostTimer.toFixed(1);
+  } else {
+    pill.classList.remove('show');
+  }
+}
 let currentRoundPersonalBest = null; // cached record for the live round
 function updateRoundTimerHud(){
   const elapsed = roundTimerFrozenElapsed === null
@@ -15927,7 +16037,7 @@ function renderShopList(){
       ? ((isDefault&&!currentPrimaryWeaponId)||currentPrimaryWeaponId===id)
       : currentWeaponId===id;
     const unlockRound=weaponUnlockRound(combat,id);
-    const roundLocked=!UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING && unlockRound>1 && avatarLevel()<unlockRound && !owned;
+    const roundLocked=!TEST_MODE_ACTIVE && unlockRound>1 && avatarLevel()<unlockRound && !owned;
     const row=document.createElement('div');
     row.className='weaponRow'+(equipped?' equipped':'');
     if(roundLocked) row.style.opacity='.5';
@@ -16086,7 +16196,7 @@ function renderAbilityShopList(list){
   const header = document.createElement('div');
   header.className = 'wName';
   header.style.cssText = 'margin:14px 0 4px;opacity:.75;font-size:12px;letter-spacing:.5px;';
-  header.textContent = UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING ? 'ULTIMATE-TIER ABILITIES · ALL UNLOCKED FOR TESTING · EQUIP ONE' : 'ULTIMATE-TIER ABILITIES · EQUIP ONE';
+  header.textContent = TEST_MODE_ACTIVE ? 'ULTIMATE-TIER ABILITIES · ALL UNLOCKED FOR TESTING · EQUIP ONE' : 'ULTIMATE-TIER ABILITIES · EQUIP ONE';
   list.appendChild(header);
   for(const a of abilities){
     const owned = !!ownedAbilities[a.id];
@@ -16100,7 +16210,7 @@ function renderAbilityShopList(list){
     info.className = 'weaponInfo';
     info.innerHTML = `<div class="wName">${a.name}</div><div class="wDesc">${a.desc}</div>`;
     const btn = document.createElement('button');
-    const levelLocked = !UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING && a.unlockLevel && avatarLevel() < a.unlockLevel && !owned;
+    const levelLocked = !TEST_MODE_ACTIVE && a.unlockLevel && avatarLevel() < a.unlockLevel && !owned;
     if(levelLocked){
       info.innerHTML = `<div class="wName">🔒 ${a.name}</div><div class="wDesc">Unlocks at Round ${a.unlockLevel}</div>`;
       row.style.opacity='.5';
@@ -16605,6 +16715,7 @@ function setupControls(){
     rerunCurrentRound();
   });
   bindTapOrClick(document.getElementById('btnAbilities'), ()=>{ openShop('abilities'); });
+  bindTapOrClick(document.getElementById('btnTestModeMid'), ()=>toggleTestMode());
   bindTapOrClick(document.getElementById('btnQuitMid'), ()=>{
     document.getElementById('pauseOverlay').classList.remove('show');
     gameRunning = false;
@@ -17197,7 +17308,7 @@ function triggerChopperBroadsideClones(){
 function chopperBroadsideMoveSpeed(){
   const speedStat=(playerStats&&Number.isFinite(playerStats.speed))?playerStats.speed:1;
   const characterMoveMult=(combatForAvatar().baseMoveMult||1);
-  const playerMoveSpeed=PLAYER_SPEED*characterMoveMult*chopperMoveMultiplier()*(1+(speedStat-1)*.15);
+  const playerMoveSpeed=PLAYER_SPEED*characterMoveMult*chopperMoveMultiplier()*(1+(speedStat-1)*.15)*speedBoostMultiplier();
   return Math.max(0,playerMoveSpeed*(2/3));
 }
 function updateChopperBroadsideClones(dt){
@@ -17340,7 +17451,7 @@ function barbarianBuildWhirlVisual(){
   scene.add(g);barbarianRuntime.whirlFx=g;return g;
 }
 function barbarianWhirlCooldownForRound(){
-  if(((typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)||corsairIsActive()))return 0;
+  if(((typeof TEST_MODE_ACTIVE!=='undefined'&&TEST_MODE_ACTIVE)||corsairIsActive()))return 0;
   return knightDefensiveWhirlwindCooldownForRound();
 }
 function barbarianWhirlActive(){
@@ -18202,7 +18313,7 @@ function findClipByWords(parts, fallback='1H_Melee_Attack_Chop'){
   return found || fallback;
 }
 function attackCooldownFor(w){
-  if(((typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)))return 0;
+  if(((typeof TEST_MODE_ACTIVE!=='undefined'&&TEST_MODE_ACTIVE)))return 0;
   if(chopperClassIsActive()&&w&&w.name==='Cannon Shot'){const r=Math.max(1,Number(round)||1);return r>=20?0:.38*((20-r)/19);}
   // Green Ranger tactical Secondaries intentionally have NO post-move cooldown.
   if(rhinoIsActive() && (w.kind==='rhino_overdrive'||w.kind==='rhino_gamma_leap'||w.kind==='rhino_cloud_whirlwind')) return 0;
@@ -18664,7 +18775,7 @@ function arcaneEchoCurrentMoveSpeed(){
   const passiveMoveMult=(mageGameplayActive() && passiveState.mageSpeedBoostTimer>0)
     ? MAGE_SPEED_BOOST_MULT
     : 1;
-  const playerMoveSpeed=PLAYER_SPEED*characterMoveMult*passiveMoveMult*(1+(speedStat-1)*0.15);
+  const playerMoveSpeed=PLAYER_SPEED*characterMoveMult*passiveMoveMult*(1+(speedStat-1)*0.15)*speedBoostMultiplier();
   return Math.max(0,playerMoveSpeed*.50);
 }
 
@@ -20840,7 +20951,7 @@ function triggerKnightWhirlwind(){
   }
 }
 function knightDefensiveWhirlwindCooldownForRound(){
-  if(((typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)||corsairIsActive()))return 0;
+  if(((typeof TEST_MODE_ACTIVE!=='undefined'&&TEST_MODE_ACTIVE)||corsairIsActive()))return 0;
   const r=Math.max(1,Number(round)||1);
   if(r<=10)return 8;if(r<=15)return 3;if(r<=20)return 1.5;return 0;
 }
@@ -24303,7 +24414,7 @@ function knightRoundTableMoveSpeed(){
   // Knights of the Round move at exactly 2/3 of that current speed.
   const speedStat=(playerStats&&Number.isFinite(playerStats.speed))?playerStats.speed:1;
   const characterMoveMult=(combatForAvatar().baseMoveMult||1);
-  const playerMoveSpeed=PLAYER_SPEED*characterMoveMult*knightMoveMultiplier()*(1+(speedStat-1)*0.15);
+  const playerMoveSpeed=PLAYER_SPEED*characterMoveMult*knightMoveMultiplier()*(1+(speedStat-1)*0.15)*speedBoostMultiplier();
   return Math.max(0,playerMoveSpeed*(2/3));
 }
 
@@ -27494,7 +27605,7 @@ function rhinoRoyalCloneUnlocked(){
 function rhinoRoyalCloneMoveSpeed(){
   const speedStat=(playerStats&&Number.isFinite(playerStats.speed))?playerStats.speed:1;
   const characterMoveMult=(combatForAvatar().baseMoveMult||1);
-  const playerMoveSpeed=PLAYER_SPEED*characterMoveMult*barbarianMoveMultiplier()*(1+(speedStat-1)*.15);
+  const playerMoveSpeed=PLAYER_SPEED*characterMoveMult*barbarianMoveMultiplier()*(1+(speedStat-1)*.15)*speedBoostMultiplier();
   return Math.max(0,playerMoveSpeed*(2/3));
 }
 function rhinoRoyalCloneFormationSlot(index,count,rotation=0){
@@ -29099,11 +29210,11 @@ let archerMirrorCycleDuration=15;
 let archerMirrorInitialChargePending=true;
 
 function archerMirrorCooldownForLevel(level=avatarLevel()){
-  if(((typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)||corsairIsActive()))return 0;
+  if(((typeof TEST_MODE_ACTIVE!=='undefined'&&TEST_MODE_ACTIVE)||corsairIsActive()))return 0;
   return Math.max(1.5,15-(Math.max(1,level)-1)*(10/19));
 }
 function archerMirrorUnlocked(){
-  return archerIsActive()&&(UNLOCK_ALL_COMBAT_ABILITIES_FOR_TESTING||avatarLevel()>=10);
+  return archerIsActive()&&(TEST_MODE_ACTIVE||avatarLevel()>=10);
 }
 function tintArcherMirror(root){
   root.traverse(o=>{
@@ -30313,7 +30424,7 @@ let activeBlizzardImpactGroups=[];
 const BLIZZARD_IMPACT_EFFECT_CAP=6;
 
 function abilityButtonCooldown(seconds){
-  if(TEST_NO_ULTIMATE_COOLDOWNS)return;
+  if(TEST_MODE_ACTIVE)return;
   const btn=document.getElementById('abilityBtn');
   if(btn){btn.classList.add('cooling');setTimeout(()=>btn.classList.remove('cooling'),seconds*1000);}
 }
@@ -32424,7 +32535,7 @@ class VelocityWeaver {
     this.player.scale.set(b.x*sx,b.y*sy,b.z*sz);this._scaleDirty=true;
   }
   _ready(name){return (this.cooldowns[name]||0)<=0;}
-  _startCooldown(name){this.cooldowns[name]=(((typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)||corsairIsActive()))?0:(this.cooldownLengths[name]||0);}
+  _startCooldown(name){this.cooldowns[name]=(((typeof TEST_MODE_ACTIVE!=='undefined'&&TEST_MODE_ACTIVE)||corsairIsActive()))?0:(this.cooldownLengths[name]||0);}
   cooldownFor(name){return Math.max(0,this.cooldowns[name]||0);}
   sonicPiston(){
     if(this.sonic)return false;
@@ -33553,7 +33664,7 @@ class SpiderKit {
     if(dx*dx+dz*dz>0.0001) this.player.rotation.y=Math.atan2(dx,dz);
   }
   _roundCooldown(base,zeroRound){
-    if(((typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)||corsairIsActive()))return 0;
+    if(((typeof TEST_MODE_ACTIVE!=='undefined'&&TEST_MODE_ACTIVE)||corsairIsActive()))return 0;
     const r=Math.max(1,Number(round)||1);
     if(r>=zeroRound)return 0;
     return Math.max(0,base*((zeroRound-r)/(zeroRound-1)));
@@ -34725,7 +34836,7 @@ class ChopperPirateKit {
   movementMultiplier(){return this._titanActive()?.85:1;}
   attackSpeedMultiplier(){return 1;}
   _roundCooldown(base,zeroRound){
-    if(((typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)||corsairIsActive()))return 0;
+    if(((typeof TEST_MODE_ACTIVE!=='undefined'&&TEST_MODE_ACTIVE)||corsairIsActive()))return 0;
     const r=Math.max(1,Number(round)||1);
     if(r>=zeroRound)return 0;
     return Math.max(0,base*((zeroRound-r)/(zeroRound-1)));
@@ -35762,7 +35873,7 @@ function triggerCloudSkybreakerSlash(w){
   }
 
   const now=performance.now();
-  cloudSkybreakerNextReadyAt=(((typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)||corsairIsActive()))?0:(now+Math.max(150,(w.cooldown||0.5)*1000));
+  cloudSkybreakerNextReadyAt=(((typeof TEST_MODE_ACTIVE!=='undefined'&&TEST_MODE_ACTIVE)||corsairIsActive()))?0:(now+Math.max(150,(w.cooldown||0.5)*1000));
 
   const target=findNearestEnemy(50);
   if(target){
@@ -36223,7 +36334,7 @@ function doSecondaryShoot(){
   // one-second cooldown so repeated casts remain powerful without becoming spammy.
   if(w.kind==='chain_lightning_javelin'){
     if((player.userData.secondaryAttackCooldown||0)>0)return;
-    player.userData.secondaryAttackCooldown=(((typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)||corsairIsActive()))?0:1.0;
+    player.userData.secondaryAttackCooldown=(((typeof TEST_MODE_ACTIVE!=='undefined'&&TEST_MODE_ACTIVE)||corsairIsActive()))?0:1.0;
     markSecondaryUsed();
     triggerChainLightningJavelin(w);
     return;
@@ -36665,7 +36776,7 @@ const MIRROR_VOLLEY_MAX_PLACEMENTS=3;
 const mirrorVolleySlots=Array.from({length:MIRROR_VOLLEY_MAX_PLACEMENTS},(_,index)=>({index,placementId:null,cooldown:0}));
 let mirrorVolleyCastSequence=0;
 function mirrorVolleyCooldownForLevel(level=avatarLevel()){
-  if(((typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)||corsairIsActive()))return 0;
+  if(((typeof TEST_MODE_ACTIVE!=='undefined'&&TEST_MODE_ACTIVE)||corsairIsActive()))return 0;
   const lv=Math.max(1,level);
   if(lv>=40)return 0;
   if(lv>=20)return Math.max(0,1-(lv-20)/20);
@@ -37527,6 +37638,22 @@ function completeCurrentRound(force=false){
   clearMageRoundSpecials(true,true);
   clearZombies();
   const clearTime = roundTimerFrozenElapsed;
+  // Test Mode clears never count as real progress: no tokens, crystals,
+  // round-clear/leaderboard records, or run-score tracking. The round still
+  // advances so testing can continue seamlessly into the next one.
+  if(TEST_MODE_ACTIVE){
+    toast('Round '+round+' cleared in '+clearTime.toFixed(1)+'s! (Test Mode — not counted)');
+    round++;
+    if(rerunEndsAfterRound){
+      rerunEndsAfterRound=false;
+      setTimeout(()=>endSurvival(),500);
+      return;
+    }
+    setTimeout(()=>{
+      if(!document.getElementById('levelUpOverlay').classList.contains('show')) showLevelUp();
+    }, 500);
+    return;
+  }
   let bonusMsg = 'Round '+round+' cleared in '+clearTime.toFixed(1)+'s!';
   const paceBudget = roundKillTarget * 3;
   if(clearTime < paceBudget){
@@ -37929,6 +38056,7 @@ function updateSceneryOcclusion(dt){
 
 // ---- Main update ----
 function update(dt){
+  applyTestModeCooldownReset();
   if(enemySpawnQueueDirty){ enemySpawnQueueDirty=false; fillEnemySlotsFromQueue(); }
   if(tutorialActive) updateTutorial(dt);
   updateCorsairFury(dt);
@@ -38101,7 +38229,7 @@ function update(dt){
     const passiveMoveMult=(hoodedIsActive() && passiveState.shadowstepTimer>0)?(passiveForAvatar().killMoveMult||1):((archerIsActive() && (passiveState.archerTailwindTimer||0)>0)?(passiveForAvatar().tailwindMoveMult||1):((mageGameplayActive() && passiveState.mageSpeedBoostTimer>0)?MAGE_SPEED_BOOST_MULT:1));
     const speed=(player&&player.userData&&player.userData.supernovaRooted)
       ? 0
-      : PLAYER_SPEED * characterMoveMult * passiveMoveMult * knightMoveMultiplier() * barbarianMoveMultiplier() * chopperMoveMultiplier() * velocityWeaverMovementMultiplier() * (1 + (speedStat-1)*0.15);
+      : PLAYER_SPEED * characterMoveMult * passiveMoveMult * knightMoveMultiplier() * barbarianMoveMultiplier() * chopperMoveMultiplier() * velocityWeaverMovementMultiplier() * (1 + (speedStat-1)*0.15) * speedBoostMultiplier();
     const nx = player.position.x + (mx/len)*speed*dt;
     const nz = player.position.z + (mz/len)*speed*dt;
     const resolved = freeMode ? {x:nx, z:nz} : resolveCollision(nx, nz, player.position.y);
@@ -38246,7 +38374,7 @@ function update(dt){
   if((player.userData.secondaryAttackCooldown||0)>0){
     player.userData.secondaryAttackCooldown=Math.max(0,player.userData.secondaryAttackCooldown-dt);
   }
-  if(((typeof TEST_NO_MOVE_COOLDOWNS!=='undefined'&&TEST_NO_MOVE_COOLDOWNS)||corsairIsActive())){
+  if(((typeof TEST_MODE_ACTIVE!=='undefined'&&TEST_MODE_ACTIVE)||corsairIsActive())){
     player.userData.attackCooldown=0;player.userData.secondaryAttackCooldown=0;
     if(typeof knightRuntime!=='undefined'&&knightRuntime){
       knightRuntime.whirlwindCooldown=0;knightRuntime.shatterCooldown=0;knightRuntime.chargeCooldown=0;
@@ -38354,6 +38482,11 @@ function update(dt){
     invincibleTimer -= dt;
     if(invincibleTimer < 0) invincibleTimer = 0;
     updateInvincibleHud();
+  }
+  if(speedBoostTimer > 0){
+    speedBoostTimer -= dt;
+    if(speedBoostTimer < 0) speedBoostTimer = 0;
+    updateSpeedBoostHud();
   }
 
   // Zombies chase + contact damage — frozen in place while free roaming.
@@ -38990,6 +39123,8 @@ function startSurvival(){
   powerUps = [];
   invincibleTimer = 0;
   updateInvincibleHud();
+  speedBoostTimer = 0;
+  updateSpeedBoostHud();
   document.getElementById('levelUpOverlay').classList.remove('show');
   document.getElementById('shopOverlay').classList.remove('show');
   vy = 0; onGround = true; wasAirborne = false; jumpsUsed = 0;
