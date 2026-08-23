@@ -1230,7 +1230,7 @@
   <!-- CUSTOMIZE -->
   <div class="screen" id="screenCustomize">
     <div class="backRow"><button class="ghostBtn" id="backHome2">← Back</button></div>
-    <h1 class="title" style="font-size:22px;">Build your avatar</h1>
+    <h1 class="title" style="font-size:22px;">Choose your Champion</h1>
     <div id="avatarPreview" style="width:220px;height:245px;margin:0 auto 12px;filter:none;">
       <canvas id="avatarPreviewCanvas" style="width:100%;height:100%;display:block;border-radius:22px;background:radial-gradient(circle at 50% 36%,#26384b,#0a111b 72%);"></canvas>
       <div id="avatarPreviewStatus" style="position:absolute;left:0;right:0;bottom:10px;text-align:center;color:#9fdfff;font-size:13px;">Loading avatar…</div>
@@ -1453,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.75.07 - Nyxara Infernal Whirlwind';
+const GAME_VERSION='23.76.00 - Choose Your Champion, Hide Archer/Hooded Rogue';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -1827,6 +1827,11 @@ const CHOPPER_ENABLED = CHOPPER_PUBLIC_BUILD
   || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
 const AVATAR_TYPES = ['dragonlord','rogue','hooded','mage','cloud','barbarian','rhino','spider']
   .concat(CHOPPER_ENABLED ? ['chopper'] : []);
+// Temporarily hidden from the avatar-select screen only. They stay in
+// AVATAR_TYPES itself so the zombie skin roster and any saved profile
+// data referencing them are unaffected — this is a display-only hide.
+const HIDDEN_FROM_AVATAR_SELECT = ['rogue','hooded'];
+const SELECTABLE_AVATAR_TYPES = AVATAR_TYPES.filter(t=>!HIDDEN_FROM_AVATAR_SELECT.includes(t));
 const AVATAR_TYPE_LABELS = {
   dragonlord:'🐉 Nyxara — Demon Dragon Queen ✨NEW',
   rogue:'🏹 Archer',
@@ -1954,7 +1959,7 @@ let state = {
   skin: 0,
   outfit: 0,
   hairStyle: 'short',
-  avatarType: 'rogue',
+  avatarType: 'dragonlord',
   mode: null,
   themeIndex: 0,
   startRound: 1
@@ -2162,14 +2167,14 @@ function loadAvatarFromProfile(){
   state.skin = p.skin || 0;
   state.outfit = p.outfit || 0;
   state.hairStyle = p.hairStyle || 'short';
-  let savedType = p.avatarType || 'rogue';
+  let savedType = p.avatarType || 'dragonlord';
   if(savedType==='ninefox'){
     savedType='mage';
     p.avatarType='mage';
     Store.saveProfile(p);
   }
   const isUnlocked = UNLOCK_ALL_AVATARS_FOR_TESTING || FREE_AVATAR_TYPES.includes(savedType) || (p.unlocked||[]).includes(savedType);
-  state.avatarType = isUnlocked ? savedType : 'rogue';
+  state.avatarType = isUnlocked ? savedType : 'dragonlord';
 }
 function saveAvatarToProfile(){
   if(!state.currentName) return;
@@ -2310,7 +2315,7 @@ document.getElementById('btnPlaySurvival').onclick = ()=>{
     const typeRow=document.getElementById('typeRow');
     if(typeRow){
       typeRow.innerHTML='';
-      AVATAR_TYPES.forEach(typeId=>{
+      SELECTABLE_AVATAR_TYPES.forEach(typeId=>{
         const btn=document.createElement('button');
         btn.className='hairBtn'+(state.avatarType===typeId?' sel':'');
         btn.textContent=AVATAR_TYPE_LABELS[typeId]||typeId;
@@ -2334,7 +2339,7 @@ function buildCustomizeUI(){
   const outfitRow = document.getElementById('outfitRow');
   typeRow.innerHTML = ''; skinRow.innerHTML = ''; hairRow.innerHTML = ''; outfitRow.innerHTML = '';
   const profileForLocks = state.currentName ? Store.getProfile(state.currentName) : {unlocked:[...AVATAR_TYPES]};
-  AVATAR_TYPES.forEach(typeId=>{
+  SELECTABLE_AVATAR_TYPES.forEach(typeId=>{
     const isFree = FREE_AVATAR_TYPES.includes(typeId);
     const isUnlocked = UNLOCK_ALL_AVATARS_FOR_TESTING || isFree || profileForLocks.unlocked.includes(typeId);
     const catalogEntry = CATALOG.find(c=>c.id===typeId);
@@ -13921,7 +13926,7 @@ function buildKayKitPlayer(characterId, options={}){
 function spawnPlayer(){
   // Migration-only legacy alias. Ninefox is no longer a selectable/runtime hero.
   if(state.avatarType==='ninefox')state.avatarType='mage';
-  if(!AVATAR_TYPES.includes(state.avatarType)) state.avatarType = 'rogue';
+  if(!AVATAR_TYPES.includes(state.avatarType)) state.avatarType = 'dragonlord';
   if(state.avatarType==='mage')foxMageQueuedCastSerial++;foxMagePendingRelease.arcane_lance=false;foxMagePendingRelease.giant_fireball=false;
   if(state.avatarType==='spider' && (!equippedAbilityId || String(equippedAbilityId).indexOf('spider_')!==0 || !ownedAbilities[equippedAbilityId])) equippedAbilityId='spider_maximum';
   if(state.avatarType==='dragonlord' && (!equippedAbilityId || String(equippedAbilityId).indexOf('dragonlord_')!==0 || !ownedAbilities[equippedAbilityId])) equippedAbilityId='dragonlord_meteorstorm';
