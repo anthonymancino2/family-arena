@@ -334,12 +334,18 @@
     max-width:min(40vw,230px);text-align:right;line-height:1.45;
     pointer-events:none;display:none;letter-spacing:.2px;}
   body.kbmMode .kbmHintBar{display:block;}
-  .actBtn{position:absolute;bottom:calc(34px + env(safe-area-inset-bottom));right:22px;
-    width:72px;height:72px;border-radius:50%;background:rgba(255,80,80,0.62);
-    border:2.5px solid rgba(255,255,255,0.75);font-weight:800;font-size:13px;color:#fff;
-    pointer-events:auto;display:flex;align-items:center;justify-content:center;}
-  .secondaryBtn{position:absolute;bottom:calc(114px + env(safe-area-inset-bottom));right:22px;
-    width:72px;height:72px;border-radius:50%;background:rgba(74,47,112,.78);
+  /* Combat cluster: a size-tiered fan anchored on the corner instead of a
+     rigid grid — PRIMARY anchors the corner and reads as the biggest/most
+     important button, SECONDARY sits diagonally up-left of it at a close
+     second size, and ULTIMATE/ABILITY fan out further up-left, smallest.
+     DASH tucks in as a small accent rather than competing with the four
+     main combat buttons for visual weight. */
+  .actBtn{position:absolute;bottom:calc(20px + env(safe-area-inset-bottom));right:18px;
+    width:88px;height:88px;border-radius:50%;background:rgba(255,80,80,0.62);
+    border:2.5px solid rgba(255,255,255,0.75);font-weight:800;font-size:14px;color:#fff;
+    pointer-events:auto;display:flex;align-items:center;justify-content:center;z-index:46;}
+  .secondaryBtn{position:absolute;bottom:calc(56px + env(safe-area-inset-bottom));right:110px;
+    width:74px;height:74px;border-radius:50%;background:rgba(74,47,112,.78);
     border:2.5px solid rgba(255,255,255,.82);font-weight:900;font-size:10px;line-height:1.05;
     color:#fff;pointer-events:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;
     text-align:center;padding:4px;overflow:hidden;transition:opacity .15s,filter .15s;}
@@ -367,14 +373,14 @@
     box-shadow:0 3px 12px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(0,0,0,0.3);
     text-shadow:0 1px 3px rgba(0,0,0,0.85);}
   .camLabelBox span{font-size:15px;}
-  .dashBtn{position:absolute;bottom:calc(114px + env(safe-area-inset-bottom));right:102px;
-    width:62px;height:62px;border-radius:50%;background:rgba(255,199,54,0.82);
-    border:2.5px solid rgba(255,255,255,0.85);font-weight:800;font-size:11px;color:#1a1400;
+  .dashBtn{position:absolute;bottom:calc(20px + env(safe-area-inset-bottom));right:190px;
+    width:48px;height:48px;border-radius:50%;background:rgba(255,199,54,0.82);
+    border:2.5px solid rgba(255,255,255,0.85);font-weight:800;font-size:10px;color:#1a1400;
     pointer-events:auto;display:flex;align-items:center;justify-content:center;
     transition:opacity 0.15s;text-shadow:none;}
   .dashBtn.cooling{opacity:0.3;}
-  .abilityBtn{position:absolute;bottom:calc(34px + env(safe-area-inset-bottom));right:102px;
-    width:62px;height:62px;border-radius:50%;background:rgba(53,207,255,0.82);
+  .abilityBtn{position:absolute;bottom:calc(170px + env(safe-area-inset-bottom));right:100px;
+    width:52px;height:52px;border-radius:50%;background:rgba(53,207,255,0.82);
     border:2.5px solid rgba(255,255,255,0.85);font-weight:800;font-size:11px;color:#04222c;
     pointer-events:auto;display:flex;align-items:center;justify-content:center;
     transition:opacity 0.15s;text-shadow:none;}
@@ -391,7 +397,7 @@
   .laserBtn.empty{opacity:0.35;}
   .laserBtn.active{box-shadow:0 0 18px rgba(209,108,255,.9);}
   .laserBtn.hidden{display:none;}
-  .ultimateBtn{position:absolute;bottom:calc(194px + env(safe-area-inset-bottom));right:22px;width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:45;font-size:12px;font-weight:1000;letter-spacing:.6px;color:#fff;border:3px solid rgba(255,255,255,.8);background:conic-gradient(#b95cff var(--charge,0%),rgba(33,11,52,.92) 0);box-shadow:0 0 20px rgba(164,72,255,.65),inset 0 0 0 5px rgba(0,0,0,.28);text-shadow:0 2px 4px #000;user-select:none;-webkit-user-select:none;touch-action:manipulation;pointer-events:auto;cursor:pointer;}
+  .ultimateBtn{position:absolute;bottom:calc(118px + env(safe-area-inset-bottom));right:24px;width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:45;font-size:11px;font-weight:1000;letter-spacing:.6px;color:#fff;border:3px solid rgba(255,255,255,.8);background:conic-gradient(#b95cff var(--charge,0%),rgba(33,11,52,.92) 0);box-shadow:0 0 20px rgba(164,72,255,.65),inset 0 0 0 5px rgba(0,0,0,.28);text-shadow:0 2px 4px #000;user-select:none;-webkit-user-select:none;touch-action:manipulation;pointer-events:auto;cursor:pointer;}
   .ultimateBtn.ready{animation:ultimatePulse .75s infinite alternate;box-shadow:0 0 34px rgba(209,108,255,1),0 0 70px rgba(126,36,255,.72),inset 0 0 0 5px rgba(255,255,255,.18);}
   .ultimateBtn.hidden{display:none;}
   @keyframes ultimatePulse{from{transform:scale(1)}to{transform:scale(1.09)}}
@@ -849,36 +855,40 @@
      touch at any realistic landscape width, leaving the whole center of the
      screen clear for the view. */
   @media (orientation:landscape){
+    /* Fan cluster, biggest-to-smallest radiating out from the corner:
+       PRIMARY anchors bottom-right (biggest), SECONDARY sits close and
+       large just up-left of it, ULTIMATE and ABILITY fan out further
+       up-left at a smaller size, DASH tucks in as a small accent. */
     .actBtn{
-      right:calc(16px + env(safe-area-inset-right));
-      bottom:calc(16px + env(safe-area-inset-bottom));
-      width:72px;height:72px;
-    }
-    .dashBtn{
-      right:calc(98px + env(safe-area-inset-right));
-      bottom:calc(16px + env(safe-area-inset-bottom));
-      width:62px;height:62px;
+      right:calc(18px + env(safe-area-inset-right));
+      bottom:calc(18px + env(safe-area-inset-bottom));
+      width:92px;height:92px;
     }
     .secondaryBtn{
-      right:calc(170px + env(safe-area-inset-right));
-      bottom:calc(16px + env(safe-area-inset-bottom));
-      width:66px;height:58px;
-      border-radius:12px;
+      right:calc(116px + env(safe-area-inset-right));
+      bottom:calc(58px + env(safe-area-inset-bottom));
+      width:78px;height:70px;
+      border-radius:14px;
       padding:3px;
       font-size:9px;
     }
-    .secondaryBtn .secondaryIcon{font-size:16px;margin-bottom:1px;}
-    .secondaryBtn .secondaryLabel{max-width:58px;font-size:7px;}
-    .abilityBtn{
-      right:calc(246px + env(safe-area-inset-right));
-      bottom:calc(16px + env(safe-area-inset-bottom));
-      width:62px;height:62px;
-    }
+    .secondaryBtn .secondaryIcon{font-size:18px;margin-bottom:1px;}
+    .secondaryBtn .secondaryLabel{max-width:66px;font-size:7px;}
     .ultimateBtn{
-      right:calc(320px + env(safe-area-inset-right));
-      bottom:calc(16px + env(safe-area-inset-bottom));
-      width:80px;height:80px;
-      font-size:12px;
+      right:calc(26px + env(safe-area-inset-right));
+      bottom:calc(122px + env(safe-area-inset-bottom));
+      width:66px;height:66px;
+      font-size:11px;
+    }
+    .abilityBtn{
+      right:calc(106px + env(safe-area-inset-right));
+      bottom:calc(176px + env(safe-area-inset-bottom));
+      width:56px;height:56px;
+    }
+    .dashBtn{
+      right:calc(198px + env(safe-area-inset-right));
+      bottom:calc(18px + env(safe-area-inset-bottom));
+      width:50px;height:50px;
     }
 
     /* Utility rail stays a narrow top-right column, well clear of the
@@ -925,11 +935,15 @@
        keep the buttons crowded together the way touch's thumb-reach
        layout has to. Every right:/left: offset here is recomputed for
        both the larger widths and the wider gap. */
+    /* Keyboard/mouse play has no thumb-reach constraint driving the fan
+       shape above, so it keeps the simpler straight row — these need
+       their own explicit bottom: now since the touch-mode fan above no
+       longer shares one common baseline for them to inherit. */
     body.kbmMode .actBtn{right:calc(16px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));}
-    body.kbmMode .dashBtn{right:calc(128px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));}
-    body.kbmMode .secondaryBtn{right:calc(228px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));width:92px;height:70px;}
-    body.kbmMode .abilityBtn{right:calc(340px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));}
-    body.kbmMode .ultimateBtn{right:calc(442px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));}
+    body.kbmMode .dashBtn{right:calc(128px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));width:62px;height:62px;}
+    body.kbmMode .secondaryBtn{right:calc(228px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));width:92px;height:70px;border-radius:12px;}
+    body.kbmMode .abilityBtn{right:calc(340px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));width:62px;height:62px;}
+    body.kbmMode .ultimateBtn{right:calc(442px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));width:80px;height:80px;}
     body.kbmMode .jumpBtn{left:calc(108px + env(safe-area-inset-left));}
     body.kbmMode .lookFwdBtn{left:calc(194px + env(safe-area-inset-left));}
     body.kbmMode .upBtn{left:calc(280px + env(safe-area-inset-left));}
@@ -941,30 +955,32 @@
      itself is only ~320-430px tall) - so every element above shrinks and
      tightens its gaps together, keeping the same non-overlapping layout. */
   @media (orientation:landscape) and (max-height:430px){
+    /* Same fan shape as the main landscape rule, compressed to fit the
+       limited vertical room a short landscape screen leaves. */
     .actBtn{
-      right:calc(14px + env(safe-area-inset-right));
-      bottom:calc(12px + env(safe-area-inset-bottom));
-      width:58px;height:58px;
-    }
-    .dashBtn{
-      right:calc(78px + env(safe-area-inset-right));
-      bottom:calc(12px + env(safe-area-inset-bottom));
-      width:50px;height:50px;
+      right:calc(13px + env(safe-area-inset-right));
+      bottom:calc(13px + env(safe-area-inset-bottom));
+      width:64px;height:64px;
     }
     .secondaryBtn{
-      right:calc(134px + env(safe-area-inset-right));
-      bottom:calc(12px + env(safe-area-inset-bottom));
-      width:50px;height:42px;
-    }
-    .abilityBtn{
-      right:calc(190px + env(safe-area-inset-right));
-      bottom:calc(12px + env(safe-area-inset-bottom));
-      width:50px;height:50px;
+      right:calc(81px + env(safe-area-inset-right));
+      bottom:calc(41px + env(safe-area-inset-bottom));
+      width:55px;height:49px;
     }
     .ultimateBtn{
-      right:calc(248px + env(safe-area-inset-right));
-      bottom:calc(12px + env(safe-area-inset-bottom));
-      width:62px;height:62px;
+      right:calc(18px + env(safe-area-inset-right));
+      bottom:calc(85px + env(safe-area-inset-bottom));
+      width:46px;height:46px;
+    }
+    .abilityBtn{
+      right:calc(74px + env(safe-area-inset-right));
+      bottom:calc(123px + env(safe-area-inset-bottom));
+      width:39px;height:39px;
+    }
+    .dashBtn{
+      right:calc(139px + env(safe-area-inset-right));
+      bottom:calc(13px + env(safe-area-inset-bottom));
+      width:35px;height:35px;
     }
     .camCluster{
       top:calc(6px + env(safe-area-inset-top));
@@ -1003,11 +1019,14 @@
      where the two side clusters above can run out of width and meet in the
      middle, and only once UP/DOWN join Jump/Look Fwd in the left cluster). */
   @media (orientation:landscape) and (max-height:430px) and (max-width:620px){
-    .actBtn{right:calc(12px + env(safe-area-inset-right));width:50px;height:50px;}
-    .dashBtn{right:calc(66px + env(safe-area-inset-right));width:44px;height:44px;}
-    .secondaryBtn{right:calc(114px + env(safe-area-inset-right));width:44px;height:38px;}
-    .abilityBtn{right:calc(162px + env(safe-area-inset-right));width:44px;height:44px;}
-    .ultimateBtn{right:calc(212px + env(safe-area-inset-right));width:54px;height:54px;}
+    /* Self-contained scaled-down fan (own bottom: values — does not rely on
+       inheriting from the parent breakpoint). Verified non-overlapping via
+       center-distance vs combined radius for every button pair. */
+    .actBtn{right:calc(10px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));width:52px;height:52px;}
+    .secondaryBtn{right:calc(65px + env(safe-area-inset-right));bottom:calc(33px + env(safe-area-inset-bottom));width:44px;height:39px;}
+    .ultimateBtn{right:calc(14px + env(safe-area-inset-right));bottom:calc(68px + env(safe-area-inset-bottom));width:37px;height:37px;}
+    .abilityBtn{right:calc(59px + env(safe-area-inset-right));bottom:calc(98px + env(safe-area-inset-bottom));width:31px;height:31px;}
+    .dashBtn{right:calc(111px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));width:28px;height:28px;}
     .enemyRadar{width:60px!important;height:60px!important;}
     .jumpBtn{left:calc(76px + env(safe-area-inset-left));}
     .lookFwdBtn{left:calc(122px + env(safe-area-inset-left));}
@@ -1465,7 +1484,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.79.01 - Fix Stuck-Enemy Recovery Spawning Inside Map';
+const GAME_VERSION='23.80.00 - Fan-Style Combat Button Layout';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
