@@ -1515,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.91.00 - Dudu: Ground Fix + Mass-Kill Freeze Fix';
+const GAME_VERSION='23.92.00 - Fix mass-kill freeze: defer enemy-refill off the kill path';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -3456,6 +3456,7 @@ const MAX_CONCURRENT_ZOMBIES = 30; // hard cap on simultaneous zombies, regardle
 let zombiesRemainingToSpawn = 0;   // queued enemies still owed this round, fed in as others die
 let bossSpawnPending = false;       // every fifth round reserves the first spawn slot for its boss
 let enemySpawnRetryTimer = null;    // one shared retry timer prevents failed spawn attempts from piling up
+let enemySpawnQueueDirty = false;   // set by kills, consumed once per frame in update() — see killZombie()
 // ---- Reusable hero progression definitions. Each hero can independently
 // control its starting bonuses and how much each between-round choice grants.
 // Phase 1 enables the Mage values; heroes without an entry retain the original
@@ -37583,10 +37584,15 @@ function killZombie(z){
   if(dragonlordIsActive()){registerDragonLordKill();updateHoodedHud();}
   runTokens += tokensPerKill();
   updateRunTokensHud();
-  // Feed the spawn queue: keeps the on-screen crowd near the cap
-  // without ever exceeding it, however large the round's real target is.
+  // Feed the spawn queue: keeps the on-screen crowd near the cap without
+  // ever exceeding it. A mass-kill instant (a full-width wave ultimate
+  // killing dozens of zombies in one frame) used to call this per kill —
+  // each call builds full replacement zombie character models (skeleton
+  // clone + animation mixer), so 30 kills in one frame meant building up
+  // to 30 new zombies in that same frame, a real freeze-grade cost spike.
+  // Collapse it to one refill per frame via a dirty flag instead.
   if(zombiesRemainingToSpawn > 0 && roundKillsDone < roundKillTarget){
-    fillEnemySlotsFromQueue();
+    enemySpawnQueueDirty=true;
   }
   completeCurrentRound();
 }
@@ -37840,6 +37846,7 @@ function updateSceneryOcclusion(dt){
 
 // ---- Main update ----
 function update(dt){
+  if(enemySpawnQueueDirty){ enemySpawnQueueDirty=false; fillEnemySlotsFromQueue(); }
   if(tutorialActive) updateTutorial(dt);
   updateCorsairFury(dt);
   // Knight hit-stop: a very short, hard-capped global slow that makes a
