@@ -389,6 +389,7 @@
   .abilityBtn.laserMode.empty{opacity:.35;}
   .abilityBtn.laserMode.active{box-shadow:0 0 18px rgba(209,108,255,.9);}
   .abilityBtn.hidden{display:none;}
+  .abilityBtn.locked{background:rgba(38,40,48,.72);color:rgba(255,255,255,.72);filter:saturate(.35);font-size:18px;}
   .laserBtn{display:none!important;position:absolute;bottom:calc(122px + env(safe-area-inset-bottom));right:206px;
     width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;
     font-weight:800;font-size:10px;color:#fff;border:2.5px solid rgba(255,255,255,0.85);
@@ -400,6 +401,7 @@
   .ultimateBtn{position:absolute;bottom:calc(118px + env(safe-area-inset-bottom));right:24px;width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:45;font-size:11px;font-weight:1000;letter-spacing:.6px;color:#fff;border:3px solid rgba(255,255,255,.8);background:conic-gradient(#b95cff var(--charge,0%),rgba(33,11,52,.92) 0);box-shadow:0 0 20px rgba(164,72,255,.65),inset 0 0 0 5px rgba(0,0,0,.28);text-shadow:0 2px 4px #000;user-select:none;-webkit-user-select:none;touch-action:manipulation;pointer-events:auto;cursor:pointer;}
   .ultimateBtn.ready{animation:ultimatePulse .75s infinite alternate;box-shadow:0 0 34px rgba(209,108,255,1),0 0 70px rgba(126,36,255,.72),inset 0 0 0 5px rgba(255,255,255,.18);}
   .ultimateBtn.hidden{display:none;}
+  .ultimateBtn.locked{background:rgba(38,40,48,.72);color:rgba(255,255,255,.72);border-color:rgba(255,255,255,.35);box-shadow:none;filter:saturate(.35);font-size:20px;}
   @keyframes ultimatePulse{from{transform:scale(1)}to{transform:scale(1.09)}}
   .soulMeter{position:absolute;bottom:calc(274px + env(safe-area-inset-bottom));right:22px;z-index:20;color:#e6c7ff;font-size:12px;font-weight:900;text-shadow:0 2px 4px #000;display:none;}
   .soulMeter.on{display:block;}
@@ -1484,7 +1486,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.80.00 - Fan-Style Combat Button Layout';
+const GAME_VERSION='23.81.00 - Locked Move Buttons Show Lock Icon Instead of Hiding';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -17182,7 +17184,14 @@ function updateHoodedHud(){
   const rhinoCloneSpecialReady=rhinoIsActive()&&Math.max(1,Number(round)||1)>=10;
   const dragonlordLegionSpecialReady=dragonlordLegionUnlocked();
   const hasSignature=isHooded||chopperCloneSpecialReady||isArcher||knightCloneSpecialReady||rhinoCloneSpecialReady||(isBarbarian&&!rhinoIsActive())||mageEchoReady||dragonlordLegionSpecialReady;
-  btn.classList.toggle('hidden',!hasSignature); meter.classList.toggle('on',hasSignature);
+  const supportsSignature=isHooded||isChopper||isArcher||isKnight||isBarbarian||isMage||isDragonLord;
+  btn.classList.toggle('hidden',!supportsSignature);
+  btn.classList.toggle('locked',supportsSignature&&!hasSignature);
+  meter.classList.toggle('on',hasSignature);
+  if(supportsSignature&&!hasSignature){
+    btn.textContent='🔒';
+    btn.style.setProperty('--charge','0%');
+  }
   if(hasSignature){
     let pct=0;
     if(mageEchoReady){
@@ -17291,8 +17300,13 @@ function updateHoodedHud(){
     const supportsAbility = isHooded || isChopper || isSpider || isMage || isArcher || isKnight || isBarbarian || isDragonLord;
     const equipped = supportsAbility && equippedAbilityId && ownedAbilities[equippedAbilityId];
     const laserMode = false;
-    abilityBtn.classList.toggle('hidden', !equipped);
+    abilityBtn.classList.toggle('hidden', !supportsAbility);
+    abilityBtn.classList.toggle('locked', supportsAbility && !equipped);
     abilityBtn.classList.toggle('laserMode', !!equipped && laserMode);
+    if(supportsAbility && !equipped){
+      abilityBtn.textContent='🔒';
+      abilityBtn.classList.remove('active','cooling','empty');
+    }
     if(equipped){
       if(equippedAbilityId==='arcane_laser'){
         abilityBtn.textContent=crimsonMirrorActive>0?`MIRROR ${crimsonMirrorActive.toFixed(1)}`:'MIRROR';
