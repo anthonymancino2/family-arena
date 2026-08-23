@@ -1515,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.84.00 - Dudu: 1/3 Size, Ice/Water Move Theme';
+const GAME_VERSION='23.85.00 - Dudu: All-New Ice/Water Ultimates & FX';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -1907,7 +1907,7 @@ const AVATAR_TYPE_LABELS = {
   corsair:'🐧 Dudu the Penguin ✨NEW',
 };
 const HERO_ROSTER_INFO = {
-  corsair:{title:'Dudu the Penguin',role:'HYBRID • PIRATE MAGE',desc:'A penguin buccaneer-mage built on a 47-clip animation set — cutlass combos, cannon volleys, a grappling hookshot, and a conjured arcane cannonball, backed by three ultimate-tier powers (a summoned squall, a raining cannonade, and a falling comet) and a temporary Captain\'s Fury battle-rage. Every move is unlocked and ready from the very first round.'},
+  corsair:{title:'Dudu the Penguin',role:'HYBRID • ICE & WATER MAGE',desc:'A penguin buccaneer-mage built on a 47-clip animation set. Every move is 100% ice and water themed with dedicated frost VFX: a cutlass combo, a frozen cannon volley, a splashing Tidal Cannonball, and a piercing Frost Hookshot, backed by three ultimate-tier powers — Glacial Maelstrom, Tsunami Surge, and the telegraphed Absolute Zero — plus a temporary Captain\'s Fury battle-rage. Every move is unlocked and ready from the very first round.'},
   dragonlord:{title:'Nyxara, the Demon Dragon Queen',role:'HYBRID • APEX RAID BOSS',desc:'A wing-flaring, fire-breathing demon dragon queen built on a full 81-clip cinematic animation set, so she never freezes into a stiff pose. She fights up close with Demon Claw and Infernal Glaive combos, burns from range with the same Phoenix-scale Giant Fireball the Fox commands, hunts with the same acrobatic Somersault Hunt Spider-Man uses (burning a ring of hellfire at every point she lands), and holds the line with the same Defensive Whirlwind Cloud uses, reskinned in her own orange hellfire. Her three ultimate-tier powers — Ashfall Cataclysm, Ascend: Wyrm Form, and Open the Hellgate — are all free and pre-owned the moment she is selected, and Round 10 unlocks her signature Legion of the Abyss: a horde of invincible demon-dragon clones fighting at her side. Built to be the single strongest, flashiest avatar in the roster.'},
   spider:{title:'Spider',role:'MELEE • ACROBAT',desc:'A wall-crawling acrobat built on 25 hand-authored clips. Quick and evasive without being a blur: he closes distance with web-lines and Bezier vaults rather than raw speed. The kit is a setup-and-payoff loop — Web Snap and Web Trap wrap targets, and everything wrapped takes 45% extra damage from every source, including all three of his ultimates.'},
   rogue:{title:'Tempest Archer',role:'RANGED • EASY',desc:'The speed-focused ranged avatar: fast movement, long-lived piercing arrows, and precise crowd control. Every fifth defeat triggers Tailwind for a short burst of movement and firing speed.'},
@@ -4012,16 +4012,99 @@ const KNIGHT_JUDGMENT_ULTIMATE = {id:'knight_judgment', name:'Judgment of the Ki
   desc:'Ultimate-tier royal execution equipped in the Ability slot. Hammer rain begins immediately and continues throughout the sequence before the arena-wide final impact. The Knight can move during Judgment, cooldown scales down by round to 0 at Round 45, and boss damage remains capped.'};
 const SUPERNOVA_PIERCER = {id:'supernova_piercer', name:'Supernova Piercer', price:860,
   desc:'Signature ultimate. Enter a 3-second rooted sniper charge, then fire a solar beam completely across the map. Instantly defeats non-boss enemies in its path and deals 50% max HP to bosses. No cooldown during development testing.'};
-// Corsair ultimate tier. Reuses the mage/rogue mechanics under new pirate-mage
-// flavor (id must stay identical so the shared trigger functions fire) —
-// same pattern Chopper's ultimates already use over the Hooded Rogue's ids.
-const CORSAIR_MAELSTROM_SQUALL = {id:'blizzard_storm', name:'Maelstrom Squall', price:0,
-  desc:'Ultimate-tier ability, free and pre-owned. Conjures a 10-second gravity maelstrom that drags every enemy toward its center while conjured ice crashes down on them.'};
-const CORSAIR_SKYFALL_CANNONADE = {id:'skyfall_barrage', name:'Skyfall Cannonade', price:0,
-  desc:'Ultimate-tier ability, free and pre-owned. For 10 seconds, a spectral ice-galleon rains giant frozen cannonballs onto enemy clusters with clear landing markers and strong area damage.'};
-const CORSAIR_LEVIATHAN_COMET = {id:'super_meteor', name:"Leviathan's Comet", price:0,
-  desc:'Ultimate-tier ability, free and pre-owned. Calls down one colossal shard of glacial ice torn from the deep. The impact heavily damages nearby enemies, stuns survivors, chills them, and chips a boss\'s health.'};
-// Captain's Fury — Corsair's signature/special ability (the 4th HUD button,
+// Dudu the Penguin's ultimate tier — three fully bespoke ice/water abilities
+// (own ids, own trigger functions, own FX below). Nothing here reuses another
+// hero's ability id or shared VFX code, so nothing of his is ever tinted by
+// another character's fire/crimson/solar palette.
+const DUDU_GLACIAL_MAELSTROM = {id:'dudu_glacial_maelstrom', name:'Glacial Maelstrom', price:0,
+  desc:'Ultimate-tier ability, free and pre-owned. A three-ring shockwave of ice erupts outward from Dudu, freezing and heavily damaging every enemy caught inside.'};
+const DUDU_TSUNAMI_SURGE = {id:'dudu_tsunami_surge', name:'Tsunami Surge', price:0,
+  desc:'Ultimate-tier ability, free and pre-owned. A rolling wave of seawater and ice surges forward in a wide arc, smashing and hurling back everything in its path.'};
+const DUDU_ABSOLUTE_ZERO = {id:'dudu_absolute_zero', name:'Absolute Zero', price:0,
+  desc:'Ultimate-tier ability, free and pre-owned. Marks the ground with a warning ring, then after a beat calls down a colossal glacial spike that shatters everything caught underneath.'};
+const DUDU_GLACIAL_MAELSTROM_RADIUS=9, DUDU_TSUNAMI_RANGE=14, DUDU_TSUNAMI_HALFWIDTH=4.2,
+  DUDU_ABSOLUTE_ZERO_RADIUS=7.5, DUDU_ABSOLUTE_ZERO_DELAY=1.1;
+function duduUltimateDamage(z,bossMult){
+  const isBoss=z.userData.archetype==='boss';
+  const mh=Math.max(1,Number(z.userData.maxHp)||Number(z.userData.hp)||1);
+  applyBulletDamage(z, isBoss?mh*bossMult:999);
+}
+function triggerDuduGlacialMaelstrom(){
+  if(!corsairIsActive()||!gameRunning)return;
+  markUltimateUsed();
+  const px=player.position.x, py=player.position.y, pz=player.position.z;
+  triggerCombatShake(10,220);
+  toast('❄️ Glacial Maelstrom!');
+  spawnFrostFx(px,py+.6,pz,{radius:2.2,shards:14,life:.7,spin:4});
+  [0,120,240].forEach((delay,i)=>{
+    setTimeout(()=>{ if(gameRunning) spawnFrostWaveRing(px,py,pz,DUDU_GLACIAL_MAELSTROM_RADIUS*(0.5+i*0.25),0.85); },delay);
+  });
+  for(const z of zombies){
+    if(!z||z.userData.dead)continue;
+    if(Math.hypot(z.position.x-px,z.position.z-pz)>DUDU_GLACIAL_MAELSTROM_RADIUS)continue;
+    duduUltimateDamage(z,.22);
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,1.1);
+    spawnFrostFx(z.position.x,z.position.y+.6,z.position.z,{radius:1.1,shards:6,life:.5,spin:5});
+  }
+}
+function triggerDuduTsunamiSurge(){
+  if(!corsairIsActive()||!gameRunning)return;
+  markUltimateUsed();
+  const yaw=player.rotation.y;
+  const dirX=Math.sin(yaw), dirZ=Math.cos(yaw), rightX=Math.cos(yaw), rightZ=-Math.sin(yaw);
+  const px=player.position.x, py=player.position.y, pz=player.position.z;
+  triggerCombatShake(8,200);
+  toast('🌊 Tsunami Surge!');
+  for(let i=0;i<6;i++){
+    const dist=(i+1)*(DUDU_TSUNAMI_RANGE/6);
+    setTimeout(()=>{
+      if(!gameRunning||!player)return;
+      const wx=px+dirX*dist, wz=pz+dirZ*dist;
+      spawnFrostWaveRing(wx,py,wz,DUDU_TSUNAMI_HALFWIDTH*.9,.5);
+      spawnFrostFx(wx,py+.3,wz,{radius:1.4,shards:5,life:.4,spin:3});
+    },i*70);
+  }
+  for(const z of zombies){
+    if(!z||z.userData.dead)continue;
+    const dx=z.position.x-px, dz=z.position.z-pz;
+    const forward=dx*dirX+dz*dirZ, lateral=Math.abs(dx*rightX+dz*rightZ);
+    if(forward<0||forward>DUDU_TSUNAMI_RANGE||lateral>DUDU_TSUNAMI_HALFWIDTH)continue;
+    duduUltimateDamage(z,.18);
+    const resolved=resolveCollision(z.position.x+dirX*3.2,z.position.z+dirZ*3.2,z.position.y);
+    z.position.x=resolved.x; z.position.z=resolved.z;
+    z.userData.hitStun=Math.max(z.userData.hitStun||0,.6);
+    spawnFrostFx(z.position.x,z.position.y+.5,z.position.z,{radius:1,shards:5,life:.4,spin:4});
+  }
+}
+let duduAbsoluteZeroPending=null; // {timer,x,z}
+function triggerDuduAbsoluteZero(){
+  if(!corsairIsActive()||!gameRunning||duduAbsoluteZeroPending)return;
+  markUltimateUsed();
+  duduAbsoluteZeroPending={timer:DUDU_ABSOLUTE_ZERO_DELAY,x:player.position.x,z:player.position.z};
+  toast('🧊 Absolute Zero incoming...');
+  spawnFrostWaveRing(player.position.x,player.position.y,player.position.z,DUDU_ABSOLUTE_ZERO_RADIUS,DUDU_ABSOLUTE_ZERO_DELAY,1);
+}
+function updateDuduAbsoluteZero(dt){
+  if(!duduAbsoluteZeroPending)return;
+  if(!corsairIsActive()){ duduAbsoluteZeroPending=null; return; }
+  duduAbsoluteZeroPending.timer-=dt;
+  if(duduAbsoluteZeroPending.timer>0){ updateHoodedHud(); return; }
+  const {x,z}=duduAbsoluteZeroPending;
+  duduAbsoluteZeroPending=null;
+  triggerCombatShake(16,320);
+  spawnFrostFx(x,.4,z,{radius:3.2,shards:16,life:.9,spin:4.5});
+  spawnFrostFx(x,.4,z,{radius:1.4,shards:10,life:.6,spin:-5});
+  for(const zom of zombies){
+    if(!zom||zom.userData.dead)continue;
+    if(Math.hypot(zom.position.x-x,zom.position.z-z)>DUDU_ABSOLUTE_ZERO_RADIUS)continue;
+    duduUltimateDamage(zom,.28);
+    zom.userData.hitStun=Math.max(zom.userData.hitStun||0,1.6);
+    spawnFrostFx(zom.position.x,zom.position.y+.5,zom.position.z,{radius:1,shards:5,life:.45,spin:4});
+  }
+  toast('🧊 Absolute Zero!');
+  updateHoodedHud();
+}
+// Captain's Fury — Dudu's signature/special ability (the 4th HUD button,
 // same slot Hooded/Barbarian/Mage/etc use for their own signature move).
 // A short self-contained power buff: attack cooldown is already 0 for this
 // avatar (see corsairIsActive() bypasses on TEST_NO_MOVE_COOLDOWNS), so a
@@ -4035,7 +4118,10 @@ function triggerCorsairFury(){
   markUltimateUsed();
   corsairFuryTimer=CORSAIR_FURY_DURATION;
   toast("⚔️ Captain's Fury!");
-  if(player)spawnBurst(player.position.x,player.position.y+1,player.position.z,14,FX_MAT_SPARK,3.2);
+  if(player){
+    spawnFrostFx(player.position.x,player.position.y+.5,player.position.z,{radius:1.6,shards:10,life:.6,spin:4});
+    spawnFrostWaveRing(player.position.x,player.position.y,player.position.z,2.6,.6);
+  }
 }
 function updateCorsairFury(dt){
   if(!corsairIsActive()){ corsairFuryTimer=0; return; }
@@ -4045,6 +4131,7 @@ function updateCorsairFury(dt){
   if(wasActive||nowActive){
     playerStats.power=basePlayerPower*roundPowerMult(round)*(nowActive?CORSAIR_FURY_POWER_MULT:1);
   }
+  updateDuduAbsoluteZero(dt);
 }
 const DRAGONLORD_ASHFALL_CATACLYSM = {id:'dragonlord_meteorstorm', name:'Ashfall Cataclysm', price:0, avatar:'dragonlord', unlockLevel:24,
   desc:'Ultimate-tier ability, free once unlocked. Nyxara rears back and calls down a storm of blazing meteors across the arena — a dozen fiery impacts crater the ground, each one damaging, knocking back, and briefly stunning every enemy caught in the blast.'};
@@ -4060,7 +4147,7 @@ function tokensPerKill(){ return 5 + Math.floor(round/5); }
 function crystalsPerRound(){ return 15 + Math.floor(round/10)*5; }
 const CAM_LABELS = {1:'POV', 2:'Close', 3:'Far', 4:'Wide', 5:'Wider',
   6:'Distant', 7:'Panorama', 8:'Far out', 9:"Bird's eye"};
-let BULLET_GEO, BULLET_MAT, MUZZLE_GEO, MUZZLE_MAT, FX_GEO, FX_MAT_ZOMBIE, FX_MAT_DUST, FX_MAT_SPARK, FX_MAT_SHADOW, FX_MAT_ENEMY_SHOT;
+let BULLET_GEO, BULLET_MAT, MUZZLE_GEO, MUZZLE_MAT, FX_GEO, FX_MAT_ZOMBIE, FX_MAT_DUST, FX_MAT_SPARK, FX_MAT_SHADOW, FX_MAT_ENEMY_SHOT, FX_MAT_ICE, FX_MAT_FOAM;
 let fx = [];
 let groundMat = null;
 let arenaBoundaryGroup = null;
@@ -10094,6 +10181,11 @@ function initEngine(){
   // avoid it), used only for the Spitter's projectile so it reads as an
   // unmistakable "incoming" signal rather than blending into scenery.
   FX_MAT_ENEMY_SHOT = new THREE.MeshBasicMaterial({color:0xff2fd6, transparent:true, opacity:0.95, depthWrite:false, blending:THREE.AdditiveBlending});
+  // Dudu the Penguin's dedicated palette — every one of his moves uses only
+  // these two (plus FX_MAT_DUST above, which is already a pale icy white),
+  // so nothing of his ever reads as fire/red/orange.
+  FX_MAT_ICE = new THREE.MeshBasicMaterial({color:0x4fd0ff, transparent:true, opacity:0.92, depthWrite:false, blending:THREE.AdditiveBlending});
+  FX_MAT_FOAM = new THREE.MeshBasicMaterial({color:0xdff7ff, transparent:true, opacity:0.85});
 
   // Shared decoration geometries — scaled per-instance rather than
   // rebuilt, since scenery now regenerates every single round.
@@ -15089,7 +15181,8 @@ function renderShopList(){
     if(roundLocked) row.style.opacity='.5';
     const swatch = document.createElement('div');
     swatch.className = 'weaponSwatch';
-    swatch.style.background = w.kind.includes('fire') ? '#ff7a3d'
+    swatch.style.background = (corsairIsActive()&&(w.kind==='melee'||w.kind==='multi_arrow'||w.kind==='corsair_ice_cannonball'||w.kind==='corsair_hookshot')) ? '#4fd0ff'
+      : w.kind.includes('fire') ? '#ff7a3d'
       : (w.kind==='gale_drill_arrow' ? '#67f0ff'
       : (w.kind==='mirror_volley' ? '#b987ff'
       : (w.kind==='chain_lightning_javelin' ? '#8ee8ff'
@@ -15178,7 +15271,7 @@ const HERO_ABILITIES = { spider:[SPIDER_MAXIMUM,SPIDER_WEB_OF_SHADOWS,SPIDER_CIT
   dragonlord:[DRAGONLORD_ASHFALL_CATACLYSM, DRAGONLORD_WYRM_FORM, DRAGONLORD_HELLGATE],
   knight:[KNIGHT_GUARDIAN_QUAKE, KNIGHT_AEGIS_COUNTER, KNIGHT_JUDGMENT_ULTIMATE],
   barbarian:[BARBARIAN_PRIMAL_RAGE, BARBARIAN_RAGNAROK_WAVE, BARBARIAN_STORM_STEP_OVERDRIVE],
-  corsair:[CORSAIR_MAELSTROM_SQUALL, CORSAIR_SKYFALL_CANNONADE, CORSAIR_LEVIATHAN_COMET],
+  corsair:[DUDU_GLACIAL_MAELSTROM, DUDU_TSUNAMI_SURGE, DUDU_ABSOLUTE_ZERO],
   dragonlord:[DRAGONLORD_ASHFALL_CATACLYSM, DRAGONLORD_WYRM_FORM, DRAGONLORD_HELLGATE] };
 const REMOVED_WEAPON_IDS=['radiant_cleave','blade_cyclone','holy_wave','shield_bash','banner_spear','knight_banner_spear','primal_wave'];
 function sanitizeRemovedAbilitySelection(){
@@ -15620,6 +15713,9 @@ function setupControls(){
     else if(String(equippedAbilityId||'').indexOf('rhino_')===0) triggerBarbarianEquippedAbility();
     else if(String(equippedAbilityId||'').indexOf('barbarian_')===0) triggerBarbarianEquippedAbility();
     else if(String(equippedAbilityId||'').indexOf('dragonlord_')===0) triggerDragonLordAbility();
+    else if(equippedAbilityId==='dudu_glacial_maelstrom') triggerDuduGlacialMaelstrom();
+    else if(equippedAbilityId==='dudu_tsunami_surge') triggerDuduTsunamiSurge();
+    else if(equippedAbilityId==='dudu_absolute_zero') triggerDuduAbsoluteZero();
   };
   const releaseEquippedAbility=e=>{
     if(e&&e.preventDefault)e.preventDefault();
@@ -16967,6 +17063,43 @@ function spawnBurst(x,y,z,count,mat,spread){
     fx.push({mesh:m, vx:Math.cos(ang)*spd, vz:Math.sin(ang)*spd, vy:2+Math.random()*1.8, life:0.45, maxLife:0.45});
   }
 }
+// Dudu the Penguin's shared FX toolkit: one small self-cleaning THREE.Group
+// (ring + core ring + shard crystals, all FX_MAT_ICE/FX_MAT_FOAM cyan-white),
+// same lifecycle pattern as the arcaneImpact/arcaneRuneBurst family above —
+// pushed onto the shared fx array, animated by the 'frostFx' branch in
+// updateFx(dt), and disposed automatically when its life runs out.
+function spawnFrostFx(x,y,z,opts={}){
+  const heavy=mageStressVisualLoad();
+  const radius=opts.radius||1.3, life=opts.life||.55, spin=opts.spin!==undefined?opts.spin:3.2;
+  const shards=heavy?Math.max(3,Math.ceil((opts.shards||8)*.5)):(opts.shards||8);
+  const g=new THREE.Group();
+  const ice=new THREE.MeshBasicMaterial({color:0x4fd0ff,transparent:true,opacity:.68,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const foam=new THREE.MeshBasicMaterial({color:0xdff7ff,transparent:true,opacity:.55,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const outer=new THREE.Mesh(new THREE.RingGeometry(radius*.58,radius*.80,heavy?24:40),ice);
+  outer.rotation.x=-Math.PI/2; outer.userData.baseOpacity=.68; g.add(outer);
+  const inner=new THREE.Mesh(new THREE.RingGeometry(radius*.20,radius*.32,heavy?18:28),foam);
+  inner.rotation.x=-Math.PI/2; inner.position.y=.02; inner.userData.baseOpacity=.55; g.add(inner);
+  for(let i=0;i<shards;i++){
+    const a=(i/shards)*Math.PI*2;
+    const shard=new THREE.Mesh(new THREE.OctahedronGeometry(.11+Math.random()*.06,0), i%2?ice:foam);
+    shard.position.set(Math.sin(a)*radius*.62,.2+Math.random()*.3,Math.cos(a)*radius*.62);
+    shard.rotation.set(Math.random()*6,a,Math.random()*6);
+    shard.userData.baseOpacity=i%2?.68:.55;
+    g.add(shard);
+  }
+  g.position.set(x,y+.06,z); scene.add(g);
+  fx.push({kind:'frostFx',mesh:g,life,maxLife:life,spin,dispose:true});
+}
+// Expanding ring that grows from ~0 to maxRadius over its lifetime — used for
+// the traveling shockwave/telegraph rings on Dudu's ultimates.
+function spawnFrostWaveRing(x,y,z,maxRadius,life=1.0,thickness=1){
+  const ice=new THREE.MeshBasicMaterial({color:0x4fd0ff,transparent:true,opacity:.7,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  const ring=new THREE.Mesh(new THREE.RingGeometry(thickness*.82,thickness,mageStressVisualLoad()?32:64),ice);
+  ring.rotation.x=-Math.PI/2; ring.position.set(x,y+.05,z);
+  ring.userData.baseOpacity=.7;
+  scene.add(ring);
+  fx.push({kind:'frostWaveRing',mesh:ring,life,maxLife:life,maxRadius,dispose:true});
+}
 function removeFxAt(index){
   const f=fx[index];
   if(!f) return;
@@ -17094,6 +17227,10 @@ function updateFx(dt){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);const p=1-q;f.mesh.rotation.y+=(f.spin||1.5)*dt;f.mesh.scale.set(1, .72+p*.45, 1);f.mesh.traverse(o=>{if(o.material)o.material.opacity=q*(o.userData.baseOpacity||.38);});
     } else if(f.kind==='arcaneRuneBurst'){
       f.life-=dt;const q=Math.max(0,f.life/f.maxLife);const p=1-q;f.mesh.rotation.y+=(f.spin||6)*dt;f.mesh.scale.setScalar(.55+p*1.15);f.mesh.traverse(o=>{if(o.material)o.material.opacity=q*(o.userData.baseOpacity||.62);});
+    } else if(f.kind==='frostFx'){
+      f.life-=dt;const q=Math.max(0,f.life/f.maxLife);const p=1-q;f.mesh.scale.setScalar(.55+p*1.35);f.mesh.rotation.y+=(f.spin||3)*dt;f.mesh.traverse(o=>{if(o.material)o.material.opacity=q*(o.userData.baseOpacity||.6);});
+    } else if(f.kind==='frostWaveRing'){
+      f.life-=dt;const q=Math.max(0,f.life/f.maxLife);const p=1-q;f.mesh.scale.setScalar(Math.max(.1,f.maxRadius*p));if(f.mesh.material)f.mesh.material.opacity=q*.7;
     } else if(f.kind==='lightning'){
       f.life-=dt;
       f.mesh.material.opacity=Math.max(0,f.life/f.maxLife)*.68;
@@ -17547,6 +17684,16 @@ function updateHoodedHud(){
           : (dragonlordRuntime.hellgateCooldown>0 ? `HELLGATE ${Math.ceil(dragonlordRuntime.hellgateCooldown)}` : 'HELLGATE');
         abilityBtn.classList.toggle('active',dragonlordRuntime.hellgateTimer>0);
         abilityBtn.classList.toggle('cooling',dragonlordRuntime.hellgateCooldown>0&&dragonlordRuntime.hellgateTimer<=0);
+      }else if(equippedAbilityId==='dudu_glacial_maelstrom'){
+        abilityBtn.textContent='MAELSTROM';
+        abilityBtn.classList.remove('active','cooling');
+      }else if(equippedAbilityId==='dudu_tsunami_surge'){
+        abilityBtn.textContent='TSUNAMI';
+        abilityBtn.classList.remove('active','cooling');
+      }else if(equippedAbilityId==='dudu_absolute_zero'){
+        abilityBtn.textContent=duduAbsoluteZeroPending?`ZERO ${duduAbsoluteZeroPending.timer.toFixed(1)}`:'ABSOLUTE ZERO';
+        abilityBtn.classList.toggle('active',!!duduAbsoluteZeroPending);
+        abilityBtn.classList.remove('cooling');
       }else if(isSpider){
         const kit=ensureSpiderKit()||{maximum:null,shadows:null,webline:null,cooldownForAbility:()=>0};
         const label=equippedAbilityId==='spider_maximum'
@@ -29265,7 +29412,7 @@ function damageSkyfallImpact(x,z){
 }
 
 function triggerSkyfallBarrage(){
-  if(!gameRunning||(state.avatarType!=='rogue'&&!corsairIsActive())||equippedAbilityId!=='skyfall_barrage'||!ownedAbilities.skyfall_barrage)return;
+  if(!gameRunning||state.avatarType!=='rogue'||equippedAbilityId!=='skyfall_barrage'||!ownedAbilities.skyfall_barrage)return;
   if(skyfallActiveTimer>0){navigator.vibrate&&navigator.vibrate(8);return;}
   if(skyfallCooldownTimer>0){toast(`Skyfall recharging · ${Math.ceil(skyfallCooldownTimer)}s`);return;}
   markUltimateUsed();
@@ -29625,7 +29772,7 @@ function foxMageAbilityPose(kind,durationMs=320){
 }
 
 function triggerBlizzardStorm(){
-  if(!gameRunning||!(mageGameplayActive()||corsairIsActive())||equippedAbilityId!=='blizzard_storm'||!ownedAbilities.blizzard_storm||blizzardCooldownTimer>0||blizzardActiveTimer>0)return;
+  if(!gameRunning||!mageGameplayActive()||equippedAbilityId!=='blizzard_storm'||!ownedAbilities.blizzard_storm||blizzardCooldownTimer>0||blizzardActiveTimer>0)return;
   markUltimateUsed();
   foxMageAbilityPose('blizzard',360);
   foxMageWowUltimateFx('blizzard',2.8);
@@ -30173,7 +30320,7 @@ function spawnSuperMeteorForQuadrant(quadrantIndex){
 }
 
 function triggerSuperMeteor(){
-  if(!gameRunning||!(mageGameplayActive()||corsairIsActive())||equippedAbilityId!=='super_meteor'||!ownedAbilities.super_meteor||superMeteorCooldownTimer>0||activeSuperMeteor||superMeteorSequenceActive)return;
+  if(!gameRunning||!mageGameplayActive()||equippedAbilityId!=='super_meteor'||!ownedAbilities.super_meteor||superMeteorCooldownTimer>0||activeSuperMeteor||superMeteorSequenceActive)return;
 
   markUltimateUsed();
   foxMageAbilityPose('meteor',520);
@@ -30929,7 +31076,13 @@ function doMeleeAttack(w, origin=player.position, isClone=false){
       if(hearts<maxHearts){hearts++;renderHearts();spawnShadowSmoke(player.position.x,player.position.y+1,player.position.z,18);}
     }
   }
-  spawnBurst(pos.x,pos.y+0.65,pos.z,spin?14:10,FX_MAT_SPARK,spin?3.5:3.0);
+  if(corsairIsActive()){
+    // Dudu's Frost Cutlass Slash: ice burst instead of the shared yellow spark,
+    // bigger and brighter on a landed hit.
+    spawnFrostFx(pos.x,pos.y+.6,pos.z,{radius:hits>0?1.5:1.0,shards:hits>0?9:6,life:.45,spin:5});
+  }else{
+    spawnBurst(pos.x,pos.y+0.65,pos.z,spin?14:10,FX_MAT_SPARK,spin?3.5:3.0);
+  }
   if(!isClone) navigator.vibrate && navigator.vibrate(hits>0?[18,22,30]:12);
 }
 
@@ -30993,6 +31146,9 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
     b.splashDamage=w.splashDamage||0;
     b.directInstakill=!!w.directInstakill;
     b.pierces=w.pierce||0;
+    if(corsairIsActive()&&(w.kind==='corsair_ice_cannonball'||w.kind==='corsair_hookshot')){
+      spawnFrostFx(startX,startY,startZ,{radius:w.kind==='corsair_ice_cannonball'?1.1:.7,shards:w.kind==='corsair_ice_cannonball'?8:5,life:.4,spin:4});
+    }
     if(w.kind==='giant_fireball'){
       // Mage-specific lightweight Phoenix silhouette. The prior version built
       // ~20 detailed meshes/material instances on every cast, causing a large
@@ -31139,6 +31295,7 @@ function shootFromPosition(w, pos, angleOffset=0, lateralOffset=0){
       spawnBurst(startX,startY,startZ,14,FX_MAT_DUST,4.0);
     }
     if(w.kind==='elemental'){ b.mesh.scale.setScalar(1.45); spawnBurst(startX,startY,startZ,10,mageElementToggle?FX_MAT_DUST:FX_MAT_SPARK,3.0); }
+    if(w.kind==='corsair_ice_cannonball'){ b.mesh.scale.setScalar(1.7); }
     if(w.kind==='rocket_arrow') b.mesh.scale.setScalar(1.55);
     if(w.kind==='gale_drill_arrow'){
       b.mesh.scale.set(2.4,2.4,5.8);
@@ -36244,6 +36401,9 @@ function updateBullets(dt){
       spawnArcherSpark(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z);
       if(Math.random()<.35) spawnBurst(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,2,FX_MAT_DUST,1.7);
     }
+    if((b.kind==='corsair_ice_cannonball'||b.kind==='corsair_hookshot') && Math.random()<Math.min(1,dt*16)){
+      spawnBurst(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,2,FX_MAT_ICE,1.6);
+    }
     if(b.kind==='rhino_boomerang'){
       // Light per-frame life so a thrown blade never reads as a static sprite.
       if(!b.userData)b.userData={};
@@ -36510,6 +36670,8 @@ function updateBullets(dt){
             arcaneMark.scale.setScalar(1+age*1.6);
             requestAnimationFrame(animateArcaneMark);
           })();
+        } else if(corsairIsActive()&&(b.kind==='corsair_ice_cannonball'||b.kind==='corsair_hookshot')){
+          spawnFrostFx(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,{radius:1.0,shards:6,life:.4,spin:5});
         } else {
           // Mage projectiles already received their compact color-coded hit cue.
           if(state.avatarType!=='mage'||!['elemental','giant_fireball'].includes(b.kind)){
@@ -36527,7 +36689,15 @@ function updateBullets(dt){
               applyBulletDamage(z2,splashDamage);
             }
           }
-          spawnBurst(b.mesh.position.x, b.mesh.position.y+0.3, b.mesh.position.z, 14, FX_MAT_SPARK, 4.5);
+          if(corsairIsActive()&&b.kind==='corsair_ice_cannonball'){
+            // Tidal Cannonball's big moment: a full frost burst plus an
+            // expanding shockwave ring sized to the actual splash radius.
+            triggerCombatShake(6,140);
+            spawnFrostFx(b.mesh.position.x,b.mesh.position.y+.3,b.mesh.position.z,{radius:2.0,shards:12,life:.65,spin:4});
+            spawnFrostWaveRing(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,b.splash,.6);
+          }else{
+            spawnBurst(b.mesh.position.x, b.mesh.position.y+0.3, b.mesh.position.z, 14, FX_MAT_SPARK, 4.5);
+          }
         }
         if(b.kind==='giant_fireball'){
           // The molten sphere survives every impact and can damage each enemy once
@@ -36535,7 +36705,10 @@ function updateBullets(dt){
           continue;
         }
         if(b.kind==='star'&&b.ricochets>0){const next=zombies.filter(n=>!n.userData.dead&&n!==z).sort((a,c)=>a.position.distanceTo(b.mesh.position)-c.position.distanceTo(b.mesh.position))[0];if(next){const tx=next.position.x-b.mesh.position.x,ty=(next.position.y+.8)-b.mesh.position.y,tz=next.position.z-b.mesh.position.z,l=Math.hypot(tx,ty,tz)||1;b.dx=tx/l;b.dy=ty/l;b.dz=tz/l;b.mesh.lookAt(next.position.x,next.position.y+.8,next.position.z);b.ricochets--;spawnShadowSmoke(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,6);continue;}}
-        if((b.pierces||0)>0){b.pierces--;b.mesh.position.x+=b.dx*.65;b.mesh.position.z+=b.dz*.65;spawnArcherSpark(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z);continue;}
+        if((b.pierces||0)>0){b.pierces--;b.mesh.position.x+=b.dx*.65;b.mesh.position.z+=b.dz*.65;
+          if(corsairIsActive()&&b.kind==='corsair_hookshot')spawnFrostFx(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z,{radius:.8,shards:5,life:.35,spin:6});
+          else spawnArcherSpark(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z);
+          continue;}
         hit = true;
         break;
       }
