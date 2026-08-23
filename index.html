@@ -1515,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.94.00 - Dudu: Tidal Cataclysm = Choppers move, Cryo Prison pulls + fast kills';
+const GAME_VERSION='23.95.00 - Dudu: Kraken\'s Grasp now sweeps every enemy, not just the 10 nearest';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -4668,7 +4668,7 @@ function updateDuduCryoPrison(dt){
 // claw strikes erupting across the whole map (prioritizing living enemies,
 // falling back to scattered map coverage), not a handful of quick pokes. ---
 let duduKraken=null;
-const DUDU_KRAKEN_DURATION=10.0, DUDU_KRAKEN_STRIKE_EVERY=0.42, DUDU_KRAKEN_MEGA_EVERY=2.0, DUDU_KRAKEN_RADIUS=4.8;
+const DUDU_KRAKEN_DURATION=10.0, DUDU_KRAKEN_STRIKE_EVERY=0.28, DUDU_KRAKEN_MEGA_EVERY=1.5, DUDU_KRAKEN_RADIUS=4.8;
 function duduKrakenStrike(x,z,py,big){
   // Damage lands the instant the strike fires — no telegraph delay gating
   // the kill, so enemy clear-rate (and new-enemy spawn pacing) never stalls.
@@ -4705,15 +4705,39 @@ function triggerDuduKrakenGrasp(){
   duduEnsureMaterials();
   toast("🐙 Kraken's Grasp!");
   triggerCombatShake(10,350);
-  duduKraken={t:0,nextStrike:0,nextMega:DUDU_KRAKEN_MEGA_EVERY,duration:DUDU_KRAKEN_DURATION};
+  duduKraken={t:0,nextStrike:0,nextMega:DUDU_KRAKEN_MEGA_EVERY,duration:DUDU_KRAKEN_DURATION,queue:[],queueIdx:0};
   updateHoodedHud();
   duduKrakenStrike(player.position.x,player.position.z,player.position.y,true);
 }
-function duduKrakenPickPoint(){
-  const targets=livingEnemiesByDistance(Math.max(arenaSize*1.8,26));
-  if(targets.length){
-    const pick=targets[Math.floor(Math.random()*Math.min(targets.length,10))];
-    return {x:pick.position.x+(Math.random()-.5)*1.6, z:pick.position.z+(Math.random()-.5)*1.6};
+// Rebuilds a shuffled pass over EVERY living enemy on the map (not just the
+// ones nearest the player). Shuffled rather than distance-sorted so strikes
+// spread across the whole arena immediately instead of slowly radiating
+// outward from the player.
+function duduKrakenRefillQueue(s){
+  s.queue=livingEnemiesByDistance(Infinity);
+  for(let i=s.queue.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    const tmp=s.queue[i]; s.queue[i]=s.queue[j]; s.queue[j]=tmp;
+  }
+  s.queueIdx=0;
+}
+// Old targeting only ever sampled from the 10 enemies nearest the player,
+// so with more than 10 alive at once the far side of the map could go
+// almost entirely unstruck for the whole 10 seconds — this is why kills
+// felt slow. Sweeping every living enemy in turn (refilling/reshuffling
+// whenever a pass finishes) guarantees full coverage instead of leaving it
+// to chance.
+function duduKrakenNextTarget(s){
+  for(let tries=0;tries<64;tries++){
+    if(s.queueIdx>=s.queue.length) duduKrakenRefillQueue(s);
+    if(!s.queue.length){
+      const a=Math.random()*Math.PI*2, r=Math.random()*arenaSize*0.85;
+      return {x:Math.cos(a)*r, z:Math.sin(a)*r};
+    }
+    const z=s.queue[s.queueIdx++];
+    if(z&&z.parent&&!z.userData.dead){
+      return {x:z.position.x+(Math.random()-.5)*1.2, z:z.position.z+(Math.random()-.5)*1.2};
+    }
   }
   const a=Math.random()*Math.PI*2, r=Math.random()*arenaSize*0.85;
   return {x:Math.cos(a)*r, z:Math.sin(a)*r};
@@ -4730,11 +4754,12 @@ function updateDuduKrakenGrasp(dt){
     // one, so intensity keeps building through the full 10 seconds without
     // stacking enough live meshes at once to bog the frame down.
     s.nextMega+=DUDU_KRAKEN_MEGA_EVERY;
-    for(let i=0;i<2;i++){ const pt=duduKrakenPickPoint(); duduKrakenStrike(pt.x,pt.z,player.position.y,true); }
+    for(let i=0;i<2;i++){ const pt=duduKrakenNextTarget(s); duduKrakenStrike(pt.x,pt.z,player.position.y,true); }
   }else if(s.nextStrike<=0){
     s.nextStrike+=DUDU_KRAKEN_STRIKE_EVERY;
-    const pt=duduKrakenPickPoint();
-    duduKrakenStrike(pt.x,pt.z,player.position.y,false);
+    // Two systematic strikes per regular tick (not one) so the sweep across
+    // every living enemy completes noticeably faster.
+    for(let i=0;i<2;i++){ const pt=duduKrakenNextTarget(s); duduKrakenStrike(pt.x,pt.z,player.position.y,false); }
   }
 }
 
