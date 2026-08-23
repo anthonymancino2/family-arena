@@ -1453,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.76.02 - Dead Code Cleanup Pt.2';
+const GAME_VERSION='23.76.03 - Preview Spin Off, Whirlwind Anim Fix';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -2531,7 +2531,6 @@ async function ensureAvatarPreview(){
   floor.rotation.x=-Math.PI/2;previewScene.add(floor);
   const animate=()=>{
     previewRAF=requestAnimationFrame(animate);
-    if(previewRoot) previewRoot.rotation.y+=0.006;
     if(previewMixer) previewMixer.update(1/60);
     previewRenderer.render(previewScene,previewCamera);
   }; animate();
@@ -23330,6 +23329,12 @@ function dragonlordUpdateWhirlwind(dt){
     return;
   }
   dragonlordRuntime.whirlTimer=1; // active flag only, never a counting-down duration
+  // The shared spin-visual timer only lasts .18s per top-up (see the main
+  // update loop's kayRoot branch) and nothing else refreshes it while
+  // held, so without this the model snaps back to facing forward and
+  // sits frozen there for the rest of the hold while the whirlwind keeps
+  // dealing damage invisibly. Keep it topped up every frame she's spinning.
+  if(player&&player.userData) player.userData.spinVisualTimer=Math.max(player.userData.spinVisualTimer||0,.2);
   dragonlordRuntime.whirlPulse-=dt;
   if(dragonlordRuntime.whirlPulse<=0){
     dragonlordRuntime.whirlPulse=KNIGHT_CFG.whirlwind.pulse;
