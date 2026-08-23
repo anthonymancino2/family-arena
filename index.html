@@ -1465,7 +1465,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.77.00 - Difficulty Rework: Round-1=Round-10, Move Unlocks, Tutorial';
+const GAME_VERSION='23.78.00 - Universal Shield Gauge & Per-Character Stat Profiles';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -3391,13 +3391,38 @@ const HERO_STAT_CONFIG = {
     startingBonus: {power:0, speed:2, hp:0},
     upgradeAmount: {power:1, speed:2, hp:1}
   },
-  mage: {
-    startingBonus: {power:2, speed:2, hp:0},
+  // Note: playerStats.speed is a single shared stat driving both movement
+  // pace and attack/ability cooldown pacing (attackCooldownFor) — there is
+  // no separate attack-speed-only stat, so "faster/slower attack speed"
+  // below is expressed through this same speed bonus (and moves it a
+  // little either way, which fits each character's archetype).
+  mage: { // Nine-Tailed Fox: very high power, very high speed, low starting HP
+    startingBonus: {power:3, speed:3, hp:0},
     upgradeAmount: {power:2, speed:2, hp:1}
   },
-  barbarian: {
+  dragonlord: { // higher power, higher HP, slower attack speed
+    startingBonus: {power:2, speed:-1, hp:2},
+    upgradeAmount: {power:2, speed:1, hp:2}
+  },
+  cloud: { // high power, high HP, normal attack speed
     startingBonus: {power:2, speed:0, hp:2},
+    upgradeAmount: {power:2, speed:1, hp:2}
+  },
+  barbarian: { // Aesir: higher power, higher HP, slower attack speed
+    startingBonus: {power:2, speed:-1, hp:2},
     upgradeAmount: {power:1, speed:1, hp:2}
+  },
+  rhino: { // Green Ranger: higher speed, higher power, normal HP
+    startingBonus: {power:2, speed:2, hp:0},
+    upgradeAmount: {power:1, speed:2, hp:1}
+  },
+  spider: { // higher speed, higher power, lower HP
+    startingBonus: {power:2, speed:2, hp:0},
+    upgradeAmount: {power:1, speed:2, hp:1}
+  },
+  chopper: { // normal speed, normal HP, very high power
+    startingBonus: {power:4, speed:0, hp:0},
+    upgradeAmount: {power:2, speed:1, hp:1}
   },
   knight: {
     startingBonus: {power:0, speed:0, hp:2},
@@ -3409,7 +3434,10 @@ const DEFAULT_HERO_STAT_CONFIG = {
   upgradeAmount: {power:1, speed:1, hp:1}
 };
 function activeHeroStatConfig(){
-  return HERO_STAT_CONFIG[gameplayAvatarType()] || DEFAULT_HERO_STAT_CONFIG;
+  // Exact skin first (so Cloud/Rhino can have their own tuning distinct
+  // from the Knight/Barbarian class they otherwise share), then the
+  // gameplay class, then the default.
+  return HERO_STAT_CONFIG[state.avatarType] || HERO_STAT_CONFIG[gameplayAvatarType()] || DEFAULT_HERO_STAT_CONFIG;
 }
 function startingStatsForActiveHero(){
   const bonus=activeHeroStatConfig().startingBonus;
@@ -14484,11 +14512,10 @@ function registerKnightKill(){
 function updateKnightArmorHud(){
   const hud=document.getElementById('knightArmorHud');
   if(!hud) return;
-  const isKnight=knightIsActive();
-  hud.classList.toggle('show',isKnight);
-  if(!isKnight) return;
-  const p=HERO_PASSIVES.knight;
-  const max=knightArmorMax();
+  const max=shieldMaxForActiveHero();
+  const show=max>0 && !!player;
+  hud.classList.toggle('show',show);
+  if(!show) return;
   const armor=Math.max(0,Math.min(max,passiveState.knightArmor||0));
   const pct=(armor/max)*100;
   document.getElementById('knightArmorFill').style.width=pct+'%';
@@ -14497,16 +14524,18 @@ function updateKnightArmorHud(){
   hud.classList.toggle('regenerating',regenerating);
   const label=document.getElementById('knightArmorLabel');
   const extra=[];
-  if(knightRuntime.shieldAway) extra.push('SHIELD OUT');
-  if(knightRuntime.discipline>0) extra.push('DISC '+knightRuntime.discipline+'/'+KNIGHT_CFG.discipline.max);
-  if(knightRuntime.fortActive) extra.push('FORTIFIED');
-  if(knightRuntime.lastStandTimer>0) extra.push('LAST STAND '+knightRuntime.lastStandTimer.toFixed(1)+'s');
+  if(knightIsActive()){
+    if(knightRuntime.shieldAway) extra.push('SHIELD OUT');
+    if(knightRuntime.discipline>0) extra.push('DISC '+knightRuntime.discipline+'/'+KNIGHT_CFG.discipline.max);
+    if(knightRuntime.fortActive) extra.push('FORTIFIED');
+    if(knightRuntime.lastStandTimer>0) extra.push('LAST STAND '+knightRuntime.lastStandTimer.toFixed(1)+'s');
+  }
   const tail=extra.length?' · '+extra.join(' · '):'';
-  if(armor>=max) label.textContent=`MAGICAL ARMOR ${armor}/${max}${tail}`;
-  else if(waiting) label.textContent=`ARMOR ${armor}/${max} · RECHARGE ${(passiveState.knightArmorRegenDelay||0).toFixed(1)}s${tail}`;
+  if(armor>=max) label.textContent=`SHIELD ${armor}/${max}${tail}`;
+  else if(waiting) label.textContent=`SHIELD ${armor}/${max} · RECHARGE ${(passiveState.knightArmorRegenDelay||0).toFixed(1)}s${tail}`;
   else {
-    const prog=Math.min(100,Math.round(((passiveState.knightArmorRegenTimer||0)/((p.armorRegenInterval||3)||1))*100));
-    label.textContent=`ARMOR ${armor}/${max} · REGEN ${prog}%${tail}`;
+    const prog=Math.min(100,Math.round(((passiveState.knightArmorRegenTimer||0)/3)*100));
+    label.textContent=`SHIELD ${armor}/${max} · REGEN ${prog}%${tail}`;
   }
 }
 function refreshPassiveState(dt=0){
@@ -14522,18 +14551,23 @@ function refreshPassiveState(dt=0){
     if(passiveState.archerTailwindTimer<=0) passiveState.archerTailwindFxCooldown=0;
   }
   if(knightIsActive()){
-    const p=HERO_PASSIVES.knight;
     passiveState.knightWhirlwindHudFlash=Math.max(0,(passiveState.knightWhirlwindHudFlash||0)-dt);
     // Whirlwind timing, pulses and spin visuals live in updateKnightSystems so the
     // passive proc and the equipable ability can never double-trigger.
-    const max=knightArmorMax();
+  }
+  // Universal Shield gauge regen — every character has one now (see
+  // HERO_SHIELD_MAX / shieldMaxForActiveHero()). Internal state names
+  // (knightArmor*) are unchanged from the original Knight-only mechanic
+  // to avoid a large rename; the mechanic itself now applies roster-wide.
+  {
+    const max=shieldMaxForActiveHero();
     if((passiveState.knightArmor||0)>max) passiveState.knightArmor=max;
     if((passiveState.knightArmor||0)<max){
       if((passiveState.knightArmorRegenDelay||0)>0){
         passiveState.knightArmorRegenDelay=Math.max(0,passiveState.knightArmorRegenDelay-dt);
       }else{
         passiveState.knightArmorRegenTimer=(passiveState.knightArmorRegenTimer||0)+dt;
-        if(passiveState.knightArmorRegenTimer>=(p.armorRegenInterval||3)){
+        if(passiveState.knightArmorRegenTimer>=3){
           passiveState.knightArmor=Math.min(max,(passiveState.knightArmor||0)+1);
           passiveState.knightArmorRegenTimer=0;
           if(player){spawnKnightGuardBurst(player.position,1.35);navigator.vibrate&&navigator.vibrate(12);}
@@ -14543,10 +14577,8 @@ function refreshPassiveState(dt=0){
       passiveState.knightArmorRegenDelay=0;
       passiveState.knightArmorRegenTimer=0;
     }
-    updateKnightArmorHud();
-  }else{
-    updateKnightArmorHud();
   }
+  updateKnightArmorHud();
   if(passiveState.mageSpeedBoostTimer>0){
     const hasteWasActive=passiveState.mageSpeedBoostTimer>0;
     passiveState.mageSpeedBoostTimer=Math.max(0,passiveState.mageSpeedBoostTimer-dt);
@@ -17984,9 +18016,22 @@ function knightRoyalCloneUnlocked(){
 
 
 /* ---------------------------------------------------------------- state */
+// Universal Shield gauge: every character blocks this many full hits
+// before real heart damage, regenerating 1 charge every 3s after a 5s
+// no-hit delay (the original Knight Magical Armor timing, now shared by
+// the whole roster). Tier: lower=1, normal=2, higher=3.
+const HERO_SHIELD_MAX = {
+  dragonlord:2, mage:1, cloud:1, barbarian:2, rhino:1, spider:3, chopper:2, knight:2
+};
+function shieldMaxForActiveHero(){
+  let base=HERO_SHIELD_MAX[state.avatarType];
+  if(base===undefined) base=HERO_SHIELD_MAX[gameplayAvatarType()];
+  if(base===undefined) base=2;
+  if(knightIsActive() && knightRuntime.shieldAway) base=Math.max(1,base-1);
+  return base;
+}
 function knightArmorMax(){
-  const base=(HERO_PASSIVES.knight && HERO_PASSIVES.knight.armorMax) || 2;
-  return Math.max(1, base - (knightRuntime.shieldAway?1:0));
+  return shieldMaxForActiveHero();
 }
 function knightAddDiscipline(){
   const c=KNIGHT_CFG.discipline;
@@ -36482,7 +36527,6 @@ function playerTakeHit(sourceType='normal'){
     // random hit negation.
   }
   if(knightIsActive()){
-    const p=HERO_PASSIVES.knight;
     // Heavily protected while planting Judgment of the King.
     if(knightRuntime.ultInvuln>0 && knightRuntime.ultPhase>0){
       spawnKnightGuardBurst(player.position,2.2,KNIGHT_GOLD);
@@ -36511,7 +36555,14 @@ function playerTakeHit(sourceType='normal'){
         return;
       }
     }
-    passiveState.knightArmorRegenDelay=Math.max(0.6,(p.armorRegenDelay||5)*(1-(knightRuntime.discipline||0)*KNIGHT_CFG.discipline.blockRecoveryPerStack*0.5));
+  }
+  // Universal Shield gauge — every character blocks a full hit here before
+  // falling through to real heart damage (see HERO_SHIELD_MAX). Knight
+  // keeps his Discipline-shortened recharge delay as a flavor bonus on
+  // top of the same shared mechanic.
+  {
+    const disciplineBonus=knightIsActive()?(knightRuntime.discipline||0)*KNIGHT_CFG.discipline.blockRecoveryPerStack*0.5:0;
+    passiveState.knightArmorRegenDelay=Math.max(0.6,5*(1-disciplineBonus));
     passiveState.knightArmorRegenTimer=0;
     if((passiveState.knightArmor||0)>0){
       passiveState.knightArmor=Math.max(0,passiveState.knightArmor-1);
@@ -36525,7 +36576,7 @@ function playerTakeHit(sourceType='normal'){
       return;
     }
     // Reckless damage never builds Discipline; it resets it.
-    knightRuntime.discipline=0;
+    if(knightIsActive()) knightRuntime.discipline=0;
   }
   hearts--;
   heartsLostThisRound++;
@@ -37662,8 +37713,8 @@ function startSurvival(){
   renderHearts();
   passiveState = createFreshPassiveState();
   resetKnightRuntime();
+  passiveState.knightArmor=shieldMaxForActiveHero();
   if(knightIsActive()){
-    passiveState.knightArmor=HERO_PASSIVES.knight.armorMax||2;
     knightRuntime.fortX=player?player.position.x:0;
     knightRuntime.fortZ=player?player.position.z:0;
   }
