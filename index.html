@@ -1453,7 +1453,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.75.04 - Nyxara Hellgate Invincibility Fix';
+const GAME_VERSION='23.75.05 - Nyxara Giant Fireball Secondary';
 const LEGACY_ABILITY_RUNTIME_REMOVED=true;
 
 // ---------------------------------------------------------------------
@@ -1840,7 +1840,7 @@ const AVATAR_TYPE_LABELS = {
   spider:'🕷️ Spider',
 };
 const HERO_ROSTER_INFO = {
-  dragonlord:{title:'Nyxara, the Demon Dragon Queen',role:'HYBRID • APEX RAID BOSS',desc:'A wing-flaring, fire-breathing demon dragon queen built on a full 81-clip cinematic animation set, so she never freezes into a stiff pose. She fights up close with Demon Claw and Infernal Glaive combos, burns from range with a Brimstone Barrage volley, tears enemies apart with Soul Rend Chain, and pulls crowds apart with Void Maw. Her three ultimate-tier powers — Ashfall Cataclysm, Ascend: Wyrm Form, and Open the Hellgate — are all free and pre-owned the moment she is selected, and Round 10 unlocks her signature Legion of the Abyss: a horde of invincible demon-dragon clones fighting at her side. Built to be the single strongest, flashiest avatar in the roster.'},
+  dragonlord:{title:'Nyxara, the Demon Dragon Queen',role:'HYBRID • APEX RAID BOSS',desc:'A wing-flaring, fire-breathing demon dragon queen built on a full 81-clip cinematic animation set, so she never freezes into a stiff pose. She fights up close with Demon Claw and Infernal Glaive combos, burns from range with a Brimstone Barrage volley, hurls the same Phoenix-scale Giant Fireball the Fox commands, and pulls crowds apart with Void Maw. Her three ultimate-tier powers — Ashfall Cataclysm, Ascend: Wyrm Form, and Open the Hellgate — are all free and pre-owned the moment she is selected, and Round 10 unlocks her signature Legion of the Abyss: a horde of invincible demon-dragon clones fighting at her side. Built to be the single strongest, flashiest avatar in the roster.'},
   spider:{title:'Spider',role:'MELEE • ACROBAT',desc:'A wall-crawling acrobat built on 25 hand-authored clips. Quick and evasive without being a blur: he closes distance with web-lines and Bezier vaults rather than raw speed. The kit is a setup-and-payoff loop — Web Snap and Web Trap wrap targets, and everything wrapped takes 45% extra damage from every source, including all three of his ultimates.'},
   rogue:{title:'Tempest Archer',role:'RANGED • EASY',desc:'The speed-focused ranged avatar: fast movement, long-lived piercing arrows, and precise crowd control. Every fifth defeat triggers Tailwind for a short burst of movement and firing speed.'},
   chopper:{title:'Chopper',role:'MELEE • PIRATE',desc:'A cutlass-swinging pirate built on 15 hand-authored animations. Every move — combos, rolls, guards, throws, shots and a full three-phase jump — plays a real take, so nothing ever snaps to a frozen pose.'},
@@ -3486,8 +3486,8 @@ const CHARACTER_COMBAT = {
         desc:'Trades speed for reach: a heavier three-hit greatsword chain wreathed in dragonfire that hits harder and further than the claws.'},
       dragonlord_brimstone_barrage:{name:'Brimstone Barrage', price:0, slot:'secondary', kind:'dragonlord_brimstone_barrage', cooldown:0.9, damage:0.65, splash:1.2, auto:true, fireRateCap:2.0,
         desc:'Looses a 3-bolt volley of homing brimstone fireballs in a tight spread, then detonates the ground beneath her in a burst of hellfire.'},
-      dragonlord_soul_chain:{name:'Soul Rend Chain', price:400, slot:'secondary', kind:'dragonlord_soul_chain', cooldown:2.2, damage:3.4, range:8, fireRateCap:3,
-        desc:'Lashes a chain of hellfire at the nearest enemy ahead of her, ripping them off their feet and yanking them in for a heavy single-target detonation.'},
+      dragonlord_giant_fireball:{name:'Giant Fireball', price:400, slot:'secondary', kind:'dragonlord_giant_fireball', cooldown:0.9, damage:999, splash:5.0, splashDamage:4.2, directInstakill:true, auto:true, fireRateCap:2.0,
+        desc:'Hurls the same Phoenix-scale molten fireball the Fox commands — a direct hit executes any non-boss outright, and the impact scorches a wide area around it.'},
       dragonlord_void_maw:{name:'Void Maw', price:450, slot:'secondary', kind:'dragonlord_void_maw', cooldown:3.4, damage:2.1, radius:3.6, fireRateCap:3,
         desc:'Tears open a void rift ahead of her that drags every nearby enemy toward its center, then collapses in a violent implosion of hellfire.'}
     }
@@ -23474,30 +23474,6 @@ function dragonlordUpdateSparks(dt){
   });
 }
 
-// Shared chain/trail strip — a single reusable strip stretched between two
-// points each cast (now also used as Soul Rend Chain's chain visual),
-// instead of spawning particles along the path.
-let dragonlordDashTrailPool=null;
-function dragonlordDashTrailFactory(){ return new THREE.Mesh(new THREE.PlaneGeometry(1,1),knightMat(DL_FIRE,.7)); }
-function dragonlordFireDashTrail(fromPos,toPos,color=DL_FIRE){
-  if(!dragonlordDashTrailPool) dragonlordDashTrailPool=dragonlordCreatePool(2,dragonlordDashTrailFactory);
-  const slot=dragonlordPoolGet(dragonlordDashTrailPool);
-  slot.life=slot.maxLife=1.2; // matches the blueprint's 1.2s linear fade window
-  const dx=toPos.x-fromPos.x, dz=toPos.z-fromPos.z;
-  const len=Math.max(.4,Math.hypot(dx,dz));
-  const yaw=Math.atan2(dx,dz);
-  const m=slot.obj;
-  m.scale.set(.9,len,1);
-  m.rotation.x=-Math.PI/2; m.rotation.z=yaw;
-  m.position.set((fromPos.x+toPos.x)/2,(fromPos.y||0)+.05,(fromPos.z+toPos.z)/2);
-  m.material.color.setHex(color);
-  m.material.opacity=.7;
-}
-function dragonlordUpdateDashTrail(dt){
-  if(!dragonlordDashTrailPool) return;
-  dragonlordPoolUpdate(dragonlordDashTrailPool,dt,(slot,q)=>{ slot.obj.material.opacity=.7*q; });
-}
-
 // Expanding shockwave ring — single reusable mesh, scales 0->target over
 // 0.20s then hides. Backs Demonfire Nova's AoE and the passive kill-nova.
 let dragonlordSweepRingPool=null;
@@ -23531,7 +23507,7 @@ function doDragonLordAttack(w){
   switch(w.kind){
     case 'dragonlord_infernal_glaive': dragonlordGlaiveCombo(w); break;
     case 'dragonlord_brimstone_barrage': dragonlordBrimstoneBarrage(w); break;
-    case 'dragonlord_soul_chain': dragonlordSoulRendChain(w); break;
+    case 'dragonlord_giant_fireball': dragonlordGiantFireball(w); break;
     case 'dragonlord_void_maw': dragonlordVoidMaw(w); break;
     default: dragonlordClawRend(w); break;
   }
@@ -23599,55 +23575,27 @@ function dragonlordBrimstoneBarrage(w){
   triggerCombatShake(hits>0?13:7,160);
   navigator.vibrate&&navigator.vibrate(hits>0?[30,18,42]:18);
 }
-// Soul Rend Chain: replaces Wing Gale Dash. A single-target execute move
-// instead of a movement-reliant dash — no player repositioning or
-// multi-step in-transit hit detection to go wrong, just a forward-cone
-// target lock, a chain-pull, and a heavy single-hit detonation. Fills a
-// different role than Barrage (spread AoE) and Void Maw (crowd pull):
-// this is the move that deletes one dangerous target fast.
-function dragonlordSoulRendChain(w){
-  if(player.userData.playKayClip) player.userData.playKayClip('Spell_Simple_Shoot',true,true,.24);
+// Giant Fireball: the same Phoenix-scale molten fireball the Fox fires.
+// shootFromPosition() already contains a generic kind==='giant_fireball'
+// branch (mesh swap to the shared molten-fireball visual, slow speedMult,
+// hitRadius, boundaryPersistent, life=Infinity) and the bullet-hit code's
+// splash/directInstakill handling is generic too — neither is gated to
+// the Fox specifically (confirmed by the Arcane Echo clone using the same
+// trick). Routing through her own dispatcher first keeps her damage
+// multiplier (Wyrm Form) and cooldown/fireRateCap on her own weapon
+// entry, while the fired bullet itself is flagged with the real
+// 'giant_fireball' kind so it is mechanically and visually identical to
+// the Fox's version.
+function dragonlordGiantFireball(w){
+  if(player.userData.playKayClip) player.userData.playKayClip('Spell_Simple_Shoot',true,true,.30);
   const yaw=player.rotation.y;
-  const range=(w.range||8)*dragonlordAttackRangeMult();
-  let best=null,bestDist=range;
-  for(const z of zombies){
-    if(!z||z.userData.dead||z.userData.spawnPending) continue;
-    const dx=z.position.x-player.position.x,dz=z.position.z-player.position.z;
-    const dist=Math.hypot(dx,dz);
-    if(dist>range) continue;
-    const angleToTarget=Math.atan2(dx,dz);
-    const angleDiff=Math.abs(((angleToTarget-yaw+Math.PI*3)%(Math.PI*2))-Math.PI);
-    if(angleDiff>Math.PI/2.2) continue; // roughly an 80-degree forward cone
-    if(dist<bestDist){bestDist=dist;best=z;}
-  }
-  const chainStart={x:player.position.x,y:player.position.y+1.1,z:player.position.z};
-  // Cast flourish at her hand so the move reads as a deliberate cast even
-  // on a miss, instead of just a thin line appearing.
-  dragonlordImpactFlash(chainStart,DL_VOID,1.3,.14);
-  dragonlordFireSparks(chainStart,4,DL_VOID);
-  if(!best){
-    const missEnd={x:player.position.x+Math.sin(yaw)*range,y:player.position.y+1.1,z:player.position.z+Math.cos(yaw)*range};
-    dragonlordFireDashTrail(chainStart,missEnd,DL_VOID);
-    triggerCombatShake(3,60);
-    return;
-  }
-  const targetPos={x:best.position.x,y:best.position.y+1,z:best.position.z};
-  // Two overlapping strands (void + fire) read as a twisted chain instead
-  // of a single flat line — the pool is sized for exactly this.
-  dragonlordFireDashTrail(chainStart,targetPos,DL_VOID);
-  dragonlordFireDashTrail({x:chainStart.x,y:chainStart.y-.15,z:chainStart.z},{x:targetPos.x,y:targetPos.y-.15,z:targetPos.z},DL_FIRE);
-  applyBulletDamage(best,w.damage*dragonlordAttackDamageMult());
-  const dx=player.position.x-best.position.x,dz=player.position.z-best.position.z;
-  const d=Math.hypot(dx,dz)||1;
-  const pull=Math.min(d-1.4,d*0.7);
-  if(pull>0){ best.position.x+=(dx/d)*pull; best.position.z+=(dz/d)*pull; }
-  // Execution-grade payoff: telegraph ring + big flash + heavy spark/ember burst.
-  dragonlordFireRing(best.position,1.8,DL_VOID,.4);
-  dragonlordImpactFlash(best.position,DL_VOID,2.6,.22);
-  dragonlordFireSparks(best.position,10,DL_FIRE);
-  dragonlordEmberBurst(best.position.x,best.position.y+.7,best.position.z,16,4.4);
-  triggerCombatShake(13,180);
-  navigator.vibrate&&navigator.vibrate([34,22,50]);
+  const muzzle={x:player.position.x+Math.sin(yaw)*.9,y:player.position.y+1.0,z:player.position.z+Math.cos(yaw)*.9};
+  dragonlordImpactFlash(muzzle,DL_EMBER,1.4,.14);
+  dragonlordFireSparks(muzzle,5,DL_EMBER);
+  const dmgMult=dragonlordAttackDamageMult();
+  shootFromPosition({...w,kind:'giant_fireball',splashDamage:(w.splashDamage||0)*dmgMult},player.position,0);
+  triggerCombatShake(6,110);
+  navigator.vibrate&&navigator.vibrate(20);
 }
 // Void Maw: new 3rd secondary. Opens a void rift ahead of her that yanks
 // nearby enemies toward its center, then implodes — crowd-control flavor,
@@ -24235,7 +24183,6 @@ function updateDragonLordSystems(dt){
   dragonlordUpdateHellgate(dt);
   dragonlordUpdateSwipes(dt);
   dragonlordUpdateSparks(dt);
-  dragonlordUpdateDashTrail(dt);
   dragonlordUpdateSweepRing(dt);
   dragonlordUpdateFlashes(dt);
   updateDragonLordLegion(dt);
