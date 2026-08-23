@@ -320,6 +320,12 @@
   body.kbmMode .abilityBtn{width:80px;height:80px;background:rgba(53,207,255,0.26);}
   body.kbmMode .ultimateBtn{width:96px;height:96px;background:conic-gradient(#b95cff var(--charge,0%),rgba(33,11,52,.30) 0);}
   body.kbmMode .jumpBtn,body.kbmMode .lookFwdBtn{width:66px;height:58px;background:rgba(20,22,28,0.18);}
+  /* Portrait kbm mode repositions the whole grid further down (see the
+     "Portrait's default 2-column grid" block below — ultimateBtn actually
+     sits at bottom:258+96=354px here, not the base rule's 118px), so jump
+     needs its own higher perch above THAT real top edge, right-aligned to
+     match ultimateBtn's own right:22px column. */
+  body.kbmMode .jumpBtn{right:22px;bottom:calc(370px + env(safe-area-inset-bottom));}
   body.kbmMode .secondaryBtn .secondaryIcon{font-size:24px;}
   body.kbmMode .secondaryBtn .secondaryLabel{max-width:80px;font-size:9px;}
   /* Vertical-center-right: the left side has the info-pill stack (whose
@@ -355,10 +361,10 @@
   .secondaryBtn .secondaryTimer{font-size:16px;line-height:1;font-weight:1000;margin-top:2px;color:#fff8cf;text-shadow:0 0 7px rgba(255,221,105,.95),0 1px 3px rgba(0,0,0,.95);}
   .secondaryBtn.whirlwindActive{box-shadow:0 0 0 2px rgba(255,239,171,.82),0 0 18px rgba(140,204,255,.78),inset 0 0 16px rgba(255,255,255,.14);}
   .secondaryBtn:active{transform:scale(.96);}
-  .jumpBtn{position:relative;bottom:auto;right:auto;
+  .jumpBtn{position:absolute;right:24px;bottom:calc(196px + env(safe-area-inset-bottom));
     width:52px;height:46px;border-radius:12px;background:rgba(20,22,28,0.5);
     border:2.5px solid rgba(255,255,255,0.75);font-weight:800;font-size:10px;color:#fff;
-    pointer-events:auto;display:flex;align-items:center;justify-content:center;}
+    pointer-events:auto;display:flex;align-items:center;justify-content:center;z-index:45;}
   .camCluster{position:absolute;top:calc(56px + env(safe-area-inset-top));right:14px;
     display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none;}
   .camZoomBtn{width:52px;height:32px;border-radius:11px;background:rgba(20,22,28,0.5);
@@ -920,20 +926,28 @@
     .camLabelBox span{font-size:14px;}
     .pauseBtn{width:50px;height:40px;border-radius:11px;font-size:15px;}
 
-    /* JUMP / LOOK FWD move out of the utility rail's flex column (where
-       they'd stack the column too tall for a short landscape screen) and
-       into their own row along the bottom-left, right after the radar. */
-    .jumpBtn,.lookFwdBtn{
-      /* fixed, not absolute: both are DOM children of .camCluster (itself
+    /* LOOK FWD moves out of the utility rail's flex column (where it'd
+       stack the column too tall for a short landscape screen) and into
+       its own fixed spot along the bottom-left, right after the radar. */
+    .lookFwdBtn{
+      /* fixed, not absolute: still a DOM child of .camCluster (itself
          position:absolute), so plain absolute positioning here would be
          relative to that small top-right box instead of the screen. */
       position:fixed;
       bottom:calc(16px + env(safe-area-inset-bottom));
       width:52px;height:46px;
       border-radius:12px;
+      left:calc(98px + env(safe-area-inset-left));right:auto;font-size:7px;
     }
-    .jumpBtn{left:calc(98px + env(safe-area-inset-left));right:auto;font-size:9px;}
-    .lookFwdBtn{left:calc(160px + env(safe-area-inset-left));right:auto;font-size:7px;}
+    /* Jump sits on the right now, stacked above the attack-button fan
+       (abilityBtn is the fan's topmost element here at 176+56=232px). */
+    .jumpBtn{
+      right:calc(30px + env(safe-area-inset-right));
+      bottom:calc(248px + env(safe-area-inset-bottom));
+      width:52px;height:42px;
+      border-radius:12px;
+      font-size:9px;
+    }
 
     /* UP/DOWN (climb, swim, fly - avatar-conditional) continue the same
        bottom-left row past Jump/Look Fwd instead of stacking in the old
@@ -961,7 +975,9 @@
     body.kbmMode .secondaryBtn{right:calc(228px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));width:92px;height:70px;border-radius:12px;}
     body.kbmMode .abilityBtn{right:calc(340px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));width:62px;height:62px;}
     body.kbmMode .ultimateBtn{right:calc(442px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));width:80px;height:80px;}
-    body.kbmMode .jumpBtn{left:calc(108px + env(safe-area-inset-left));}
+    /* kbm's row (not a fan) — actBtn is tallest at this right: position
+       (16+92=108px top edge), so jump perches above it with a real gap. */
+    body.kbmMode .jumpBtn{left:auto;right:calc(16px + env(safe-area-inset-right));bottom:calc(124px + env(safe-area-inset-bottom));}
     body.kbmMode .lookFwdBtn{left:calc(194px + env(safe-area-inset-left));}
     body.kbmMode .upBtn{left:calc(280px + env(safe-area-inset-left));}
     body.kbmMode .downBtn{left:calc(358px + env(safe-area-inset-left));}
@@ -1008,15 +1024,22 @@
     .camLabelBox{width:38px;height:28px;border-radius:9px;font-size:7px;}
     .camLabelBox span{font-size:12px;}
     .pauseBtn{width:38px;height:30px;border-radius:9px;font-size:13px;}
-    .jumpBtn,.lookFwdBtn{
+    .lookFwdBtn{
       bottom:calc(12px + env(safe-area-inset-bottom));
       width:46px;height:38px;
+      left:calc(88px + env(safe-area-inset-left));font-size:6.5px;
     }
-    .jumpBtn{left:calc(88px + env(safe-area-inset-left));font-size:8px;}
-    .lookFwdBtn{left:calc(142px + env(safe-area-inset-left));font-size:6.5px;}
+    /* Jump stacks above this breakpoint's fan (abilityBtn is tallest here,
+       123+39=162px top edge). */
+    .jumpBtn{
+      right:calc(22px + env(safe-area-inset-right));
+      bottom:calc(174px + env(safe-area-inset-bottom));
+      width:44px;height:32px;
+      font-size:8px;
+    }
     .vertBtn{width:50px;height:50px;}
-    .upBtn{left:calc(196px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));}
-    .downBtn{left:calc(254px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));}
+    .upBtn{left:calc(142px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));}
+    .downBtn{left:calc(200px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));}
     /* Short landscape has no room to spare for the bigger kbmMode buttons -
        match them back to the touch sizing here (still keeping the lower
        opacity) so the carefully-spaced layout above doesn't collide. */
@@ -1025,11 +1048,11 @@
     body.kbmMode .dashBtn{width:50px;height:50px;right:calc(78px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));}
     body.kbmMode .abilityBtn{width:50px;height:50px;right:calc(190px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));}
     body.kbmMode .ultimateBtn{width:62px;height:62px;right:calc(248px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));}
-    body.kbmMode .jumpBtn,body.kbmMode .lookFwdBtn{width:46px;height:38px;bottom:calc(12px + env(safe-area-inset-bottom));}
-    body.kbmMode .jumpBtn{left:calc(88px + env(safe-area-inset-left));}
-    body.kbmMode .lookFwdBtn{left:calc(142px + env(safe-area-inset-left));}
-    body.kbmMode .upBtn{left:calc(196px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));}
-    body.kbmMode .downBtn{left:calc(254px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));}
+    body.kbmMode .lookFwdBtn{width:46px;height:38px;bottom:calc(12px + env(safe-area-inset-bottom));left:calc(88px + env(safe-area-inset-left));}
+    /* kbm row's tallest here is ultimateBtn (12+62=74px) — jump perches above it. */
+    body.kbmMode .jumpBtn{width:44px;height:32px;left:auto;right:calc(14px + env(safe-area-inset-right));bottom:calc(88px + env(safe-area-inset-bottom));}
+    body.kbmMode .upBtn{left:calc(142px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));}
+    body.kbmMode .downBtn{left:calc(200px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));}
   }
 
   /* Narrow AND short landscape (older/small phones - the only combination
@@ -1045,22 +1068,23 @@
     .abilityBtn{right:calc(59px + env(safe-area-inset-right));bottom:calc(98px + env(safe-area-inset-bottom));width:31px;height:31px;}
     .dashBtn{right:calc(111px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));width:28px;height:28px;}
     .enemyRadar{width:60px!important;height:60px!important;}
-    .jumpBtn{left:calc(76px + env(safe-area-inset-left));}
-    .lookFwdBtn{left:calc(122px + env(safe-area-inset-left));}
-    .jumpBtn,.lookFwdBtn{width:42px;height:34px;}
+    .lookFwdBtn{left:calc(76px + env(safe-area-inset-left));width:42px;height:34px;}
+    /* Jump stacks above this breakpoint's fan (abilityBtn is tallest here,
+       98+31=129px top edge). */
+    .jumpBtn{right:calc(18px + env(safe-area-inset-right));bottom:calc(140px + env(safe-area-inset-bottom));width:38px;height:28px;}
     .vertBtn{width:46px;height:46px;}
-    .upBtn{left:calc(168px + env(safe-area-inset-left));}
-    .downBtn{left:calc(218px + env(safe-area-inset-left));}
+    .upBtn{left:calc(122px + env(safe-area-inset-left));}
+    .downBtn{left:calc(172px + env(safe-area-inset-left));}
     body.kbmMode .actBtn{width:50px;height:50px;right:calc(12px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));}
     body.kbmMode .secondaryBtn{width:44px;height:38px;right:calc(114px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));}
     body.kbmMode .dashBtn{width:44px;height:44px;right:calc(66px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));}
     body.kbmMode .abilityBtn{width:44px;height:44px;right:calc(162px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));}
     body.kbmMode .ultimateBtn{width:54px;height:54px;right:calc(212px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));}
-    body.kbmMode .jumpBtn,body.kbmMode .lookFwdBtn{width:42px;height:34px;bottom:calc(12px + env(safe-area-inset-bottom));}
-    body.kbmMode .jumpBtn{left:calc(76px + env(safe-area-inset-left));}
-    body.kbmMode .lookFwdBtn{left:calc(122px + env(safe-area-inset-left));}
-    body.kbmMode .upBtn{left:calc(168px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));}
-    body.kbmMode .downBtn{left:calc(218px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));}
+    body.kbmMode .lookFwdBtn{width:42px;height:34px;bottom:calc(12px + env(safe-area-inset-bottom));left:calc(76px + env(safe-area-inset-left));}
+    /* kbm row's tallest here is ultimateBtn (12+54=66px) — jump perches above it. */
+    body.kbmMode .jumpBtn{width:38px;height:28px;left:auto;right:calc(12px + env(safe-area-inset-right));bottom:calc(80px + env(safe-area-inset-bottom));}
+    body.kbmMode .upBtn{left:calc(122px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));}
+    body.kbmMode .downBtn{left:calc(172px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));}
   }
 
 
@@ -1385,7 +1409,6 @@
           <div class="camLabelBox">VIEW<br><span id="camLabel">3</span></div>
           <div class="camZoomBtn" id="camInBtn">&plus;</div>
           <div class="pauseBtn" id="pauseBtn">❚❚</div>
-          <div class="jumpBtn" id="jumpBtn">JUMP</div>
           <div class="lookFwdBtn" id="lookFwdBtn">LOOK<br>FWD</div>
         </div>
         <div class="dashBtn" id="dashBtn">DASH</div>
@@ -1393,6 +1416,10 @@
         <div class="laserBtn hidden" id="laserBtn" style="--charge:100%">LASER</div>
         <div class="ultimateBtn hidden" id="ultimateBtn" style="--charge:0%">ECLIPSE</div>
         <div class="soulMeter" id="soulMeter">SOULS 0/25</div>
+        <!-- Jump lives with the attack cluster now (right side, stacked
+             above it), not the top-right camera/pause rail — see .jumpBtn
+             rules for exact per-breakpoint placement. -->
+        <div class="jumpBtn" id="jumpBtn">JUMP</div>
         <div class="pauseOverlay" id="pauseOverlay">
           <div class="pausePanel">
             <h2 style="margin:0 0 18px;">Paused</h2>
@@ -1515,7 +1542,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='24.00.00 - Blizzard Storm: real cooldown countdown on the ability button';
+const GAME_VERSION='24.01.00 - Jump button moved to the right, above the attack buttons';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
