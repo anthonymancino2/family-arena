@@ -463,6 +463,21 @@
     text-align:center;width:82%;max-width:320px;}
   .pausePanel .bigBtn, .pausePanel .ghostBtn{width:100%;}
 
+  .howToPlayOverlay{position:absolute;inset:0;background:rgba(5,10,18,0.85);z-index:120;
+    display:none;align-items:center;justify-content:center;pointer-events:auto;}
+  .howToPlayOverlay.show{display:flex;}
+  .howToPlayPanel{background:var(--panel);border-radius:20px;padding:24px;
+    text-align:left;width:86%;max-width:380px;max-height:80vh;overflow-y:auto;
+    -webkit-overflow-scrolling:touch;}
+  .howToPlayPanel h2{margin:0 0 16px;text-align:center;color:#fff;}
+  .howToPlayStep{display:flex;gap:10px;align-items:flex-start;margin-bottom:14px;}
+  .howToPlayStepIcon{flex:0 0 auto;width:28px;height:28px;border-radius:50%;
+    background:var(--gold);color:#1a1400;font-weight:900;display:flex;
+    align-items:center;justify-content:center;font-size:14px;}
+  .howToPlayStepText{font-size:13px;line-height:1.4;color:#e8f1ff;}
+  .howToPlayStepText strong{color:#ffe28a;}
+  .howToPlayPanel .bigBtn{width:100%;margin-top:6px;}
+
   /* ---- Run economy / progression HUD ---- */
   .runTokensPill{position:absolute;top:calc(58px + env(safe-area-inset-top));left:14px;
     background:var(--panel);border-radius:14px;padding:6px 12px;display:flex;
@@ -1216,6 +1231,7 @@
           <button class="bigBtn" id="btnGoModes">Play</button>
           <button class="ghostBtn" id="btnGoShop">Crystal<br>Shop</button>
         </div>
+        <button class="ghostBtn" id="btnHowToPlay" style="width:100%;margin-top:8px;">❔ How to Play</button>
         <div class="homeUtilityRow">
           <button class="ghostBtn syncUpdateBtn" id="btnRefreshSync" type="button">
             <span class="syncUpdateIcon">↻</span>
@@ -1228,6 +1244,19 @@
           <div class="homeSyncStatus" id="homeSyncStatus">Global scores sync automatically · tap to refresh</div>
         </div>
         <div class="homeVersion" id="homeVersion"></div>
+      </div>
+    </div>
+    <div class="howToPlayOverlay" id="howToPlayOverlay">
+      <div class="howToPlayPanel">
+        <h2>How to Play</h2>
+        <div class="howToPlayStep"><span class="howToPlayStepIcon">🕹️</span><span class="howToPlayStepText"><strong>Move</strong> — left stick or WASD to walk around the arena.</span></div>
+        <div class="howToPlayStep"><span class="howToPlayStepIcon">👀</span><span class="howToPlayStepText"><strong>Look</strong> — drag the screen, or move the mouse, to aim the camera.</span></div>
+        <div class="howToPlayStep"><span class="howToPlayStepIcon">🗡️</span><span class="howToPlayStepText"><strong>Attack</strong> — tap FIRE for your primary move, SECONDARY for your second move once it's unlocked.</span></div>
+        <div class="howToPlayStep"><span class="howToPlayStepIcon">💨</span><span class="howToPlayStepText"><strong>Dash</strong> — tap DASH to quickly dodge out of danger.</span></div>
+        <div class="howToPlayStep"><span class="howToPlayStepIcon">✨</span><span class="howToPlayStepText"><strong>Ability &amp; Ultimate</strong> — powerful moves that unlock as you clear more rounds. A locked slot shows 🔒 until then.</span></div>
+        <div class="howToPlayStep"><span class="howToPlayStepIcon">🛒</span><span class="howToPlayStepText"><strong>Shop</strong> — spend coins between rounds on new moves and stat upgrades.</span></div>
+        <div class="howToPlayStep"><span class="howToPlayStepIcon">📈</span><span class="howToPlayStepText"><strong>Round = Avatar Level</strong> — enemies get tougher every round, so keep upgrading to keep up.</span></div>
+        <button class="bigBtn" id="btnCloseHowToPlay">Got it</button>
       </div>
     </div>
   </div>
@@ -1486,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.81.00 - Locked Move Buttons Show Lock Icon Instead of Hiding';
+const GAME_VERSION='23.82.00 - Gentler Round-1 Ramp & How to Play Panel';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -2013,16 +2042,26 @@ function clampStartRound(r){
   return Math.min(highestUnlockedStartRound(), Math.max(1, n));
 }
 
-// V23.77 Round-1 Difficulty Reset: enemy count/HP/speed/type-mix now start
-// at what used to be Round 10's baseline instead of Round 1's soft ramp, so
-// the game is a real challenge from the first round instead of a long easy
-// warm-up. Boss-round SCHEDULING (every 5th real round) is deliberately NOT
-// shifted by this offset — an immediate boss ambush on Round 1, before the
-// player has unlocked a second move, would be an unfair gut-punch rather
-// than a challenge, not the "hard but fair" target.
-const ROUND_DIFFICULTY_OFFSET = 9;
+// V23.82 Round-1 Difficulty Ease-In: the flat +9 offset below (Round 1 =
+// old Round 10's baseline) turned out to be a genuine wall for a
+// first-time player who hasn't unlocked a second move yet. The offset now
+// ramps up gently instead of applying in full immediately: Round 1 plays
+// like old Round 5, Round 5 plays like old Round 10, and the ramp keeps
+// climbing until Round 21, where it reaches the original +9 and holds
+// there for the rest of the run — so the late game keeps the "hard but
+// fair, no bragging about day-1 clears" challenge the offset was built
+// for, while the first ~20 rounds give a new player room to learn.
+// Boss-round SCHEDULING (every 5th real round) is deliberately NOT shifted
+// by this offset — an immediate boss ambush on Round 1 would be an unfair
+// gut-punch rather than a challenge.
+const ROUND_DIFFICULTY_OFFSET_START = 4;
+const ROUND_DIFFICULTY_OFFSET_MAX = 9;
+const ROUND_DIFFICULTY_RAMP_PER_ROUND = 0.25;
 function difficultyRound(r=round){
-  return Math.max(1, Math.floor(Number(r)) || 1) + ROUND_DIFFICULTY_OFFSET;
+  const n = Math.max(1, Math.floor(Number(r)) || 1);
+  const offset = Math.min(ROUND_DIFFICULTY_OFFSET_MAX,
+    ROUND_DIFFICULTY_OFFSET_START + (n-1)*ROUND_DIFFICULTY_RAMP_PER_ROUND);
+  return n + Math.floor(offset);
 }
 // How many enemies a round is worth, as a pure function of the round
 // number. This used to be accumulated one round at a time (+1, +1, +10...),
@@ -2327,6 +2366,12 @@ document.getElementById('btnGoShop').onclick = ()=>{
   if(!state.currentName){ alert('Pick a player first.'); return; }
   renderShop();
   show('screenShop');
+};
+document.getElementById('btnHowToPlay').onclick = ()=>{
+  document.getElementById('howToPlayOverlay').classList.add('show');
+};
+document.getElementById('btnCloseHowToPlay').onclick = ()=>{
+  document.getElementById('howToPlayOverlay').classList.remove('show');
 };
 document.getElementById('backHome1').onclick = ()=>show('screenHome');
 document.getElementById('backHome2').onclick = ()=>show('screenModes');
