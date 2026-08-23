@@ -1515,7 +1515,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='23.89.00 - Dudu: Hydro-Snap Fix, No-Delay Kills, Bigger Ultimates';
+const GAME_VERSION='23.90.00 - Dudu: Freeze Fix (FX Ceiling + Rate Tuning)';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -4219,9 +4219,23 @@ function duduAddMeshFx(mesh,life,tick,onEnd){
   scene.add(mesh);
   duduMeshFx.push({mesh,life,elapsed:0,tick:tick||null,onEnd:onEnd||null});
 }
+// Hard safety ceilings — no matter how fast moves are cast (rapid taps, a
+// held primary, an ultimate that scales with enemy count), these arrays can
+// never grow unbounded. Oldest entries are evicted first. This is the fix
+// for a real freeze: nothing here previously capped how many live GPU
+// particle/mesh objects Dudu could accumulate in a single frame.
+const DUDU_SWARM_CEILING=45, DUDU_MESHFX_CEILING=22;
 function updateDuduFx(dt){
   if(!corsairIsActive()&&!duduSwarms.length&&!duduMeshFx.length)return;
   duduFxTime+=dt;
+  while(duduSwarms.length>DUDU_SWARM_CEILING){
+    const old=duduSwarms.shift();
+    if(old&&old.points){ scene.remove(old.points); duduDisposeMesh(old.points); }
+  }
+  while(duduMeshFx.length>DUDU_MESHFX_CEILING){
+    const old=duduMeshFx.shift();
+    if(old&&old.mesh){ scene.remove(old.mesh); duduDisposeMesh(old.mesh); }
+  }
   for(let i=duduSwarms.length-1;i>=0;i--){
     const s=duduSwarms[i];
     s.mat.uniforms.uTime.value=duduFxTime;
@@ -4325,8 +4339,8 @@ function duduHydroSnap(w){
     blade.scale.z=Math.min(1,t/0.06);
     if(t>0.1){ const q=1-Math.min(1,(t-0.1)/0.2); if(blade.material)blade.material.uniforms.uOpacity.value=0.9*q; }
   });
-  duduSpawnSwarm(ox,oy,oz,{shape:'line',dirX,dirZ,count:30,speed:16,life:.35,size:.16,color:0x2f8fd6,color2:0xeafcff,damping:0.5,burstSpread:.03});
-  duduSpawnSwarm(ex,oy,ez,{shape:'sphere',count:20,speed:5,life:.4,size:.17,color:0x6fd8ff,color2:0xffffff,gravity:-2,damping:2.0});
+  duduSpawnSwarm(ox,oy,oz,{shape:'line',dirX,dirZ,count:20,speed:16,life:.35,size:.16,color:0x2f8fd6,color2:0xeafcff,damping:0.5,burstSpread:.03});
+  duduSpawnSwarm(ex,oy,ez,{shape:'sphere',count:14,speed:5,life:.4,size:.17,color:0x6fd8ff,color2:0xffffff,gravity:-2,damping:2.0});
   triggerCombatShake(hits.length?4:1.8,100);
 }
 // --- PRIMARY 2: Frost-Fracture — crystals crackle across the ground ---
@@ -4548,10 +4562,10 @@ function updateDuduTidalCataclysm(dt){
     w.mesh.userData.crest.rotation.z+=dt*2;
     // Continuous spray across the FULL width of the wave, not one random
     // point — this is what makes it read as a wall, not a line of sparks.
-    if(Math.random()<dt*46){
+    if(Math.random()<dt*12){
       const along=(Math.random()-.5)*s.halfWidth*1.9;
       const sprayX=pos.x+s.dir.z*along*-1, sprayZ=pos.z+s.dir.x*along;
-      duduSpawnSwarm(sprayX,player.position.y+.1,sprayZ,{shape:'sphere',count:6,speed:2.2,life:.45,size:.14,color:0xdff7ff,color2:0xffffff,damping:2.0,gravity:-1});
+      duduSpawnSwarm(sprayX,player.position.y+.1,sprayZ,{shape:'sphere',count:5,speed:2.2,life:.45,size:.14,color:0xdff7ff,color2:0xffffff,damping:2.0,gravity:-1});
     }
     const thick=2.8;
     for(const z of zombies){
@@ -4636,9 +4650,15 @@ function updateDuduCryoPrison(dt){
       b.mesh.scale.setScalar(pulse);
     }
     b.mesh.rotation.y+=dt*0.5;
-    if(Math.random()<dt*0.9){
-      duduSpawnSwarm(b.mesh.position.x,b.mesh.position.y-.6,b.mesh.position.z,{shape:'sphere',count:3,speed:.5,life:.7,size:.08,color:0x9fe8ff,color2:0xffffff,damping:1.6,gravity:.6});
-    }
+  }
+  // Ambient mist is a fixed rate off a shared timer, not a per-block roll —
+  // with dozens of enemies frozen at once a per-block chance scales spawn
+  // volume with enemy count and can overwhelm the frame; this stays flat.
+  s.nextMist=(s.nextMist||0)-dt;
+  if(s.nextMist<=0&&s.blocks.length){
+    s.nextMist+=0.09;
+    const pick=s.blocks[Math.floor(Math.random()*s.blocks.length)];
+    if(pick&&pick.mesh)duduSpawnSwarm(pick.mesh.position.x,pick.mesh.position.y-.6,pick.mesh.position.z,{shape:'sphere',count:3,speed:.5,life:.7,size:.08,color:0x9fe8ff,color2:0xffffff,damping:1.6,gravity:.6});
   }
   if(s.t>=s.duration){
     triggerCombatShake(20,560);
@@ -4677,7 +4697,7 @@ function updateDuduCryoPrison(dt){
 // claw strikes erupting across the whole map (prioritizing living enemies,
 // falling back to scattered map coverage), not a handful of quick pokes. ---
 let duduKraken=null;
-const DUDU_KRAKEN_DURATION=10.0, DUDU_KRAKEN_STRIKE_EVERY=0.38, DUDU_KRAKEN_MEGA_EVERY=1.8, DUDU_KRAKEN_RADIUS=4.8;
+const DUDU_KRAKEN_DURATION=10.0, DUDU_KRAKEN_STRIKE_EVERY=0.42, DUDU_KRAKEN_MEGA_EVERY=2.0, DUDU_KRAKEN_RADIUS=4.8;
 function duduKrakenStrike(x,z,py,big){
   // Damage lands the instant the strike fires — no telegraph delay gating
   // the kill, so enemy clear-rate (and new-enemy spawn pacing) never stalls.
@@ -4735,11 +4755,11 @@ function updateDuduKrakenGrasp(dt){
   if(s.t>=s.duration){ duduKraken=null; updateHoodedHud(); return; }
   if(!player)return;
   if(s.nextMega<=0){
-    // Escalating cluster strike every ~1.8s — three simultaneous big
-    // eruptions instead of one, so intensity keeps building through the
-    // full 10 seconds rather than staying flat.
+    // Escalating cluster strike — two simultaneous big eruptions instead of
+    // one, so intensity keeps building through the full 10 seconds without
+    // stacking enough live meshes at once to bog the frame down.
     s.nextMega+=DUDU_KRAKEN_MEGA_EVERY;
-    for(let i=0;i<3;i++){ const pt=duduKrakenPickPoint(); duduKrakenStrike(pt.x,pt.z,player.position.y,true); }
+    for(let i=0;i<2;i++){ const pt=duduKrakenPickPoint(); duduKrakenStrike(pt.x,pt.z,player.position.y,true); }
   }else if(s.nextStrike<=0){
     s.nextStrike+=DUDU_KRAKEN_STRIKE_EVERY;
     const pt=duduKrakenPickPoint();
