@@ -1552,7 +1552,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='24.02.00 - Slower base speed + Speed Boost power-up + Test Mode toggle';
+const GAME_VERSION='24.03.00 - Captain\'s Fury follows Knight clone rule: round-10 lock, tiered cooldown';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -4085,6 +4085,7 @@ function applyTestModeCooldownReset(){
   knightRoyalCloneCooldown=0;
   rhinoRoyalCloneCooldown=0;
   dragonlordLegionCooldown=0;
+  corsairFuryCooldown=0;
   if(dragonlordRuntime){ dragonlordRuntime.wyrmFormCooldown=0; dragonlordRuntime.hellgateCooldown=0; }
   if(knightRuntime){ knightRuntime.ultCooldown=0; knightRuntime.chargeCooldown=0; knightRuntime.shatterCooldown=0; knightRuntime.aegisCooldown=0; }
   if(rhinoRuntime){ rhinoRuntime.titanCooldown=0; rhinoRuntime.armageddonCooldown=0; }
@@ -4911,12 +4912,27 @@ function updateDuduKrakenGrasp(dt){
 // speed buff here would be invisible — a temporary damage buff is the
 // effect that actually reads as "Fury" on top of already-instant attacks.
 let corsairFuryTimer=0;
+let corsairFuryCooldown=0;
 const CORSAIR_FURY_DURATION=6;
 const CORSAIR_FURY_POWER_MULT=1.5;
+// Fury follows the same signature-move rule as Knight's Round Table clones:
+// locked until round 10, then gated by a real post-use cooldown (not just
+// the active buff duration) that shortens as the round tier climbs.
+function corsairFuryConfig(){
+  const r=Math.max(1,Number(round)||1);
+  if(r<10) return {cooldown:0};
+  if(r<=15) return {cooldown:10};
+  if(r<=20) return {cooldown:5};
+  return {cooldown:.8};
+}
+function corsairFurySpecialReady(){
+  return corsairIsActive() && Math.max(1,Number(round)||1)>=10;
+}
 function triggerCorsairFury(){
-  if(!corsairIsActive()||!gameRunning||corsairFuryTimer>0)return;
+  if(!corsairIsActive()||!gameRunning||!corsairFurySpecialReady()||corsairFuryTimer>0||corsairFuryCooldown>0)return;
   markUltimateUsed();
   corsairFuryTimer=CORSAIR_FURY_DURATION;
+  corsairFuryCooldown=corsairFuryConfig().cooldown;
   toast("⚔️ Captain's Fury!");
   if(player){
     spawnFrostFx(player.position.x,player.position.y+.5,player.position.z,{radius:1.6,shards:10,life:.6,spin:4});
@@ -4924,9 +4940,10 @@ function triggerCorsairFury(){
   }
 }
 function updateCorsairFury(dt){
-  if(!corsairIsActive()){ corsairFuryTimer=0; return; }
+  if(!corsairIsActive()){ corsairFuryTimer=0; corsairFuryCooldown=0; return; }
   const wasActive=corsairFuryTimer>0;
   if(wasActive) corsairFuryTimer=Math.max(0,corsairFuryTimer-dt);
+  if(corsairFuryCooldown>0) corsairFuryCooldown=Math.max(0,corsairFuryCooldown-dt);
   const nowActive=corsairFuryTimer>0;
   if(wasActive||nowActive){
     playerStats.power=basePlayerPower*roundPowerMult(round)*(nowActive?CORSAIR_FURY_POWER_MULT:1);
@@ -18372,7 +18389,8 @@ function updateHoodedHud(){
   const rhinoCloneSpecialReady=rhinoIsActive()&&Math.max(1,Number(round)||1)>=10;
   const dragonlordLegionSpecialReady=dragonlordLegionUnlocked();
   const isCorsair=corsairIsActive();
-  const hasSignature=isHooded||chopperCloneSpecialReady||isArcher||knightCloneSpecialReady||rhinoCloneSpecialReady||(isBarbarian&&!rhinoIsActive())||mageEchoReady||dragonlordLegionSpecialReady||isCorsair;
+  const corsairFurySignatureReady=corsairFurySpecialReady();
+  const hasSignature=isHooded||chopperCloneSpecialReady||isArcher||knightCloneSpecialReady||rhinoCloneSpecialReady||(isBarbarian&&!rhinoIsActive())||mageEchoReady||dragonlordLegionSpecialReady||corsairFurySignatureReady;
   const supportsSignature=isHooded||isChopper||isArcher||isKnight||isBarbarian||isMage||isDragonLord||isCorsair;
   btn.classList.toggle('hidden',!supportsSignature);
   btn.classList.toggle('locked',supportsSignature&&!hasSignature);
@@ -18411,8 +18429,9 @@ function updateHoodedHud(){
       pct=dragonlordLegionCooldown<=0
         ? 100
         : Math.max(0,Math.min(100,(1-dragonlordLegionCooldown/total)*100));
-    }else if(isCorsair){
-      pct=corsairFuryTimer>0?0:100;
+    }else if(corsairFurySignatureReady){
+      const total=Math.max(.001,corsairFuryConfig().cooldown||1);
+      pct=corsairFuryTimer>0?0:(corsairFuryCooldown<=0?100:Math.max(0,Math.min(100,(1-corsairFuryCooldown/total)*100)));
     }else{
       const displayedCharge=isChopper?chopperBroadsideCharge:(isHooded?hoodedUltimateCharge:barbarianUltimateCharge);
       pct=Math.max(0,Math.min(100,displayedCharge));
@@ -18481,9 +18500,13 @@ function updateHoodedHud(){
           ? `ABYSS ${dragonlordLegionCooldown.toFixed(1)}s`
           : 'LEGION OF THE ABYSS READY');
     }
-    else if(isCorsair){
+    else if(corsairFurySignatureReady){
       btn.textContent=corsairFuryTimer>0?'FURY!':'FURY';
-      meter.textContent=corsairFuryTimer>0?`FURY ${corsairFuryTimer.toFixed(1)}s`:"CAPTAIN'S FURY READY";
+      meter.textContent=corsairFuryTimer>0
+        ? `FURY ${corsairFuryTimer.toFixed(1)}s`
+        : (corsairFuryCooldown>0
+          ? `FURY ${corsairFuryCooldown.toFixed(1)}s`
+          : "CAPTAIN'S FURY READY");
     }
   }else{
     btn.classList.remove('ready');
