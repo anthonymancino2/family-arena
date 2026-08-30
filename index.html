@@ -1552,7 +1552,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='24.04.00 - Fix version-sync loop caused by an apostrophe in the build string';
+const GAME_VERSION='24.05.00 - Failsafe against future sync loops: retry cap, timeouts, version sanity check';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -2330,62 +2330,100 @@ function addName(){
 }
 document.getElementById('newName').addEventListener('blur', addName);
 
+// Races a promise against a timeout so a hung network request can never
+// block the Play flow forever -- part of the failsafe against the
+// "stuck syncing" class of bug (see AUTO_SYNC_MAX_UPDATE_RETRIES below).
+function withTimeout(promise, ms, label){
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error((label||'operation')+' timed out after '+ms+'ms')), ms))
+  ]);
+}
+// Hard cap on how many times autoSyncBeforePlay will force a reload chasing
+// a "newer version" before giving up and letting the player in anyway.
+// This is the failsafe of last resort: no matter what causes the version
+// check to report a mismatch (a parsing bug, a stale CDN edge, anything not
+// yet imagined), the loop is now structurally incapable of running forever.
+const AUTO_SYNC_MAX_UPDATE_RETRIES = 2;
 async function autoSyncBeforePlay(){
   const playBtn=document.getElementById('btnGoModes');
   const status=document.getElementById('homeSyncStatus');
   if(playBtn&&playBtn.dataset.syncing==='1') return;
   if(playBtn){playBtn.dataset.syncing='1';playBtn.disabled=true;playBtn.textContent='Syncing…';}
   if(status)status.textContent='Syncing game and checking for latest version…';
-
-  // Preserve the existing cloud record sync, but do not make Play depend on
-  // network availability.
+  let reloading=false;
   try{
-    const [all,survivalRows]=await Promise.all([
-      Cloud.fetchAllRoundBests(),
-      Cloud.fetchSurvivalLeaderboard()
-    ]);
-    if(all){
-      cloudRoundBestsCache=Object.assign({},cloudRoundBestsCache,all);
-      saveCloudRoundBestsCache();
-    }
-    if(survivalRows){
-      cloudSurvivalLeaderboardCache=survivalRows;
-      saveCloudSurvivalLeaderboardCache();
-    }
-  }catch(err){console.warn('Auto Play cloud sync skipped:',err);}
-
-  // Check the exact deployed HTML URL with a cache-buster. If the deployed
-  // GAME_VERSION differs, reload that fresh response before entering selection.
-  try{
-    const u=new URL(window.location.href);
-    u.searchParams.set('_familyArenaUpdate',Date.now().toString());
-    const res=await fetch(u.toString(),{cache:'no-store',credentials:'same-origin'});
-    if(res.ok){
-      const html=await res.text();
-      // Matches escaped quotes/backslashes inside the string literal too, so a
-      // version label containing an apostrophe (e.g. "Captain's Fury") can't
-      // truncate the extracted value and false-trigger this update path forever.
-      const match=html.match(/const\s+GAME_VERSION\s*=\s*'((?:[^'\\]|\\.)*)'/);
-      const remoteVersion=match&&match[1].replace(/\\(.)/g,'$1');
-      if(remoteVersion&&remoteVersion!==GAME_VERSION){
-        if(status)status.textContent='New game version found · updating…';
-        try{
-          if('caches' in window){
-            const keys=await caches.keys();
-            await Promise.all(keys.map(key=>caches.delete(key)));
-          }
-        }catch(_err){}
-        sessionStorage.setItem('familyArenaResumePlay','1');
-        window.location.replace(u.toString());
-        return;
+    // Preserve the existing cloud record sync, but do not make Play depend on
+    // network availability, and never let a hung request block Play forever.
+    try{
+      const [all,survivalRows]=await withTimeout(Promise.all([
+        Cloud.fetchAllRoundBests(),
+        Cloud.fetchSurvivalLeaderboard()
+      ]), 8000, 'Cloud sync');
+      if(all){
+        cloudRoundBestsCache=Object.assign({},cloudRoundBestsCache,all);
+        saveCloudRoundBestsCache();
       }
-    }
-  }catch(err){console.warn('Latest-version check skipped:',err);}
+      if(survivalRows){
+        cloudSurvivalLeaderboardCache=survivalRows;
+        saveCloudSurvivalLeaderboardCache();
+      }
+    }catch(err){console.warn('Auto Play cloud sync skipped:',err);}
 
-  if(status)status.textContent='Game synced · latest version ready';
-  if(playBtn){playBtn.dataset.syncing='0';playBtn.disabled=false;playBtn.textContent='Play';}
-  refreshCrystalPills();
-  show('screenModes');
+    // Check the exact deployed HTML URL with a cache-buster. If the deployed
+    // GAME_VERSION differs, reload that fresh response before entering selection.
+    try{
+      const u=new URL(window.location.href);
+      u.searchParams.set('_familyArenaUpdate',Date.now().toString());
+      const res=await withTimeout(fetch(u.toString(),{cache:'no-store',credentials:'same-origin'}), 8000, 'Version check');
+      if(res.ok){
+        const html=await withTimeout(res.text(), 8000, 'Version check body');
+        // Matches escaped quotes/backslashes inside the string literal too, so a
+        // version label containing an apostrophe (e.g. "Captain's Fury") can't
+        // truncate the extracted value and false-trigger this update path forever.
+        const match=html.match(/const\s+GAME_VERSION\s*=\s*'((?:[^'\\]|\\.)*)'/);
+        const remoteVersion=match&&match[1].replace(/\\(.)/g,'$1');
+        // Failsafe: only trust a remote value that actually looks like a
+        // version label ("24.04.00 - ..."). Guards against any future
+        // extraction bug silently producing garbage that would otherwise
+        // force an update loop.
+        const looksLikeVersion = !!remoteVersion && /^\d+\.\d+/.test(remoteVersion) && remoteVersion.length>=5;
+        if(looksLikeVersion && remoteVersion!==GAME_VERSION){
+          const attempts=Number(sessionStorage.getItem('familyArenaSyncAttempts')||'0');
+          if(attempts<AUTO_SYNC_MAX_UPDATE_RETRIES){
+            sessionStorage.setItem('familyArenaSyncAttempts', String(attempts+1));
+            if(status)status.textContent='New game version found · updating…';
+            try{
+              if('caches' in window){
+                const keys=await caches.keys();
+                await Promise.all(keys.map(key=>caches.delete(key)));
+              }
+            }catch(_err){}
+            sessionStorage.setItem('familyArenaResumePlay','1');
+            reloading=true;
+            window.location.replace(u.toString());
+            return;
+          }
+          // Failsafe: a mismatch that survives repeated reload attempts means
+          // the check itself is unreliable (bad extraction, flaky CDN edge,
+          // etc) -- stop forcing reloads and let the player in with whatever
+          // build is currently loaded, rather than looping forever.
+          console.warn('Auto-update check kept reporting a mismatch after '+attempts+' reload attempts; continuing with the currently loaded build instead of retrying indefinitely.');
+          if(status)status.textContent='Could not confirm the latest build · continuing anyway';
+        }
+      }
+    }catch(err){console.warn('Latest-version check skipped:',err);}
+    sessionStorage.removeItem('familyArenaSyncAttempts');
+
+    if(status)status.textContent='Game synced · latest version ready';
+    refreshCrystalPills();
+    show('screenModes');
+  } finally {
+    // Guarantees the Play button never stays permanently stuck disabled on
+    // "Syncing…", even if something above throws unexpectedly. Skipped only
+    // when we're intentionally navigating away to reload a newer build.
+    if(!reloading && playBtn){playBtn.dataset.syncing='0';playBtn.disabled=false;playBtn.textContent='Play';}
+  }
 }
 
 document.getElementById('btnGoModes').onclick = ()=>{
