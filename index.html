@@ -1323,8 +1323,9 @@
     <h1 class="title" style="font-size:22px;">Choose your Champion</h1>
     <div id="avatarPreview" style="width:220px;height:245px;margin:0 auto 12px;filter:none;">
       <canvas id="avatarPreviewCanvas" style="width:100%;height:100%;display:block;border-radius:22px;background:radial-gradient(circle at 50% 36%,#26384b,#0a111b 72%);"></canvas>
-      <div id="avatarPreviewStatus" style="position:absolute;left:0;right:0;bottom:10px;text-align:center;color:#9fdfff;font-size:13px;">Loading avatar…</div>
+      <div id="avatarPreviewStatus" style="position:absolute;left:0;right:0;bottom:10px;text-align:center;color:#9fdfff;font-size:13px;pointer-events:none;">Loading avatar…</div>
     </div>
+    <div style="text-align:center;color:#6fa8c9;font-size:11px;margin:-6px 0 10px;">↔ Drag to rotate</div>
     <div class="subtitle" style="margin-bottom:6px;">Avatar</div>
     <div class="swatchRow" id="typeRow"></div>
     <div id="heroInfoPanel" style="max-width:560px;margin:10px auto 14px;padding:12px 14px;border:1px solid rgba(159,223,255,.28);border-radius:16px;background:rgba(8,18,29,.72);text-align:left;">
@@ -1552,7 +1553,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='24.05.00 - Failsafe against future sync loops: retry cap, timeouts, version sanity check';
+const GAME_VERSION='24.06.00 - Drag to rotate your champion on the Choose your Champion screen';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -2704,6 +2705,35 @@ async function ensureAvatarPreview(){
     if(previewMixer) previewMixer.update(1/60);
     previewRenderer.render(previewScene,previewCamera);
   }; animate();
+
+  // Let the player drag the champion preview to look at it from any angle.
+  // Rotates whatever previewRoot currently is, so it keeps working across
+  // avatar/skin swaps without any extra wiring. touch-action:none stops the
+  // page from scrolling instead of rotating on mobile.
+  canvas.style.touchAction='none';
+  canvas.style.cursor='grab';
+  const PREVIEW_DRAG_SENSITIVITY=0.012;
+  canvas.addEventListener('pointerdown',e=>{
+    previewDragActive=true; previewDragMoved=false;
+    previewDragPointerId=e.pointerId; previewDragLastX=e.clientX;
+    canvas.style.cursor='grabbing';
+    try{canvas.setPointerCapture(e.pointerId);}catch(_err){}
+  },{passive:true});
+  canvas.addEventListener('pointermove',e=>{
+    if(!previewDragActive||e.pointerId!==previewDragPointerId)return;
+    const dx=e.clientX-previewDragLastX;
+    previewDragLastX=e.clientX;
+    if(Math.abs(dx)>0.5)previewDragMoved=true;
+    if(previewRoot)previewRoot.rotation.y+=dx*PREVIEW_DRAG_SENSITIVITY;
+  },{passive:true});
+  const endPreviewDrag=e=>{
+    if(e&&e.pointerId!==previewDragPointerId)return;
+    previewDragActive=false; previewDragPointerId=null;
+    canvas.style.cursor='grab';
+  };
+  canvas.addEventListener('pointerup',endPreviewDrag);
+  canvas.addEventListener('pointercancel',endPreviewDrag);
+  canvas.addEventListener('pointerleave',e=>{ if(previewDragActive)endPreviewDrag(e); });
 }
 let previewRequestId=0;
 async function updateAvatarPreview(characterId){
@@ -2960,7 +2990,6 @@ async function updateAvatarPreview(characterId){
     if(status)status.textContent='Character model failed: '+(e?.message||'network error');
   }
 }
-
 // ---- SHOP (stub catalogue — purchase logic works now, character
 // swap into gameplay is the fresh-avatar-set hook for a later chunk) ----
 const CATALOG = [];
@@ -3896,6 +3925,7 @@ function arcaneEchoesUnlocked(){
   return mageGameplayActive() && (TEST_MODE_ACTIVE || avatarLevel()>=10);
 }
 let previewRenderer=null, previewScene=null, previewCamera=null, previewRoot=null, previewMixer=null, previewRAF=0;
+let previewDragActive=false, previewDragPointerId=null, previewDragLastX=0, previewDragMoved=false;
 function combatForAvatar(){
   // Exact skin first, then the gameplay class. This is what lets the Green
   // Rhino Ranger carry its own weapon list while still running the whole
