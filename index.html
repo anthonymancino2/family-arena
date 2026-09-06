@@ -1553,7 +1553,7 @@ window.addEventListener('unhandledrejection',e=>{
   vwBanner('PROMISE REJECT: '+(e.reason&&e.reason.message||e.reason));
 });
 // ===========================================================================
-const GAME_VERSION='24.06.00 - Drag to rotate your champion on the Choose your Champion screen';
+const GAME_VERSION='24.07.00 - Male and Female champion groups, fix Nyxara squish and lower Aesir idle arms';
 
 // ---------------------------------------------------------------------
 // V22.16.00 CRITICAL FIX: isMobile was used by twelve effect functions
@@ -1929,8 +1929,14 @@ const AVATAR_TYPES = ['dragonlord','rogue','hooded','mage','cloud','barbarian','
 // Temporarily hidden from the avatar-select screen only. They stay in
 // AVATAR_TYPES itself so the zombie skin roster and any saved profile
 // data referencing them are unaffected — this is a display-only hide.
-const HIDDEN_FROM_AVATAR_SELECT = ['rogue','hooded'];
-const SELECTABLE_AVATAR_TYPES = AVATAR_TYPES.filter(t=>!HIDDEN_FROM_AVATAR_SELECT.includes(t));
+const HIDDEN_FROM_AVATAR_SELECT = ['rogue','hooded','spider'];
+// Curated avatar-select roster, grouped by gender: Male (Cloud, Green Rhino
+// Ranger, Chopper, Dudu the Penguin), then Female (Nine-Tailed Fox Mage,
+// Nyxara, Aesir Barbarian). The .filter guards MALE against CHOPPER_ENABLED
+// being off, where 'chopper' never made it into AVATAR_TYPES at all.
+const MALE_AVATAR_TYPES = ['cloud','rhino','chopper','corsair'].filter(t=>AVATAR_TYPES.includes(t));
+const FEMALE_AVATAR_TYPES = ['mage','dragonlord','barbarian'];
+const SELECTABLE_AVATAR_TYPES = MALE_AVATAR_TYPES.concat(FEMALE_AVATAR_TYPES).filter(t=>!HIDDEN_FROM_AVATAR_SELECT.includes(t));
 const AVATAR_TYPE_LABELS = {
   dragonlord:'🐉 Nyxara — Demon Dragon Queen ✨NEW',
   rogue:'🏹 Archer',
@@ -2506,24 +2512,35 @@ function buildCustomizeUI(){
   const outfitRow = document.getElementById('outfitRow');
   typeRow.innerHTML = ''; skinRow.innerHTML = ''; hairRow.innerHTML = ''; outfitRow.innerHTML = '';
   const profileForLocks = state.currentName ? Store.getProfile(state.currentName) : {unlocked:[...AVATAR_TYPES]};
-  SELECTABLE_AVATAR_TYPES.forEach(typeId=>{
-    const isFree = FREE_AVATAR_TYPES.includes(typeId);
-    const isUnlocked = UNLOCK_ALL_AVATARS_FOR_TESTING || isFree || profileForLocks.unlocked.includes(typeId);
-    const catalogEntry = CATALOG.find(c=>c.id===typeId);
-    const btn = document.createElement('button');
-    btn.className = 'hairBtn' + (state.avatarType===typeId?' sel':'') + (isUnlocked?'':' locked');
-    btn.innerHTML = isUnlocked
-      ? AVATAR_TYPE_LABELS[typeId]
-      : `${AVATAR_TYPE_LABELS[typeId]}<br><span class="lockNote">🔒 ${catalogEntry?catalogEntry.price:''} crystals</span>`;
-    btn.onclick = ()=>{
-      if(!isUnlocked){ toast('Locked — unlock it in the Crystal Shop first'); return; }
-      state.avatarType=typeId;
-      preGameLoadout.avatar=null;
-      pendingPreGameLoadout=null;
-      saveAvatarToProfile();
-      buildCustomizeUI();
-    };
-    typeRow.appendChild(btn);
+  // Male and Female render as two labeled groups within the same flex row —
+  // a full-width divider forces a line break without needing new CSS.
+  [['Male',MALE_AVATAR_TYPES],['Female',FEMALE_AVATAR_TYPES]].forEach(([label,group])=>{
+    const shown = group.filter(t=>!HIDDEN_FROM_AVATAR_SELECT.includes(t));
+    if(!shown.length)return;
+    const header = document.createElement('div');
+    header.className='subtitle';
+    header.style.cssText='width:100%;margin:2px 0 -2px;opacity:.55;font-size:12px;text-align:center;';
+    header.textContent=label;
+    typeRow.appendChild(header);
+    shown.forEach(typeId=>{
+      const isFree = FREE_AVATAR_TYPES.includes(typeId);
+      const isUnlocked = UNLOCK_ALL_AVATARS_FOR_TESTING || isFree || profileForLocks.unlocked.includes(typeId);
+      const catalogEntry = CATALOG.find(c=>c.id===typeId);
+      const btn = document.createElement('button');
+      btn.className = 'hairBtn' + (state.avatarType===typeId?' sel':'') + (isUnlocked?'':' locked');
+      btn.innerHTML = isUnlocked
+        ? AVATAR_TYPE_LABELS[typeId]
+        : `${AVATAR_TYPE_LABELS[typeId]}<br><span class="lockNote">🔒 ${catalogEntry?catalogEntry.price:''} crystals</span>`;
+      btn.onclick = ()=>{
+        if(!isUnlocked){ toast('Locked — unlock it in the Crystal Shop first'); return; }
+        state.avatarType=typeId;
+        preGameLoadout.avatar=null;
+        pendingPreGameLoadout=null;
+        saveAvatarToProfile();
+        buildCustomizeUI();
+      };
+      typeRow.appendChild(btn);
+    });
   });
   SKINS.forEach((c,i)=>{
     const sw = document.createElement('div');
@@ -2703,6 +2720,7 @@ async function ensureAvatarPreview(){
   const animate=()=>{
     previewRAF=requestAnimationFrame(animate);
     if(previewMixer) previewMixer.update(1/60);
+    if(previewCharacterId==='barbarian') previewApplyAesirIdleArms();
     previewRenderer.render(previewScene,previewCamera);
   }; animate();
 
@@ -2738,6 +2756,7 @@ async function ensureAvatarPreview(){
 let previewRequestId=0;
 async function updateAvatarPreview(characterId){
   await ensureAvatarPreview();
+  previewCharacterId=characterId;
   const requestId=++previewRequestId;
   const status=document.getElementById('avatarPreviewStatus');
   if(status) status.textContent='Loading '+AVATAR_TYPE_LABELS[characterId].replace(/^.\s/,'')+'…';
@@ -2935,13 +2954,6 @@ async function updateAvatarPreview(characterId){
       const fullBodyMaxHeight=2.12;
       const fullBodyFitScale=fullBodyMaxHeight/Math.max(.001,size.y);
       root.scale.setScalar(Math.min(relativeScale,fullBodyFitScale));
-      if(characterId==='dragonlord'){
-        // Same Cloud-calibrated compression as the gameplay build (see
-        // buildKayKitPlayer) — matches her measured footprint to Cloud's
-        // actual footprint at the same height, not a guessed constant.
-        root.scale.x*=0.687;
-        root.scale.z*=0.992;
-      }
       const box2=new THREEAsset.Box3().setFromObject(root);
       root.position.y-=box2.min.y;
     }
@@ -3924,7 +3936,8 @@ function arcaneEchoesCooldownForLevel(level=avatarLevel()){
 function arcaneEchoesUnlocked(){
   return mageGameplayActive() && (TEST_MODE_ACTIVE || avatarLevel()>=10);
 }
-let previewRenderer=null, previewScene=null, previewCamera=null, previewRoot=null, previewMixer=null, previewRAF=0;
+let previewRenderer=null, previewScene=null, previewCamera=null, previewRoot=null, previewMixer=null, previewRAF=0, previewCharacterId=null;
+let _aesPreviewArmRig=null, _aesPreviewArmRigFor=null;
 let previewDragActive=false, previewDragPointerId=null, previewDragLastX=0, previewDragMoved=false;
 function combatForAvatar(){
   // Exact skin first, then the gameplay class. This is what lets the Green
@@ -12421,7 +12434,10 @@ const AESIR_ARM_POSE = {
                    // so combat clips saturate the correction while Rest_Pose
                    // (already at 0.209 and pointing outward) is geometrically
                    // inert and stays as authored.
-  attackScale:0.80 // ease off mid-swing so authored attacks stay readable
+  attackScale:0.80,// ease off mid-swing so authored attacks stay readable
+  idleDrop:0.30    // true-idle only: eases both arms down from the baked
+                   // Rest_Pose height a little, without touching the lateral
+                   // clearance the original bake fixed (see V23.18 note above)
 };
 const AESIR_ARM_TUNER = false;  // production HUD: arm tuning UI disabled
 
@@ -12489,9 +12505,19 @@ function aesirApplyArmPose(){
   const trueIdle=(player.userData.kayCurrentName==='Rest_Pose' && !(player.userData.kayActionLock>0));
   const axeCount=Math.max(1,Number(player.userData.aesirAxeCount)||1);
   // V23.25: one-up / one-down proved too extreme in live testing. During true
-  // standing idle with the normal single axe, do not post-process either arm.
-  // Both arms stay in the lower authored Rest_Pose that was already corrected.
-  if(trueIdle && axeCount<2)return;
+  // standing idle with the normal single axe, the lateral/lift combat
+  // correction below stays off — only ease both arms down a little from the
+  // baked Rest_Pose height, which still read as too raised for a calm stance.
+  if(trueIdle && axeCount<2){
+    if(C.idleDrop>0.0001){
+      _aesOut.set(0,-1,0);
+      aesirPushArm(R.uL,R.fL,C.idleDrop);
+      aesirPushArm(R.uR,R.fR,C.idleDrop);
+      aesirPushArm(R.fL,R.hL,C.idleDrop*0.5);
+      aesirPushArm(R.fR,R.hR,C.idleDrop*0.5);
+    }
+    return;
+  }
 
   const soften=(player.userData.kayActionLock||0)>0?C.attackScale:1;
   for(let i=0;i<2;i++){
@@ -12510,6 +12536,30 @@ function aesirApplyArmPose(){
     aesirPushArm(up,fo,C.out*deficit*soften);
     aesirPushArm(fo,ha,C.fore*deficit*soften);
   }
+}
+
+// Champion-select preview runs its own tiny scene/mixer with no combat state
+// at all, so it can only ever show the true-idle Rest_Pose — this is the same
+// idleDrop nudge as aesirApplyArmPose's idle branch, just aimed at previewRoot's
+// bones instead of the live player's. Kept in sync by sharing AESIR_ARM_POSE.
+function previewApplyAesirIdleArms(){
+  const C=AESIR_ARM_POSE;
+  if(!C.enabled||C.idleDrop<=0.0001||!previewRoot)return;
+  if(_aesPreviewArmRigFor!==previewRoot){
+    _aesPreviewArmRigFor=previewRoot; _aesPreviewArmRig=null;
+    const b={};
+    previewRoot.traverse(o=>{ if(o.isBone&&o.name)b[o.name]=o; });
+    if(b.upperarm_l&&b.upperarm_r&&b.lowerarm_l&&b.lowerarm_r){
+      _aesPreviewArmRig={uL:b.upperarm_l,uR:b.upperarm_r,fL:b.lowerarm_l,fR:b.lowerarm_r,
+        hL:b.hand_l||b.lowerarm_l,hR:b.hand_r||b.lowerarm_r};
+    }
+  }
+  const R=_aesPreviewArmRig; if(!R)return;
+  _aesOut.set(0,-1,0);
+  aesirPushArm(R.uL,R.fL,C.idleDrop);
+  aesirPushArm(R.uR,R.fR,C.idleDrop);
+  aesirPushArm(R.fL,R.hL,C.idleDrop*0.5);
+  aesirPushArm(R.fR,R.hR,C.idleDrop*0.5);
 }
 
 /* On-device tuning. Anthony is on mobile Safari with no console, and the last
@@ -14831,17 +14881,6 @@ function buildKayKitPlayer(characterId, options={}){
       const rawBox=new THREEAsset.Box3().setFromObject(root);
       const rawSize=rawBox.getSize(new THREEAsset.Vector3());
       root.scale.setScalar(1.48/Math.max(.001,rawSize.y));
-      if(characterId==='dragonlord'){
-        // Her raw export's width/depth come from a rigid, unskinned mesh
-        // (wings/hair — confirmed by measuring bind-pose vs Idle-posed
-        // bounds: identical, so it's not a T-pose artifact, it's static
-        // geometry) that isn't proportioned like a normal humanoid. Measured
-        // against Cloud's own actual footprint at this same 1.48 height
-        // (x=1.221, z=1.369 vs her uncompressed x=1.777, z=1.380), her depth
-        // was already correct — only her width needed correcting.
-        root.scale.x*=0.687;
-        root.scale.z*=0.992;
-      }
       root.updateMatrixWorld(true);
       const placedBox=new THREEAsset.Box3().setFromObject(root);
       root.position.y-=placedBox.min.y;
@@ -25400,7 +25439,6 @@ function triggerDragonLordLegion(){
       root.rotation.y=AVATAR_MODEL_YAW.dragonlord||0;
       const box=new THREEAsset.Box3().setFromObject(root),size=box.getSize(new THREEAsset.Vector3());
       root.scale.setScalar(1.48/Math.max(.001,size.y));
-      root.scale.x*=0.687;root.scale.z*=0.992; // match the Cloud-calibrated compression applied to the live player model
       const box2=new THREEAsset.Box3().setFromObject(root);root.position.y-=box2.min.y;
       tintDragonLordClone(root,i);wrap.add(root);decorateDragonLordClone(wrap,i);
       const slot=knightRoyalCloneFormationSlot(i,cfg.count,formationScale,-Math.PI/2);
